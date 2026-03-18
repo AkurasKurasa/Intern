@@ -1,0 +1,28 @@
+# Computer Vision Pipeline Dependencies for Trace Translator
+
+# Core CV Models
+ultralytics>=8.0.0              # YOLOv8 for UI element detection
+segment-anything>=1.0           # Meta's SAM for UI segmentation
+pytesseract>=0.3.10            # Tesseract OCR wrapper
+transformers>=4.30.0           # HuggingFace transformers for LayoutLM
+
+# Deep Learning Frameworks
+torch>=2.0.0                   # PyTorch backend
+torchvision>=0.15.0            # Vision utilities
+
+# Image Processing
+Pillow>=10.0.0                 # Image loading and manipulation
+opencv-python>=4.8.0           # Computer vision utilities
+numpy>=1.24.0                  # Numerical operations
+
+# Utilities
+pyyaml>=6.0                    # Configuration management
+tqdm>=4.65.0                   # Progress bars
+requests>=2.31.0               # Model downloading
+
+# Browser Automation (for HTML-based detection)
+playwright>=1.40.0             # Web UI element extraction
+
+# Optional but recommended
+# tesseract-ocr                # System-level Tesseract installation required
+# CUDA toolkit                 # For GPU acceleration (install separately)

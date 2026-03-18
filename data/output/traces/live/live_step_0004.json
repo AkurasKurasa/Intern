@@ -1,0 +1,6895 @@
+{
+  "trace_id": "live_step_0004",
+  "timestamp": "2026-03-08T14:58:05.341249",
+  "duration": 1.0,
+  "type": "gui",
+  "state": {
+    "application": "Unknown",
+    "window_title": "frame_0004",
+    "screen_resolution": [
+      1920,
+      1200
+    ],
+    "focused_element_id": null,
+    "elements": [
+      {
+        "element_id": "label_0",
+        "type": "label",
+        "bbox": [
+          41,
+          23,
+          91,
+          34
+        ],
+        "text": "Untitled",
+        "label": "Untitled",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.86,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_1",
+        "type": "label",
+        "bbox": [
+          98,
+          26,
+          140,
+          37
+        ],
+        "text": "presen’",
+        "label": "presen’",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.71,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_2",
+        "type": "label",
+        "bbox": [
+          151,
+          23,
+          160,
+          32
+        ],
+        "text": "X",
+        "label": "X",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.76,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_3",
+        "type": "label",
+        "bbox": [
+          186,
+          14,
+          200,
+          41
+        ],
+        "text": "@",
+        "label": "@",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.82,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_4",
+        "type": "label",
+        "bbox": [
+          218,
+          23,
+          280,
+          34
+        ],
+        "text": "Facebook",
+        "label": "Facebook",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.9,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_5",
+        "type": "label",
+        "bbox": [
+          328,
+          23,
+          337,
+          32
+        ],
+        "text": "x",
+        "label": "x",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.95,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_6",
+        "type": "label",
+        "bbox": [
+          378,
+          21,
+          382,
+          29
+        ],
+        "text": "A.",
+        "label": "A.",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.57,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_7",
+        "type": "label",
+        "bbox": [
+          395,
+          23,
+          442,
+          37
+        ],
+        "text": "Google",
+        "label": "Google",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.9,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_8",
+        "type": "label",
+        "bbox": [
+          506,
+          23,
+          515,
+          32
+        ],
+        "text": "x",
+        "label": "x",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.68,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_9",
+        "type": "label",
+        "bbox": [
+          556,
+          21,
+          560,
+          29
+        ],
+        "text": "A.",
+        "label": "A.",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.56,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_10",
+        "type": "label",
+        "bbox": [
+          573,
+          23,
+          620,
+          37
+        ],
+        "text": "Google",
+        "label": "Google",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.91,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_11",
+        "type": "label",
+        "bbox": [
+          625,
+          23,
+          672,
+          37
+        ],
+        "text": "Antigray",
+        "label": "Antigray",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.69,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_12",
+        "type": "label",
+        "bbox": [
+          684,
+          23,
+          693,
+          32
+        ],
+        "text": "x",
+        "label": "x",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.47,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_13",
+        "type": "label",
+        "bbox": [
+          733,
+          21,
+          737,
+          29
+        ],
+        "text": "A.",
+        "label": "A.",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.58,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_14",
+        "type": "label",
+        "bbox": [
+          751,
+          23,
+          798,
+          37
+        ],
+        "text": "Google",
+        "label": "Google",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.9,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_15",
+        "type": "label",
+        "bbox": [
+          803,
+          23,
+          825,
+          34
+        ],
+        "text": "Anti",
+        "label": "Anti",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.83,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_16",
+        "type": "label",
+        "bbox": [
+          861,
+          23,
+          870,
+          32
+        ],
+        "text": "x",
+        "label": "x",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.95,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_17",
+        "type": "label",
+        "bbox": [
+          906,
+          22,
+          916,
+          31
+        ],
+        "text": "G",
+        "label": "G",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.89,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_18",
+        "type": "label",
+        "bbox": [
+          928,
+          23,
+          1024,
+          34
+        ],
+        "text": "Authentication",
+        "label": "Authentication",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_19",
+        "type": "label",
+        "bbox": [
+          1039,
+          23,
+          1048,
+          32
+        ],
+        "text": "x",
+        "label": "x",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.94,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_20",
+        "type": "label",
+        "bbox": [
+          1084,
+          22,
+          1092,
+          26
+        ],
+        "text": "eR",
+        "label": "eR",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.33,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_21",
+        "type": "label",
+        "bbox": [
+          1106,
+          23,
+          1202,
+          34
+        ],
+        "text": "Authentication",
+        "label": "Authentication",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_22",
+        "type": "label",
+        "bbox": [
+          1217,
+          23,
+          1226,
+          32
+        ],
+        "text": "x",
+        "label": "x",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.94,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_23",
+        "type": "label",
+        "bbox": [
+          1266,
+          21,
+          1270,
+          29
+        ],
+        "text": "A.",
+        "label": "A.",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.58,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_24",
+        "type": "label",
+        "bbox": [
+          1284,
+          23,
+          1331,
+          37
+        ],
+        "text": "Google",
+        "label": "Google",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.9,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_25",
+        "type": "label",
+        "bbox": [
+          1336,
+          23,
+          1358,
+          34
+        ],
+        "text": "Anti",
+        "label": "Anti",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.83,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_26",
+        "type": "label",
+        "bbox": [
+          1394,
+          23,
+          1403,
+          32
+        ],
+        "text": "x",
+        "label": "x",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.95,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_27",
+        "type": "label",
+        "bbox": [
+          1435,
+          23,
+          1452,
+          37
+        ],
+        "text": "@",
+        "label": "@",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.88,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_28",
+        "type": "label",
+        "bbox": [
+          1462,
+          23,
+          1490,
+          34
+        ],
+        "text": "New",
+        "label": "New",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_29",
+        "type": "label",
+        "bbox": [
+          1495,
+          23,
+          1517,
+          34
+        ],
+        "text": "Tab",
+        "label": "Tab",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.95,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_30",
+        "type": "label",
+        "bbox": [
+          1572,
+          23,
+          1581,
+          32
+        ],
+        "text": "x",
+        "label": "x",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.95,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_31",
+        "type": "label",
+        "bbox": [
+          1616,
+          21,
+          1631,
+          36
+        ],
+        "text": "fb",
+        "label": "fb",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.48,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_32",
+        "type": "label",
+        "bbox": [
+          1828,
+          22,
+          1841,
+          34
+        ],
+        "text": "a",
+        "label": "a",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.73,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_33",
+        "type": "label",
+        "bbox": [
+          1885,
+          22,
+          1898,
+          34
+        ],
+        "text": "x",
+        "label": "x",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.91,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_34",
+        "type": "label",
+        "bbox": [
+          20,
+          73,
+          40,
+          87
+        ],
+        "text": "o",
+        "label": "o",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.72,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_35",
+        "type": "label",
+        "bbox": [
+          157,
+          72,
+          174,
+          88
+        ],
+        "text": "Cc",
+        "label": "Cc",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.49,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_36",
+        "type": "label",
+        "bbox": [
+          354,
+          79,
+          384,
+          85
+        ],
+        "text": "Sy",
+        "label": "Sy",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.36,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_37",
+        "type": "label",
+        "bbox": [
+          1637,
+          66,
+          1651,
+          94
+        ],
+        "text": "©",
+        "label": "©",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_38",
+        "type": "label",
+        "bbox": [
+          1670,
+          75,
+          1697,
+          89
+        ],
+        "text": "Sign",
+        "label": "Sign",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.73,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_39",
+        "type": "label",
+        "bbox": [
+          1703,
+          78,
+          1713,
+          86
+        ],
+        "text": "in",
+        "label": "in",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.73,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_40",
+        "type": "label",
+        "bbox": [
+          1743,
+          70,
+          1759,
+          90
+        ],
+        "text": "4",
+        "label": "4",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.7,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_41",
+        "type": "label",
+        "bbox": [
+          1789,
+          70,
+          1807,
+          90
+        ],
+        "text": "9",
+        "label": "9",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.46,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_42",
+        "type": "label",
+        "bbox": [
+          1837,
+          73,
+          1852,
+          87
+        ],
+        "text": "»",
+        "label": "»",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.87,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_43",
+        "type": "label",
+        "bbox": [
+          41,
+          118,
+          85,
+          132
+        ],
+        "text": "Import",
+        "label": "Import",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.68,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_44",
+        "type": "label",
+        "bbox": [
+          90,
+          118,
+          169,
+          129
+        ],
+        "text": "bookmarks...",
+        "label": "bookmarks...",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.95,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_45",
+        "type": "label",
+        "bbox": [
+          189,
+          114,
+          263,
+          130
+        ],
+        "text": "OFinance",
+        "label": "OFinance",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.69,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_46",
+        "type": "label",
+        "bbox": [
+          281,
+          110,
+          289,
+          139
+        ],
+        "text": "©",
+        "label": "©",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.8,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_47",
+        "type": "label",
+        "bbox": [
+          305,
+          118,
+          327,
+          129
+        ],
+        "text": "Phil",
+        "label": "Phil",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.9,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_48",
+        "type": "label",
+        "bbox": [
+          1514,
+          118,
+          1552,
+          129
+        ],
+        "text": "Home",
+        "label": "Home",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.91,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_49",
+        "type": "label",
+        "bbox": [
+          1558,
+          118,
+          1559,
+          132
+        ],
+        "text": "|",
+        "label": "|",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.95,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_50",
+        "type": "label",
+        "bbox": [
+          1566,
+          118,
+          1595,
+          129
+        ],
+        "text": "Laws",
+        "label": "Laws",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.95,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_51",
+        "type": "label",
+        "bbox": [
+          1601,
+          118,
+          1614,
+          129
+        ],
+        "text": "of",
+        "label": "of",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_52",
+        "type": "label",
+        "bbox": [
+          1619,
+          118,
+          1637,
+          129
+        ],
+        "text": "UX",
+        "label": "UX",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.94,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_53",
+        "type": "label",
+        "bbox": [
+          1678,
+          118,
+          1718,
+          129
+        ],
+        "text": "2000+",
+        "label": "2000+",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.94,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_54",
+        "type": "label",
+        "bbox": [
+          1725,
+          118,
+          1752,
+          129
+        ],
+        "text": "Free",
+        "label": "Free",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.94,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_55",
+        "type": "label",
+        "bbox": [
+          1757,
+          118,
+          1822,
+          132
+        ],
+        "text": "Developer.",
+        "label": "Developer.",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.88,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_56",
+        "type": "label",
+        "bbox": [
+          349,
+          173,
+          376,
+          197
+        ],
+        "text": "G",
+        "label": "G",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.9,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_57",
+        "type": "label",
+        "bbox": [
+          392,
+          181,
+          447,
+          198
+        ],
+        "text": "google",
+        "label": "google",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.82,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_58",
+        "type": "label",
+        "bbox": [
+          1664,
+          198,
+          1724,
+          210
+        ],
+        "text": "Weather",
+        "label": "Weather",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_59",
+        "type": "label",
+        "bbox": [
+          1729,
+          198,
+          1759,
+          210
+        ],
+        "text": "data",
+        "label": "data",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_60",
+        "type": "label",
+        "bbox": [
+          1766,
+          198,
+          1775,
+          210
+        ],
+        "text": "is",
+        "label": "is",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_61",
+        "type": "label",
+        "bbox": [
+          1781,
+          200,
+          1804,
+          210
+        ],
+        "text": "not",
+        "label": "not",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_62",
+        "type": "label",
+        "bbox": [
+          1664,
+          220,
+          1726,
+          232
+        ],
+        "text": "available",
+        "label": "available",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.94,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_63",
+        "type": "label",
+        "bbox": [
+          1732,
+          220,
+          1764,
+          236
+        ],
+        "text": "right",
+        "label": "right",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_64",
+        "type": "label",
+        "bbox": [
+          1770,
+          224,
+          1802,
+          232
+        ],
+        "text": "now.",
+        "label": "now.",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_65",
+        "type": "label",
+        "bbox": [
+          392,
+          234,
+          447,
+          251
+        ],
+        "text": "google",
+        "label": "google",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_66",
+        "type": "label",
+        "bbox": [
+          454,
+          238,
+          488,
+          251
+        ],
+        "text": "map",
+        "label": "map",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_67",
+        "type": "label",
+        "bbox": [
+          392,
+          278,
+          447,
+          295
+        ],
+        "text": "google",
+        "label": "google",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.93,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_68",
+        "type": "label",
+        "bbox": [
+          453,
+          278,
+          523,
+          291
+        ],
+        "text": "translate",
+        "label": "translate",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.93,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_69",
+        "type": "label",
+        "bbox": [
+          392,
+          322,
+          447,
+          339
+        ],
+        "text": "google",
+        "label": "google",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_70",
+        "type": "label",
+        "bbox": [
+          453,
+          322,
+          511,
+          335
+        ],
+        "text": "scholar",
+        "label": "scholar",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_71",
+        "type": "label",
+        "bbox": [
+          392,
+          366,
+          447,
+          383
+        ],
+        "text": "google",
+        "label": "google",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.92,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_72",
+        "type": "label",
+        "bbox": [
+          453,
+          366,
+          508,
+          383
+        ],
+        "text": "gemini",
+        "label": "gemini",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_73",
+        "type": "label",
+        "bbox": [
+          392,
+          410,
+          447,
+          427
+        ],
+        "text": "google",
+        "label": "google",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_74",
+        "type": "label",
+        "bbox": [
+          453,
+          410,
+          533,
+          423
+        ],
+        "text": "classroom",
+        "label": "classroom",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.92,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_75",
+        "type": "label",
+        "bbox": [
+          392,
+          454,
+          447,
+          471
+        ],
+        "text": "google",
+        "label": "google",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.95,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_76",
+        "type": "label",
+        "bbox": [
+          453,
+          454,
+          504,
+          471
+        ],
+        "text": "flights",
+        "label": "flights",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.93,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_77",
+        "type": "label",
+        "bbox": [
+          392,
+          498,
+          447,
+          515
+        ],
+        "text": "google",
+        "label": "google",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_78",
+        "type": "label",
+        "bbox": [
+          454,
+          499,
+          494,
+          511
+        ],
+        "text": "meet",
+        "label": "meet",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.9,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_79",
+        "type": "label",
+        "bbox": [
+          392,
+          542,
+          447,
+          559
+        ],
+        "text": "google",
+        "label": "google",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.95,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_80",
+        "type": "label",
+        "bbox": [
+          453,
+          542,
+          495,
+          555
+        ],
+        "text": "earth",
+        "label": "earth",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_81",
+        "type": "label",
+        "bbox": [
+          577,
+          577,
+          620,
+          590
+        ],
+        "text": "Search",
+        "label": "Search",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_82",
+        "type": "label",
+        "bbox": [
+          637,
+          577,
+          660,
+          590
+        ],
+        "text": "with",
+        "label": "with",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_83",
+        "type": "label",
+        "bbox": [
+          677,
+          577,
+          821,
+          594
+        ],
+        "text": "Google",
+        "label": "Google",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_84",
+        "type": "label",
+        "bbox": [
+          739,
+          573,
+          755,
+          599
+        ],
+        "text": "or",
+        "label": "or",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_85",
+        "type": "label",
+        "bbox": [
+          762,
+          577,
+          805,
+          594
+        ],
+        "text": "enter",
+        "label": "enter",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_86",
+        "type": "label",
+        "bbox": [
+          812,
+          573,
+          824,
+          599
+        ],
+        "text": "a",
+        "label": "a",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_87",
+        "type": "label",
+        "bbox": [
+          846,
+          580,
+          876,
+          590
+        ],
+        "text": "ress",
+        "label": "ress",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.89,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_88",
+        "type": "label",
+        "bbox": [
+          1190,
+          718,
+          1198,
+          726
+        ],
+        "text": ">",
+        "label": ">",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.81,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_89",
+        "type": "label",
+        "bbox": [
+          417,
+          728,
+          455,
+          746
+        ],
+        "text": "Trip.",
+        "label": "Trip.",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_90",
+        "type": "label",
+        "bbox": [
+          1330,
+          729,
+          1342,
+          743
+        ],
+        "text": ">",
+        "label": ">",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.52,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_91",
+        "type": "label",
+        "bbox": [
+          1017,
+          718,
+          1053,
+          755
+        ],
+        "text": "in",
+        "label": "in",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_92",
+        "type": "label",
+        "bbox": [
+          404,
+          791,
+          462,
+          805
+        ],
+        "text": "“Trip.com",
+        "label": "“Trip.com",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.64,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_93",
+        "type": "label",
+        "bbox": [
+          540,
+          793,
+          542,
+          795
+        ],
+        "text": "*",
+        "label": "*",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.34,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_94",
+        "type": "label",
+        "bbox": [
+          549,
+          791,
+          621,
+          802
+        ],
+        "text": "Hotels.com",
+        "label": "Hotels.com",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_95",
+        "type": "label",
+        "bbox": [
+          699,
+          791,
+          772,
+          805
+        ],
+        "text": "Skyscanner",
+        "label": "Skyscanner",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.8,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_96",
+        "type": "label",
+        "bbox": [
+          855,
+          791,
+          899,
+          802
+        ],
+        "text": "facebor",
+        "label": "facebor",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.5,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_97",
+        "type": "label",
+        "bbox": [
+          1008,
+          791,
+          1062,
+          802
+        ],
+        "text": "Linkedin",
+        "label": "Linkedin",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.95,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_98",
+        "type": "label",
+        "bbox": [
+          1146,
+          791,
+          1187,
+          802
+        ],
+        "text": "Reddit",
+        "label": "Reddit",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.93,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_99",
+        "type": "label",
+        "bbox": [
+          1192,
+          797,
+          1197,
+          798
+        ],
+        "text": "-",
+        "label": "-",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.92,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_100",
+        "type": "label",
+        "bbox": [
+          1202,
+          791,
+          1225,
+          802
+        ],
+        "text": "The",
+        "label": "The",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.94,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_101",
+        "type": "label",
+        "bbox": [
+          1308,
+          791,
+          1362,
+          805
+        ],
+        "text": "youtube",
+        "label": "youtube",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_102",
+        "type": "label",
+        "bbox": [
+          1147,
+          809,
+          1180,
+          822
+        ],
+        "text": "héart",
+        "label": "héart",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.88,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_103",
+        "type": "label",
+        "bbox": [
+          1185,
+          811,
+          1199,
+          822
+        ],
+        "text": "of",
+        "label": "of",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_104",
+        "type": "label",
+        "bbox": [
+          1202,
+          811,
+          1223,
+          822
+        ],
+        "text": "the.",
+        "label": "the.",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.89,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_105",
+        "type": "label",
+        "bbox": [
+          1438,
+          791,
+          1532,
+          810
+        ],
+        "text": "aufinstructure",
+        "label": "aufinstructure",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.87,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_106",
+        "type": "label",
+        "bbox": [
+          403,
+          812,
+          467,
+          825
+        ],
+        "text": "Sponsored",
+        "label": "Sponsored",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_107",
+        "type": "label",
+        "bbox": [
+          553,
+          812,
+          617,
+          825
+        ],
+        "text": "Sponsored",
+        "label": "Sponsored",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_108",
+        "type": "label",
+        "bbox": [
+          703,
+          812,
+          767,
+          825
+        ],
+        "text": "Sponsored",
+        "label": "Sponsored",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.9,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_109",
+        "type": "label",
+        "bbox": [
+          1048,
+          1093,
+          1051,
+          1098
+        ],
+        "text": "‘",
+        "label": "‘",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.45,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_110",
+        "type": "label",
+        "bbox": [
+          31,
+          1088,
+          72,
+          1100
+        ],
+        "text": "Photo",
+        "label": "Photo",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.92,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_111",
+        "type": "label",
+        "bbox": [
+          78,
+          1088,
+          95,
+          1104
+        ],
+        "text": "by",
+        "label": "by",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.92,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_112",
+        "type": "label",
+        "bbox": [
+          101,
+          1088,
+          145,
+          1100
+        ],
+        "text": "Farzad",
+        "label": "Farzad",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.93,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_113",
+        "type": "label",
+        "bbox": [
+          152,
+          1088,
+          242,
+          1100
+        ],
+        "text": "Mohsenvand",
+        "label": "Mohsenvand",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.9,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_114",
+        "type": "label",
+        "bbox": [
+          248,
+          1092,
+          265,
+          1114
+        ],
+        "text": "on",
+        "label": "on",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.93,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_115",
+        "type": "label",
+        "bbox": [
+          272,
+          1088,
+          335,
+          1104
+        ],
+        "text": "Unsplash",
+        "label": "Unsplash",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.87,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_116",
+        "type": "label",
+        "bbox": [
+          39,
+          1148,
+          50,
+          1170
+        ],
+        "text": "O",
+        "label": "O",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.71,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_117",
+        "type": "label",
+        "bbox": [
+          1813,
+          1154,
+          1839,
+          1165
+        ],
+        "text": "2:57",
+        "label": "2:57",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_118",
+        "type": "label",
+        "bbox": [
+          1845,
+          1154,
+          1865,
+          1165
+        ],
+        "text": "PM",
+        "label": "PM",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.95,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_119",
+        "type": "label",
+        "bbox": [
+          139,
+          1174,
+          156,
+          1186
+        ],
+        "text": "udy",
+        "label": "udy",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.53,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_120",
+        "type": "label",
+        "bbox": [
+          734,
+          1164,
+          750,
+          1177
+        ],
+        "text": "rch",
+        "label": "rch",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.69,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_121",
+        "type": "label",
+        "bbox": [
+          1662,
+          1166,
+          1676,
+          1173
+        ],
+        "text": "A",
+        "label": "A",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.68,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_122",
+        "type": "label",
+        "bbox": [
+          1759,
+          1161,
+          1784,
+          1176
+        ],
+        "text": "ea",
+        "label": "ea",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.4,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_123",
+        "type": "label",
+        "bbox": [
+          1806,
+          1174,
+          1831,
+          1186
+        ],
+        "text": "3/8/",
+        "label": "3/8/",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.82,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_124",
+        "type": "label",
+        "bbox": [
+          1014,
+          1155,
+          1309,
+          1194
+        ],
+        "text": "29238",
+        "label": "29238",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.36,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_125",
+        "type": "label",
+        "bbox": [
+          1230,
+          1151,
+          1256,
+          1200
+        ],
+        "text": "©",
+        "label": "©",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.67,
+        "metadata": {
+          "source": "ocr"
+        }
+      }
+    ]
+  },
+  "next_state": {
+    "application": "Unknown",
+    "window_title": "frame_0005",
+    "screen_resolution": [
+      1920,
+      1200
+    ],
+    "focused_element_id": null,
+    "elements": [
+      {
+        "element_id": "label_0",
+        "type": "label",
+        "bbox": [
+          41,
+          23,
+          91,
+          34
+        ],
+        "text": "Untitled",
+        "label": "Untitled",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.86,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_1",
+        "type": "label",
+        "bbox": [
+          98,
+          26,
+          140,
+          37
+        ],
+        "text": "presen’",
+        "label": "presen’",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.71,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_2",
+        "type": "label",
+        "bbox": [
+          151,
+          23,
+          160,
+          32
+        ],
+        "text": "X",
+        "label": "X",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.76,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_3",
+        "type": "label",
+        "bbox": [
+          186,
+          14,
+          200,
+          41
+        ],
+        "text": "@",
+        "label": "@",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.82,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_4",
+        "type": "label",
+        "bbox": [
+          218,
+          23,
+          280,
+          34
+        ],
+        "text": "Facebook",
+        "label": "Facebook",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.9,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_5",
+        "type": "label",
+        "bbox": [
+          328,
+          23,
+          337,
+          32
+        ],
+        "text": "x",
+        "label": "x",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.95,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_6",
+        "type": "label",
+        "bbox": [
+          378,
+          21,
+          382,
+          29
+        ],
+        "text": "A.",
+        "label": "A.",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.57,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_7",
+        "type": "label",
+        "bbox": [
+          395,
+          23,
+          442,
+          37
+        ],
+        "text": "Google",
+        "label": "Google",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.9,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_8",
+        "type": "label",
+        "bbox": [
+          506,
+          23,
+          515,
+          32
+        ],
+        "text": "x",
+        "label": "x",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.68,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_9",
+        "type": "label",
+        "bbox": [
+          556,
+          21,
+          560,
+          29
+        ],
+        "text": "A.",
+        "label": "A.",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.56,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_10",
+        "type": "label",
+        "bbox": [
+          573,
+          23,
+          620,
+          37
+        ],
+        "text": "Google",
+        "label": "Google",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.91,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_11",
+        "type": "label",
+        "bbox": [
+          625,
+          23,
+          672,
+          37
+        ],
+        "text": "Antigray",
+        "label": "Antigray",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.69,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_12",
+        "type": "label",
+        "bbox": [
+          684,
+          23,
+          693,
+          32
+        ],
+        "text": "x",
+        "label": "x",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.47,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_13",
+        "type": "label",
+        "bbox": [
+          733,
+          21,
+          737,
+          29
+        ],
+        "text": "A.",
+        "label": "A.",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.58,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_14",
+        "type": "label",
+        "bbox": [
+          751,
+          23,
+          798,
+          37
+        ],
+        "text": "Google",
+        "label": "Google",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.9,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_15",
+        "type": "label",
+        "bbox": [
+          803,
+          23,
+          825,
+          34
+        ],
+        "text": "Anti",
+        "label": "Anti",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.83,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_16",
+        "type": "label",
+        "bbox": [
+          861,
+          23,
+          870,
+          32
+        ],
+        "text": "x",
+        "label": "x",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.95,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_17",
+        "type": "label",
+        "bbox": [
+          911,
+          27,
+          916,
+          30
+        ],
+        "text": "S",
+        "label": "S",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.91,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_18",
+        "type": "label",
+        "bbox": [
+          928,
+          23,
+          1024,
+          34
+        ],
+        "text": "Authentication",
+        "label": "Authentication",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_19",
+        "type": "label",
+        "bbox": [
+          1039,
+          23,
+          1048,
+          32
+        ],
+        "text": "x",
+        "label": "x",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.94,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_20",
+        "type": "label",
+        "bbox": [
+          1084,
+          22,
+          1092,
+          26
+        ],
+        "text": "eR",
+        "label": "eR",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.33,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_21",
+        "type": "label",
+        "bbox": [
+          1089,
+          27,
+          1094,
+          30
+        ],
+        "text": "5",
+        "label": "5",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.46,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_22",
+        "type": "label",
+        "bbox": [
+          1106,
+          23,
+          1202,
+          34
+        ],
+        "text": "Authentication",
+        "label": "Authentication",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_23",
+        "type": "label",
+        "bbox": [
+          1217,
+          23,
+          1226,
+          32
+        ],
+        "text": "x",
+        "label": "x",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.94,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_24",
+        "type": "label",
+        "bbox": [
+          1266,
+          21,
+          1270,
+          29
+        ],
+        "text": "A.",
+        "label": "A.",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.58,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_25",
+        "type": "label",
+        "bbox": [
+          1284,
+          23,
+          1331,
+          37
+        ],
+        "text": "Google",
+        "label": "Google",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.9,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_26",
+        "type": "label",
+        "bbox": [
+          1336,
+          23,
+          1358,
+          34
+        ],
+        "text": "Anti",
+        "label": "Anti",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.83,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_27",
+        "type": "label",
+        "bbox": [
+          1394,
+          23,
+          1403,
+          32
+        ],
+        "text": "x",
+        "label": "x",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.95,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_28",
+        "type": "label",
+        "bbox": [
+          1435,
+          23,
+          1452,
+          37
+        ],
+        "text": "@",
+        "label": "@",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.88,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_29",
+        "type": "label",
+        "bbox": [
+          1462,
+          23,
+          1490,
+          34
+        ],
+        "text": "New",
+        "label": "New",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_30",
+        "type": "label",
+        "bbox": [
+          1495,
+          23,
+          1517,
+          34
+        ],
+        "text": "Tab",
+        "label": "Tab",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.95,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_31",
+        "type": "label",
+        "bbox": [
+          1572,
+          23,
+          1581,
+          32
+        ],
+        "text": "x",
+        "label": "x",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.95,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_32",
+        "type": "label",
+        "bbox": [
+          1616,
+          21,
+          1631,
+          36
+        ],
+        "text": "fb",
+        "label": "fb",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.48,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_33",
+        "type": "label",
+        "bbox": [
+          1828,
+          22,
+          1841,
+          34
+        ],
+        "text": "a",
+        "label": "a",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.73,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_34",
+        "type": "label",
+        "bbox": [
+          1885,
+          22,
+          1898,
+          34
+        ],
+        "text": "x",
+        "label": "x",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.91,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_35",
+        "type": "label",
+        "bbox": [
+          20,
+          73,
+          40,
+          87
+        ],
+        "text": "o",
+        "label": "o",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.72,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_36",
+        "type": "label",
+        "bbox": [
+          157,
+          76,
+          173,
+          88
+        ],
+        "text": "CG",
+        "label": "CG",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.42,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_37",
+        "type": "label",
+        "bbox": [
+          1453,
+          73,
+          1470,
+          87
+        ],
+        "text": ">",
+        "label": ">",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.89,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_38",
+        "type": "label",
+        "bbox": [
+          1637,
+          66,
+          1651,
+          94
+        ],
+        "text": "©",
+        "label": "©",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_39",
+        "type": "label",
+        "bbox": [
+          1670,
+          75,
+          1697,
+          89
+        ],
+        "text": "Sign",
+        "label": "Sign",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.73,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_40",
+        "type": "label",
+        "bbox": [
+          1703,
+          78,
+          1713,
+          86
+        ],
+        "text": "in",
+        "label": "in",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.73,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_41",
+        "type": "label",
+        "bbox": [
+          1743,
+          70,
+          1759,
+          90
+        ],
+        "text": "4",
+        "label": "4",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.7,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_42",
+        "type": "label",
+        "bbox": [
+          1789,
+          70,
+          1807,
+          90
+        ],
+        "text": "9",
+        "label": "9",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.46,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_43",
+        "type": "label",
+        "bbox": [
+          1837,
+          73,
+          1852,
+          87
+        ],
+        "text": "»",
+        "label": "»",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.87,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_44",
+        "type": "label",
+        "bbox": [
+          41,
+          118,
+          85,
+          132
+        ],
+        "text": "Import",
+        "label": "Import",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.68,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_45",
+        "type": "label",
+        "bbox": [
+          90,
+          118,
+          169,
+          129
+        ],
+        "text": "bookmarks...",
+        "label": "bookmarks...",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.95,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_46",
+        "type": "label",
+        "bbox": [
+          189,
+          114,
+          263,
+          130
+        ],
+        "text": "OFinance",
+        "label": "OFinance",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.69,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_47",
+        "type": "label",
+        "bbox": [
+          281,
+          110,
+          289,
+          139
+        ],
+        "text": "©",
+        "label": "©",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.8,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_48",
+        "type": "label",
+        "bbox": [
+          305,
+          118,
+          327,
+          129
+        ],
+        "text": "Phil",
+        "label": "Phil",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.9,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_49",
+        "type": "label",
+        "bbox": [
+          1514,
+          118,
+          1552,
+          129
+        ],
+        "text": "Home",
+        "label": "Home",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.91,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_50",
+        "type": "label",
+        "bbox": [
+          1558,
+          118,
+          1559,
+          132
+        ],
+        "text": "|",
+        "label": "|",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.95,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_51",
+        "type": "label",
+        "bbox": [
+          1566,
+          118,
+          1595,
+          129
+        ],
+        "text": "Laws",
+        "label": "Laws",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.95,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_52",
+        "type": "label",
+        "bbox": [
+          1601,
+          118,
+          1614,
+          129
+        ],
+        "text": "of",
+        "label": "of",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_53",
+        "type": "label",
+        "bbox": [
+          1619,
+          118,
+          1637,
+          129
+        ],
+        "text": "UX",
+        "label": "UX",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.94,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_54",
+        "type": "label",
+        "bbox": [
+          1678,
+          118,
+          1718,
+          129
+        ],
+        "text": "2000+",
+        "label": "2000+",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.94,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_55",
+        "type": "label",
+        "bbox": [
+          1725,
+          118,
+          1752,
+          129
+        ],
+        "text": "Free",
+        "label": "Free",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.94,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_56",
+        "type": "label",
+        "bbox": [
+          1757,
+          118,
+          1822,
+          132
+        ],
+        "text": "Developer.",
+        "label": "Developer.",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.88,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_57",
+        "type": "label",
+        "bbox": [
+          393,
+          128,
+          441,
+          141
+        ],
+        "text": "Reddit",
+        "label": "Reddit",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.93,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_58",
+        "type": "label",
+        "bbox": [
+          448,
+          136,
+          453,
+          137
+        ],
+        "text": "-",
+        "label": "-",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.93,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_59",
+        "type": "label",
+        "bbox": [
+          459,
+          128,
+          485,
+          141
+        ],
+        "text": "The",
+        "label": "The",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.97,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_60",
+        "type": "label",
+        "bbox": [
+          492,
+          128,
+          531,
+          141
+        ],
+        "text": "heart",
+        "label": "heart",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_61",
+        "type": "label",
+        "bbox": [
+          537,
+          128,
+          552,
+          141
+        ],
+        "text": "of",
+        "label": "of",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.95,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_62",
+        "type": "label",
+        "bbox": [
+          556,
+          128,
+          580,
+          141
+        ],
+        "text": "the",
+        "label": "the",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.95,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_63",
+        "type": "label",
+        "bbox": [
+          587,
+          129,
+          645,
+          141
+        ],
+        "text": "internet",
+        "label": "internet",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.93,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_64",
+        "type": "label",
+        "bbox": [
+          653,
+          136,
+          670,
+          137
+        ],
+        "text": "—",
+        "label": "—",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.93,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_65",
+        "type": "label",
+        "bbox": [
+          678,
+          130,
+          747,
+          141
+        ],
+        "text": "reddit.com",
+        "label": "reddit.com",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.93,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_66",
+        "type": "label",
+        "bbox": [
+          393,
+          173,
+          433,
+          185
+        ],
+        "text": "notes",
+        "label": "notes",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_67",
+        "type": "label",
+        "bbox": [
+          439,
+          172,
+          477,
+          185
+        ],
+        "text": "from",
+        "label": "from",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_68",
+        "type": "label",
+        "bbox": [
+          483,
+          172,
+          509,
+          185
+        ],
+        "text": "the",
+        "label": "the",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_69",
+        "type": "label",
+        "bbox": [
+          515,
+          172,
+          620,
+          189
+        ],
+        "text": "underground",
+        "label": "underground",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_70",
+        "type": "label",
+        "bbox": [
+          1664,
+          198,
+          1724,
+          210
+        ],
+        "text": "Weather",
+        "label": "Weather",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_71",
+        "type": "label",
+        "bbox": [
+          1729,
+          198,
+          1759,
+          210
+        ],
+        "text": "data",
+        "label": "data",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_72",
+        "type": "label",
+        "bbox": [
+          1766,
+          198,
+          1775,
+          210
+        ],
+        "text": "is",
+        "label": "is",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_73",
+        "type": "label",
+        "bbox": [
+          1781,
+          200,
+          1804,
+          210
+        ],
+        "text": "not",
+        "label": "not",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_74",
+        "type": "label",
+        "bbox": [
+          418,
+          220,
+          433,
+          229
+        ],
+        "text": "es",
+        "label": "es",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.92,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_75",
+        "type": "label",
+        "bbox": [
+          439,
+          216,
+          477,
+          229
+        ],
+        "text": "from",
+        "label": "from",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_76",
+        "type": "label",
+        "bbox": [
+          483,
+          216,
+          509,
+          229
+        ],
+        "text": "the",
+        "label": "the",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_77",
+        "type": "label",
+        "bbox": [
+          515,
+          216,
+          620,
+          233
+        ],
+        "text": "underground",
+        "label": "underground",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_78",
+        "type": "label",
+        "bbox": [
+          627,
+          216,
+          654,
+          233
+        ],
+        "text": "pdf",
+        "label": "pdf",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_79",
+        "type": "label",
+        "bbox": [
+          1664,
+          220,
+          1726,
+          232
+        ],
+        "text": "available",
+        "label": "available",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.94,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_80",
+        "type": "label",
+        "bbox": [
+          1732,
+          220,
+          1764,
+          236
+        ],
+        "text": "right",
+        "label": "right",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_81",
+        "type": "label",
+        "bbox": [
+          1770,
+          224,
+          1802,
+          232
+        ],
+        "text": "now.",
+        "label": "now.",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_82",
+        "type": "label",
+        "bbox": [
+          393,
+          264,
+          408,
+          273
+        ],
+        "text": "no",
+        "label": "no",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_83",
+        "type": "label",
+        "bbox": [
+          418,
+          264,
+          433,
+          273
+        ],
+        "text": "es",
+        "label": "es",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.83,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_84",
+        "type": "label",
+        "bbox": [
+          393,
+          308,
+          408,
+          317
+        ],
+        "text": "no",
+        "label": "no",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_85",
+        "type": "label",
+        "bbox": [
+          418,
+          348,
+          455,
+          365
+        ],
+        "text": "epad",
+        "label": "epad",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.6,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_86",
+        "type": "label",
+        "bbox": [
+          393,
+          392,
+          467,
+          405
+        ],
+        "text": "notebook",
+        "label": "notebook",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_87",
+        "type": "label",
+        "bbox": [
+          345,
+          437,
+          365,
+          447
+        ],
+        "text": "Fire!",
+        "label": "Fire!",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.35,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_88",
+        "type": "label",
+        "bbox": [
+          392,
+          467,
+          747,
+          484
+        ],
+        "text": "Calma_Canlapan_Ganzon_Uwitonze_RRLMatrix",
+        "label": "Calma_Canlapan_Ganzon_Uwitonze_RRLMatrix",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.89,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_89",
+        "type": "label",
+        "bbox": [
+          753,
+          475,
+          758,
+          476
+        ],
+        "text": "-",
+        "label": "-",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.89,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_90",
+        "type": "label",
+        "bbox": [
+          764,
+          467,
+          818,
+          484
+        ],
+        "text": "Google",
+        "label": "Google",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_91",
+        "type": "label",
+        "bbox": [
+          825,
+          468,
+          860,
+          480
+        ],
+        "text": "Docs",
+        "label": "Docs",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.93,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_92",
+        "type": "label",
+        "bbox": [
+          868,
+          475,
+          885,
+          476
+        ],
+        "text": "—",
+        "label": "—",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.9,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_93",
+        "type": "label",
+        "bbox": [
+          1196,
+          469,
+          1204,
+          480
+        ],
+        "text": "D)",
+        "label": "D)",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.64,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_94",
+        "type": "label",
+        "bbox": [
+          1258,
+          469,
+          1274,
+          480
+        ],
+        "text": "Hus",
+        "label": "Hus",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.78,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_95",
+        "type": "label",
+        "bbox": [
+          1388,
+          469,
+          1412,
+          480
+        ],
+        "text": "Hx",
+        "label": "Hx",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.54,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_96",
+        "type": "label",
+        "bbox": [
+          1431,
+          469,
+          1448,
+          480
+        ],
+        "text": "RR:",
+        "label": "RR:",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.86,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_97",
+        "type": "label",
+        "bbox": [
+          393,
+          511,
+          567,
+          528
+        ],
+        "text": "Notifications",
+        "label": "Notifications",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.69,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_98",
+        "type": "label",
+        "bbox": [
+          491,
+          504,
+          499,
+          532
+        ],
+        "text": "|",
+        "label": "|",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_99",
+        "type": "label",
+        "bbox": [
+          505,
+          511,
+          567,
+          528
+        ],
+        "text": "LinkedIn",
+        "label": "LinkedIn",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.92,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_100",
+        "type": "label",
+        "bbox": [
+          576,
+          519,
+          592,
+          520
+        ],
+        "text": "—",
+        "label": "—",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.92,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_101",
+        "type": "label",
+        "bbox": [
+          690,
+          516,
+          699,
+          524
+        ],
+        "text": "nc",
+        "label": "nc",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.93,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_102",
+        "type": "label",
+        "bbox": [
+          829,
+          513,
+          834,
+          524
+        ],
+        "text": "HI",
+        "label": "HI",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.54,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_103",
+        "type": "label",
+        "bbox": [
+          476,
+          563,
+          493,
+          564
+        ],
+        "text": "—",
+        "label": "—",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.9,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_104",
+        "type": "label",
+        "bbox": [
+          1190,
+          718,
+          1198,
+          726
+        ],
+        "text": ">",
+        "label": ">",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.81,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_105",
+        "type": "label",
+        "bbox": [
+          417,
+          728,
+          455,
+          746
+        ],
+        "text": "Trip.",
+        "label": "Trip.",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_106",
+        "type": "label",
+        "bbox": [
+          1330,
+          729,
+          1342,
+          743
+        ],
+        "text": ">",
+        "label": ">",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.52,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_107",
+        "type": "label",
+        "bbox": [
+          1017,
+          718,
+          1053,
+          755
+        ],
+        "text": "in",
+        "label": "in",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_108",
+        "type": "label",
+        "bbox": [
+          404,
+          791,
+          462,
+          805
+        ],
+        "text": "“Trip.com",
+        "label": "“Trip.com",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.64,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_109",
+        "type": "label",
+        "bbox": [
+          539,
+          793,
+          542,
+          795
+        ],
+        "text": "*",
+        "label": "*",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.9,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_110",
+        "type": "label",
+        "bbox": [
+          549,
+          791,
+          621,
+          802
+        ],
+        "text": "Hotels.com",
+        "label": "Hotels.com",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.95,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_111",
+        "type": "label",
+        "bbox": [
+          699,
+          791,
+          772,
+          805
+        ],
+        "text": "Skyscanner",
+        "label": "Skyscanner",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.8,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_112",
+        "type": "label",
+        "bbox": [
+          855,
+          791,
+          899,
+          802
+        ],
+        "text": "facebor",
+        "label": "facebor",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.5,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_113",
+        "type": "label",
+        "bbox": [
+          1008,
+          791,
+          1062,
+          802
+        ],
+        "text": "Linkedin",
+        "label": "Linkedin",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.95,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_114",
+        "type": "label",
+        "bbox": [
+          1146,
+          791,
+          1187,
+          802
+        ],
+        "text": "Reddit",
+        "label": "Reddit",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.93,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_115",
+        "type": "label",
+        "bbox": [
+          1192,
+          797,
+          1197,
+          798
+        ],
+        "text": "-",
+        "label": "-",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.92,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_116",
+        "type": "label",
+        "bbox": [
+          1202,
+          791,
+          1225,
+          802
+        ],
+        "text": "The",
+        "label": "The",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.94,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_117",
+        "type": "label",
+        "bbox": [
+          1308,
+          791,
+          1362,
+          805
+        ],
+        "text": "youtube",
+        "label": "youtube",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_118",
+        "type": "label",
+        "bbox": [
+          1147,
+          809,
+          1180,
+          822
+        ],
+        "text": "héart",
+        "label": "héart",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.88,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_119",
+        "type": "label",
+        "bbox": [
+          1185,
+          811,
+          1199,
+          822
+        ],
+        "text": "of",
+        "label": "of",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_120",
+        "type": "label",
+        "bbox": [
+          1202,
+          811,
+          1234,
+          822
+        ],
+        "text": "the...",
+        "label": "the...",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.95,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_121",
+        "type": "label",
+        "bbox": [
+          1438,
+          791,
+          1532,
+          810
+        ],
+        "text": "aufinstructure",
+        "label": "aufinstructure",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.87,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_122",
+        "type": "label",
+        "bbox": [
+          403,
+          812,
+          467,
+          825
+        ],
+        "text": "Sponsored",
+        "label": "Sponsored",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_123",
+        "type": "label",
+        "bbox": [
+          553,
+          812,
+          617,
+          825
+        ],
+        "text": "Sponsored",
+        "label": "Sponsored",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_124",
+        "type": "label",
+        "bbox": [
+          703,
+          812,
+          767,
+          825
+        ],
+        "text": "Sponsored",
+        "label": "Sponsored",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.9,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_125",
+        "type": "label",
+        "bbox": [
+          1048,
+          1093,
+          1051,
+          1098
+        ],
+        "text": "‘",
+        "label": "‘",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.45,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_126",
+        "type": "label",
+        "bbox": [
+          31,
+          1088,
+          72,
+          1100
+        ],
+        "text": "Photo",
+        "label": "Photo",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.92,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_127",
+        "type": "label",
+        "bbox": [
+          78,
+          1088,
+          95,
+          1104
+        ],
+        "text": "by",
+        "label": "by",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.92,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_128",
+        "type": "label",
+        "bbox": [
+          101,
+          1088,
+          145,
+          1100
+        ],
+        "text": "Farzad",
+        "label": "Farzad",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.93,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_129",
+        "type": "label",
+        "bbox": [
+          152,
+          1088,
+          242,
+          1100
+        ],
+        "text": "Mohsenvand",
+        "label": "Mohsenvand",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.9,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_130",
+        "type": "label",
+        "bbox": [
+          248,
+          1092,
+          265,
+          1114
+        ],
+        "text": "on",
+        "label": "on",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.93,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_131",
+        "type": "label",
+        "bbox": [
+          272,
+          1088,
+          335,
+          1104
+        ],
+        "text": "Unsplash",
+        "label": "Unsplash",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.87,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_132",
+        "type": "label",
+        "bbox": [
+          39,
+          1148,
+          50,
+          1170
+        ],
+        "text": "O",
+        "label": "O",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.71,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_133",
+        "type": "label",
+        "bbox": [
+          1813,
+          1154,
+          1839,
+          1165
+        ],
+        "text": "2:57",
+        "label": "2:57",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_134",
+        "type": "label",
+        "bbox": [
+          1845,
+          1154,
+          1865,
+          1165
+        ],
+        "text": "PM",
+        "label": "PM",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.95,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_135",
+        "type": "label",
+        "bbox": [
+          139,
+          1174,
+          156,
+          1186
+        ],
+        "text": "udy",
+        "label": "udy",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.53,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_136",
+        "type": "label",
+        "bbox": [
+          734,
+          1164,
+          750,
+          1177
+        ],
+        "text": "rch",
+        "label": "rch",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.69,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_137",
+        "type": "label",
+        "bbox": [
+          1004,
+          1164,
+          1016,
+          1173
+        ],
+        "text": "a",
+        "label": "a",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.6,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_138",
+        "type": "label",
+        "bbox": [
+          1173,
+          1159,
+          1195,
+          1181
+        ],
+        "text": "o",
+        "label": "o",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.43,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_139",
+        "type": "label",
+        "bbox": [
+          1231,
+          1163,
+          1251,
+          1184
+        ],
+        "text": "@",
+        "label": "@",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.38,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_140",
+        "type": "label",
+        "bbox": [
+          1279,
+          1155,
+          1309,
+          1185
+        ],
+        "text": "A",
+        "label": "A",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.54,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_141",
+        "type": "label",
+        "bbox": [
+          1662,
+          1166,
+          1676,
+          1173
+        ],
+        "text": "A",
+        "label": "A",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.68,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_142",
+        "type": "label",
+        "bbox": [
+          1759,
+          1161,
+          1784,
+          1176
+        ],
+        "text": "ea",
+        "label": "ea",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.4,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_143",
+        "type": "label",
+        "bbox": [
+          1806,
+          1174,
+          1831,
+          1186
+        ],
+        "text": "3/8/",
+        "label": "3/8/",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.82,
+        "metadata": {
+          "source": "ocr"
+        }
+      }
+    ]
+  },
+  "mouse": {
+    "actions": [
+      {
+        "id": "mouse_action_0000",
+        "position": [
+          1237,
+          1199
+        ],
+        "type": "click",
+        "timestamp": "2026-03-08T14:57:25.019095"
+      },
+      {
+        "id": "mouse_action_0001",
+        "position": [
+          1633,
+          1
+        ],
+        "type": "click",
+        "timestamp": "2026-03-08T14:57:26.024035"
+      },
+      {
+        "id": "mouse_action_0002",
+        "position": [
+          402,
+          423
+        ],
+        "type": "click",
+        "timestamp": "2026-03-08T14:57:32.874287"
+      },
+      {
+        "id": "mouse_action_0003",
+        "position": [
+          420,
+          402
+        ],
+        "type": "click",
+        "timestamp": "2026-03-08T14:57:33.378084"
+      },
+      {
+        "id": "mouse_action_0004",
+        "position": [
+          517,
+          700
+        ],
+        "type": "click",
+        "timestamp": "2026-03-08T14:57:36.796162"
+      },
+      {
+        "id": "mouse_action_0005",
+        "position": [
+          674,
+          566
+        ],
+        "type": "click",
+        "timestamp": "2026-03-08T14:57:37.480262"
+      },
+      {
+        "id": "mouse_action_0006",
+        "position": [
+          1285,
+          1184
+        ],
+        "type": "click",
+        "timestamp": "2026-03-08T14:57:47.363020"
+      }
+    ]
+  },
+  "keyboard": {
+    "actions": [
+      {
+        "strokes": [
+          "g",
+          "o",
+          "o",
+          "g",
+          "e",
+          "l",
+          "Key.space",
+          "Key.backspace",
+          "Key.backspace",
+          "Key.backspace",
+          "Key.backspace",
+          "Key.backspace",
+          "Key.backspace",
+          "Key.backspace",
+          "n",
+          "o",
+          "t",
+          "e",
+          "Key.backspace",
+          "Key.backspace",
+          "Key.backspace",
+          "Key.backspace",
+          "r",
+          "a",
+          "p",
+          "i",
+          "d",
+          "Key.space",
+          "n",
+          "o",
+          "t",
+          "e",
+          "s",
+          "Key.backspace",
+          "Key.backspace",
+          "Key.backspace",
+          "Key.backspace",
+          "Key.backspace",
+          "Key.backspace",
+          "Key.down",
+          "Key.enter"
+        ]
+      },
+      {
+        "strokes": [
+          "Key.shift",
+          "H",
+          "e",
+          "l",
+          "l",
+          "o",
+          ",",
+          "Key.space",
+          "Key.shift",
+          "I",
+          "Key.space",
+          "h",
+          "o",
+          "p",
+          "e",
+          "Key.space",
+          "y",
+          "o",
+          "u",
+          "Key.space",
+          "h",
+          "a",
+          "v",
+          "e",
+          "Key.space"
+        ]
+      },
+      {
+        "strokes": [
+          "s",
+          "e",
+          "e",
+          "Key.space",
+          "n",
+          "Key.backspace",
+          "Key.backspace",
+          "n",
+          "Key.space",
+          "t",
+          "h",
+          "i",
+          "s",
+          "s",
+          "Key.backspace",
+          "Key.shift",
+          "!"
+        ]
+      },
+      {
+        "strokes": [
+          "Key.ctrl_l",
+          "\u0003"
+        ]
+      }
+    ]
+  },
+  "diff": {
+    "added": [
+      {
+        "element_id": "label_21",
+        "type": "label",
+        "bbox": [
+          1089,
+          27,
+          1094,
+          30
+        ],
+        "text": "5",
+        "label": "5",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.46,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_37",
+        "type": "label",
+        "bbox": [
+          1453,
+          73,
+          1470,
+          87
+        ],
+        "text": ">",
+        "label": ">",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.89,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_57",
+        "type": "label",
+        "bbox": [
+          393,
+          128,
+          441,
+          141
+        ],
+        "text": "Reddit",
+        "label": "Reddit",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.93,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_58",
+        "type": "label",
+        "bbox": [
+          448,
+          136,
+          453,
+          137
+        ],
+        "text": "-",
+        "label": "-",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.93,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_59",
+        "type": "label",
+        "bbox": [
+          459,
+          128,
+          485,
+          141
+        ],
+        "text": "The",
+        "label": "The",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.97,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_60",
+        "type": "label",
+        "bbox": [
+          492,
+          128,
+          531,
+          141
+        ],
+        "text": "heart",
+        "label": "heart",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_61",
+        "type": "label",
+        "bbox": [
+          537,
+          128,
+          552,
+          141
+        ],
+        "text": "of",
+        "label": "of",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.95,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_62",
+        "type": "label",
+        "bbox": [
+          556,
+          128,
+          580,
+          141
+        ],
+        "text": "the",
+        "label": "the",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.95,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_63",
+        "type": "label",
+        "bbox": [
+          587,
+          129,
+          645,
+          141
+        ],
+        "text": "internet",
+        "label": "internet",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.93,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_64",
+        "type": "label",
+        "bbox": [
+          653,
+          136,
+          670,
+          137
+        ],
+        "text": "—",
+        "label": "—",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.93,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_65",
+        "type": "label",
+        "bbox": [
+          678,
+          130,
+          747,
+          141
+        ],
+        "text": "reddit.com",
+        "label": "reddit.com",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.93,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_67",
+        "type": "label",
+        "bbox": [
+          439,
+          172,
+          477,
+          185
+        ],
+        "text": "from",
+        "label": "from",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_68",
+        "type": "label",
+        "bbox": [
+          483,
+          172,
+          509,
+          185
+        ],
+        "text": "the",
+        "label": "the",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_69",
+        "type": "label",
+        "bbox": [
+          515,
+          172,
+          620,
+          189
+        ],
+        "text": "underground",
+        "label": "underground",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_76",
+        "type": "label",
+        "bbox": [
+          483,
+          216,
+          509,
+          229
+        ],
+        "text": "the",
+        "label": "the",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_77",
+        "type": "label",
+        "bbox": [
+          515,
+          216,
+          620,
+          233
+        ],
+        "text": "underground",
+        "label": "underground",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_78",
+        "type": "label",
+        "bbox": [
+          627,
+          216,
+          654,
+          233
+        ],
+        "text": "pdf",
+        "label": "pdf",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_82",
+        "type": "label",
+        "bbox": [
+          393,
+          264,
+          408,
+          273
+        ],
+        "text": "no",
+        "label": "no",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_87",
+        "type": "label",
+        "bbox": [
+          345,
+          437,
+          365,
+          447
+        ],
+        "text": "Fire!",
+        "label": "Fire!",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.35,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_88",
+        "type": "label",
+        "bbox": [
+          392,
+          467,
+          747,
+          484
+        ],
+        "text": "Calma_Canlapan_Ganzon_Uwitonze_RRLMatrix",
+        "label": "Calma_Canlapan_Ganzon_Uwitonze_RRLMatrix",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.89,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_89",
+        "type": "label",
+        "bbox": [
+          753,
+          475,
+          758,
+          476
+        ],
+        "text": "-",
+        "label": "-",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.89,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_90",
+        "type": "label",
+        "bbox": [
+          764,
+          467,
+          818,
+          484
+        ],
+        "text": "Google",
+        "label": "Google",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_91",
+        "type": "label",
+        "bbox": [
+          825,
+          468,
+          860,
+          480
+        ],
+        "text": "Docs",
+        "label": "Docs",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.93,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_92",
+        "type": "label",
+        "bbox": [
+          868,
+          475,
+          885,
+          476
+        ],
+        "text": "—",
+        "label": "—",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.9,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_93",
+        "type": "label",
+        "bbox": [
+          1196,
+          469,
+          1204,
+          480
+        ],
+        "text": "D)",
+        "label": "D)",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.64,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_94",
+        "type": "label",
+        "bbox": [
+          1258,
+          469,
+          1274,
+          480
+        ],
+        "text": "Hus",
+        "label": "Hus",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.78,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_95",
+        "type": "label",
+        "bbox": [
+          1388,
+          469,
+          1412,
+          480
+        ],
+        "text": "Hx",
+        "label": "Hx",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.54,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_96",
+        "type": "label",
+        "bbox": [
+          1431,
+          469,
+          1448,
+          480
+        ],
+        "text": "RR:",
+        "label": "RR:",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.86,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_98",
+        "type": "label",
+        "bbox": [
+          491,
+          504,
+          499,
+          532
+        ],
+        "text": "|",
+        "label": "|",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_99",
+        "type": "label",
+        "bbox": [
+          505,
+          511,
+          567,
+          528
+        ],
+        "text": "LinkedIn",
+        "label": "LinkedIn",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.92,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_100",
+        "type": "label",
+        "bbox": [
+          576,
+          519,
+          592,
+          520
+        ],
+        "text": "—",
+        "label": "—",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.92,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_101",
+        "type": "label",
+        "bbox": [
+          690,
+          516,
+          699,
+          524
+        ],
+        "text": "nc",
+        "label": "nc",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.93,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_102",
+        "type": "label",
+        "bbox": [
+          829,
+          513,
+          834,
+          524
+        ],
+        "text": "HI",
+        "label": "HI",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.54,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_137",
+        "type": "label",
+        "bbox": [
+          1004,
+          1164,
+          1016,
+          1173
+        ],
+        "text": "a",
+        "label": "a",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.6,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_140",
+        "type": "label",
+        "bbox": [
+          1279,
+          1155,
+          1309,
+          1185
+        ],
+        "text": "A",
+        "label": "A",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.54,
+        "metadata": {
+          "source": "ocr"
+        }
+      }
+    ],
+    "removed": [
+      {
+        "element_id": "label_36",
+        "type": "label",
+        "bbox": [
+          354,
+          79,
+          384,
+          85
+        ],
+        "text": "Sy",
+        "label": "Sy",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.36,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_56",
+        "type": "label",
+        "bbox": [
+          349,
+          173,
+          376,
+          197
+        ],
+        "text": "G",
+        "label": "G",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.9,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_68",
+        "type": "label",
+        "bbox": [
+          453,
+          278,
+          523,
+          291
+        ],
+        "text": "translate",
+        "label": "translate",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.93,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_70",
+        "type": "label",
+        "bbox": [
+          453,
+          322,
+          511,
+          335
+        ],
+        "text": "scholar",
+        "label": "scholar",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_72",
+        "type": "label",
+        "bbox": [
+          453,
+          366,
+          508,
+          383
+        ],
+        "text": "gemini",
+        "label": "gemini",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_74",
+        "type": "label",
+        "bbox": [
+          453,
+          410,
+          533,
+          423
+        ],
+        "text": "classroom",
+        "label": "classroom",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.92,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_75",
+        "type": "label",
+        "bbox": [
+          392,
+          454,
+          447,
+          471
+        ],
+        "text": "google",
+        "label": "google",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.95,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_76",
+        "type": "label",
+        "bbox": [
+          453,
+          454,
+          504,
+          471
+        ],
+        "text": "flights",
+        "label": "flights",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.93,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_77",
+        "type": "label",
+        "bbox": [
+          392,
+          498,
+          447,
+          515
+        ],
+        "text": "google",
+        "label": "google",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_79",
+        "type": "label",
+        "bbox": [
+          392,
+          542,
+          447,
+          559
+        ],
+        "text": "google",
+        "label": "google",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.95,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_81",
+        "type": "label",
+        "bbox": [
+          577,
+          577,
+          620,
+          590
+        ],
+        "text": "Search",
+        "label": "Search",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_82",
+        "type": "label",
+        "bbox": [
+          637,
+          577,
+          660,
+          590
+        ],
+        "text": "with",
+        "label": "with",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_83",
+        "type": "label",
+        "bbox": [
+          677,
+          577,
+          821,
+          594
+        ],
+        "text": "Google",
+        "label": "Google",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_84",
+        "type": "label",
+        "bbox": [
+          739,
+          573,
+          755,
+          599
+        ],
+        "text": "or",
+        "label": "or",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_85",
+        "type": "label",
+        "bbox": [
+          762,
+          577,
+          805,
+          594
+        ],
+        "text": "enter",
+        "label": "enter",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_86",
+        "type": "label",
+        "bbox": [
+          812,
+          573,
+          824,
+          599
+        ],
+        "text": "a",
+        "label": "a",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_87",
+        "type": "label",
+        "bbox": [
+          846,
+          580,
+          876,
+          590
+        ],
+        "text": "ress",
+        "label": "ress",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.89,
+        "metadata": {
+          "source": "ocr"
+        }
+      }
+    ],
+    "changed": [
+      {
+        "element_id": "label_17",
+        "element_id_after": "label_17",
+        "match_score": 0.893,
+        "before": {
+          "element_id": "label_17",
+          "type": "label",
+          "bbox": [
+            906,
+            22,
+            916,
+            31
+          ],
+          "text": "G",
+          "label": "G",
+          "enabled": true,
+          "visible": true,
+          "confidence": 0.89,
+          "metadata": {
+            "source": "ocr"
+          }
+        },
+        "after": {
+          "element_id": "label_17",
+          "type": "label",
+          "bbox": [
+            911,
+            27,
+            916,
+            30
+          ],
+          "text": "S",
+          "label": "S",
+          "enabled": true,
+          "visible": true,
+          "confidence": 0.91,
+          "metadata": {
+            "source": "ocr"
+          }
+        },
+        "changes": {
+          "text": {
+            "before": "G",
+            "after": "S"
+          },
+          "label": {
+            "before": "G",
+            "after": "S"
+          }
+        }
+      },
+      {
+        "element_id": "label_35",
+        "element_id_after": "label_36",
+        "match_score": 0.706,
+        "before": {
+          "element_id": "label_35",
+          "type": "label",
+          "bbox": [
+            157,
+            72,
+            174,
+            88
+          ],
+          "text": "Cc",
+          "label": "Cc",
+          "enabled": true,
+          "visible": true,
+          "confidence": 0.49,
+          "metadata": {
+            "source": "ocr"
+          }
+        },
+        "after": {
+          "element_id": "label_36",
+          "type": "label",
+          "bbox": [
+            157,
+            76,
+            173,
+            88
+          ],
+          "text": "CG",
+          "label": "CG",
+          "enabled": true,
+          "visible": true,
+          "confidence": 0.42,
+          "metadata": {
+            "source": "ocr"
+          }
+        },
+        "changes": {
+          "text": {
+            "before": "Cc",
+            "after": "CG"
+          },
+          "label": {
+            "before": "Cc",
+            "after": "CG"
+          }
+        }
+      },
+      {
+        "element_id": "label_57",
+        "element_id_after": "label_66",
+        "match_score": 0.588,
+        "before": {
+          "element_id": "label_57",
+          "type": "label",
+          "bbox": [
+            392,
+            181,
+            447,
+            198
+          ],
+          "text": "google",
+          "label": "google",
+          "enabled": true,
+          "visible": true,
+          "confidence": 0.82,
+          "metadata": {
+            "source": "ocr"
+          }
+        },
+        "after": {
+          "element_id": "label_66",
+          "type": "label",
+          "bbox": [
+            393,
+            173,
+            433,
+            185
+          ],
+          "text": "notes",
+          "label": "notes",
+          "enabled": true,
+          "visible": true,
+          "confidence": 0.96,
+          "metadata": {
+            "source": "ocr"
+          }
+        },
+        "changes": {
+          "text": {
+            "before": "google",
+            "after": "notes"
+          },
+          "label": {
+            "before": "google",
+            "after": "notes"
+          },
+          "bbox": {
+            "before": [
+              392,
+              181,
+              447,
+              198
+            ],
+            "after": [
+              393,
+              173,
+              433,
+              185
+            ]
+          }
+        }
+      },
+      {
+        "element_id": "label_65",
+        "element_id_after": "label_74",
+        "match_score": 0.368,
+        "before": {
+          "element_id": "label_65",
+          "type": "label",
+          "bbox": [
+            392,
+            234,
+            447,
+            251
+          ],
+          "text": "google",
+          "label": "google",
+          "enabled": true,
+          "visible": true,
+          "confidence": 0.96,
+          "metadata": {
+            "source": "ocr"
+          }
+        },
+        "after": {
+          "element_id": "label_74",
+          "type": "label",
+          "bbox": [
+            418,
+            220,
+            433,
+            229
+          ],
+          "text": "es",
+          "label": "es",
+          "enabled": true,
+          "visible": true,
+          "confidence": 0.92,
+          "metadata": {
+            "source": "ocr"
+          }
+        },
+        "changes": {
+          "text": {
+            "before": "google",
+            "after": "es"
+          },
+          "label": {
+            "before": "google",
+            "after": "es"
+          },
+          "bbox": {
+            "before": [
+              392,
+              234,
+              447,
+              251
+            ],
+            "after": [
+              418,
+              220,
+              433,
+              229
+            ]
+          }
+        }
+      },
+      {
+        "element_id": "label_66",
+        "element_id_after": "label_75",
+        "match_score": 0.148,
+        "before": {
+          "element_id": "label_66",
+          "type": "label",
+          "bbox": [
+            454,
+            238,
+            488,
+            251
+          ],
+          "text": "map",
+          "label": "map",
+          "enabled": true,
+          "visible": true,
+          "confidence": 0.96,
+          "metadata": {
+            "source": "ocr"
+          }
+        },
+        "after": {
+          "element_id": "label_75",
+          "type": "label",
+          "bbox": [
+            439,
+            216,
+            477,
+            229
+          ],
+          "text": "from",
+          "label": "from",
+          "enabled": true,
+          "visible": true,
+          "confidence": 0.96,
+          "metadata": {
+            "source": "ocr"
+          }
+        },
+        "changes": {
+          "text": {
+            "before": "map",
+            "after": "from"
+          },
+          "label": {
+            "before": "map",
+            "after": "from"
+          },
+          "bbox": {
+            "before": [
+              454,
+              238,
+              488,
+              251
+            ],
+            "after": [
+              439,
+              216,
+              477,
+              229
+            ]
+          }
+        }
+      },
+      {
+        "element_id": "label_67",
+        "element_id_after": "label_83",
+        "match_score": 0.368,
+        "before": {
+          "element_id": "label_67",
+          "type": "label",
+          "bbox": [
+            392,
+            278,
+            447,
+            295
+          ],
+          "text": "google",
+          "label": "google",
+          "enabled": true,
+          "visible": true,
+          "confidence": 0.93,
+          "metadata": {
+            "source": "ocr"
+          }
+        },
+        "after": {
+          "element_id": "label_83",
+          "type": "label",
+          "bbox": [
+            418,
+            264,
+            433,
+            273
+          ],
+          "text": "es",
+          "label": "es",
+          "enabled": true,
+          "visible": true,
+          "confidence": 0.83,
+          "metadata": {
+            "source": "ocr"
+          }
+        },
+        "changes": {
+          "text": {
+            "before": "google",
+            "after": "es"
+          },
+          "label": {
+            "before": "google",
+            "after": "es"
+          },
+          "bbox": {
+            "before": [
+              392,
+              278,
+              447,
+              295
+            ],
+            "after": [
+              418,
+              264,
+              433,
+              273
+            ]
+          }
+        }
+      },
+      {
+        "element_id": "label_69",
+        "element_id_after": "label_84",
+        "match_score": 0.128,
+        "before": {
+          "element_id": "label_69",
+          "type": "label",
+          "bbox": [
+            392,
+            322,
+            447,
+            339
+          ],
+          "text": "google",
+          "label": "google",
+          "enabled": true,
+          "visible": true,
+          "confidence": 0.96,
+          "metadata": {
+            "source": "ocr"
+          }
+        },
+        "after": {
+          "element_id": "label_84",
+          "type": "label",
+          "bbox": [
+            393,
+            308,
+            408,
+            317
+          ],
+          "text": "no",
+          "label": "no",
+          "enabled": true,
+          "visible": true,
+          "confidence": 0.96,
+          "metadata": {
+            "source": "ocr"
+          }
+        },
+        "changes": {
+          "text": {
+            "before": "google",
+            "after": "no"
+          },
+          "label": {
+            "before": "google",
+            "after": "no"
+          },
+          "bbox": {
+            "before": [
+              392,
+              322,
+              447,
+              339
+            ],
+            "after": [
+              393,
+              308,
+              408,
+              317
+            ]
+          }
+        }
+      },
+      {
+        "element_id": "label_71",
+        "element_id_after": "label_85",
+        "match_score": 0.175,
+        "before": {
+          "element_id": "label_71",
+          "type": "label",
+          "bbox": [
+            392,
+            366,
+            447,
+            383
+          ],
+          "text": "google",
+          "label": "google",
+          "enabled": true,
+          "visible": true,
+          "confidence": 0.92,
+          "metadata": {
+            "source": "ocr"
+          }
+        },
+        "after": {
+          "element_id": "label_85",
+          "type": "label",
+          "bbox": [
+            418,
+            348,
+            455,
+            365
+          ],
+          "text": "epad",
+          "label": "epad",
+          "enabled": true,
+          "visible": true,
+          "confidence": 0.6,
+          "metadata": {
+            "source": "ocr"
+          }
+        },
+        "changes": {
+          "text": {
+            "before": "google",
+            "after": "epad"
+          },
+          "label": {
+            "before": "google",
+            "after": "epad"
+          },
+          "bbox": {
+            "before": [
+              392,
+              366,
+              447,
+              383
+            ],
+            "after": [
+              418,
+              348,
+              455,
+              365
+            ]
+          }
+        }
+      },
+      {
+        "element_id": "label_73",
+        "element_id_after": "label_86",
+        "match_score": 0.247,
+        "before": {
+          "element_id": "label_73",
+          "type": "label",
+          "bbox": [
+            392,
+            410,
+            447,
+            427
+          ],
+          "text": "google",
+          "label": "google",
+          "enabled": true,
+          "visible": true,
+          "confidence": 0.96,
+          "metadata": {
+            "source": "ocr"
+          }
+        },
+        "after": {
+          "element_id": "label_86",
+          "type": "label",
+          "bbox": [
+            393,
+            392,
+            467,
+            405
+          ],
+          "text": "notebook",
+          "label": "notebook",
+          "enabled": true,
+          "visible": true,
+          "confidence": 0.96,
+          "metadata": {
+            "source": "ocr"
+          }
+        },
+        "changes": {
+          "text": {
+            "before": "google",
+            "after": "notebook"
+          },
+          "label": {
+            "before": "google",
+            "after": "notebook"
+          },
+          "bbox": {
+            "before": [
+              392,
+              410,
+              447,
+              427
+            ],
+            "after": [
+              393,
+              392,
+              467,
+              405
+            ]
+          }
+        }
+      },
+      {
+        "element_id": "label_78",
+        "element_id_after": "label_97",
+        "match_score": 0.477,
+        "before": {
+          "element_id": "label_78",
+          "type": "label",
+          "bbox": [
+            454,
+            499,
+            494,
+            511
+          ],
+          "text": "meet",
+          "label": "meet",
+          "enabled": true,
+          "visible": true,
+          "confidence": 0.9,
+          "metadata": {
+            "source": "ocr"
+          }
+        },
+        "after": {
+          "element_id": "label_97",
+          "type": "label",
+          "bbox": [
+            393,
+            511,
+            567,
+            528
+          ],
+          "text": "Notifications",
+          "label": "Notifications",
+          "enabled": true,
+          "visible": true,
+          "confidence": 0.69,
+          "metadata": {
+            "source": "ocr"
+          }
+        },
+        "changes": {
+          "text": {
+            "before": "meet",
+            "after": "Notifications"
+          },
+          "label": {
+            "before": "meet",
+            "after": "Notifications"
+          },
+          "bbox": {
+            "before": [
+              454,
+              499,
+              494,
+              511
+            ],
+            "after": [
+              393,
+              511,
+              567,
+              528
+            ]
+          }
+        }
+      },
+      {
+        "element_id": "label_80",
+        "element_id_after": "label_103",
+        "match_score": 0.39,
+        "before": {
+          "element_id": "label_80",
+          "type": "label",
+          "bbox": [
+            453,
+            542,
+            495,
+            555
+          ],
+          "text": "earth",
+          "label": "earth",
+          "enabled": true,
+          "visible": true,
+          "confidence": 0.96,
+          "metadata": {
+            "source": "ocr"
+          }
+        },
+        "after": {
+          "element_id": "label_103",
+          "type": "label",
+          "bbox": [
+            476,
+            563,
+            493,
+            564
+          ],
+          "text": "—",
+          "label": "—",
+          "enabled": true,
+          "visible": true,
+          "confidence": 0.9,
+          "metadata": {
+            "source": "ocr"
+          }
+        },
+        "changes": {
+          "text": {
+            "before": "earth",
+            "after": "—"
+          },
+          "label": {
+            "before": "earth",
+            "after": "—"
+          },
+          "bbox": {
+            "before": [
+              453,
+              542,
+              495,
+              555
+            ],
+            "after": [
+              476,
+              563,
+              493,
+              564
+            ]
+          }
+        }
+      },
+      {
+        "element_id": "label_104",
+        "element_id_after": "label_120",
+        "match_score": 0.656,
+        "before": {
+          "element_id": "label_104",
+          "type": "label",
+          "bbox": [
+            1202,
+            811,
+            1223,
+            822
+          ],
+          "text": "the.",
+          "label": "the.",
+          "enabled": true,
+          "visible": true,
+          "confidence": 0.89,
+          "metadata": {
+            "source": "ocr"
+          }
+        },
+        "after": {
+          "element_id": "label_120",
+          "type": "label",
+          "bbox": [
+            1202,
+            811,
+            1234,
+            822
+          ],
+          "text": "the...",
+          "label": "the...",
+          "enabled": true,
+          "visible": true,
+          "confidence": 0.95,
+          "metadata": {
+            "source": "ocr"
+          }
+        },
+        "changes": {
+          "text": {
+            "before": "the.",
+            "after": "the..."
+          },
+          "label": {
+            "before": "the.",
+            "after": "the..."
+          },
+          "bbox": {
+            "before": [
+              1202,
+              811,
+              1223,
+              822
+            ],
+            "after": [
+              1202,
+              811,
+              1234,
+              822
+            ]
+          }
+        }
+      },
+      {
+        "element_id": "label_124",
+        "element_id_after": "label_138",
+        "match_score": 0.235,
+        "before": {
+          "element_id": "label_124",
+          "type": "label",
+          "bbox": [
+            1014,
+            1155,
+            1309,
+            1194
+          ],
+          "text": "29238",
+          "label": "29238",
+          "enabled": true,
+          "visible": true,
+          "confidence": 0.36,
+          "metadata": {
+            "source": "ocr"
+          }
+        },
+        "after": {
+          "element_id": "label_138",
+          "type": "label",
+          "bbox": [
+            1173,
+            1159,
+            1195,
+            1181
+          ],
+          "text": "o",
+          "label": "o",
+          "enabled": true,
+          "visible": true,
+          "confidence": 0.43,
+          "metadata": {
+            "source": "ocr"
+          }
+        },
+        "changes": {
+          "text": {
+            "before": "29238",
+            "after": "o"
+          },
+          "label": {
+            "before": "29238",
+            "after": "o"
+          },
+          "bbox": {
+            "before": [
+              1014,
+              1155,
+              1309,
+              1194
+            ],
+            "after": [
+              1173,
+              1159,
+              1195,
+              1181
+            ]
+          }
+        }
+      },
+      {
+        "element_id": "label_125",
+        "element_id_after": "label_139",
+        "match_score": 0.33,
+        "before": {
+          "element_id": "label_125",
+          "type": "label",
+          "bbox": [
+            1230,
+            1151,
+            1256,
+            1200
+          ],
+          "text": "©",
+          "label": "©",
+          "enabled": true,
+          "visible": true,
+          "confidence": 0.67,
+          "metadata": {
+            "source": "ocr"
+          }
+        },
+        "after": {
+          "element_id": "label_139",
+          "type": "label",
+          "bbox": [
+            1231,
+            1163,
+            1251,
+            1184
+          ],
+          "text": "@",
+          "label": "@",
+          "enabled": true,
+          "visible": true,
+          "confidence": 0.38,
+          "metadata": {
+            "source": "ocr"
+          }
+        },
+        "changes": {
+          "text": {
+            "before": "©",
+            "after": "@"
+          },
+          "label": {
+            "before": "©",
+            "after": "@"
+          },
+          "bbox": {
+            "before": [
+              1230,
+              1151,
+              1256,
+              1200
+            ],
+            "after": [
+              1231,
+              1163,
+              1251,
+              1184
+            ]
+          }
+        }
+      }
+    ],
+    "summary": {
+      "total_before": 126,
+      "total_after": 144,
+      "matched": 109,
+      "added_count": 35,
+      "removed_count": 17,
+      "changed_count": 14,
+      "diff_method": "position_iou"
+    }
+  }
+}

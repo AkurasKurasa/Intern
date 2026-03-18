@@ -1,0 +1,8744 @@
+{
+  "trace_id": "live_step_0011",
+  "timestamp": "2026-03-08T14:58:05.341249",
+  "duration": 1.0,
+  "type": "gui",
+  "state": {
+    "application": "Unknown",
+    "window_title": "frame_0011",
+    "screen_resolution": [
+      1920,
+      1200
+    ],
+    "focused_element_id": null,
+    "elements": [
+      {
+        "element_id": "label_0",
+        "type": "label",
+        "bbox": [
+          328,
+          23,
+          337,
+          32
+        ],
+        "text": "x",
+        "label": "x",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.95,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_1",
+        "type": "label",
+        "bbox": [
+          13,
+          18,
+          33,
+          38
+        ],
+        "text": "©",
+        "label": "©",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.63,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_2",
+        "type": "label",
+        "bbox": [
+          40,
+          23,
+          91,
+          34
+        ],
+        "text": "untitled",
+        "label": "untitled",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.55,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_3",
+        "type": "label",
+        "bbox": [
+          97,
+          26,
+          140,
+          37
+        ],
+        "text": "preseni",
+        "label": "preseni",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.88,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_4",
+        "type": "label",
+        "bbox": [
+          151,
+          23,
+          160,
+          32
+        ],
+        "text": "x",
+        "label": "x",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.92,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_5",
+        "type": "label",
+        "bbox": [
+          186,
+          14,
+          200,
+          42
+        ],
+        "text": "@",
+        "label": "@",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.88,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_6",
+        "type": "label",
+        "bbox": [
+          218,
+          23,
+          281,
+          34
+        ],
+        "text": "Facebook",
+        "label": "Facebook",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.94,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_7",
+        "type": "label",
+        "bbox": [
+          370,
+          20,
+          386,
+          36
+        ],
+        "text": "AA",
+        "label": "AA",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.82,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_8",
+        "type": "label",
+        "bbox": [
+          395,
+          16,
+          434,
+          41
+        ],
+        "text": "Google",
+        "label": "Google",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.93,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_9",
+        "type": "label",
+        "bbox": [
+          506,
+          23,
+          515,
+          32
+        ],
+        "text": "X",
+        "label": "X",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.76,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_10",
+        "type": "label",
+        "bbox": [
+          548,
+          20,
+          564,
+          36
+        ],
+        "text": "A",
+        "label": "A",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.71,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_11",
+        "type": "label",
+        "bbox": [
+          573,
+          23,
+          620,
+          37
+        ],
+        "text": "Google",
+        "label": "Google",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.92,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_12",
+        "type": "label",
+        "bbox": [
+          684,
+          23,
+          693,
+          32
+        ],
+        "text": "X",
+        "label": "X",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.71,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_13",
+        "type": "label",
+        "bbox": [
+          725,
+          20,
+          741,
+          36
+        ],
+        "text": "AM",
+        "label": "AM",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.47,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_14",
+        "type": "label",
+        "bbox": [
+          750,
+          23,
+          798,
+          37
+        ],
+        "text": "Google",
+        "label": "Google",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.91,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_15",
+        "type": "label",
+        "bbox": [
+          861,
+          23,
+          870,
+          32
+        ],
+        "text": "X",
+        "label": "X",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.76,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_16",
+        "type": "label",
+        "bbox": [
+          905,
+          21,
+          917,
+          34
+        ],
+        "text": "G",
+        "label": "G",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.56,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_17",
+        "type": "label",
+        "bbox": [
+          928,
+          23,
+          1024,
+          34
+        ],
+        "text": "Authentication",
+        "label": "Authentication",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.95,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_18",
+        "type": "label",
+        "bbox": [
+          1039,
+          23,
+          1048,
+          32
+        ],
+        "text": "<x",
+        "label": "<x",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.61,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_19",
+        "type": "label",
+        "bbox": [
+          1083,
+          21,
+          1095,
+          34
+        ],
+        "text": "G",
+        "label": "G",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.69,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_20",
+        "type": "label",
+        "bbox": [
+          1106,
+          23,
+          1202,
+          34
+        ],
+        "text": "Authentication",
+        "label": "Authentication",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.95,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_21",
+        "type": "label",
+        "bbox": [
+          1217,
+          23,
+          1226,
+          32
+        ],
+        "text": "<x",
+        "label": "<x",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.54,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_22",
+        "type": "label",
+        "bbox": [
+          1258,
+          20,
+          1274,
+          36
+        ],
+        "text": "AM",
+        "label": "AM",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.47,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_23",
+        "type": "label",
+        "bbox": [
+          1283,
+          23,
+          1331,
+          37
+        ],
+        "text": "Google",
+        "label": "Google",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.91,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_24",
+        "type": "label",
+        "bbox": [
+          1394,
+          23,
+          1403,
+          32
+        ],
+        "text": "X",
+        "label": "X",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.76,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_25",
+        "type": "label",
+        "bbox": [
+          1461,
+          23,
+          1504,
+          34
+        ],
+        "text": "online",
+        "label": "online",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.83,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_26",
+        "type": "label",
+        "bbox": [
+          1509,
+          23,
+          1560,
+          34
+        ],
+        "text": "Catcutate",
+        "label": "Catcutate",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.35,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_27",
+        "type": "label",
+        "bbox": [
+          1572,
+          23,
+          1581,
+          32
+        ],
+        "text": "x",
+        "label": "x",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.6,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_28",
+        "type": "label",
+        "bbox": [
+          1616,
+          21,
+          1631,
+          36
+        ],
+        "text": "fb",
+        "label": "fb",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.47,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_29",
+        "type": "label",
+        "bbox": [
+          1828,
+          22,
+          1841,
+          34
+        ],
+        "text": "a",
+        "label": "a",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.73,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_30",
+        "type": "label",
+        "bbox": [
+          1885,
+          22,
+          1898,
+          34
+        ],
+        "text": "x",
+        "label": "x",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.91,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_31",
+        "type": "label",
+        "bbox": [
+          1883,
+          68,
+          1900,
+          80
+        ],
+        "text": "=?",
+        "label": "=?",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.42,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_32",
+        "type": "label",
+        "bbox": [
+          20,
+          67,
+          84,
+          87
+        ],
+        "text": "oe",
+        "label": "oe",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.75,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_33",
+        "type": "label",
+        "bbox": [
+          156,
+          71,
+          174,
+          89
+        ],
+        "text": "CG",
+        "label": "CG",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.48,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_34",
+        "type": "label",
+        "bbox": [
+          345,
+          70,
+          397,
+          90
+        ],
+        "text": "08",
+        "label": "08",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.67,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_35",
+        "type": "label",
+        "bbox": [
+          447,
+          75,
+          607,
+          92
+        ],
+        "text": "www.rapidtables.com",
+        "label": "www.rapidtables.com",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.85,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_36",
+        "type": "label",
+        "bbox": [
+          1419,
+          70,
+          1472,
+          89
+        ],
+        "text": "Ow",
+        "label": "Ow",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.74,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_37",
+        "type": "label",
+        "bbox": [
+          1637,
+          66,
+          1651,
+          94
+        ],
+        "text": "©",
+        "label": "©",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_38",
+        "type": "label",
+        "bbox": [
+          1669,
+          75,
+          1697,
+          89
+        ],
+        "text": "Sign",
+        "label": "Sign",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.73,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_39",
+        "type": "label",
+        "bbox": [
+          1703,
+          78,
+          1713,
+          86
+        ],
+        "text": "in",
+        "label": "in",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.73,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_40",
+        "type": "label",
+        "bbox": [
+          1743,
+          60,
+          1770,
+          97
+        ],
+        "text": "Hj",
+        "label": "Hj",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.37,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_41",
+        "type": "label",
+        "bbox": [
+          1794,
+          64,
+          1813,
+          90
+        ],
+        "text": "8",
+        "label": "8",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.55,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_42",
+        "type": "label",
+        "bbox": [
+          1837,
+          73,
+          1852,
+          87
+        ],
+        "text": "»",
+        "label": "»",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.83,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_43",
+        "type": "label",
+        "bbox": [
+          1883,
+          84,
+          1897,
+          85
+        ],
+        "text": "=",
+        "label": "=",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_44",
+        "type": "label",
+        "bbox": [
+          16,
+          116,
+          34,
+          130
+        ],
+        "text": "-3)",
+        "label": "-3)",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.55,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_45",
+        "type": "label",
+        "bbox": [
+          41,
+          118,
+          85,
+          132
+        ],
+        "text": "Import",
+        "label": "Import",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.9,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_46",
+        "type": "label",
+        "bbox": [
+          90,
+          118,
+          173,
+          129
+        ],
+        "text": "bookmarks...",
+        "label": "bookmarks...",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.83,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_47",
+        "type": "label",
+        "bbox": [
+          189,
+          114,
+          264,
+          129
+        ],
+        "text": "(Finance",
+        "label": "(Finance",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.51,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_48",
+        "type": "label",
+        "bbox": [
+          280,
+          114,
+          376,
+          132
+        ],
+        "text": "[Philosophy",
+        "label": "[Philosophy",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.4,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_49",
+        "type": "label",
+        "bbox": [
+          392,
+          114,
+          481,
+          132
+        ],
+        "text": "[Language",
+        "label": "[Language",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.54,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_50",
+        "type": "label",
+        "bbox": [
+          610,
+          114,
+          667,
+          132
+        ],
+        "text": "[Body",
+        "label": "[Body",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.54,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_51",
+        "type": "label",
+        "bbox": [
+          684,
+          114,
+          698,
+          132
+        ],
+        "text": "¢",
+        "label": "¢",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.66,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_52",
+        "type": "label",
+        "bbox": [
+          708,
+          118,
+          757,
+          129
+        ],
+        "text": "FlowCV",
+        "label": "FlowCV",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.37,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_53",
+        "type": "label",
+        "bbox": [
+          773,
+          113,
+          791,
+          133
+        ],
+        "text": "©",
+        "label": "©",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.57,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_54",
+        "type": "label",
+        "bbox": [
+          797,
+          118,
+          829,
+          129
+        ],
+        "text": "Khan",
+        "label": "Khan",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.53,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_55",
+        "type": "label",
+        "bbox": [
+          834,
+          118,
+          895,
+          132
+        ],
+        "text": "Academy",
+        "label": "Academy",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.53,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_56",
+        "type": "label",
+        "bbox": [
+          911,
+          116,
+          930,
+          133
+        ],
+        "text": "@",
+        "label": "@",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.82,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_57",
+        "type": "label",
+        "bbox": [
+          935,
+          118,
+          959,
+          129
+        ],
+        "text": "The",
+        "label": "The",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.91,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_58",
+        "type": "label",
+        "bbox": [
+          963,
+          118,
+          1015,
+          129
+        ],
+        "text": "Toulmin",
+        "label": "Toulmin",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.91,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_59",
+        "type": "label",
+        "bbox": [
+          1021,
+          118,
+          1071,
+          129
+        ],
+        "text": "Method",
+        "label": "Method",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.87,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_60",
+        "type": "label",
+        "bbox": [
+          1087,
+          113,
+          1107,
+          133
+        ],
+        "text": "@",
+        "label": "@",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.72,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_61",
+        "type": "label",
+        "bbox": [
+          1113,
+          118,
+          1173,
+          129
+        ],
+        "text": "Choose",
+        "label": "Choose",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_62",
+        "type": "label",
+        "bbox": [
+          1164,
+          109,
+          1170,
+          137
+        ],
+        "text": "a",
+        "label": "a",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_63",
+        "type": "label",
+        "bbox": [
+          1178,
+          118,
+          1228,
+          132
+        ],
+        "text": "Starting",
+        "label": "Starting",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_64",
+        "type": "label",
+        "bbox": [
+          1234,
+          118,
+          1264,
+          129
+        ],
+        "text": "Poi...",
+        "label": "Poi...",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.78,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_65",
+        "type": "label",
+        "bbox": [
+          1287,
+          113,
+          1307,
+          133
+        ],
+        "text": "BB",
+        "label": "BB",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.54,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_66",
+        "type": "label",
+        "bbox": [
+          1314,
+          118,
+          1344,
+          129
+        ],
+        "text": "1049",
+        "label": "1049",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.89,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_67",
+        "type": "label",
+        "bbox": [
+          1349,
+          118,
+          1389,
+          129
+        ],
+        "text": "cards:",
+        "label": "cards:",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.95,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_68",
+        "type": "label",
+        "bbox": [
+          1394,
+          118,
+          1418,
+          129
+        ],
+        "text": "Css",
+        "label": "Css",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.52,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_69",
+        "type": "label",
+        "bbox": [
+          1423,
+          118,
+          1435,
+          129
+        ],
+        "text": "&",
+        "label": "&",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.92,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_70",
+        "type": "label",
+        "bbox": [
+          1439,
+          118,
+          1456,
+          129
+        ],
+        "text": "Tail",
+        "label": "Tail",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.94,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_71",
+        "type": "label",
+        "bbox": [
+          1487,
+          113,
+          1507,
+          133
+        ],
+        "text": "HB",
+        "label": "HB",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.55,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_72",
+        "type": "label",
+        "bbox": [
+          1513,
+          118,
+          1559,
+          132
+        ],
+        "text": "Home",
+        "label": "Home",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.88,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_73",
+        "type": "label",
+        "bbox": [
+          1553,
+          109,
+          1560,
+          137
+        ],
+        "text": "|",
+        "label": "|",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.88,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_74",
+        "type": "label",
+        "bbox": [
+          1565,
+          118,
+          1596,
+          129
+        ],
+        "text": "Laws",
+        "label": "Laws",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_75",
+        "type": "label",
+        "bbox": [
+          1601,
+          118,
+          1614,
+          129
+        ],
+        "text": "of",
+        "label": "of",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_76",
+        "type": "label",
+        "bbox": [
+          1619,
+          118,
+          1637,
+          129
+        ],
+        "text": "UX)",
+        "label": "UX)",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.37,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_77",
+        "type": "label",
+        "bbox": [
+          1677,
+          118,
+          1719,
+          129
+        ],
+        "text": "2000+",
+        "label": "2000+",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.92,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_78",
+        "type": "label",
+        "bbox": [
+          1725,
+          118,
+          1752,
+          129
+        ],
+        "text": "Free",
+        "label": "Free",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.95,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_79",
+        "type": "label",
+        "bbox": [
+          1757,
+          118,
+          1834,
+          132
+        ],
+        "text": "Developer...",
+        "label": "Developer...",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.8,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_80",
+        "type": "label",
+        "bbox": [
+          1887,
+          116,
+          1902,
+          130
+        ],
+        "text": "»",
+        "label": "»",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.92,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_81",
+        "type": "label",
+        "bbox": [
+          343,
+          167,
+          510,
+          197
+        ],
+        "text": "RapidTables",
+        "label": "RapidTables",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.91,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_82",
+        "type": "label",
+        "bbox": [
+          1332,
+          172,
+          1355,
+          194
+        ],
+        "text": "Q",
+        "label": "Q",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.93,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_83",
+        "type": "label",
+        "bbox": [
+          1365,
+          171,
+          1434,
+          188
+        ],
+        "text": "Search",
+        "label": "Search",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_84",
+        "type": "label",
+        "bbox": [
+          343,
+          239,
+          395,
+          253
+        ],
+        "text": "Home",
+        "label": "Home",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_85",
+        "type": "label",
+        "bbox": [
+          342,
+          292,
+          433,
+          316
+        ],
+        "text": "Online",
+        "label": "Online",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_86",
+        "type": "label",
+        "bbox": [
+          444,
+          292,
+          597,
+          316
+        ],
+        "text": "Calculators",
+        "label": "Calculators",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.93,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_87",
+        "type": "label",
+        "bbox": [
+          608,
+          293,
+          632,
+          316
+        ],
+        "text": "&",
+        "label": "&",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.93,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_88",
+        "type": "label",
+        "bbox": [
+          641,
+          292,
+          712,
+          316
+        ],
+        "text": "Tools",
+        "label": "Tools",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_89",
+        "type": "label",
+        "bbox": [
+          1172,
+          321,
+          1266,
+          334
+        ],
+        "text": "CONTENTS",
+        "label": "CONTENTS",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.89,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_90",
+        "type": "label",
+        "bbox": [
+          343,
+          357,
+          405,
+          378
+        ],
+        "text": "Math",
+        "label": "Math",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_91",
+        "type": "label",
+        "bbox": [
+          415,
+          357,
+          549,
+          378
+        ],
+        "text": "Calculators",
+        "label": "Calculators",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_92",
+        "type": "label",
+        "bbox": [
+          1168,
+          371,
+          1176,
+          377
+        ],
+        "text": "*",
+        "label": "*",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.38,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_93",
+        "type": "label",
+        "bbox": [
+          1186,
+          365,
+          1282,
+          380
+        ],
+        "text": "Calculators",
+        "label": "Calculators",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_94",
+        "type": "label",
+        "bbox": [
+          364,
+          421,
+          371,
+          427
+        ],
+        "text": "©",
+        "label": "©",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.3,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_95",
+        "type": "label",
+        "bbox": [
+          382,
+          415,
+          459,
+          430
+        ],
+        "text": "Scientific",
+        "label": "Scientific",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.95,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_96",
+        "type": "label",
+        "bbox": [
+          466,
+          415,
+          551,
+          430
+        ],
+        "text": "calculator",
+        "label": "calculator",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_97",
+        "type": "label",
+        "bbox": [
+          1168,
+          414,
+          1176,
+          420
+        ],
+        "text": "*",
+        "label": "*",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.66,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_98",
+        "type": "label",
+        "bbox": [
+          1186,
+          408,
+          1283,
+          423
+        ],
+        "text": "Conversion",
+        "label": "Conversion",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_99",
+        "type": "label",
+        "bbox": [
+          383,
+          458,
+          479,
+          477
+        ],
+        "text": "Percentage",
+        "label": "Percentage",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_100",
+        "type": "label",
+        "bbox": [
+          486,
+          457,
+          570,
+          472
+        ],
+        "text": "calculator",
+        "label": "calculator",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_101",
+        "type": "label",
+        "bbox": [
+          1168,
+          456,
+          1176,
+          462
+        ],
+        "text": "*",
+        "label": "*",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.7,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_102",
+        "type": "label",
+        "bbox": [
+          1186,
+          450,
+          1230,
+          465
+        ],
+        "text": "Tools",
+        "label": "Tools",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.95,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_103",
+        "type": "label",
+        "bbox": [
+          383,
+          500,
+          451,
+          515
+        ],
+        "text": "Fraction",
+        "label": "Fraction",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_104",
+        "type": "label",
+        "bbox": [
+          458,
+          500,
+          543,
+          515
+        ],
+        "text": "calculator",
+        "label": "calculator",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_105",
+        "type": "label",
+        "bbox": [
+          1173,
+          513,
+          1226,
+          526
+        ],
+        "text": "RAPID",
+        "label": "RAPID",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_106",
+        "type": "label",
+        "bbox": [
+          1231,
+          513,
+          1294,
+          526
+        ],
+        "text": "TABLES",
+        "label": "TABLES",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_107",
+        "type": "label",
+        "bbox": [
+          382,
+          543,
+          453,
+          562
+        ],
+        "text": "Average",
+        "label": "Average",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.97,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_108",
+        "type": "label",
+        "bbox": [
+          460,
+          542,
+          544,
+          557
+        ],
+        "text": "calculator",
+        "label": "calculator",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_109",
+        "type": "label",
+        "bbox": [
+          1187,
+          558,
+          1221,
+          573
+        ],
+        "text": "Link",
+        "label": "Link",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_110",
+        "type": "label",
+        "bbox": [
+          1227,
+          560,
+          1245,
+          573
+        ],
+        "text": "to",
+        "label": "to",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_111",
+        "type": "label",
+        "bbox": [
+          1252,
+          559,
+          1272,
+          573
+        ],
+        "text": "Us",
+        "label": "Us",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_112",
+        "type": "label",
+        "bbox": [
+          1187,
+          600,
+          1295,
+          615
+        ],
+        "text": "Recommend",
+        "label": "Recommend",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_113",
+        "type": "label",
+        "bbox": [
+          1303,
+          600,
+          1334,
+          615
+        ],
+        "text": "Site",
+        "label": "Site",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_114",
+        "type": "label",
+        "bbox": [
+          343,
+          604,
+          397,
+          625
+        ],
+        "text": "Misc",
+        "label": "Misc",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_115",
+        "type": "label",
+        "bbox": [
+          407,
+          604,
+          541,
+          625
+        ],
+        "text": "Calculators",
+        "label": "Calculators",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_116",
+        "type": "label",
+        "bbox": [
+          1187,
+          643,
+          1229,
+          658
+        ],
+        "text": "Send",
+        "label": "Send",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_117",
+        "type": "label",
+        "bbox": [
+          1237,
+          643,
+          1319,
+          658
+        ],
+        "text": "Feedback",
+        "label": "Feedback",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_118",
+        "type": "label",
+        "bbox": [
+          364,
+          669,
+          371,
+          675
+        ],
+        "text": "©",
+        "label": "©",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.34,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_119",
+        "type": "label",
+        "bbox": [
+          382,
+          663,
+          434,
+          678
+        ],
+        "text": "Grade",
+        "label": "Grade",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_120",
+        "type": "label",
+        "bbox": [
+          440,
+          663,
+          526,
+          678
+        ],
+        "text": "calculator",
+        "label": "calculator",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_121",
+        "type": "label",
+        "bbox": [
+          1186,
+          685,
+          1240,
+          700
+        ],
+        "text": "About",
+        "label": "About",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_122",
+        "type": "label",
+        "bbox": [
+          364,
+          711,
+          371,
+          717
+        ],
+        "text": "©",
+        "label": "©",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.66,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_123",
+        "type": "label",
+        "bbox": [
+          382,
+          706,
+          418,
+          720
+        ],
+        "text": "GPA",
+        "label": "GPA",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.95,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_124",
+        "type": "label",
+        "bbox": [
+          424,
+          705,
+          509,
+          720
+        ],
+        "text": "calculator",
+        "label": "calculator",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.95,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_125",
+        "type": "label",
+        "bbox": [
+          383,
+          748,
+          421,
+          763
+        ],
+        "text": "Final",
+        "label": "Final",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.97,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_126",
+        "type": "label",
+        "bbox": [
+          429,
+          748,
+          478,
+          768
+        ],
+        "text": "grade",
+        "label": "grade",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_127",
+        "type": "label",
+        "bbox": [
+          485,
+          748,
+          570,
+          763
+        ],
+        "text": "calculator",
+        "label": "calculator",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_128",
+        "type": "label",
+        "bbox": [
+          383,
+          791,
+          469,
+          810
+        ],
+        "text": "Mortgage",
+        "label": "Mortgage",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_129",
+        "type": "label",
+        "bbox": [
+          475,
+          790,
+          560,
+          805
+        ],
+        "text": "calculator",
+        "label": "calculator",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_130",
+        "type": "label",
+        "bbox": [
+          364,
+          839,
+          371,
+          845
+        ],
+        "text": "*",
+        "label": "*",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.54,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_131",
+        "type": "label",
+        "bbox": [
+          382,
+          833,
+          479,
+          853
+        ],
+        "text": "Compound",
+        "label": "Compound",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_132",
+        "type": "label",
+        "bbox": [
+          487,
+          833,
+          552,
+          848
+        ],
+        "text": "interest",
+        "label": "interest",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_133",
+        "type": "label",
+        "bbox": [
+          558,
+          833,
+          643,
+          848
+        ],
+        "text": "calculator",
+        "label": "calculator",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_134",
+        "type": "label",
+        "bbox": [
+          383,
+          876,
+          415,
+          890
+        ],
+        "text": "BMI",
+        "label": "BMI",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.95,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_135",
+        "type": "label",
+        "bbox": [
+          422,
+          875,
+          507,
+          890
+        ],
+        "text": "calculator",
+        "label": "calculator",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.95,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_136",
+        "type": "label",
+        "bbox": [
+          341,
+          937,
+          404,
+          958
+        ],
+        "text": "Tools",
+        "label": "Tools",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_137",
+        "type": "label",
+        "bbox": [
+          364,
+          1002,
+          371,
+          1008
+        ],
+        "text": "©",
+        "label": "©",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.36,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_138",
+        "type": "label",
+        "bbox": [
+          382,
+          996,
+          439,
+          1011
+        ],
+        "text": "Online",
+        "label": "Online",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_139",
+        "type": "label",
+        "bbox": [
+          446,
+          996,
+          517,
+          1016
+        ],
+        "text": "notepad",
+        "label": "notepad",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_140",
+        "type": "label",
+        "bbox": [
+          383,
+          1039,
+          418,
+          1053
+        ],
+        "text": "RGB",
+        "label": "RGB",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_141",
+        "type": "label",
+        "bbox": [
+          424,
+          1038,
+          469,
+          1053
+        ],
+        "text": "color",
+        "label": "color",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_142",
+        "type": "label",
+        "bbox": [
+          474,
+          1038,
+          525,
+          1053
+        ],
+        "text": "codes",
+        "label": "codes",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.9,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_143",
+        "type": "label",
+        "bbox": [
+          382,
+          1082,
+          426,
+          1096
+        ],
+        "text": "ASCII",
+        "label": "ASCII",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.89,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_144",
+        "type": "label",
+        "bbox": [
+          434,
+          1081,
+          477,
+          1096
+        ],
+        "text": "table",
+        "label": "table",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_145",
+        "type": "label",
+        "bbox": [
+          354,
+          1123,
+          368,
+          1134
+        ],
+        "text": "ml",
+        "label": "ml",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.71,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_146",
+        "type": "label",
+        "bbox": [
+          670,
+          1156,
+          683,
+          1187
+        ],
+        "text": "Q",
+        "label": "Q",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.93,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_147",
+        "type": "label",
+        "bbox": [
+          706,
+          1164,
+          755,
+          1177
+        ],
+        "text": "Search",
+        "label": "Search",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.95,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_148",
+        "type": "label",
+        "bbox": [
+          1662,
+          1166,
+          1676,
+          1173
+        ],
+        "text": "A",
+        "label": "A",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.68,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_149",
+        "type": "label",
+        "bbox": [
+          1764,
+          1156,
+          1789,
+          1187
+        ],
+        "text": "&",
+        "label": "&",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.8,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_150",
+        "type": "label",
+        "bbox": [
+          1812,
+          1154,
+          1839,
+          1165
+        ],
+        "text": "2:57",
+        "label": "2:57",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.87,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_151",
+        "type": "label",
+        "bbox": [
+          1845,
+          1154,
+          1865,
+          1165
+        ],
+        "text": "PM",
+        "label": "PM",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.41,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_152",
+        "type": "label",
+        "bbox": [
+          1877,
+          1161,
+          1894,
+          1176
+        ],
+        "text": "ge",
+        "label": "ge",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.41,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_153",
+        "type": "label",
+        "bbox": [
+          25,
+          1171,
+          33,
+          1176
+        ],
+        "text": "<—",
+        "label": "<—",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.3,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_154",
+        "type": "label",
+        "bbox": [
+          65,
+          1174,
+          109,
+          1188
+        ],
+        "text": "Mostly",
+        "label": "Mostly",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_155",
+        "type": "label",
+        "bbox": [
+          114,
+          1174,
+          158,
+          1188
+        ],
+        "text": "cloudy",
+        "label": "cloudy",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_156",
+        "type": "label",
+        "bbox": [
+          1806,
+          1174,
+          1865,
+          1186
+        ],
+        "text": "3/8/2026",
+        "label": "3/8/2026",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.95,
+        "metadata": {
+          "source": "ocr"
+        }
+      }
+    ]
+  },
+  "next_state": {
+    "application": "Unknown",
+    "window_title": "frame_0012",
+    "screen_resolution": [
+      1920,
+      1200
+    ],
+    "focused_element_id": null,
+    "elements": [
+      {
+        "element_id": "label_0",
+        "type": "label",
+        "bbox": [
+          219,
+          23,
+          223,
+          24
+        ],
+        "text": "5",
+        "label": "5",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.34,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_1",
+        "type": "label",
+        "bbox": [
+          41,
+          23,
+          91,
+          34
+        ],
+        "text": "Untitled",
+        "label": "Untitled",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.86,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_2",
+        "type": "label",
+        "bbox": [
+          98,
+          26,
+          140,
+          37
+        ],
+        "text": "presen’",
+        "label": "presen’",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.71,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_3",
+        "type": "label",
+        "bbox": [
+          151,
+          23,
+          160,
+          32
+        ],
+        "text": "X",
+        "label": "X",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.76,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_4",
+        "type": "label",
+        "bbox": [
+          328,
+          23,
+          337,
+          32
+        ],
+        "text": "x",
+        "label": "x",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.95,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_5",
+        "type": "label",
+        "bbox": [
+          395,
+          23,
+          442,
+          37
+        ],
+        "text": "Google",
+        "label": "Google",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.92,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_6",
+        "type": "label",
+        "bbox": [
+          447,
+          23,
+          494,
+          37
+        ],
+        "text": "Antigray",
+        "label": "Antigray",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.46,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_7",
+        "type": "label",
+        "bbox": [
+          506,
+          23,
+          515,
+          32
+        ],
+        "text": "X",
+        "label": "X",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.88,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_8",
+        "type": "label",
+        "bbox": [
+          573,
+          23,
+          620,
+          37
+        ],
+        "text": "Google",
+        "label": "Google",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.93,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_9",
+        "type": "label",
+        "bbox": [
+          625,
+          23,
+          672,
+          37
+        ],
+        "text": "Antigray",
+        "label": "Antigray",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.76,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_10",
+        "type": "label",
+        "bbox": [
+          684,
+          23,
+          693,
+          32
+        ],
+        "text": "X",
+        "label": "X",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.86,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_11",
+        "type": "label",
+        "bbox": [
+          751,
+          23,
+          798,
+          37
+        ],
+        "text": "Google",
+        "label": "Google",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_12",
+        "type": "label",
+        "bbox": [
+          803,
+          23,
+          825,
+          34
+        ],
+        "text": "Anti",
+        "label": "Anti",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.85,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_13",
+        "type": "label",
+        "bbox": [
+          861,
+          23,
+          870,
+          32
+        ],
+        "text": "x",
+        "label": "x",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.95,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_14",
+        "type": "label",
+        "bbox": [
+          928,
+          23,
+          1024,
+          34
+        ],
+        "text": "Authentication",
+        "label": "Authentication",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.94,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_15",
+        "type": "label",
+        "bbox": [
+          1039,
+          23,
+          1048,
+          32
+        ],
+        "text": "x",
+        "label": "x",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.95,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_16",
+        "type": "label",
+        "bbox": [
+          1106,
+          23,
+          1202,
+          34
+        ],
+        "text": "Authentication",
+        "label": "Authentication",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.94,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_17",
+        "type": "label",
+        "bbox": [
+          1217,
+          23,
+          1226,
+          32
+        ],
+        "text": "x",
+        "label": "x",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.95,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_18",
+        "type": "label",
+        "bbox": [
+          1284,
+          23,
+          1331,
+          37
+        ],
+        "text": "Google",
+        "label": "Google",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_19",
+        "type": "label",
+        "bbox": [
+          1336,
+          23,
+          1358,
+          34
+        ],
+        "text": "Anti",
+        "label": "Anti",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.85,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_20",
+        "type": "label",
+        "bbox": [
+          1394,
+          23,
+          1403,
+          32
+        ],
+        "text": "x",
+        "label": "x",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.95,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_21",
+        "type": "label",
+        "bbox": [
+          1435,
+          26,
+          1440,
+          30
+        ],
+        "text": "°",
+        "label": "°",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.64,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_22",
+        "type": "label",
+        "bbox": [
+          1462,
+          23,
+          1518,
+          37
+        ],
+        "text": "Notepad",
+        "label": "Notepad",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_23",
+        "type": "label",
+        "bbox": [
+          1524,
+          23,
+          1526,
+          37
+        ],
+        "text": "|",
+        "label": "|",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_24",
+        "type": "label",
+        "bbox": [
+          1531,
+          23,
+          1558,
+          34
+        ],
+        "text": "Write",
+        "label": "Write",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.95,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_25",
+        "type": "label",
+        "bbox": [
+          1572,
+          23,
+          1581,
+          32
+        ],
+        "text": "x",
+        "label": "x",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.64,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_26",
+        "type": "label",
+        "bbox": [
+          1616,
+          22,
+          1631,
+          36
+        ],
+        "text": "fb",
+        "label": "fb",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.47,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_27",
+        "type": "label",
+        "bbox": [
+          20,
+          73,
+          84,
+          87
+        ],
+        "text": "O<¢",
+        "label": "O<¢",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.57,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_28",
+        "type": "label",
+        "bbox": [
+          345,
+          70,
+          396,
+          90
+        ],
+        "text": "08",
+        "label": "08",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.67,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_29",
+        "type": "label",
+        "bbox": [
+          479,
+          75,
+          607,
+          92
+        ],
+        "text": "v.rapidtables.com",
+        "label": "v.rapidtables.com",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.6,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_30",
+        "type": "label",
+        "bbox": [
+          708,
+          75,
+          756,
+          88
+        ],
+        "text": "ad.htm|",
+        "label": "ad.htm|",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.3,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_31",
+        "type": "label",
+        "bbox": [
+          1417,
+          70,
+          1472,
+          89
+        ],
+        "text": "Ow",
+        "label": "Ow",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.9,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_32",
+        "type": "label",
+        "bbox": [
+          1696,
+          78,
+          1713,
+          86
+        ],
+        "text": "vin",
+        "label": "vin",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.67,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_33",
+        "type": "label",
+        "bbox": [
+          1743,
+          70,
+          1806,
+          90
+        ],
+        "text": "4",
+        "label": "4",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.55,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_34",
+        "type": "label",
+        "bbox": [
+          1787,
+          66,
+          1810,
+          100
+        ],
+        "text": "0",
+        "label": "0",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.55,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_35",
+        "type": "label",
+        "bbox": [
+          1837,
+          73,
+          1852,
+          87
+        ],
+        "text": "»",
+        "label": "»",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.87,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_36",
+        "type": "label",
+        "bbox": [
+          45,
+          121,
+          55,
+          129
+        ],
+        "text": "Im",
+        "label": "Im",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.6,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_37",
+        "type": "label",
+        "bbox": [
+          117,
+          118,
+          153,
+          129
+        ],
+        "text": "kmark",
+        "label": "kmark",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.9,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_38",
+        "type": "label",
+        "bbox": [
+          185,
+          110,
+          198,
+          139
+        ],
+        "text": "O",
+        "label": "O",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.84,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_39",
+        "type": "label",
+        "bbox": [
+          215,
+          118,
+          251,
+          129
+        ],
+        "text": "Financ",
+        "label": "Financ",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.48,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_40",
+        "type": "label",
+        "bbox": [
+          280,
+          114,
+          319,
+          130
+        ],
+        "text": "Opn",
+        "label": "Opn",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.69,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_41",
+        "type": "label",
+        "bbox": [
+          367,
+          123,
+          374,
+          130
+        ],
+        "text": "ay",
+        "label": "ay",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.34,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_42",
+        "type": "label",
+        "bbox": [
+          392,
+          114,
+          434,
+          130
+        ],
+        "text": "Oar",
+        "label": "Oar",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.45,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_43",
+        "type": "label",
+        "bbox": [
+          533,
+          119,
+          580,
+          132
+        ],
+        "text": "ompute",
+        "label": "ompute",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.91,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_44",
+        "type": "label",
+        "bbox": [
+          657,
+          118,
+          665,
+          131
+        ],
+        "text": "dy",
+        "label": "dy",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.95,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_45",
+        "type": "label",
+        "bbox": [
+          709,
+          118,
+          726,
+          129
+        ],
+        "text": "Flo",
+        "label": "Flo",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_46",
+        "type": "label",
+        "bbox": [
+          868,
+          121,
+          883,
+          129
+        ],
+        "text": "lem",
+        "label": "lem",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.53,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_47",
+        "type": "label",
+        "bbox": [
+          911,
+          118,
+          950,
+          129
+        ],
+        "text": "Th",
+        "label": "Th",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.47,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_48",
+        "type": "label",
+        "bbox": [
+          980,
+          118,
+          1015,
+          129
+        ],
+        "text": "ulmin",
+        "label": "ulmin",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.67,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_49",
+        "type": "label",
+        "bbox": [
+          1021,
+          118,
+          1049,
+          129
+        ],
+        "text": "Meth",
+        "label": "Meth",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_50",
+        "type": "label",
+        "bbox": [
+          1087,
+          116,
+          1120,
+          132
+        ],
+        "text": "@c",
+        "label": "@c",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.74,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_51",
+        "type": "label",
+        "bbox": [
+          1179,
+          119,
+          1218,
+          129
+        ],
+        "text": "Startin",
+        "label": "Startin",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.82,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_52",
+        "type": "label",
+        "bbox": [
+          1514,
+          118,
+          1559,
+          132
+        ],
+        "text": "Home|",
+        "label": "Home|",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.75,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_53",
+        "type": "label",
+        "bbox": [
+          1601,
+          119,
+          1613,
+          129
+        ],
+        "text": "of",
+        "label": "of",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.86,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_54",
+        "type": "label",
+        "bbox": [
+          1619,
+          118,
+          1625,
+          129
+        ],
+        "text": "U",
+        "label": "U",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.86,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_55",
+        "type": "label",
+        "bbox": [
+          1711,
+          121,
+          1718,
+          128
+        ],
+        "text": "+",
+        "label": "+",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.83,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_56",
+        "type": "label",
+        "bbox": [
+          1725,
+          118,
+          1734,
+          129
+        ],
+        "text": "Fr",
+        "label": "Fr",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.89,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_57",
+        "type": "label",
+        "bbox": [
+          5,
+          1123,
+          55,
+          1137
+        ],
+        "text": "Waiting",
+        "label": "Waiting",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.95,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_58",
+        "type": "label",
+        "bbox": [
+          60,
+          1123,
+          79,
+          1134
+        ],
+        "text": "for",
+        "label": "for",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.93,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_59",
+        "type": "label",
+        "bbox": [
+          82,
+          1123,
+          234,
+          1137
+        ],
+        "text": "www.rapidtables.com...",
+        "label": "www.rapidtables.com...",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.75,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_60",
+        "type": "label",
+        "bbox": [
+          66,
+          1154,
+          77,
+          1165
+        ],
+        "text": "31",
+        "label": "31",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.54,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_61",
+        "type": "label",
+        "bbox": [
+          139,
+          1174,
+          156,
+          1186
+        ],
+        "text": "udy",
+        "label": "udy",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.53,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_62",
+        "type": "label",
+        "bbox": [
+          709,
+          1164,
+          755,
+          1177
+        ],
+        "text": "Search",
+        "label": "Search",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_63",
+        "type": "label",
+        "bbox": [
+          1662,
+          1166,
+          1676,
+          1173
+        ],
+        "text": "A",
+        "label": "A",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.68,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_64",
+        "type": "label",
+        "bbox": [
+          1759,
+          1161,
+          1784,
+          1176
+        ],
+        "text": "ea",
+        "label": "ea",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.4,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_65",
+        "type": "label",
+        "bbox": [
+          1813,
+          1154,
+          1839,
+          1186
+        ],
+        "text": "ae",
+        "label": "ae",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.36,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_66",
+        "type": "label",
+        "bbox": [
+          1845,
+          1154,
+          1865,
+          1175
+        ],
+        "text": "PM",
+        "label": "PM",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.82,
+        "metadata": {
+          "source": "ocr"
+        }
+      }
+    ]
+  },
+  "mouse": {
+    "actions": [
+      {
+        "id": "mouse_action_0000",
+        "position": [
+          1237,
+          1199
+        ],
+        "type": "click",
+        "timestamp": "2026-03-08T14:57:25.019095"
+      },
+      {
+        "id": "mouse_action_0001",
+        "position": [
+          1633,
+          1
+        ],
+        "type": "click",
+        "timestamp": "2026-03-08T14:57:26.024035"
+      },
+      {
+        "id": "mouse_action_0002",
+        "position": [
+          402,
+          423
+        ],
+        "type": "click",
+        "timestamp": "2026-03-08T14:57:32.874287"
+      },
+      {
+        "id": "mouse_action_0003",
+        "position": [
+          420,
+          402
+        ],
+        "type": "click",
+        "timestamp": "2026-03-08T14:57:33.378084"
+      },
+      {
+        "id": "mouse_action_0004",
+        "position": [
+          517,
+          700
+        ],
+        "type": "click",
+        "timestamp": "2026-03-08T14:57:36.796162"
+      },
+      {
+        "id": "mouse_action_0005",
+        "position": [
+          674,
+          566
+        ],
+        "type": "click",
+        "timestamp": "2026-03-08T14:57:37.480262"
+      },
+      {
+        "id": "mouse_action_0006",
+        "position": [
+          1285,
+          1184
+        ],
+        "type": "click",
+        "timestamp": "2026-03-08T14:57:47.363020"
+      }
+    ]
+  },
+  "keyboard": {
+    "actions": [
+      {
+        "strokes": [
+          "g",
+          "o",
+          "o",
+          "g",
+          "e",
+          "l",
+          "Key.space",
+          "Key.backspace",
+          "Key.backspace",
+          "Key.backspace",
+          "Key.backspace",
+          "Key.backspace",
+          "Key.backspace",
+          "Key.backspace",
+          "n",
+          "o",
+          "t",
+          "e",
+          "Key.backspace",
+          "Key.backspace",
+          "Key.backspace",
+          "Key.backspace",
+          "r",
+          "a",
+          "p",
+          "i",
+          "d",
+          "Key.space",
+          "n",
+          "o",
+          "t",
+          "e",
+          "s",
+          "Key.backspace",
+          "Key.backspace",
+          "Key.backspace",
+          "Key.backspace",
+          "Key.backspace",
+          "Key.backspace",
+          "Key.down",
+          "Key.enter"
+        ]
+      },
+      {
+        "strokes": [
+          "Key.shift",
+          "H",
+          "e",
+          "l",
+          "l",
+          "o",
+          ",",
+          "Key.space",
+          "Key.shift",
+          "I",
+          "Key.space",
+          "h",
+          "o",
+          "p",
+          "e",
+          "Key.space",
+          "y",
+          "o",
+          "u",
+          "Key.space",
+          "h",
+          "a",
+          "v",
+          "e",
+          "Key.space"
+        ]
+      },
+      {
+        "strokes": [
+          "s",
+          "e",
+          "e",
+          "Key.space",
+          "n",
+          "Key.backspace",
+          "Key.backspace",
+          "n",
+          "Key.space",
+          "t",
+          "h",
+          "i",
+          "s",
+          "s",
+          "Key.backspace",
+          "Key.shift",
+          "!"
+        ]
+      },
+      {
+        "strokes": [
+          "Key.ctrl_l",
+          "\u0003"
+        ]
+      }
+    ]
+  },
+  "diff": {
+    "added": [
+      {
+        "element_id": "label_6",
+        "type": "label",
+        "bbox": [
+          447,
+          23,
+          494,
+          37
+        ],
+        "text": "Antigray",
+        "label": "Antigray",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.46,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_9",
+        "type": "label",
+        "bbox": [
+          625,
+          23,
+          672,
+          37
+        ],
+        "text": "Antigray",
+        "label": "Antigray",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.76,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_12",
+        "type": "label",
+        "bbox": [
+          803,
+          23,
+          825,
+          34
+        ],
+        "text": "Anti",
+        "label": "Anti",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.85,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_19",
+        "type": "label",
+        "bbox": [
+          1336,
+          23,
+          1358,
+          34
+        ],
+        "text": "Anti",
+        "label": "Anti",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.85,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_21",
+        "type": "label",
+        "bbox": [
+          1435,
+          26,
+          1440,
+          30
+        ],
+        "text": "°",
+        "label": "°",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.64,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_23",
+        "type": "label",
+        "bbox": [
+          1524,
+          23,
+          1526,
+          37
+        ],
+        "text": "|",
+        "label": "|",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_30",
+        "type": "label",
+        "bbox": [
+          708,
+          75,
+          756,
+          88
+        ],
+        "text": "ad.htm|",
+        "label": "ad.htm|",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.3,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_38",
+        "type": "label",
+        "bbox": [
+          185,
+          110,
+          198,
+          139
+        ],
+        "text": "O",
+        "label": "O",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.84,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_41",
+        "type": "label",
+        "bbox": [
+          367,
+          123,
+          374,
+          130
+        ],
+        "text": "ay",
+        "label": "ay",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.34,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_43",
+        "type": "label",
+        "bbox": [
+          533,
+          119,
+          580,
+          132
+        ],
+        "text": "ompute",
+        "label": "ompute",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.91,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_57",
+        "type": "label",
+        "bbox": [
+          5,
+          1123,
+          55,
+          1137
+        ],
+        "text": "Waiting",
+        "label": "Waiting",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.95,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_58",
+        "type": "label",
+        "bbox": [
+          60,
+          1123,
+          79,
+          1134
+        ],
+        "text": "for",
+        "label": "for",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.93,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_59",
+        "type": "label",
+        "bbox": [
+          82,
+          1123,
+          234,
+          1137
+        ],
+        "text": "www.rapidtables.com...",
+        "label": "www.rapidtables.com...",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.75,
+        "metadata": {
+          "source": "ocr"
+        }
+      }
+    ],
+    "removed": [
+      {
+        "element_id": "label_1",
+        "type": "label",
+        "bbox": [
+          13,
+          18,
+          33,
+          38
+        ],
+        "text": "©",
+        "label": "©",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.63,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_6",
+        "type": "label",
+        "bbox": [
+          218,
+          23,
+          281,
+          34
+        ],
+        "text": "Facebook",
+        "label": "Facebook",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.94,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_7",
+        "type": "label",
+        "bbox": [
+          370,
+          20,
+          386,
+          36
+        ],
+        "text": "AA",
+        "label": "AA",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.82,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_10",
+        "type": "label",
+        "bbox": [
+          548,
+          20,
+          564,
+          36
+        ],
+        "text": "A",
+        "label": "A",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.71,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_13",
+        "type": "label",
+        "bbox": [
+          725,
+          20,
+          741,
+          36
+        ],
+        "text": "AM",
+        "label": "AM",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.47,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_16",
+        "type": "label",
+        "bbox": [
+          905,
+          21,
+          917,
+          34
+        ],
+        "text": "G",
+        "label": "G",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.56,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_19",
+        "type": "label",
+        "bbox": [
+          1083,
+          21,
+          1095,
+          34
+        ],
+        "text": "G",
+        "label": "G",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.69,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_22",
+        "type": "label",
+        "bbox": [
+          1258,
+          20,
+          1274,
+          36
+        ],
+        "text": "AM",
+        "label": "AM",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.47,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_29",
+        "type": "label",
+        "bbox": [
+          1828,
+          22,
+          1841,
+          34
+        ],
+        "text": "a",
+        "label": "a",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.73,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_30",
+        "type": "label",
+        "bbox": [
+          1885,
+          22,
+          1898,
+          34
+        ],
+        "text": "x",
+        "label": "x",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.91,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_31",
+        "type": "label",
+        "bbox": [
+          1883,
+          68,
+          1900,
+          80
+        ],
+        "text": "=?",
+        "label": "=?",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.42,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_33",
+        "type": "label",
+        "bbox": [
+          156,
+          71,
+          174,
+          89
+        ],
+        "text": "CG",
+        "label": "CG",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.48,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_37",
+        "type": "label",
+        "bbox": [
+          1637,
+          66,
+          1651,
+          94
+        ],
+        "text": "©",
+        "label": "©",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_39",
+        "type": "label",
+        "bbox": [
+          1703,
+          78,
+          1713,
+          86
+        ],
+        "text": "in",
+        "label": "in",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.73,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_43",
+        "type": "label",
+        "bbox": [
+          1883,
+          84,
+          1897,
+          85
+        ],
+        "text": "=",
+        "label": "=",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_45",
+        "type": "label",
+        "bbox": [
+          41,
+          118,
+          85,
+          132
+        ],
+        "text": "Import",
+        "label": "Import",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.9,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_52",
+        "type": "label",
+        "bbox": [
+          708,
+          118,
+          757,
+          129
+        ],
+        "text": "FlowCV",
+        "label": "FlowCV",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.37,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_53",
+        "type": "label",
+        "bbox": [
+          773,
+          113,
+          791,
+          133
+        ],
+        "text": "©",
+        "label": "©",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.57,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_54",
+        "type": "label",
+        "bbox": [
+          797,
+          118,
+          829,
+          129
+        ],
+        "text": "Khan",
+        "label": "Khan",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.53,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_57",
+        "type": "label",
+        "bbox": [
+          935,
+          118,
+          959,
+          129
+        ],
+        "text": "The",
+        "label": "The",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.91,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_61",
+        "type": "label",
+        "bbox": [
+          1113,
+          118,
+          1173,
+          129
+        ],
+        "text": "Choose",
+        "label": "Choose",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_62",
+        "type": "label",
+        "bbox": [
+          1164,
+          109,
+          1170,
+          137
+        ],
+        "text": "a",
+        "label": "a",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_64",
+        "type": "label",
+        "bbox": [
+          1234,
+          118,
+          1264,
+          129
+        ],
+        "text": "Poi...",
+        "label": "Poi...",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.78,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_65",
+        "type": "label",
+        "bbox": [
+          1287,
+          113,
+          1307,
+          133
+        ],
+        "text": "BB",
+        "label": "BB",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.54,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_66",
+        "type": "label",
+        "bbox": [
+          1314,
+          118,
+          1344,
+          129
+        ],
+        "text": "1049",
+        "label": "1049",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.89,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_67",
+        "type": "label",
+        "bbox": [
+          1349,
+          118,
+          1389,
+          129
+        ],
+        "text": "cards:",
+        "label": "cards:",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.95,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_68",
+        "type": "label",
+        "bbox": [
+          1394,
+          118,
+          1418,
+          129
+        ],
+        "text": "Css",
+        "label": "Css",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.52,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_69",
+        "type": "label",
+        "bbox": [
+          1423,
+          118,
+          1435,
+          129
+        ],
+        "text": "&",
+        "label": "&",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.92,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_70",
+        "type": "label",
+        "bbox": [
+          1439,
+          118,
+          1456,
+          129
+        ],
+        "text": "Tail",
+        "label": "Tail",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.94,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_71",
+        "type": "label",
+        "bbox": [
+          1487,
+          113,
+          1507,
+          133
+        ],
+        "text": "HB",
+        "label": "HB",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.55,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_73",
+        "type": "label",
+        "bbox": [
+          1553,
+          109,
+          1560,
+          137
+        ],
+        "text": "|",
+        "label": "|",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.88,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_76",
+        "type": "label",
+        "bbox": [
+          1619,
+          118,
+          1637,
+          129
+        ],
+        "text": "UX)",
+        "label": "UX)",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.37,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_79",
+        "type": "label",
+        "bbox": [
+          1757,
+          118,
+          1834,
+          132
+        ],
+        "text": "Developer...",
+        "label": "Developer...",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.8,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_80",
+        "type": "label",
+        "bbox": [
+          1887,
+          116,
+          1902,
+          130
+        ],
+        "text": "»",
+        "label": "»",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.92,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_81",
+        "type": "label",
+        "bbox": [
+          343,
+          167,
+          510,
+          197
+        ],
+        "text": "RapidTables",
+        "label": "RapidTables",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.91,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_82",
+        "type": "label",
+        "bbox": [
+          1332,
+          172,
+          1355,
+          194
+        ],
+        "text": "Q",
+        "label": "Q",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.93,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_83",
+        "type": "label",
+        "bbox": [
+          1365,
+          171,
+          1434,
+          188
+        ],
+        "text": "Search",
+        "label": "Search",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_84",
+        "type": "label",
+        "bbox": [
+          343,
+          239,
+          395,
+          253
+        ],
+        "text": "Home",
+        "label": "Home",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_85",
+        "type": "label",
+        "bbox": [
+          342,
+          292,
+          433,
+          316
+        ],
+        "text": "Online",
+        "label": "Online",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_86",
+        "type": "label",
+        "bbox": [
+          444,
+          292,
+          597,
+          316
+        ],
+        "text": "Calculators",
+        "label": "Calculators",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.93,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_87",
+        "type": "label",
+        "bbox": [
+          608,
+          293,
+          632,
+          316
+        ],
+        "text": "&",
+        "label": "&",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.93,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_88",
+        "type": "label",
+        "bbox": [
+          641,
+          292,
+          712,
+          316
+        ],
+        "text": "Tools",
+        "label": "Tools",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_89",
+        "type": "label",
+        "bbox": [
+          1172,
+          321,
+          1266,
+          334
+        ],
+        "text": "CONTENTS",
+        "label": "CONTENTS",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.89,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_90",
+        "type": "label",
+        "bbox": [
+          343,
+          357,
+          405,
+          378
+        ],
+        "text": "Math",
+        "label": "Math",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_91",
+        "type": "label",
+        "bbox": [
+          415,
+          357,
+          549,
+          378
+        ],
+        "text": "Calculators",
+        "label": "Calculators",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_92",
+        "type": "label",
+        "bbox": [
+          1168,
+          371,
+          1176,
+          377
+        ],
+        "text": "*",
+        "label": "*",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.38,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_93",
+        "type": "label",
+        "bbox": [
+          1186,
+          365,
+          1282,
+          380
+        ],
+        "text": "Calculators",
+        "label": "Calculators",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_94",
+        "type": "label",
+        "bbox": [
+          364,
+          421,
+          371,
+          427
+        ],
+        "text": "©",
+        "label": "©",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.3,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_95",
+        "type": "label",
+        "bbox": [
+          382,
+          415,
+          459,
+          430
+        ],
+        "text": "Scientific",
+        "label": "Scientific",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.95,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_96",
+        "type": "label",
+        "bbox": [
+          466,
+          415,
+          551,
+          430
+        ],
+        "text": "calculator",
+        "label": "calculator",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_97",
+        "type": "label",
+        "bbox": [
+          1168,
+          414,
+          1176,
+          420
+        ],
+        "text": "*",
+        "label": "*",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.66,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_98",
+        "type": "label",
+        "bbox": [
+          1186,
+          408,
+          1283,
+          423
+        ],
+        "text": "Conversion",
+        "label": "Conversion",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_99",
+        "type": "label",
+        "bbox": [
+          383,
+          458,
+          479,
+          477
+        ],
+        "text": "Percentage",
+        "label": "Percentage",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_100",
+        "type": "label",
+        "bbox": [
+          486,
+          457,
+          570,
+          472
+        ],
+        "text": "calculator",
+        "label": "calculator",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_101",
+        "type": "label",
+        "bbox": [
+          1168,
+          456,
+          1176,
+          462
+        ],
+        "text": "*",
+        "label": "*",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.7,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_102",
+        "type": "label",
+        "bbox": [
+          1186,
+          450,
+          1230,
+          465
+        ],
+        "text": "Tools",
+        "label": "Tools",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.95,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_103",
+        "type": "label",
+        "bbox": [
+          383,
+          500,
+          451,
+          515
+        ],
+        "text": "Fraction",
+        "label": "Fraction",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_104",
+        "type": "label",
+        "bbox": [
+          458,
+          500,
+          543,
+          515
+        ],
+        "text": "calculator",
+        "label": "calculator",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_105",
+        "type": "label",
+        "bbox": [
+          1173,
+          513,
+          1226,
+          526
+        ],
+        "text": "RAPID",
+        "label": "RAPID",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_106",
+        "type": "label",
+        "bbox": [
+          1231,
+          513,
+          1294,
+          526
+        ],
+        "text": "TABLES",
+        "label": "TABLES",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_107",
+        "type": "label",
+        "bbox": [
+          382,
+          543,
+          453,
+          562
+        ],
+        "text": "Average",
+        "label": "Average",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.97,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_108",
+        "type": "label",
+        "bbox": [
+          460,
+          542,
+          544,
+          557
+        ],
+        "text": "calculator",
+        "label": "calculator",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_109",
+        "type": "label",
+        "bbox": [
+          1187,
+          558,
+          1221,
+          573
+        ],
+        "text": "Link",
+        "label": "Link",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_110",
+        "type": "label",
+        "bbox": [
+          1227,
+          560,
+          1245,
+          573
+        ],
+        "text": "to",
+        "label": "to",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_111",
+        "type": "label",
+        "bbox": [
+          1252,
+          559,
+          1272,
+          573
+        ],
+        "text": "Us",
+        "label": "Us",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_112",
+        "type": "label",
+        "bbox": [
+          1187,
+          600,
+          1295,
+          615
+        ],
+        "text": "Recommend",
+        "label": "Recommend",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_113",
+        "type": "label",
+        "bbox": [
+          1303,
+          600,
+          1334,
+          615
+        ],
+        "text": "Site",
+        "label": "Site",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_114",
+        "type": "label",
+        "bbox": [
+          343,
+          604,
+          397,
+          625
+        ],
+        "text": "Misc",
+        "label": "Misc",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_115",
+        "type": "label",
+        "bbox": [
+          407,
+          604,
+          541,
+          625
+        ],
+        "text": "Calculators",
+        "label": "Calculators",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_116",
+        "type": "label",
+        "bbox": [
+          1187,
+          643,
+          1229,
+          658
+        ],
+        "text": "Send",
+        "label": "Send",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_117",
+        "type": "label",
+        "bbox": [
+          1237,
+          643,
+          1319,
+          658
+        ],
+        "text": "Feedback",
+        "label": "Feedback",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_118",
+        "type": "label",
+        "bbox": [
+          364,
+          669,
+          371,
+          675
+        ],
+        "text": "©",
+        "label": "©",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.34,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_119",
+        "type": "label",
+        "bbox": [
+          382,
+          663,
+          434,
+          678
+        ],
+        "text": "Grade",
+        "label": "Grade",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_120",
+        "type": "label",
+        "bbox": [
+          440,
+          663,
+          526,
+          678
+        ],
+        "text": "calculator",
+        "label": "calculator",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_121",
+        "type": "label",
+        "bbox": [
+          1186,
+          685,
+          1240,
+          700
+        ],
+        "text": "About",
+        "label": "About",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_122",
+        "type": "label",
+        "bbox": [
+          364,
+          711,
+          371,
+          717
+        ],
+        "text": "©",
+        "label": "©",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.66,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_123",
+        "type": "label",
+        "bbox": [
+          382,
+          706,
+          418,
+          720
+        ],
+        "text": "GPA",
+        "label": "GPA",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.95,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_124",
+        "type": "label",
+        "bbox": [
+          424,
+          705,
+          509,
+          720
+        ],
+        "text": "calculator",
+        "label": "calculator",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.95,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_125",
+        "type": "label",
+        "bbox": [
+          383,
+          748,
+          421,
+          763
+        ],
+        "text": "Final",
+        "label": "Final",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.97,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_126",
+        "type": "label",
+        "bbox": [
+          429,
+          748,
+          478,
+          768
+        ],
+        "text": "grade",
+        "label": "grade",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_127",
+        "type": "label",
+        "bbox": [
+          485,
+          748,
+          570,
+          763
+        ],
+        "text": "calculator",
+        "label": "calculator",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_128",
+        "type": "label",
+        "bbox": [
+          383,
+          791,
+          469,
+          810
+        ],
+        "text": "Mortgage",
+        "label": "Mortgage",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_129",
+        "type": "label",
+        "bbox": [
+          475,
+          790,
+          560,
+          805
+        ],
+        "text": "calculator",
+        "label": "calculator",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_130",
+        "type": "label",
+        "bbox": [
+          364,
+          839,
+          371,
+          845
+        ],
+        "text": "*",
+        "label": "*",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.54,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_131",
+        "type": "label",
+        "bbox": [
+          382,
+          833,
+          479,
+          853
+        ],
+        "text": "Compound",
+        "label": "Compound",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_132",
+        "type": "label",
+        "bbox": [
+          487,
+          833,
+          552,
+          848
+        ],
+        "text": "interest",
+        "label": "interest",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_133",
+        "type": "label",
+        "bbox": [
+          558,
+          833,
+          643,
+          848
+        ],
+        "text": "calculator",
+        "label": "calculator",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_134",
+        "type": "label",
+        "bbox": [
+          383,
+          876,
+          415,
+          890
+        ],
+        "text": "BMI",
+        "label": "BMI",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.95,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_135",
+        "type": "label",
+        "bbox": [
+          422,
+          875,
+          507,
+          890
+        ],
+        "text": "calculator",
+        "label": "calculator",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.95,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_136",
+        "type": "label",
+        "bbox": [
+          341,
+          937,
+          404,
+          958
+        ],
+        "text": "Tools",
+        "label": "Tools",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_137",
+        "type": "label",
+        "bbox": [
+          364,
+          1002,
+          371,
+          1008
+        ],
+        "text": "©",
+        "label": "©",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.36,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_138",
+        "type": "label",
+        "bbox": [
+          382,
+          996,
+          439,
+          1011
+        ],
+        "text": "Online",
+        "label": "Online",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_139",
+        "type": "label",
+        "bbox": [
+          446,
+          996,
+          517,
+          1016
+        ],
+        "text": "notepad",
+        "label": "notepad",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_140",
+        "type": "label",
+        "bbox": [
+          383,
+          1039,
+          418,
+          1053
+        ],
+        "text": "RGB",
+        "label": "RGB",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_141",
+        "type": "label",
+        "bbox": [
+          424,
+          1038,
+          469,
+          1053
+        ],
+        "text": "color",
+        "label": "color",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_142",
+        "type": "label",
+        "bbox": [
+          474,
+          1038,
+          525,
+          1053
+        ],
+        "text": "codes",
+        "label": "codes",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.9,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_143",
+        "type": "label",
+        "bbox": [
+          382,
+          1082,
+          426,
+          1096
+        ],
+        "text": "ASCII",
+        "label": "ASCII",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.89,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_144",
+        "type": "label",
+        "bbox": [
+          434,
+          1081,
+          477,
+          1096
+        ],
+        "text": "table",
+        "label": "table",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.96,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_145",
+        "type": "label",
+        "bbox": [
+          354,
+          1123,
+          368,
+          1134
+        ],
+        "text": "ml",
+        "label": "ml",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.71,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_146",
+        "type": "label",
+        "bbox": [
+          670,
+          1156,
+          683,
+          1187
+        ],
+        "text": "Q",
+        "label": "Q",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.93,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_152",
+        "type": "label",
+        "bbox": [
+          1877,
+          1161,
+          1894,
+          1176
+        ],
+        "text": "ge",
+        "label": "ge",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.41,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_153",
+        "type": "label",
+        "bbox": [
+          25,
+          1171,
+          33,
+          1176
+        ],
+        "text": "<—",
+        "label": "<—",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.3,
+        "metadata": {
+          "source": "ocr"
+        }
+      },
+      {
+        "element_id": "label_156",
+        "type": "label",
+        "bbox": [
+          1806,
+          1174,
+          1865,
+          1186
+        ],
+        "text": "3/8/2026",
+        "label": "3/8/2026",
+        "enabled": true,
+        "visible": true,
+        "confidence": 0.95,
+        "metadata": {
+          "source": "ocr"
+        }
+      }
+    ],
+    "changed": [
+      {
+        "element_id": "label_2",
+        "element_id_after": "label_1",
+        "match_score": 0.98,
+        "before": {
+          "element_id": "label_2",
+          "type": "label",
+          "bbox": [
+            40,
+            23,
+            91,
+            34
+          ],
+          "text": "untitled",
+          "label": "untitled",
+          "enabled": true,
+          "visible": true,
+          "confidence": 0.55,
+          "metadata": {
+            "source": "ocr"
+          }
+        },
+        "after": {
+          "element_id": "label_1",
+          "type": "label",
+          "bbox": [
+            41,
+            23,
+            91,
+            34
+          ],
+          "text": "Untitled",
+          "label": "Untitled",
+          "enabled": true,
+          "visible": true,
+          "confidence": 0.86,
+          "metadata": {
+            "source": "ocr"
+          }
+        },
+        "changes": {
+          "text": {
+            "before": "untitled",
+            "after": "Untitled"
+          },
+          "label": {
+            "before": "untitled",
+            "after": "Untitled"
+          }
+        }
+      },
+      {
+        "element_id": "label_3",
+        "element_id_after": "label_2",
+        "match_score": 0.977,
+        "before": {
+          "element_id": "label_3",
+          "type": "label",
+          "bbox": [
+            97,
+            26,
+            140,
+            37
+          ],
+          "text": "preseni",
+          "label": "preseni",
+          "enabled": true,
+          "visible": true,
+          "confidence": 0.88,
+          "metadata": {
+            "source": "ocr"
+          }
+        },
+        "after": {
+          "element_id": "label_2",
+          "type": "label",
+          "bbox": [
+            98,
+            26,
+            140,
+            37
+          ],
+          "text": "presen’",
+          "label": "presen’",
+          "enabled": true,
+          "visible": true,
+          "confidence": 0.71,
+          "metadata": {
+            "source": "ocr"
+          }
+        },
+        "changes": {
+          "text": {
+            "before": "preseni",
+            "after": "presen’"
+          },
+          "label": {
+            "before": "preseni",
+            "after": "presen’"
+          }
+        }
+      },
+      {
+        "element_id": "label_4",
+        "element_id_after": "label_3",
+        "match_score": 1.0,
+        "before": {
+          "element_id": "label_4",
+          "type": "label",
+          "bbox": [
+            151,
+            23,
+            160,
+            32
+          ],
+          "text": "x",
+          "label": "x",
+          "enabled": true,
+          "visible": true,
+          "confidence": 0.92,
+          "metadata": {
+            "source": "ocr"
+          }
+        },
+        "after": {
+          "element_id": "label_3",
+          "type": "label",
+          "bbox": [
+            151,
+            23,
+            160,
+            32
+          ],
+          "text": "X",
+          "label": "X",
+          "enabled": true,
+          "visible": true,
+          "confidence": 0.76,
+          "metadata": {
+            "source": "ocr"
+          }
+        },
+        "changes": {
+          "text": {
+            "before": "x",
+            "after": "X"
+          },
+          "label": {
+            "before": "x",
+            "after": "X"
+          }
+        }
+      },
+      {
+        "element_id": "label_5",
+        "element_id_after": "label_0",
+        "match_score": 0.055,
+        "before": {
+          "element_id": "label_5",
+          "type": "label",
+          "bbox": [
+            186,
+            14,
+            200,
+            42
+          ],
+          "text": "@",
+          "label": "@",
+          "enabled": true,
+          "visible": true,
+          "confidence": 0.88,
+          "metadata": {
+            "source": "ocr"
+          }
+        },
+        "after": {
+          "element_id": "label_0",
+          "type": "label",
+          "bbox": [
+            219,
+            23,
+            223,
+            24
+          ],
+          "text": "5",
+          "label": "5",
+          "enabled": true,
+          "visible": true,
+          "confidence": 0.34,
+          "metadata": {
+            "source": "ocr"
+          }
+        },
+        "changes": {
+          "text": {
+            "before": "@",
+            "after": "5"
+          },
+          "label": {
+            "before": "@",
+            "after": "5"
+          },
+          "bbox": {
+            "before": [
+              186,
+              14,
+              200,
+              42
+            ],
+            "after": [
+              219,
+              23,
+              223,
+              24
+            ]
+          }
+        }
+      },
+      {
+        "element_id": "label_8",
+        "element_id_after": "label_5",
+        "match_score": 0.502,
+        "before": {
+          "element_id": "label_8",
+          "type": "label",
+          "bbox": [
+            395,
+            16,
+            434,
+            41
+          ],
+          "text": "Google",
+          "label": "Google",
+          "enabled": true,
+          "visible": true,
+          "confidence": 0.93,
+          "metadata": {
+            "source": "ocr"
+          }
+        },
+        "after": {
+          "element_id": "label_5",
+          "type": "label",
+          "bbox": [
+            395,
+            23,
+            442,
+            37
+          ],
+          "text": "Google",
+          "label": "Google",
+          "enabled": true,
+          "visible": true,
+          "confidence": 0.92,
+          "metadata": {
+            "source": "ocr"
+          }
+        },
+        "changes": {
+          "bbox": {
+            "before": [
+              395,
+              16,
+              434,
+              41
+            ],
+            "after": [
+              395,
+              23,
+              442,
+              37
+            ]
+          }
+        }
+      },
+      {
+        "element_id": "label_15",
+        "element_id_after": "label_13",
+        "match_score": 1.0,
+        "before": {
+          "element_id": "label_15",
+          "type": "label",
+          "bbox": [
+            861,
+            23,
+            870,
+            32
+          ],
+          "text": "X",
+          "label": "X",
+          "enabled": true,
+          "visible": true,
+          "confidence": 0.76,
+          "metadata": {
+            "source": "ocr"
+          }
+        },
+        "after": {
+          "element_id": "label_13",
+          "type": "label",
+          "bbox": [
+            861,
+            23,
+            870,
+            32
+          ],
+          "text": "x",
+          "label": "x",
+          "enabled": true,
+          "visible": true,
+          "confidence": 0.95,
+          "metadata": {
+            "source": "ocr"
+          }
+        },
+        "changes": {
+          "text": {
+            "before": "X",
+            "after": "x"
+          },
+          "label": {
+            "before": "X",
+            "after": "x"
+          }
+        }
+      },
+      {
+        "element_id": "label_18",
+        "element_id_after": "label_15",
+        "match_score": 1.0,
+        "before": {
+          "element_id": "label_18",
+          "type": "label",
+          "bbox": [
+            1039,
+            23,
+            1048,
+            32
+          ],
+          "text": "<x",
+          "label": "<x",
+          "enabled": true,
+          "visible": true,
+          "confidence": 0.61,
+          "metadata": {
+            "source": "ocr"
+          }
+        },
+        "after": {
+          "element_id": "label_15",
+          "type": "label",
+          "bbox": [
+            1039,
+            23,
+            1048,
+            32
+          ],
+          "text": "x",
+          "label": "x",
+          "enabled": true,
+          "visible": true,
+          "confidence": 0.95,
+          "metadata": {
+            "source": "ocr"
+          }
+        },
+        "changes": {
+          "text": {
+            "before": "<x",
+            "after": "x"
+          },
+          "label": {
+            "before": "<x",
+            "after": "x"
+          }
+        }
+      },
+      {
+        "element_id": "label_21",
+        "element_id_after": "label_17",
+        "match_score": 1.0,
+        "before": {
+          "element_id": "label_21",
+          "type": "label",
+          "bbox": [
+            1217,
+            23,
+            1226,
+            32
+          ],
+          "text": "<x",
+          "label": "<x",
+          "enabled": true,
+          "visible": true,
+          "confidence": 0.54,
+          "metadata": {
+            "source": "ocr"
+          }
+        },
+        "after": {
+          "element_id": "label_17",
+          "type": "label",
+          "bbox": [
+            1217,
+            23,
+            1226,
+            32
+          ],
+          "text": "x",
+          "label": "x",
+          "enabled": true,
+          "visible": true,
+          "confidence": 0.95,
+          "metadata": {
+            "source": "ocr"
+          }
+        },
+        "changes": {
+          "text": {
+            "before": "<x",
+            "after": "x"
+          },
+          "label": {
+            "before": "<x",
+            "after": "x"
+          }
+        }
+      },
+      {
+        "element_id": "label_24",
+        "element_id_after": "label_20",
+        "match_score": 1.0,
+        "before": {
+          "element_id": "label_24",
+          "type": "label",
+          "bbox": [
+            1394,
+            23,
+            1403,
+            32
+          ],
+          "text": "X",
+          "label": "X",
+          "enabled": true,
+          "visible": true,
+          "confidence": 0.76,
+          "metadata": {
+            "source": "ocr"
+          }
+        },
+        "after": {
+          "element_id": "label_20",
+          "type": "label",
+          "bbox": [
+            1394,
+            23,
+            1403,
+            32
+          ],
+          "text": "x",
+          "label": "x",
+          "enabled": true,
+          "visible": true,
+          "confidence": 0.95,
+          "metadata": {
+            "source": "ocr"
+          }
+        },
+        "changes": {
+          "text": {
+            "before": "X",
+            "after": "x"
+          },
+          "label": {
+            "before": "X",
+            "after": "x"
+          }
+        }
+      },
+      {
+        "element_id": "label_25",
+        "element_id_after": "label_22",
+        "match_score": 0.581,
+        "before": {
+          "element_id": "label_25",
+          "type": "label",
+          "bbox": [
+            1461,
+            23,
+            1504,
+            34
+          ],
+          "text": "online",
+          "label": "online",
+          "enabled": true,
+          "visible": true,
+          "confidence": 0.83,
+          "metadata": {
+            "source": "ocr"
+          }
+        },
+        "after": {
+          "element_id": "label_22",
+          "type": "label",
+          "bbox": [
+            1462,
+            23,
+            1518,
+            37
+          ],
+          "text": "Notepad",
+          "label": "Notepad",
+          "enabled": true,
+          "visible": true,
+          "confidence": 0.96,
+          "metadata": {
+            "source": "ocr"
+          }
+        },
+        "changes": {
+          "text": {
+            "before": "online",
+            "after": "Notepad"
+          },
+          "label": {
+            "before": "online",
+            "after": "Notepad"
+          },
+          "bbox": {
+            "before": [
+              1461,
+              23,
+              1504,
+              34
+            ],
+            "after": [
+              1462,
+              23,
+              1518,
+              37
+            ]
+          }
+        }
+      },
+      {
+        "element_id": "label_26",
+        "element_id_after": "label_24",
+        "match_score": 0.529,
+        "before": {
+          "element_id": "label_26",
+          "type": "label",
+          "bbox": [
+            1509,
+            23,
+            1560,
+            34
+          ],
+          "text": "Catcutate",
+          "label": "Catcutate",
+          "enabled": true,
+          "visible": true,
+          "confidence": 0.35,
+          "metadata": {
+            "source": "ocr"
+          }
+        },
+        "after": {
+          "element_id": "label_24",
+          "type": "label",
+          "bbox": [
+            1531,
+            23,
+            1558,
+            34
+          ],
+          "text": "Write",
+          "label": "Write",
+          "enabled": true,
+          "visible": true,
+          "confidence": 0.95,
+          "metadata": {
+            "source": "ocr"
+          }
+        },
+        "changes": {
+          "text": {
+            "before": "Catcutate",
+            "after": "Write"
+          },
+          "label": {
+            "before": "Catcutate",
+            "after": "Write"
+          },
+          "bbox": {
+            "before": [
+              1509,
+              23,
+              1560,
+              34
+            ],
+            "after": [
+              1531,
+              23,
+              1558,
+              34
+            ]
+          }
+        }
+      },
+      {
+        "element_id": "label_32",
+        "element_id_after": "label_27",
+        "match_score": 0.7,
+        "before": {
+          "element_id": "label_32",
+          "type": "label",
+          "bbox": [
+            20,
+            67,
+            84,
+            87
+          ],
+          "text": "oe",
+          "label": "oe",
+          "enabled": true,
+          "visible": true,
+          "confidence": 0.75,
+          "metadata": {
+            "source": "ocr"
+          }
+        },
+        "after": {
+          "element_id": "label_27",
+          "type": "label",
+          "bbox": [
+            20,
+            73,
+            84,
+            87
+          ],
+          "text": "O<¢",
+          "label": "O<¢",
+          "enabled": true,
+          "visible": true,
+          "confidence": 0.57,
+          "metadata": {
+            "source": "ocr"
+          }
+        },
+        "changes": {
+          "text": {
+            "before": "oe",
+            "after": "O<¢"
+          },
+          "label": {
+            "before": "oe",
+            "after": "O<¢"
+          },
+          "bbox": {
+            "before": [
+              20,
+              67,
+              84,
+              87
+            ],
+            "after": [
+              20,
+              73,
+              84,
+              87
+            ]
+          }
+        }
+      },
+      {
+        "element_id": "label_35",
+        "element_id_after": "label_29",
+        "match_score": 0.8,
+        "before": {
+          "element_id": "label_35",
+          "type": "label",
+          "bbox": [
+            447,
+            75,
+            607,
+            92
+          ],
+          "text": "www.rapidtables.com",
+          "label": "www.rapidtables.com",
+          "enabled": true,
+          "visible": true,
+          "confidence": 0.85,
+          "metadata": {
+            "source": "ocr"
+          }
+        },
+        "after": {
+          "element_id": "label_29",
+          "type": "label",
+          "bbox": [
+            479,
+            75,
+            607,
+            92
+          ],
+          "text": "v.rapidtables.com",
+          "label": "v.rapidtables.com",
+          "enabled": true,
+          "visible": true,
+          "confidence": 0.6,
+          "metadata": {
+            "source": "ocr"
+          }
+        },
+        "changes": {
+          "text": {
+            "before": "www.rapidtables.com",
+            "after": "v.rapidtables.com"
+          },
+          "label": {
+            "before": "www.rapidtables.com",
+            "after": "v.rapidtables.com"
+          },
+          "bbox": {
+            "before": [
+              447,
+              75,
+              607,
+              92
+            ],
+            "after": [
+              479,
+              75,
+              607,
+              92
+            ]
+          }
+        }
+      },
+      {
+        "element_id": "label_38",
+        "element_id_after": "label_32",
+        "match_score": 0.283,
+        "before": {
+          "element_id": "label_38",
+          "type": "label",
+          "bbox": [
+            1669,
+            75,
+            1697,
+            89
+          ],
+          "text": "Sign",
+          "label": "Sign",
+          "enabled": true,
+          "visible": true,
+          "confidence": 0.73,
+          "metadata": {
+            "source": "ocr"
+          }
+        },
+        "after": {
+          "element_id": "label_32",
+          "type": "label",
+          "bbox": [
+            1696,
+            78,
+            1713,
+            86
+          ],
+          "text": "vin",
+          "label": "vin",
+          "enabled": true,
+          "visible": true,
+          "confidence": 0.67,
+          "metadata": {
+            "source": "ocr"
+          }
+        },
+        "changes": {
+          "text": {
+            "before": "Sign",
+            "after": "vin"
+          },
+          "label": {
+            "before": "Sign",
+            "after": "vin"
+          },
+          "bbox": {
+            "before": [
+              1669,
+              75,
+              1697,
+              89
+            ],
+            "after": [
+              1696,
+              78,
+              1713,
+              86
+            ]
+          }
+        }
+      },
+      {
+        "element_id": "label_40",
+        "element_id_after": "label_33",
+        "match_score": 0.314,
+        "before": {
+          "element_id": "label_40",
+          "type": "label",
+          "bbox": [
+            1743,
+            60,
+            1770,
+            97
+          ],
+          "text": "Hj",
+          "label": "Hj",
+          "enabled": true,
+          "visible": true,
+          "confidence": 0.37,
+          "metadata": {
+            "source": "ocr"
+          }
+        },
+        "after": {
+          "element_id": "label_33",
+          "type": "label",
+          "bbox": [
+            1743,
+            70,
+            1806,
+            90
+          ],
+          "text": "4",
+          "label": "4",
+          "enabled": true,
+          "visible": true,
+          "confidence": 0.55,
+          "metadata": {
+            "source": "ocr"
+          }
+        },
+        "changes": {
+          "text": {
+            "before": "Hj",
+            "after": "4"
+          },
+          "label": {
+            "before": "Hj",
+            "after": "4"
+          },
+          "bbox": {
+            "before": [
+              1743,
+              60,
+              1770,
+              97
+            ],
+            "after": [
+              1743,
+              70,
+              1806,
+              90
+            ]
+          }
+        }
+      },
+      {
+        "element_id": "label_41",
+        "element_id_after": "label_34",
+        "match_score": 0.43,
+        "before": {
+          "element_id": "label_41",
+          "type": "label",
+          "bbox": [
+            1794,
+            64,
+            1813,
+            90
+          ],
+          "text": "8",
+          "label": "8",
+          "enabled": true,
+          "visible": true,
+          "confidence": 0.55,
+          "metadata": {
+            "source": "ocr"
+          }
+        },
+        "after": {
+          "element_id": "label_34",
+          "type": "label",
+          "bbox": [
+            1787,
+            66,
+            1810,
+            100
+          ],
+          "text": "0",
+          "label": "0",
+          "enabled": true,
+          "visible": true,
+          "confidence": 0.55,
+          "metadata": {
+            "source": "ocr"
+          }
+        },
+        "changes": {
+          "text": {
+            "before": "8",
+            "after": "0"
+          },
+          "label": {
+            "before": "8",
+            "after": "0"
+          },
+          "bbox": {
+            "before": [
+              1794,
+              64,
+              1813,
+              90
+            ],
+            "after": [
+              1787,
+              66,
+              1810,
+              100
+            ]
+          }
+        }
+      },
+      {
+        "element_id": "label_44",
+        "element_id_after": "label_36",
+        "match_score": 0.164,
+        "before": {
+          "element_id": "label_44",
+          "type": "label",
+          "bbox": [
+            16,
+            116,
+            34,
+            130
+          ],
+          "text": "-3)",
+          "label": "-3)",
+          "enabled": true,
+          "visible": true,
+          "confidence": 0.55,
+          "metadata": {
+            "source": "ocr"
+          }
+        },
+        "after": {
+          "element_id": "label_36",
+          "type": "label",
+          "bbox": [
+            45,
+            121,
+            55,
+            129
+          ],
+          "text": "Im",
+          "label": "Im",
+          "enabled": true,
+          "visible": true,
+          "confidence": 0.6,
+          "metadata": {
+            "source": "ocr"
+          }
+        },
+        "changes": {
+          "text": {
+            "before": "-3)",
+            "after": "Im"
+          },
+          "label": {
+            "before": "-3)",
+            "after": "Im"
+          },
+          "bbox": {
+            "before": [
+              16,
+              116,
+              34,
+              130
+            ],
+            "after": [
+              45,
+              121,
+              55,
+              129
+            ]
+          }
+        }
+      },
+      {
+        "element_id": "label_46",
+        "element_id_after": "label_37",
+        "match_score": 0.434,
+        "before": {
+          "element_id": "label_46",
+          "type": "label",
+          "bbox": [
+            90,
+            118,
+            173,
+            129
+          ],
+          "text": "bookmarks...",
+          "label": "bookmarks...",
+          "enabled": true,
+          "visible": true,
+          "confidence": 0.83,
+          "metadata": {
+            "source": "ocr"
+          }
+        },
+        "after": {
+          "element_id": "label_37",
+          "type": "label",
+          "bbox": [
+            117,
+            118,
+            153,
+            129
+          ],
+          "text": "kmark",
+          "label": "kmark",
+          "enabled": true,
+          "visible": true,
+          "confidence": 0.9,
+          "metadata": {
+            "source": "ocr"
+          }
+        },
+        "changes": {
+          "text": {
+            "before": "bookmarks...",
+            "after": "kmark"
+          },
+          "label": {
+            "before": "bookmarks...",
+            "after": "kmark"
+          },
+          "bbox": {
+            "before": [
+              90,
+              118,
+              173,
+              129
+            ],
+            "after": [
+              117,
+              118,
+              153,
+              129
+            ]
+          }
+        }
+      },
+      {
+        "element_id": "label_47",
+        "element_id_after": "label_39",
+        "match_score": 0.352,
+        "before": {
+          "element_id": "label_47",
+          "type": "label",
+          "bbox": [
+            189,
+            114,
+            264,
+            129
+          ],
+          "text": "(Finance",
+          "label": "(Finance",
+          "enabled": true,
+          "visible": true,
+          "confidence": 0.51,
+          "metadata": {
+            "source": "ocr"
+          }
+        },
+        "after": {
+          "element_id": "label_39",
+          "type": "label",
+          "bbox": [
+            215,
+            118,
+            251,
+            129
+          ],
+          "text": "Financ",
+          "label": "Financ",
+          "enabled": true,
+          "visible": true,
+          "confidence": 0.48,
+          "metadata": {
+            "source": "ocr"
+          }
+        },
+        "changes": {
+          "text": {
+            "before": "(Finance",
+            "after": "Financ"
+          },
+          "label": {
+            "before": "(Finance",
+            "after": "Financ"
+          },
+          "bbox": {
+            "before": [
+              189,
+              114,
+              264,
+              129
+            ],
+            "after": [
+              215,
+              118,
+              251,
+              129
+            ]
+          }
+        }
+      },
+      {
+        "element_id": "label_48",
+        "element_id_after": "label_40",
+        "match_score": 0.361,
+        "before": {
+          "element_id": "label_48",
+          "type": "label",
+          "bbox": [
+            280,
+            114,
+            376,
+            132
+          ],
+          "text": "[Philosophy",
+          "label": "[Philosophy",
+          "enabled": true,
+          "visible": true,
+          "confidence": 0.4,
+          "metadata": {
+            "source": "ocr"
+          }
+        },
+        "after": {
+          "element_id": "label_40",
+          "type": "label",
+          "bbox": [
+            280,
+            114,
+            319,
+            130
+          ],
+          "text": "Opn",
+          "label": "Opn",
+          "enabled": true,
+          "visible": true,
+          "confidence": 0.69,
+          "metadata": {
+            "source": "ocr"
+          }
+        },
+        "changes": {
+          "text": {
+            "before": "[Philosophy",
+            "after": "Opn"
+          },
+          "label": {
+            "before": "[Philosophy",
+            "after": "Opn"
+          },
+          "bbox": {
+            "before": [
+              280,
+              114,
+              376,
+              132
+            ],
+            "after": [
+              280,
+              114,
+              319,
+              130
+            ]
+          }
+        }
+      },
+      {
+        "element_id": "label_49",
+        "element_id_after": "label_42",
+        "match_score": 0.419,
+        "before": {
+          "element_id": "label_49",
+          "type": "label",
+          "bbox": [
+            392,
+            114,
+            481,
+            132
+          ],
+          "text": "[Language",
+          "label": "[Language",
+          "enabled": true,
+          "visible": true,
+          "confidence": 0.54,
+          "metadata": {
+            "source": "ocr"
+          }
+        },
+        "after": {
+          "element_id": "label_42",
+          "type": "label",
+          "bbox": [
+            392,
+            114,
+            434,
+            130
+          ],
+          "text": "Oar",
+          "label": "Oar",
+          "enabled": true,
+          "visible": true,
+          "confidence": 0.45,
+          "metadata": {
+            "source": "ocr"
+          }
+        },
+        "changes": {
+          "text": {
+            "before": "[Language",
+            "after": "Oar"
+          },
+          "label": {
+            "before": "[Language",
+            "after": "Oar"
+          },
+          "bbox": {
+            "before": [
+              392,
+              114,
+              481,
+              132
+            ],
+            "after": [
+              392,
+              114,
+              434,
+              130
+            ]
+          }
+        }
+      },
+      {
+        "element_id": "label_50",
+        "element_id_after": "label_44",
+        "match_score": 0.248,
+        "before": {
+          "element_id": "label_50",
+          "type": "label",
+          "bbox": [
+            610,
+            114,
+            667,
+            132
+          ],
+          "text": "[Body",
+          "label": "[Body",
+          "enabled": true,
+          "visible": true,
+          "confidence": 0.54,
+          "metadata": {
+            "source": "ocr"
+          }
+        },
+        "after": {
+          "element_id": "label_44",
+          "type": "label",
+          "bbox": [
+            657,
+            118,
+            665,
+            131
+          ],
+          "text": "dy",
+          "label": "dy",
+          "enabled": true,
+          "visible": true,
+          "confidence": 0.95,
+          "metadata": {
+            "source": "ocr"
+          }
+        },
+        "changes": {
+          "text": {
+            "before": "[Body",
+            "after": "dy"
+          },
+          "label": {
+            "before": "[Body",
+            "after": "dy"
+          },
+          "bbox": {
+            "before": [
+              610,
+              114,
+              667,
+              132
+            ],
+            "after": [
+              657,
+              118,
+              665,
+              131
+            ]
+          }
+        }
+      },
+      {
+        "element_id": "label_51",
+        "element_id_after": "label_45",
+        "match_score": 0.117,
+        "before": {
+          "element_id": "label_51",
+          "type": "label",
+          "bbox": [
+            684,
+            114,
+            698,
+            132
+          ],
+          "text": "¢",
+          "label": "¢",
+          "enabled": true,
+          "visible": true,
+          "confidence": 0.66,
+          "metadata": {
+            "source": "ocr"
+          }
+        },
+        "after": {
+          "element_id": "label_45",
+          "type": "label",
+          "bbox": [
+            709,
+            118,
+            726,
+            129
+          ],
+          "text": "Flo",
+          "label": "Flo",
+          "enabled": true,
+          "visible": true,
+          "confidence": 0.96,
+          "metadata": {
+            "source": "ocr"
+          }
+        },
+        "changes": {
+          "text": {
+            "before": "¢",
+            "after": "Flo"
+          },
+          "label": {
+            "before": "¢",
+            "after": "Flo"
+          },
+          "bbox": {
+            "before": [
+              684,
+              114,
+              698,
+              132
+            ],
+            "after": [
+              709,
+              118,
+              726,
+              129
+            ]
+          }
+        }
+      },
+      {
+        "element_id": "label_55",
+        "element_id_after": "label_46",
+        "match_score": 0.633,
+        "before": {
+          "element_id": "label_55",
+          "type": "label",
+          "bbox": [
+            834,
+            118,
+            895,
+            132
+          ],
+          "text": "Academy",
+          "label": "Academy",
+          "enabled": true,
+          "visible": true,
+          "confidence": 0.53,
+          "metadata": {
+            "source": "ocr"
+          }
+        },
+        "after": {
+          "element_id": "label_46",
+          "type": "label",
+          "bbox": [
+            868,
+            121,
+            883,
+            129
+          ],
+          "text": "lem",
+          "label": "lem",
+          "enabled": true,
+          "visible": true,
+          "confidence": 0.53,
+          "metadata": {
+            "source": "ocr"
+          }
+        },
+        "changes": {
+          "text": {
+            "before": "Academy",
+            "after": "lem"
+          },
+          "label": {
+            "before": "Academy",
+            "after": "lem"
+          },
+          "bbox": {
+            "before": [
+              834,
+              118,
+              895,
+              132
+            ],
+            "after": [
+              868,
+              121,
+              883,
+              129
+            ]
+          }
+        }
+      },
+      {
+        "element_id": "label_56",
+        "element_id_after": "label_47",
+        "match_score": 0.385,
+        "before": {
+          "element_id": "label_56",
+          "type": "label",
+          "bbox": [
+            911,
+            116,
+            930,
+            133
+          ],
+          "text": "@",
+          "label": "@",
+          "enabled": true,
+          "visible": true,
+          "confidence": 0.82,
+          "metadata": {
+            "source": "ocr"
+          }
+        },
+        "after": {
+          "element_id": "label_47",
+          "type": "label",
+          "bbox": [
+            911,
+            118,
+            950,
+            129
+          ],
+          "text": "Th",
+          "label": "Th",
+          "enabled": true,
+          "visible": true,
+          "confidence": 0.47,
+          "metadata": {
+            "source": "ocr"
+          }
+        },
+        "changes": {
+          "text": {
+            "before": "@",
+            "after": "Th"
+          },
+          "label": {
+            "before": "@",
+            "after": "Th"
+          },
+          "bbox": {
+            "before": [
+              911,
+              116,
+              930,
+              133
+            ],
+            "after": [
+              911,
+              118,
+              950,
+              129
+            ]
+          }
+        }
+      },
+      {
+        "element_id": "label_58",
+        "element_id_after": "label_48",
+        "match_score": 0.673,
+        "before": {
+          "element_id": "label_58",
+          "type": "label",
+          "bbox": [
+            963,
+            118,
+            1015,
+            129
+          ],
+          "text": "Toulmin",
+          "label": "Toulmin",
+          "enabled": true,
+          "visible": true,
+          "confidence": 0.91,
+          "metadata": {
+            "source": "ocr"
+          }
+        },
+        "after": {
+          "element_id": "label_48",
+          "type": "label",
+          "bbox": [
+            980,
+            118,
+            1015,
+            129
+          ],
+          "text": "ulmin",
+          "label": "ulmin",
+          "enabled": true,
+          "visible": true,
+          "confidence": 0.67,
+          "metadata": {
+            "source": "ocr"
+          }
+        },
+        "changes": {
+          "text": {
+            "before": "Toulmin",
+            "after": "ulmin"
+          },
+          "label": {
+            "before": "Toulmin",
+            "after": "ulmin"
+          },
+          "bbox": {
+            "before": [
+              963,
+              118,
+              1015,
+              129
+            ],
+            "after": [
+              980,
+              118,
+              1015,
+              129
+            ]
+          }
+        }
+      },
+      {
+        "element_id": "label_59",
+        "element_id_after": "label_49",
+        "match_score": 0.56,
+        "before": {
+          "element_id": "label_59",
+          "type": "label",
+          "bbox": [
+            1021,
+            118,
+            1071,
+            129
+          ],
+          "text": "Method",
+          "label": "Method",
+          "enabled": true,
+          "visible": true,
+          "confidence": 0.87,
+          "metadata": {
+            "source": "ocr"
+          }
+        },
+        "after": {
+          "element_id": "label_49",
+          "type": "label",
+          "bbox": [
+            1021,
+            118,
+            1049,
+            129
+          ],
+          "text": "Meth",
+          "label": "Meth",
+          "enabled": true,
+          "visible": true,
+          "confidence": 0.96,
+          "metadata": {
+            "source": "ocr"
+          }
+        },
+        "changes": {
+          "text": {
+            "before": "Method",
+            "after": "Meth"
+          },
+          "label": {
+            "before": "Method",
+            "after": "Meth"
+          },
+          "bbox": {
+            "before": [
+              1021,
+              118,
+              1071,
+              129
+            ],
+            "after": [
+              1021,
+              118,
+              1049,
+              129
+            ]
+          }
+        }
+      },
+      {
+        "element_id": "label_60",
+        "element_id_after": "label_50",
+        "match_score": 0.526,
+        "before": {
+          "element_id": "label_60",
+          "type": "label",
+          "bbox": [
+            1087,
+            113,
+            1107,
+            133
+          ],
+          "text": "@",
+          "label": "@",
+          "enabled": true,
+          "visible": true,
+          "confidence": 0.72,
+          "metadata": {
+            "source": "ocr"
+          }
+        },
+        "after": {
+          "element_id": "label_50",
+          "type": "label",
+          "bbox": [
+            1087,
+            116,
+            1120,
+            132
+          ],
+          "text": "@c",
+          "label": "@c",
+          "enabled": true,
+          "visible": true,
+          "confidence": 0.74,
+          "metadata": {
+            "source": "ocr"
+          }
+        },
+        "changes": {
+          "text": {
+            "before": "@",
+            "after": "@c"
+          },
+          "label": {
+            "before": "@",
+            "after": "@c"
+          },
+          "bbox": {
+            "before": [
+              1087,
+              113,
+              1107,
+              133
+            ],
+            "after": [
+              1087,
+              116,
+              1120,
+              132
+            ]
+          }
+        }
+      },
+      {
+        "element_id": "label_63",
+        "element_id_after": "label_51",
+        "match_score": 0.557,
+        "before": {
+          "element_id": "label_63",
+          "type": "label",
+          "bbox": [
+            1178,
+            118,
+            1228,
+            132
+          ],
+          "text": "Starting",
+          "label": "Starting",
+          "enabled": true,
+          "visible": true,
+          "confidence": 0.96,
+          "metadata": {
+            "source": "ocr"
+          }
+        },
+        "after": {
+          "element_id": "label_51",
+          "type": "label",
+          "bbox": [
+            1179,
+            119,
+            1218,
+            129
+          ],
+          "text": "Startin",
+          "label": "Startin",
+          "enabled": true,
+          "visible": true,
+          "confidence": 0.82,
+          "metadata": {
+            "source": "ocr"
+          }
+        },
+        "changes": {
+          "text": {
+            "before": "Starting",
+            "after": "Startin"
+          },
+          "label": {
+            "before": "Starting",
+            "after": "Startin"
+          },
+          "bbox": {
+            "before": [
+              1178,
+              118,
+              1228,
+              132
+            ],
+            "after": [
+              1179,
+              119,
+              1218,
+              129
+            ]
+          }
+        }
+      },
+      {
+        "element_id": "label_72",
+        "element_id_after": "label_52",
+        "match_score": 0.978,
+        "before": {
+          "element_id": "label_72",
+          "type": "label",
+          "bbox": [
+            1513,
+            118,
+            1559,
+            132
+          ],
+          "text": "Home",
+          "label": "Home",
+          "enabled": true,
+          "visible": true,
+          "confidence": 0.88,
+          "metadata": {
+            "source": "ocr"
+          }
+        },
+        "after": {
+          "element_id": "label_52",
+          "type": "label",
+          "bbox": [
+            1514,
+            118,
+            1559,
+            132
+          ],
+          "text": "Home|",
+          "label": "Home|",
+          "enabled": true,
+          "visible": true,
+          "confidence": 0.75,
+          "metadata": {
+            "source": "ocr"
+          }
+        },
+        "changes": {
+          "text": {
+            "before": "Home",
+            "after": "Home|"
+          },
+          "label": {
+            "before": "Home",
+            "after": "Home|"
+          }
+        }
+      },
+      {
+        "element_id": "label_74",
+        "element_id_after": "label_53",
+        "match_score": 0.117,
+        "before": {
+          "element_id": "label_74",
+          "type": "label",
+          "bbox": [
+            1565,
+            118,
+            1596,
+            129
+          ],
+          "text": "Laws",
+          "label": "Laws",
+          "enabled": true,
+          "visible": true,
+          "confidence": 0.96,
+          "metadata": {
+            "source": "ocr"
+          }
+        },
+        "after": {
+          "element_id": "label_53",
+          "type": "label",
+          "bbox": [
+            1601,
+            119,
+            1613,
+            129
+          ],
+          "text": "of",
+          "label": "of",
+          "enabled": true,
+          "visible": true,
+          "confidence": 0.86,
+          "metadata": {
+            "source": "ocr"
+          }
+        },
+        "changes": {
+          "text": {
+            "before": "Laws",
+            "after": "of"
+          },
+          "label": {
+            "before": "Laws",
+            "after": "of"
+          },
+          "bbox": {
+            "before": [
+              1565,
+              118,
+              1596,
+              129
+            ],
+            "after": [
+              1601,
+              119,
+              1613,
+              129
+            ]
+          }
+        }
+      },
+      {
+        "element_id": "label_75",
+        "element_id_after": "label_54",
+        "match_score": 0.517,
+        "before": {
+          "element_id": "label_75",
+          "type": "label",
+          "bbox": [
+            1601,
+            118,
+            1614,
+            129
+          ],
+          "text": "of",
+          "label": "of",
+          "enabled": true,
+          "visible": true,
+          "confidence": 0.96,
+          "metadata": {
+            "source": "ocr"
+          }
+        },
+        "after": {
+          "element_id": "label_54",
+          "type": "label",
+          "bbox": [
+            1619,
+            118,
+            1625,
+            129
+          ],
+          "text": "U",
+          "label": "U",
+          "enabled": true,
+          "visible": true,
+          "confidence": 0.86,
+          "metadata": {
+            "source": "ocr"
+          }
+        },
+        "changes": {
+          "text": {
+            "before": "of",
+            "after": "U"
+          },
+          "label": {
+            "before": "of",
+            "after": "U"
+          },
+          "bbox": {
+            "before": [
+              1601,
+              118,
+              1614,
+              129
+            ],
+            "after": [
+              1619,
+              118,
+              1625,
+              129
+            ]
+          }
+        }
+      },
+      {
+        "element_id": "label_77",
+        "element_id_after": "label_55",
+        "match_score": 0.449,
+        "before": {
+          "element_id": "label_77",
+          "type": "label",
+          "bbox": [
+            1677,
+            118,
+            1719,
+            129
+          ],
+          "text": "2000+",
+          "label": "2000+",
+          "enabled": true,
+          "visible": true,
+          "confidence": 0.92,
+          "metadata": {
+            "source": "ocr"
+          }
+        },
+        "after": {
+          "element_id": "label_55",
+          "type": "label",
+          "bbox": [
+            1711,
+            121,
+            1718,
+            128
+          ],
+          "text": "+",
+          "label": "+",
+          "enabled": true,
+          "visible": true,
+          "confidence": 0.83,
+          "metadata": {
+            "source": "ocr"
+          }
+        },
+        "changes": {
+          "text": {
+            "before": "2000+",
+            "after": "+"
+          },
+          "label": {
+            "before": "2000+",
+            "after": "+"
+          },
+          "bbox": {
+            "before": [
+              1677,
+              118,
+              1719,
+              129
+            ],
+            "after": [
+              1711,
+              121,
+              1718,
+              128
+            ]
+          }
+        }
+      },
+      {
+        "element_id": "label_78",
+        "element_id_after": "label_56",
+        "match_score": 0.333,
+        "before": {
+          "element_id": "label_78",
+          "type": "label",
+          "bbox": [
+            1725,
+            118,
+            1752,
+            129
+          ],
+          "text": "Free",
+          "label": "Free",
+          "enabled": true,
+          "visible": true,
+          "confidence": 0.95,
+          "metadata": {
+            "source": "ocr"
+          }
+        },
+        "after": {
+          "element_id": "label_56",
+          "type": "label",
+          "bbox": [
+            1725,
+            118,
+            1734,
+            129
+          ],
+          "text": "Fr",
+          "label": "Fr",
+          "enabled": true,
+          "visible": true,
+          "confidence": 0.89,
+          "metadata": {
+            "source": "ocr"
+          }
+        },
+        "changes": {
+          "text": {
+            "before": "Free",
+            "after": "Fr"
+          },
+          "label": {
+            "before": "Free",
+            "after": "Fr"
+          },
+          "bbox": {
+            "before": [
+              1725,
+              118,
+              1752,
+              129
+            ],
+            "after": [
+              1725,
+              118,
+              1734,
+              129
+            ]
+          }
+        }
+      },
+      {
+        "element_id": "label_149",
+        "element_id_after": "label_64",
+        "match_score": 0.353,
+        "before": {
+          "element_id": "label_149",
+          "type": "label",
+          "bbox": [
+            1764,
+            1156,
+            1789,
+            1187
+          ],
+          "text": "&",
+          "label": "&",
+          "enabled": true,
+          "visible": true,
+          "confidence": 0.8,
+          "metadata": {
+            "source": "ocr"
+          }
+        },
+        "after": {
+          "element_id": "label_64",
+          "type": "label",
+          "bbox": [
+            1759,
+            1161,
+            1784,
+            1176
+          ],
+          "text": "ea",
+          "label": "ea",
+          "enabled": true,
+          "visible": true,
+          "confidence": 0.4,
+          "metadata": {
+            "source": "ocr"
+          }
+        },
+        "changes": {
+          "text": {
+            "before": "&",
+            "after": "ea"
+          },
+          "label": {
+            "before": "&",
+            "after": "ea"
+          },
+          "bbox": {
+            "before": [
+              1764,
+              1156,
+              1789,
+              1187
+            ],
+            "after": [
+              1759,
+              1161,
+              1784,
+              1176
+            ]
+          }
+        }
+      },
+      {
+        "element_id": "label_150",
+        "element_id_after": "label_65",
+        "match_score": 0.339,
+        "before": {
+          "element_id": "label_150",
+          "type": "label",
+          "bbox": [
+            1812,
+            1154,
+            1839,
+            1165
+          ],
+          "text": "2:57",
+          "label": "2:57",
+          "enabled": true,
+          "visible": true,
+          "confidence": 0.87,
+          "metadata": {
+            "source": "ocr"
+          }
+        },
+        "after": {
+          "element_id": "label_65",
+          "type": "label",
+          "bbox": [
+            1813,
+            1154,
+            1839,
+            1186
+          ],
+          "text": "ae",
+          "label": "ae",
+          "enabled": true,
+          "visible": true,
+          "confidence": 0.36,
+          "metadata": {
+            "source": "ocr"
+          }
+        },
+        "changes": {
+          "text": {
+            "before": "2:57",
+            "after": "ae"
+          },
+          "label": {
+            "before": "2:57",
+            "after": "ae"
+          },
+          "bbox": {
+            "before": [
+              1812,
+              1154,
+              1839,
+              1165
+            ],
+            "after": [
+              1813,
+              1154,
+              1839,
+              1186
+            ]
+          }
+        }
+      },
+      {
+        "element_id": "label_151",
+        "element_id_after": "label_66",
+        "match_score": 0.524,
+        "before": {
+          "element_id": "label_151",
+          "type": "label",
+          "bbox": [
+            1845,
+            1154,
+            1865,
+            1165
+          ],
+          "text": "PM",
+          "label": "PM",
+          "enabled": true,
+          "visible": true,
+          "confidence": 0.41,
+          "metadata": {
+            "source": "ocr"
+          }
+        },
+        "after": {
+          "element_id": "label_66",
+          "type": "label",
+          "bbox": [
+            1845,
+            1154,
+            1865,
+            1175
+          ],
+          "text": "PM",
+          "label": "PM",
+          "enabled": true,
+          "visible": true,
+          "confidence": 0.82,
+          "metadata": {
+            "source": "ocr"
+          }
+        },
+        "changes": {
+          "bbox": {
+            "before": [
+              1845,
+              1154,
+              1865,
+              1165
+            ],
+            "after": [
+              1845,
+              1154,
+              1865,
+              1175
+            ]
+          }
+        }
+      },
+      {
+        "element_id": "label_154",
+        "element_id_after": "label_60",
+        "match_score": 0.117,
+        "before": {
+          "element_id": "label_154",
+          "type": "label",
+          "bbox": [
+            65,
+            1174,
+            109,
+            1188
+          ],
+          "text": "Mostly",
+          "label": "Mostly",
+          "enabled": true,
+          "visible": true,
+          "confidence": 0.96,
+          "metadata": {
+            "source": "ocr"
+          }
+        },
+        "after": {
+          "element_id": "label_60",
+          "type": "label",
+          "bbox": [
+            66,
+            1154,
+            77,
+            1165
+          ],
+          "text": "31",
+          "label": "31",
+          "enabled": true,
+          "visible": true,
+          "confidence": 0.54,
+          "metadata": {
+            "source": "ocr"
+          }
+        },
+        "changes": {
+          "text": {
+            "before": "Mostly",
+            "after": "31"
+          },
+          "label": {
+            "before": "Mostly",
+            "after": "31"
+          },
+          "bbox": {
+            "before": [
+              65,
+              1174,
+              109,
+              1188
+            ],
+            "after": [
+              66,
+              1154,
+              77,
+              1165
+            ]
+          }
+        }
+      },
+      {
+        "element_id": "label_155",
+        "element_id_after": "label_61",
+        "match_score": 0.331,
+        "before": {
+          "element_id": "label_155",
+          "type": "label",
+          "bbox": [
+            114,
+            1174,
+            158,
+            1188
+          ],
+          "text": "cloudy",
+          "label": "cloudy",
+          "enabled": true,
+          "visible": true,
+          "confidence": 0.96,
+          "metadata": {
+            "source": "ocr"
+          }
+        },
+        "after": {
+          "element_id": "label_61",
+          "type": "label",
+          "bbox": [
+            139,
+            1174,
+            156,
+            1186
+          ],
+          "text": "udy",
+          "label": "udy",
+          "enabled": true,
+          "visible": true,
+          "confidence": 0.53,
+          "metadata": {
+            "source": "ocr"
+          }
+        },
+        "changes": {
+          "text": {
+            "before": "cloudy",
+            "after": "udy"
+          },
+          "label": {
+            "before": "cloudy",
+            "after": "udy"
+          },
+          "bbox": {
+            "before": [
+              114,
+              1174,
+              158,
+              1188
+            ],
+            "after": [
+              139,
+              1174,
+              156,
+              1186
+            ]
+          }
+        }
+      }
+    ],
+    "summary": {
+      "total_before": 157,
+      "total_after": 67,
+      "matched": 54,
+      "added_count": 13,
+      "removed_count": 103,
+      "changed_count": 39,
+      "diff_method": "position_iou"
+    }
+  }
+}

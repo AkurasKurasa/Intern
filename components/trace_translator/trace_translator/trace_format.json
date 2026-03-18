@@ -1,0 +1,83 @@
+{
+    "trace_id": "trace_0001",
+    "timestamp": "2026-02-07T15:32:10.123Z",
+    "duration": 0.0,
+    "type": "excel",
+    "state": {
+        "application": "Excel",
+        "window_title": "Game Stats.xlsx",
+        "screen_resolution": [
+            1920,
+            1080
+        ],
+        "focused_element_id": "cell_A2",
+        "elements": [
+            {
+                "element_id": "cell_A2",
+                "type": "textbox",
+                "label": "Points",
+                "bbox": [
+                    120,
+                    340,
+                    200,
+                    380
+                ],
+                "text": "",
+                "enabled": true
+            },
+            {
+                "element_id": "btn_save",
+                "type": "button",
+                "label": "Save",
+                "bbox": [
+                    1500,
+                    50,
+                    1580,
+                    90
+                ],
+                "enabled": true
+            }
+        ]
+    },
+    "next_state": {
+        "application": "Excel",
+        "window_title": "Game Stats.xlsx",
+        "screen_resolution": [
+            1920,
+            1080
+        ],
+        "focused_element_id": "cell_A2",
+        "elements": [
+            {
+                "element_id": "cell_A2",
+                "type": "textbox",
+                "label": "Points",
+                "bbox": [
+                    120,
+                    340,
+                    200,
+                    380
+                ],
+                "text": "23",
+                "enabled": true
+            }
+        ]
+    },
+    "mouse": {
+        "actions": [
+            {
+                "id": "mouse_action_0001",
+                "position": [160, 360],
+                "type": "click",
+                "timestamp": "2026-02-07T15:32:10.123Z"
+            }
+        ]
+    },
+    "keyboard": {
+        "actions": [
+            {
+                "strokes": ["2", "3"]
+            }
+        ]
+    }
+}
