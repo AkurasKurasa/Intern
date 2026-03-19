@@ -1,7 +1,10 @@
 """
 app/main.py — Intern Control Panel
 ====================================
-GUI to start and stop the ScreenObserver.
+Tabbed GUI with:
+  • Control Panel — start / stop ScreenObserver recording
+  • Workflow Builder — visual n8n-style pipeline editor
+
 Run with: python app/main.py
 """
 
@@ -9,7 +12,7 @@ import os
 import sys
 import threading
 import tkinter as tk
-from tkinter import filedialog
+from tkinter import filedialog, ttk
 from datetime import datetime
 
 # ── path setup ────────────────────────────────────────────────────────────────
@@ -21,6 +24,7 @@ for _p in (_ROOT, _COMP):
         sys.path.insert(0, _p)
 
 from screen_observer.screen_observer import ScreenObserver
+from workflow_builder.workflow_builder import WorkflowBuilderPanel
 
 # ══════════════════════════════════════════════════════════════════════════════
 #  Design tokens
@@ -45,17 +49,12 @@ FONT_COUNT  = ("Segoe UI", 28, "bold")
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-#  Main App
+#  Control Panel tab (original functionality)
 # ══════════════════════════════════════════════════════════════════════════════
-class ControlPanel(tk.Tk):
+class ControlPanelTab(tk.Frame):
 
-    def __init__(self):
-        super().__init__()
-        self.title("Intern — Control Panel")
-        self.geometry("560x680")
-        self.resizable(False, False)
-        self.configure(bg=BG)
-
+    def __init__(self, parent):
+        super().__init__(parent, bg=BG)
         self._observer: ScreenObserver | None = None
         self._recording = False
         self._frame_count = 0
@@ -117,7 +116,7 @@ class ControlPanel(tk.Tk):
 
         # Indicator dot
         self._dot = tk.Label(row, text="●", font=("Segoe UI", 18),
-                              bg=BG_CARD, fg=TEXT_DIM)
+                               bg=BG_CARD, fg=TEXT_DIM)
         self._dot.pack(side="left", padx=(0, 12))
 
         col = tk.Frame(row, bg=BG_CARD)
@@ -306,6 +305,67 @@ class ControlPanel(tk.Tk):
 
 
 # ══════════════════════════════════════════════════════════════════════════════
+#  Main Application  — tabbed shell
+# ══════════════════════════════════════════════════════════════════════════════
+class InternApp(tk.Tk):
+
+    def __init__(self):
+        super().__init__()
+        self.title("Intern — AI Automation Suite")
+        self.geometry("1100x740")
+        self.minsize(800, 580)
+        self.configure(bg=BG)
+
+        self._setup_styles()
+        self._build_header()
+        self._build_tabs()
+
+    def _setup_styles(self):
+        style = ttk.Style(self)
+        style.theme_use("clam")
+        style.configure("TNotebook",
+                         background=BG, borderwidth=0, tabmargins=0)
+        style.configure("TNotebook.Tab",
+                         background=BG_HOVER, foreground=TEXT_DIM,
+                         font=("Segoe UI", 10, "bold"),
+                         padding=[18, 9], borderwidth=0)
+        style.map("TNotebook.Tab",
+                  background=[("selected", ACCENT)],
+                  foreground=[("selected", "white")])
+        style.configure("TFrame", background=BG)
+
+    def _build_header(self):
+        hdr = tk.Frame(self, bg=BG, pady=14)
+        hdr.pack(fill="x", padx=24)
+        tk.Label(hdr, text="[I]", font=("Segoe UI", 22, "bold"),
+                 bg=BG, fg=ACCENT).pack(side="left")
+        tk.Label(hdr, text="  Intern — AI Automation Suite",
+                 font=("Segoe UI", 14), bg=BG, fg=TEXT).pack(side="left")
+        # timestamp
+        self._clock = tk.Label(hdr, font=FONT_MONO, bg=BG, fg=TEXT_DIM)
+        self._clock.pack(side="right")
+        self._tick_clock()
+
+    def _tick_clock(self):
+        self._clock.config(text=datetime.now().strftime("%Y-%m-%d  %H:%M:%S"))
+        self.after(1000, self._tick_clock)
+
+    def _build_tabs(self):
+        nb = ttk.Notebook(self)
+        nb.pack(fill="both", expand=True, padx=8, pady=(0, 8))
+
+        # ── Tab 1: Control Panel ─────────────────────────────────────────────
+        cp_outer = tk.Frame(nb, bg=BG)
+        nb.add(cp_outer, text="🎛  Control Panel")
+        ControlPanelTab(cp_outer).pack(fill="both", expand=True)
+
+        # ── Tab 2: Workflow Builder ──────────────────────────────────────────
+        wb_outer = tk.Frame(nb, bg=BG)
+        nb.add(wb_outer, text="🔗  Workflow Builder")
+        WorkflowBuilderPanel(wb_outer).pack(fill="both", expand=True)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
 if __name__ == "__main__":
-    app = ControlPanel()
+    app = InternApp()
     app.mainloop()
