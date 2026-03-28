@@ -48,7 +48,7 @@ from collections import defaultdict
 import io
 
 # MouseInput and KeyboardInput have been moved to:
-#   components/trace_translator/screen_observer/screen_observer.py
+#   components/trace_translator/recorder/recorder.py
 
 
 # ============================================================================
@@ -262,10 +262,11 @@ class HTMLDetector:
             }
         """)
         
-        # Add confidence score (HTML detection is always 100% accurate)
+        # Add confidence score and window_role (HTML = single active window)
         for element in elements:
             element['confidence'] = 1.0
-        
+            element['window_role'] = 'active'
+
         return elements
 
 
@@ -387,6 +388,39 @@ class UIElementExtractor:
         """Initialize element extractor."""
         self.element_counter = 0
     
+    # Common button labels for type inference
+    _BUTTON_KEYWORDS = {
+        "ok", "cancel", "submit", "save", "delete", "close", "open", "yes", "no",
+        "apply", "back", "next", "continue", "confirm", "add", "remove", "edit",
+        "update", "create", "new", "browse", "upload", "download", "refresh",
+        "search", "find", "login", "logout", "sign in", "sign out",
+    }
+
+    def _infer_type(self, text: str, bbox: list) -> str:
+        """Infer element type from text and bounding-box geometry."""
+        w = max(1, bbox[2] - bbox[0])
+        h = max(1, bbox[3] - bbox[1])
+        t = (text or "").strip()
+        tl = t.lower()
+
+        if not t:
+            # Wide thin box with no text → input field
+            return "input" if w > 3 * h else "label"
+
+        if tl in self._BUTTON_KEYWORDS:
+            return "button"
+
+        # Short title-case text in a roughly square-ish box → button
+        words = t.split()
+        if len(words) <= 3 and t[0].isupper() and w / h < 8 and h >= 16:
+            return "button"
+
+        # Ends with colon → label for a field
+        if t.endswith(":"):
+            return "label"
+
+        return "label"
+
     def extract_elements(
         self,
         image: Image.Image,
@@ -394,50 +428,80 @@ class UIElementExtractor:
     ) -> List[Dict[str, Any]]:
         """
         Extract UI elements from OCR results.
-        
-        Args:
-            image: Original PIL Image
-            ocr_results: OCR text extraction results
-            
-        Returns:
-            List of structured UI element dictionaries
+
+        Infers element type from text content and bounding-box geometry so the
+        transformer receives richer type signals than a flat "label" for everything.
+        All OCR elements are tagged window_role="active" (single-window source).
         """
         elements = []
         self.element_counter = 0
-        
-        # Convert OCR results to elements
+
         for ocr_result in ocr_results:
+            bbox = ocr_result['bbox']
+            text = ocr_result['text']
+            elem_type = self._infer_type(text, bbox)
             element = {
-                "element_id": f"label_{self.element_counter}",
-                "type": "label",  # OCR text is labeled as "label" type
-                "bbox": ocr_result['bbox'],
-                "text": ocr_result['text'],
-                "label": ocr_result['text'],
+                "element_id": f"{elem_type}_{self.element_counter}",
+                "type": elem_type,
+                "bbox": bbox,
+                "text": text,
+                "label": text,
                 "enabled": True,
                 "visible": True,
                 "confidence": ocr_result['confidence'],
+                "window_role": "active",
                 "metadata": {
                     "source": "ocr"
                 }
             }
             elements.append(element)
             self.element_counter += 1
-        
+
         return elements
-    
+
     def merge_overlapping_elements(self, elements: List[Dict]) -> List[Dict]:
         """
-        Merge overlapping elements (simple version).
-        
-        Args:
-            elements: List of elements
-            
-        Returns:
-            List with overlapping elements merged
+        Deduplicate elements whose bounding boxes overlap significantly (IoU >= 0.5).
+
+        OCR often produces multiple fragments for the same text region.  This pass
+        keeps the highest-confidence representative from each overlapping cluster.
         """
-        # For now, just return as-is
-        # In production, this would implement IoU-based merging
-        return elements
+        if len(elements) <= 1:
+            return elements
+
+        def iou(a, b):
+            ax1, ay1, ax2, ay2 = a
+            bx1, by1, bx2, by2 = b
+            ix1 = max(ax1, bx1); iy1 = max(ay1, by1)
+            ix2 = min(ax2, bx2); iy2 = min(ay2, by2)
+            inter = max(0, ix2 - ix1) * max(0, iy2 - iy1)
+            if inter == 0:
+                return 0.0
+            area_a = max(1, (ax2 - ax1) * (ay2 - ay1))
+            area_b = max(1, (bx2 - bx1) * (by2 - by1))
+            return inter / (area_a + area_b - inter)
+
+        kept = []
+        suppressed = set()
+        # Sort by confidence descending so we keep the best representative
+        sorted_elems = sorted(
+            enumerate(elements),
+            key=lambda x: x[1].get("confidence", 0.0),
+            reverse=True,
+        )
+        for i, elem in sorted_elems:
+            if i in suppressed:
+                continue
+            kept.append(elem)
+            for j, other in sorted_elems:
+                if j <= i or j in suppressed:
+                    continue
+                if iou(elem["bbox"], other["bbox"]) >= 0.5:
+                    suppressed.add(j)
+
+        # Restore original order
+        kept_ids = {id(e) for e in kept}
+        return [e for e in elements if id(e) in kept_ids]
 
 
 # ============================================================================
@@ -792,9 +856,11 @@ class TraceTranslator:
         trace = {
             'trace_id': trace_id,
             'timestamp': datetime.now().isoformat(),
-            # Single-state layout kept for backward compatibility
-            'state_before': state,
+            'state': state,           # transformer reads this key
+            'state_before': state,    # kept for compatibility
             'state_after': None,
+            'mouse': action.get('mouse', {}) if action else {},
+            'keyboard': action.get('keyboard', {}) if action else {},
             'action': action,
             'metadata': {
                 'trace_type': 'snapshot',
@@ -802,7 +868,7 @@ class TraceTranslator:
                 'num_elements': len(state['elements'])
             }
         }
-        
+
         return trace
 
     def states_to_trace(
@@ -835,11 +901,23 @@ class TraceTranslator:
         # --- compute a lightweight diff between the two states -----------
         diff = self._diff_states(state_before, state_after)
 
+        # Infer mouse/keyboard from diff when no explicit action is provided
+        if action is None:
+            mouse, keyboard = self._infer_action_from_diff(
+                diff, state_before, state_after
+            )
+        else:
+            mouse    = action.get('mouse', {})
+            keyboard = action.get('keyboard', {})
+
         trace = {
             'trace_id': trace_id,
             'timestamp': datetime.now().isoformat(),
+            'state': state_before,    # transformer reads this key
             'state_before': state_before,
             'state_after': state_after,
+            'mouse': mouse,
+            'keyboard': keyboard,
             'action': action,
             'diff': diff,
             'metadata': {
@@ -1003,6 +1081,67 @@ class TraceTranslator:
         }
 
     
+    def _infer_action_from_diff(
+        self,
+        diff: Dict[str, Any],
+        state_before: Dict[str, Any],
+        state_after: Dict[str, Any],
+    ) -> Tuple[Dict, Dict]:
+        """
+        Heuristically infer mouse/keyboard actions from a state diff.
+
+        Used by states_to_trace() when no explicit action is supplied (e.g. video mode).
+
+        Priority:
+          1. Text grew in an element → keyboard action (type the new characters)
+          2. Element was removed and was a button/link → click at its centre
+          3. No distinguishable change → no_op (empty dicts)
+
+        Returns
+        -------
+        (mouse_dict, keyboard_dict) compatible with transformer.train() input format.
+        """
+        res = state_before.get('screen_resolution', [1920, 1080])
+        W   = float(res[0]) or 1920.0
+        H   = float(res[1]) or 1080.0
+
+        # --- 1. Text grew in a changed element → keyboard ----------------
+        for change in diff.get('changed', []):
+            text_delta = change.get('changes', {}).get('text')
+            if text_delta is None:
+                continue
+            before_text = text_delta.get('before') or ''
+            after_text  = text_delta.get('after')  or ''
+            if len(after_text) > len(before_text):
+                typed = after_text[len(before_text):]
+                elem  = change['after']
+                bbox  = elem.get('bbox', [0, 0, 0, 0])
+                cx    = (bbox[0] + bbox[2]) / 2.0
+                cy    = (bbox[1] + bbox[3]) / 2.0
+                return (
+                    {'action': 'click', 'x': cx, 'y': cy},
+                    {'text': typed, 'key_count': len(typed)},
+                )
+
+        # --- 2. Button/link disappeared → click --------------------------
+        for elem in diff.get('removed', []):
+            if elem.get('type') in ('button', 'link'):
+                bbox = elem.get('bbox', [0, 0, 0, 0])
+                cx   = (bbox[0] + bbox[2]) / 2.0
+                cy   = (bbox[1] + bbox[3]) / 2.0
+                return ({'action': 'click', 'x': cx, 'y': cy}, {})
+
+        # --- 3. Any added element whose bbox centre is new → click --------
+        for elem in diff.get('added', []):
+            if elem.get('type') in ('button', 'link', 'menu_item'):
+                bbox = elem.get('bbox', [0, 0, 0, 0])
+                cx   = (bbox[0] + bbox[2]) / 2.0
+                cy   = (bbox[1] + bbox[3]) / 2.0
+                return ({'action': 'click', 'x': cx, 'y': cy}, {})
+
+        # --- 4. No distinguishable change --------------------------------
+        return ({}, {})
+
     def save_trace(self, trace: Dict[str, Any], output_path: str):
         """
         Save a single trace to a JSON file.
@@ -1048,7 +1187,7 @@ class TraceTranslator:
 # ============================================================================
 
 # MouseInput and KeyboardInput live in:
-#   components/trace_translator/screen_observer/screen_observer.py
+#   components/trace_translator/recorder/recorder.py
 
 __all__ = [
     'TraceTranslator',

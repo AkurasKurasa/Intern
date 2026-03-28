@@ -1,0 +1,3456 @@
+{
+  "source": "correction",
+  "task": "fill_insurance",
+  "recorded_at": "2026-03-26T12:22:27.430864+00:00",
+  "steps": [
+    {
+      "action_type": "click",
+      "click_position": [
+        135.0,
+        736.0
+      ],
+      "state": {
+        "application": "WindowsTerminal.exe",
+        "window_title": "Windows PowerShell",
+        "process_id": 33760,
+        "screen_resolution": [
+          1920,
+          1200
+        ],
+        "focused_element_id": "elem_13",
+        "windows": [
+          {
+            "hwnd": 459012,
+            "title": "Windows PowerShell",
+            "app": "WindowsTerminal.exe",
+            "pid": 33760,
+            "role": "active",
+            "element_count": 23
+          },
+          {
+            "hwnd": 853192,
+            "title": "Car Insurance \u2014 Data Entry Form",
+            "app": "python.exe",
+            "pid": 31004,
+            "role": "background",
+            "element_count": 92
+          },
+          {
+            "hwnd": 198058,
+            "title": "Settings",
+            "app": "ApplicationFrameHost.exe",
+            "pid": 15712,
+            "role": "background",
+            "element_count": 1
+          },
+          {
+            "hwnd": 328902,
+            "title": "NVIDIA GeForce Overlay",
+            "app": "NVIDIA Share.exe",
+            "pid": 8364,
+            "role": "background",
+            "element_count": 1
+          }
+        ],
+        "elements": [
+          {
+            "element_id": "elem_0",
+            "type": "windowcontrol",
+            "control_type": "WindowControl",
+            "bbox": [
+              151,
+              160,
+              1650,
+              930
+            ],
+            "text": "Windows PowerShell",
+            "value": "",
+            "label": "Windows PowerShell",
+            "automation_id": "",
+            "class_name": "CASCADIA_HOSTING_WINDOW_CLASS",
+            "enabled": true,
+            "visible": true,
+            "focused": false,
+            "confidence": 1.0,
+            "source": "uia",
+            "app": "WindowsTerminal.exe",
+            "window_title": "Windows PowerShell",
+            "window_role": "active",
+            "pid": 33760,
+            "metadata": {
+              "depth": 0,
+              "ctrl_type": "WindowControl"
+            }
+          },
+          {
+            "element_id": "elem_1",
+            "type": "panecontrol",
+            "control_type": "PaneControl",
+            "bbox": [
+              160,
+              161,
+              1641,
+              921
+            ],
+            "text": "DesktopWindowXamlSource",
+            "value": "",
+            "label": "DesktopWindowXamlSource",
+            "automation_id": "",
+            "class_name": "Windows.UI.Composition.DesktopWindowContentBridge",
+            "enabled": true,
+            "visible": true,
+            "focused": false,
+            "confidence": 1.0,
+            "source": "uia",
+            "app": "WindowsTerminal.exe",
+            "window_title": "Windows PowerShell",
+            "window_role": "active",
+            "pid": 33760,
+            "metadata": {
+              "depth": 1,
+              "ctrl_type": "PaneControl"
+            }
+          },
+          {
+            "element_id": "elem_2",
+            "type": "tabitemcontrol",
+            "control_type": "TabItemControl",
+            "bbox": [
+              166,
+              171,
+              476,
+              211
+            ],
+            "text": "Windows PowerShell",
+            "value": "",
+            "label": "Windows PowerShell",
+            "automation_id": "",
+            "class_name": "ListViewItem",
+            "enabled": true,
+            "visible": true,
+            "focused": false,
+            "confidence": 1.0,
+            "source": "uia",
+            "app": "WindowsTerminal.exe",
+            "window_title": "Windows PowerShell",
+            "window_role": "active",
+            "pid": 33760,
+            "metadata": {
+              "depth": 5,
+              "ctrl_type": "TabItemControl"
+            }
+          },
+          {
+            "element_id": "elem_3",
+            "type": "textcontrol",
+            "control_type": "TextControl",
+            "bbox": [
+              214,
+              181,
+              358,
+              201
+            ],
+            "text": "Windows PowerShell",
+            "value": "",
+            "label": "Windows PowerShell",
+            "automation_id": "HeaderTextBlock",
+            "class_name": "TextBlock",
+            "enabled": true,
+            "visible": true,
+            "focused": false,
+            "confidence": 1.0,
+            "source": "uia",
+            "app": "WindowsTerminal.exe",
+            "window_title": "Windows PowerShell",
+            "window_role": "active",
+            "pid": 33760,
+            "metadata": {
+              "depth": 6,
+              "ctrl_type": "TextControl"
+            }
+          },
+          {
+            "element_id": "elem_4",
+            "type": "buttoncontrol",
+            "control_type": "ButtonControl",
+            "bbox": [
+              424,
+              176,
+              464,
+              206
+            ],
+            "text": "Close Tab",
+            "value": "",
+            "label": "Close Tab",
+            "automation_id": "CloseButton",
+            "class_name": "Button",
+            "enabled": true,
+            "visible": true,
+            "focused": false,
+            "confidence": 1.0,
+            "source": "uia",
+            "app": "WindowsTerminal.exe",
+            "window_title": "Windows PowerShell",
+            "window_role": "active",
+            "pid": 33760,
+            "metadata": {
+              "depth": 6,
+              "ctrl_type": "ButtonControl"
+            }
+          },
+          {
+            "element_id": "elem_5",
+            "type": "textcontrol",
+            "control_type": "TextControl",
+            "bbox": [
+              437,
+              183,
+              452,
+              198
+            ],
+            "text": "\ue711",
+            "value": "",
+            "label": "\ue711",
+            "automation_id": "",
+            "class_name": "TextBlock",
+            "enabled": true,
+            "visible": true,
+            "focused": false,
+            "confidence": 1.0,
+            "source": "uia",
+            "app": "WindowsTerminal.exe",
+            "window_title": "Windows PowerShell",
+            "window_role": "active",
+            "pid": 33760,
+            "metadata": {
+              "depth": 7,
+              "ctrl_type": "TextControl"
+            }
+          },
+          {
+            "element_id": "elem_6",
+            "type": "splitbuttoncontrol",
+            "control_type": "SplitButtonControl",
+            "bbox": [
+              478,
+              176,
+              557,
+              206
+            ],
+            "text": "New Tab",
+            "value": "",
+            "label": "New Tab",
+            "automation_id": "NewTabButton",
+            "class_name": "Microsoft.UI.Xaml.Controls.SplitButton",
+            "enabled": true,
+            "visible": true,
+            "focused": false,
+            "confidence": 1.0,
+            "source": "uia",
+            "app": "WindowsTerminal.exe",
+            "window_title": "Windows PowerShell",
+            "window_role": "active",
+            "pid": 33760,
+            "metadata": {
+              "depth": 4,
+              "ctrl_type": "SplitButtonControl"
+            }
+          },
+          {
+            "element_id": "elem_7",
+            "type": "buttoncontrol",
+            "control_type": "ButtonControl",
+            "bbox": [
+              478,
+              176,
+              517,
+              206
+            ],
+            "text": "\ue710",
+            "value": "",
+            "label": "\ue710",
+            "automation_id": "PrimaryButton",
+            "class_name": "Button",
+            "enabled": true,
+            "visible": true,
+            "focused": false,
+            "confidence": 1.0,
+            "source": "uia",
+            "app": "WindowsTerminal.exe",
+            "window_title": "Windows PowerShell",
+            "window_role": "active",
+            "pid": 33760,
+            "metadata": {
+              "depth": 5,
+              "ctrl_type": "ButtonControl"
+            }
+          },
+          {
+            "element_id": "elem_8",
+            "type": "textcontrol",
+            "control_type": "TextControl",
+            "bbox": [
+              490,
+              184,
+              505,
+              199
+            ],
+            "text": "\ue710",
+            "value": "",
+            "label": "\ue710",
+            "automation_id": "",
+            "class_name": "TextBlock",
+            "enabled": true,
+            "visible": true,
+            "focused": false,
+            "confidence": 1.0,
+            "source": "uia",
+            "app": "WindowsTerminal.exe",
+            "window_title": "Windows PowerShell",
+            "window_role": "active",
+            "pid": 33760,
+            "metadata": {
+              "depth": 6,
+              "ctrl_type": "TextControl"
+            }
+          },
+          {
+            "element_id": "elem_9",
+            "type": "buttoncontrol",
+            "control_type": "ButtonControl",
+            "bbox": [
+              518,
+              176,
+              557,
+              206
+            ],
+            "text": "More Options",
+            "value": "",
+            "label": "More Options",
+            "automation_id": "SecondaryButton",
+            "class_name": "Button",
+            "enabled": true,
+            "visible": true,
+            "focused": false,
+            "confidence": 1.0,
+            "source": "uia",
+            "app": "WindowsTerminal.exe",
+            "window_title": "Windows PowerShell",
+            "window_role": "active",
+            "pid": 33760,
+            "metadata": {
+              "depth": 5,
+              "ctrl_type": "ButtonControl"
+            }
+          },
+          {
+            "element_id": "elem_10",
+            "type": "textcontrol",
+            "control_type": "TextControl",
+            "bbox": [
+              1490,
+              179,
+              1503,
+              192
+            ],
+            "text": "\ue921",
+            "value": "",
+            "label": "\ue921",
+            "automation_id": "",
+            "class_name": "TextBlock",
+            "enabled": true,
+            "visible": true,
+            "focused": false,
+            "confidence": 1.0,
+            "source": "uia",
+            "app": "WindowsTerminal.exe",
+            "window_title": "Windows PowerShell",
+            "window_role": "active",
+            "pid": 33760,
+            "metadata": {
+              "depth": 4,
+              "ctrl_type": "TextControl"
+            }
+          },
+          {
+            "element_id": "elem_11",
+            "type": "textcontrol",
+            "control_type": "TextControl",
+            "bbox": [
+              1548,
+              179,
+              1560,
+              192
+            ],
+            "text": "\ue922",
+            "value": "",
+            "label": "\ue922",
+            "automation_id": "",
+            "class_name": "TextBlock",
+            "enabled": true,
+            "visible": true,
+            "focused": false,
+            "confidence": 1.0,
+            "source": "uia",
+            "app": "WindowsTerminal.exe",
+            "window_title": "Windows PowerShell",
+            "window_role": "active",
+            "pid": 33760,
+            "metadata": {
+              "depth": 4,
+              "ctrl_type": "TextControl"
+            }
+          },
+          {
+            "element_id": "elem_12",
+            "type": "textcontrol",
+            "control_type": "TextControl",
+            "bbox": [
+              1605,
+              179,
+              1618,
+              192
+            ],
+            "text": "\ue8bb",
+            "value": "",
+            "label": "\ue8bb",
+            "automation_id": "",
+            "class_name": "TextBlock",
+            "enabled": true,
+            "visible": true,
+            "focused": false,
+            "confidence": 1.0,
+            "source": "uia",
+            "app": "WindowsTerminal.exe",
+            "window_title": "Windows PowerShell",
+            "window_role": "active",
+            "pid": 33760,
+            "metadata": {
+              "depth": 4,
+              "ctrl_type": "TextControl"
+            }
+          },
+          {
+            "element_id": "elem_13",
+            "type": "customcontrol",
+            "control_type": "CustomControl",
+            "bbox": [
+              160,
+              211,
+              1641,
+              921
+            ],
+            "text": "",
+            "value": "",
+            "label": "",
+            "automation_id": "",
+            "class_name": "",
+            "enabled": true,
+            "visible": true,
+            "focused": true,
+            "confidence": 1.0,
+            "source": "uia",
+            "app": "WindowsTerminal.exe",
+            "window_title": "Windows PowerShell",
+            "window_role": "active",
+            "pid": 33760,
+            "metadata": {
+              "depth": 3,
+              "ctrl_type": "CustomControl"
+            }
+          },
+          {
+            "element_id": "elem_14",
+            "type": "textcontrol",
+            "control_type": "TextControl",
+            "bbox": [
+              160,
+              211,
+              1641,
+              921
+            ],
+            "text": "Windows PowerShell",
+            "value": "",
+            "label": "Windows PowerShell",
+            "automation_id": "",
+            "class_name": "TermControl",
+            "enabled": true,
+            "visible": true,
+            "focused": true,
+            "confidence": 1.0,
+            "source": "uia",
+            "app": "WindowsTerminal.exe",
+            "window_title": "Windows PowerShell",
+            "window_role": "active",
+            "pid": 33760,
+            "metadata": {
+              "depth": 4,
+              "ctrl_type": "TextControl"
+            }
+          },
+          {
+            "element_id": "elem_15",
+            "type": "scrollbarcontrol",
+            "control_type": "ScrollBarControl",
+            "bbox": [
+              1621,
+              211,
+              1641,
+              921
+            ],
+            "text": "Vertical",
+            "value": "",
+            "label": "Vertical",
+            "automation_id": "ScrollBar",
+            "class_name": "ScrollBar",
+            "enabled": true,
+            "visible": true,
+            "focused": false,
+            "confidence": 1.0,
+            "source": "uia",
+            "app": "WindowsTerminal.exe",
+            "window_title": "Windows PowerShell",
+            "window_role": "active",
+            "pid": 33760,
+            "metadata": {
+              "depth": 5,
+              "ctrl_type": "ScrollBarControl"
+            }
+          },
+          {
+            "element_id": "elem_16",
+            "type": "buttoncontrol",
+            "control_type": "ButtonControl",
+            "bbox": [
+              1621,
+              211,
+              1641,
+              231
+            ],
+            "text": "Vertical Small Decrease",
+            "value": "",
+            "label": "Vertical Small Decrease",
+            "automation_id": "VerticalSmallDecrease",
+            "class_name": "RepeatButton",
+            "enabled": true,
+            "visible": true,
+            "focused": false,
+            "confidence": 1.0,
+            "source": "uia",
+            "app": "WindowsTerminal.exe",
+            "window_title": "Windows PowerShell",
+            "window_role": "active",
+            "pid": 33760,
+            "metadata": {
+              "depth": 6,
+              "ctrl_type": "ButtonControl"
+            }
+          },
+          {
+            "element_id": "elem_17",
+            "type": "textcontrol",
+            "control_type": "TextControl",
+            "bbox": [
+              1621,
+              219,
+              1641,
+              229
+            ],
+            "text": "\ueddb",
+            "value": "",
+            "label": "\ueddb",
+            "automation_id": "",
+            "class_name": "TextBlock",
+            "enabled": true,
+            "visible": true,
+            "focused": false,
+            "confidence": 1.0,
+            "source": "uia",
+            "app": "WindowsTerminal.exe",
+            "window_title": "Windows PowerShell",
+            "window_role": "active",
+            "pid": 33760,
+            "metadata": {
+              "depth": 7,
+              "ctrl_type": "TextControl"
+            }
+          },
+          {
+            "element_id": "elem_18",
+            "type": "buttoncontrol",
+            "control_type": "ButtonControl",
+            "bbox": [
+              1621,
+              231,
+              1641,
+              787
+            ],
+            "text": "Vertical Large Decrease",
+            "value": "",
+            "label": "Vertical Large Decrease",
+            "automation_id": "VerticalLargeDecrease",
+            "class_name": "RepeatButton",
+            "enabled": true,
+            "visible": true,
+            "focused": false,
+            "confidence": 1.0,
+            "source": "uia",
+            "app": "WindowsTerminal.exe",
+            "window_title": "Windows PowerShell",
+            "window_role": "active",
+            "pid": 33760,
+            "metadata": {
+              "depth": 6,
+              "ctrl_type": "ButtonControl"
+            }
+          },
+          {
+            "element_id": "elem_19",
+            "type": "thumbcontrol",
+            "control_type": "ThumbControl",
+            "bbox": [
+              1628,
+              787,
+              1638,
+              824
+            ],
+            "text": "Vertical Thumb",
+            "value": "",
+            "label": "Vertical Thumb",
+            "automation_id": "VerticalThumb",
+            "class_name": "Thumb",
+            "enabled": true,
+            "visible": true,
+            "focused": false,
+            "confidence": 1.0,
+            "source": "uia",
+            "app": "WindowsTerminal.exe",
+            "window_title": "Windows PowerShell",
+            "window_role": "active",
+            "pid": 33760,
+            "metadata": {
+              "depth": 6,
+              "ctrl_type": "ThumbControl"
+            }
+          },
+          {
+            "element_id": "elem_20",
+            "type": "buttoncontrol",
+            "control_type": "ButtonControl",
+            "bbox": [
+              1621,
+              825,
+              1641,
+              901
+            ],
+            "text": "Vertical Large Increase",
+            "value": "",
+            "label": "Vertical Large Increase",
+            "automation_id": "VerticalLargeIncrease",
+            "class_name": "RepeatButton",
+            "enabled": true,
+            "visible": true,
+            "focused": false,
+            "confidence": 1.0,
+            "source": "uia",
+            "app": "WindowsTerminal.exe",
+            "window_title": "Windows PowerShell",
+            "window_role": "active",
+            "pid": 33760,
+            "metadata": {
+              "depth": 6,
+              "ctrl_type": "ButtonControl"
+            }
+          },
+          {
+            "element_id": "elem_21",
+            "type": "buttoncontrol",
+            "control_type": "ButtonControl",
+            "bbox": [
+              1621,
+              901,
+              1641,
+              921
+            ],
+            "text": "Vertical Small Increase",
+            "value": "",
+            "label": "Vertical Small Increase",
+            "automation_id": "VerticalSmallIncrease",
+            "class_name": "RepeatButton",
+            "enabled": true,
+            "visible": true,
+            "focused": false,
+            "confidence": 1.0,
+            "source": "uia",
+            "app": "WindowsTerminal.exe",
+            "window_title": "Windows PowerShell",
+            "window_role": "active",
+            "pid": 33760,
+            "metadata": {
+              "depth": 6,
+              "ctrl_type": "ButtonControl"
+            }
+          },
+          {
+            "element_id": "elem_22",
+            "type": "textcontrol",
+            "control_type": "TextControl",
+            "bbox": [
+              1621,
+              904,
+              1641,
+              914
+            ],
+            "text": "\ueddc",
+            "value": "",
+            "label": "\ueddc",
+            "automation_id": "",
+            "class_name": "TextBlock",
+            "enabled": true,
+            "visible": true,
+            "focused": false,
+            "confidence": 1.0,
+            "source": "uia",
+            "app": "WindowsTerminal.exe",
+            "window_title": "Windows PowerShell",
+            "window_role": "active",
+            "pid": 33760,
+            "metadata": {
+              "depth": 7,
+              "ctrl_type": "TextControl"
+            }
+          },
+          {
+            "element_id": "elem_23",
+            "type": "windowcontrol",
+            "control_type": "WindowControl",
+            "bbox": [
+              43,
+              29,
+              1118,
+              1054
+            ],
+            "text": "Car Insurance \u2014 Data Entry Form",
+            "value": "",
+            "label": "Car Insurance \u2014 Data Entry Form",
+            "automation_id": "",
+            "class_name": "wxWindowNR",
+            "enabled": true,
+            "visible": true,
+            "focused": false,
+            "confidence": 1.0,
+            "source": "uia",
+            "app": "python.exe",
+            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_role": "background",
+            "pid": 31004,
+            "metadata": {
+              "depth": 0,
+              "ctrl_type": "WindowControl"
+            }
+          },
+          {
+            "element_id": "elem_24",
+            "type": "panecontrol",
+            "control_type": "PaneControl",
+            "bbox": [
+              53,
+              68,
+              1108,
+              1044
+            ],
+            "text": "outer_panel",
+            "value": "",
+            "label": "outer_panel",
+            "automation_id": "-31993",
+            "class_name": "wxWindowNR",
+            "enabled": true,
+            "visible": true,
+            "focused": false,
+            "confidence": 1.0,
+            "source": "uia",
+            "app": "python.exe",
+            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_role": "background",
+            "pid": 31004,
+            "metadata": {
+              "depth": 1,
+              "ctrl_type": "PaneControl"
+            }
+          },
+          {
+            "element_id": "elem_25",
+            "type": "panecontrol",
+            "control_type": "PaneControl",
+            "bbox": [
+              53,
+              68,
+              1108,
+              138
+            ],
+            "text": "header_panel",
+            "value": "",
+            "label": "header_panel",
+            "automation_id": "-31992",
+            "class_name": "wxWindowNR",
+            "enabled": true,
+            "visible": true,
+            "focused": false,
+            "confidence": 1.0,
+            "source": "uia",
+            "app": "python.exe",
+            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_role": "background",
+            "pid": 31004,
+            "metadata": {
+              "depth": 2,
+              "ctrl_type": "PaneControl"
+            }
+          },
+          {
+            "element_id": "elem_26",
+            "type": "textcontrol",
+            "control_type": "TextControl",
+            "bbox": [
+              63,
+              86,
+              478,
+              117
+            ],
+            "text": "Car Insurance \u2014 Data Entry Form",
+            "value": "",
+            "label": "Car Insurance \u2014 Data Entry Form",
+            "automation_id": "-31991",
+            "class_name": "Static",
+            "enabled": true,
+            "visible": true,
+            "focused": false,
+            "confidence": 1.0,
+            "source": "uia",
+            "app": "python.exe",
+            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_role": "background",
+            "pid": 31004,
+            "metadata": {
+              "depth": 3,
+              "ctrl_type": "TextControl"
+            }
+          },
+          {
+            "element_id": "elem_27",
+            "type": "panecontrol",
+            "control_type": "PaneControl",
+            "bbox": [
+              68,
+              178,
+              1093,
+              988
+            ],
+            "text": "tab_payment",
+            "value": "",
+            "label": "tab_payment",
+            "automation_id": "-31641",
+            "class_name": "wxWindowNR",
+            "enabled": true,
+            "visible": true,
+            "focused": false,
+            "confidence": 1.0,
+            "source": "uia",
+            "app": "python.exe",
+            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_role": "background",
+            "pid": 31004,
+            "metadata": {
+              "depth": 3,
+              "ctrl_type": "PaneControl"
+            }
+          },
+          {
+            "element_id": "elem_28",
+            "type": "panecontrol",
+            "control_type": "PaneControl",
+            "bbox": [
+              78,
+              163,
+              1062,
+              193
+            ],
+            "text": "section_billing_summary",
+            "value": "",
+            "label": "section_billing_summary",
+            "automation_id": "-31640",
+            "class_name": "wxWindowNR",
+            "enabled": true,
+            "visible": true,
+            "focused": false,
+            "confidence": 1.0,
+            "source": "uia",
+            "app": "python.exe",
+            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_role": "background",
+            "pid": 31004,
+            "metadata": {
+              "depth": 4,
+              "ctrl_type": "PaneControl"
+            }
+          },
+          {
+            "element_id": "elem_29",
+            "type": "textcontrol",
+            "control_type": "TextControl",
+            "bbox": [
+              78,
+              168,
+              202,
+              188
+            ],
+            "text": "Billing Summary",
+            "value": "",
+            "label": "Billing Summary",
+            "automation_id": "-31639",
+            "class_name": "Static",
+            "enabled": true,
+            "visible": true,
+            "focused": false,
+            "confidence": 1.0,
+            "source": "uia",
+            "app": "python.exe",
+            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_role": "background",
+            "pid": 31004,
+            "metadata": {
+              "depth": 5,
+              "ctrl_type": "TextControl"
+            }
+          },
+          {
+            "element_id": "elem_30",
+            "type": "textcontrol",
+            "control_type": "TextControl",
+            "bbox": [
+              88,
+              209,
+              213,
+              229
+            ],
+            "text": "Total Premium ($)",
+            "value": "",
+            "label": "Total Premium ($)",
+            "automation_id": "-31638",
+            "class_name": "Static",
+            "enabled": true,
+            "visible": true,
+            "focused": false,
+            "confidence": 1.0,
+            "source": "uia",
+            "app": "python.exe",
+            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_role": "background",
+            "pid": 31004,
+            "metadata": {
+              "depth": 4,
+              "ctrl_type": "TextControl"
+            }
+          },
+          {
+            "element_id": "elem_31",
+            "type": "editcontrol",
+            "control_type": "EditControl",
+            "bbox": [
+              274,
+              205,
+              1052,
+              234
+            ],
+            "text": "Total Premium ($)",
+            "value": "",
+            "label": "Total Premium ($)",
+            "automation_id": "-31637",
+            "class_name": "Edit",
+            "enabled": true,
+            "visible": true,
+            "focused": false,
+            "confidence": 1.0,
+            "source": "uia",
+            "app": "python.exe",
+            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_role": "background",
+            "pid": 31004,
+            "metadata": {
+              "depth": 4,
+              "ctrl_type": "EditControl"
+            }
+          },
+          {
+            "element_id": "elem_32",
+            "type": "textcontrol",
+            "control_type": "TextControl",
+            "bbox": [
+              88,
+              244,
+              216,
+              264
+            ],
+            "text": "Down Payment ($)",
+            "value": "",
+            "label": "Down Payment ($)",
+            "automation_id": "-31636",
+            "class_name": "Static",
+            "enabled": true,
+            "visible": true,
+            "focused": false,
+            "confidence": 1.0,
+            "source": "uia",
+            "app": "python.exe",
+            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_role": "background",
+            "pid": 31004,
+            "metadata": {
+              "depth": 4,
+              "ctrl_type": "TextControl"
+            }
+          },
+          {
+            "element_id": "elem_33",
+            "type": "editcontrol",
+            "control_type": "EditControl",
+            "bbox": [
+              274,
+              240,
+              1052,
+              269
+            ],
+            "text": "Down Payment ($)",
+            "value": "",
+            "label": "Down Payment ($)",
+            "automation_id": "-31635",
+            "class_name": "Edit",
+            "enabled": true,
+            "visible": true,
+            "focused": false,
+            "confidence": 1.0,
+            "source": "uia",
+            "app": "python.exe",
+            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_role": "background",
+            "pid": 31004,
+            "metadata": {
+              "depth": 4,
+              "ctrl_type": "EditControl"
+            }
+          },
+          {
+            "element_id": "elem_34",
+            "type": "textcontrol",
+            "control_type": "TextControl",
+            "bbox": [
+              88,
+              279,
+              201,
+              299
+            ],
+            "text": "Balance Due ($)",
+            "value": "",
+            "label": "Balance Due ($)",
+            "automation_id": "-31634",
+            "class_name": "Static",
+            "enabled": true,
+            "visible": true,
+            "focused": false,
+            "confidence": 1.0,
+            "source": "uia",
+            "app": "python.exe",
+            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_role": "background",
+            "pid": 31004,
+            "metadata": {
+              "depth": 4,
+              "ctrl_type": "TextControl"
+            }
+          },
+          {
+            "element_id": "elem_35",
+            "type": "editcontrol",
+            "control_type": "EditControl",
+            "bbox": [
+              274,
+              275,
+              1052,
+              304
+            ],
+            "text": "Balance Due ($)",
+            "value": "",
+            "label": "Balance Due ($)",
+            "automation_id": "-31633",
+            "class_name": "Edit",
+            "enabled": true,
+            "visible": true,
+            "focused": false,
+            "confidence": 1.0,
+            "source": "uia",
+            "app": "python.exe",
+            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_role": "background",
+            "pid": 31004,
+            "metadata": {
+              "depth": 4,
+              "ctrl_type": "EditControl"
+            }
+          },
+          {
+            "element_id": "elem_36",
+            "type": "textcontrol",
+            "control_type": "TextControl",
+            "bbox": [
+              88,
+              314,
+              218,
+              334
+            ],
+            "text": "Payment Due Date",
+            "value": "",
+            "label": "Payment Due Date",
+            "automation_id": "-31632",
+            "class_name": "Static",
+            "enabled": true,
+            "visible": true,
+            "focused": false,
+            "confidence": 1.0,
+            "source": "uia",
+            "app": "python.exe",
+            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_role": "background",
+            "pid": 31004,
+            "metadata": {
+              "depth": 4,
+              "ctrl_type": "TextControl"
+            }
+          },
+          {
+            "element_id": "elem_37",
+            "type": "editcontrol",
+            "control_type": "EditControl",
+            "bbox": [
+              274,
+              310,
+              1052,
+              339
+            ],
+            "text": "Payment Due Date",
+            "value": "",
+            "label": "Payment Due Date",
+            "automation_id": "-31631",
+            "class_name": "Edit",
+            "enabled": true,
+            "visible": true,
+            "focused": false,
+            "confidence": 1.0,
+            "source": "uia",
+            "app": "python.exe",
+            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_role": "background",
+            "pid": 31004,
+            "metadata": {
+              "depth": 4,
+              "ctrl_type": "EditControl"
+            }
+          },
+          {
+            "element_id": "elem_38",
+            "type": "textcontrol",
+            "control_type": "TextControl",
+            "bbox": [
+              88,
+              349,
+              224,
+              369
+            ],
+            "text": "Payment Frequency",
+            "value": "",
+            "label": "Payment Frequency",
+            "automation_id": "-31630",
+            "class_name": "Static",
+            "enabled": true,
+            "visible": true,
+            "focused": false,
+            "confidence": 1.0,
+            "source": "uia",
+            "app": "python.exe",
+            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_role": "background",
+            "pid": 31004,
+            "metadata": {
+              "depth": 4,
+              "ctrl_type": "TextControl"
+            }
+          },
+          {
+            "element_id": "elem_39",
+            "type": "comboboxcontrol",
+            "control_type": "ComboBoxControl",
+            "bbox": [
+              274,
+              345,
+              1052,
+              374
+            ],
+            "text": "Payment Frequency",
+            "value": "Annual",
+            "label": "Payment Frequency",
+            "automation_id": "-31629",
+            "class_name": "ComboBox",
+            "enabled": true,
+            "visible": true,
+            "focused": false,
+            "confidence": 1.0,
+            "source": "uia",
+            "app": "python.exe",
+            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_role": "background",
+            "pid": 31004,
+            "metadata": {
+              "depth": 4,
+              "ctrl_type": "ComboBoxControl"
+            }
+          },
+          {
+            "element_id": "elem_40",
+            "type": "textcontrol",
+            "control_type": "TextControl",
+            "bbox": [
+              4,
+              4,
+              753,
+              25
+            ],
+            "text": "Payment Frequency",
+            "value": "Annual",
+            "label": "Payment Frequency",
+            "automation_id": "",
+            "class_name": "",
+            "enabled": true,
+            "visible": true,
+            "focused": false,
+            "confidence": 1.0,
+            "source": "uia",
+            "app": "python.exe",
+            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_role": "background",
+            "pid": 31004,
+            "metadata": {
+              "depth": 5,
+              "ctrl_type": "TextControl"
+            }
+          },
+          {
+            "element_id": "elem_41",
+            "type": "buttoncontrol",
+            "control_type": "ButtonControl",
+            "bbox": [
+              1031,
+              346,
+              1050,
+              372
+            ],
+            "text": "Payment Frequency",
+            "value": "",
+            "label": "Payment Frequency",
+            "automation_id": "",
+            "class_name": "",
+            "enabled": true,
+            "visible": true,
+            "focused": false,
+            "confidence": 1.0,
+            "source": "uia",
+            "app": "python.exe",
+            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_role": "background",
+            "pid": 31004,
+            "metadata": {
+              "depth": 5,
+              "ctrl_type": "ButtonControl"
+            }
+          },
+          {
+            "element_id": "elem_42",
+            "type": "textcontrol",
+            "control_type": "TextControl",
+            "bbox": [
+              88,
+              384,
+              219,
+              404
+            ],
+            "text": "Last Payment Date",
+            "value": "",
+            "label": "Last Payment Date",
+            "automation_id": "-31628",
+            "class_name": "Static",
+            "enabled": true,
+            "visible": true,
+            "focused": false,
+            "confidence": 1.0,
+            "source": "uia",
+            "app": "python.exe",
+            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_role": "background",
+            "pid": 31004,
+            "metadata": {
+              "depth": 4,
+              "ctrl_type": "TextControl"
+            }
+          },
+          {
+            "element_id": "elem_43",
+            "type": "editcontrol",
+            "control_type": "EditControl",
+            "bbox": [
+              274,
+              380,
+              1052,
+              409
+            ],
+            "text": "Last Payment Date",
+            "value": "",
+            "label": "Last Payment Date",
+            "automation_id": "-31627",
+            "class_name": "Edit",
+            "enabled": true,
+            "visible": true,
+            "focused": false,
+            "confidence": 1.0,
+            "source": "uia",
+            "app": "python.exe",
+            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_role": "background",
+            "pid": 31004,
+            "metadata": {
+              "depth": 4,
+              "ctrl_type": "EditControl"
+            }
+          },
+          {
+            "element_id": "elem_44",
+            "type": "textcontrol",
+            "control_type": "TextControl",
+            "bbox": [
+              88,
+              419,
+              262,
+              439
+            ],
+            "text": "Last Payment Amount ($)",
+            "value": "",
+            "label": "Last Payment Amount ($)",
+            "automation_id": "-31626",
+            "class_name": "Static",
+            "enabled": true,
+            "visible": true,
+            "focused": false,
+            "confidence": 1.0,
+            "source": "uia",
+            "app": "python.exe",
+            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_role": "background",
+            "pid": 31004,
+            "metadata": {
+              "depth": 4,
+              "ctrl_type": "TextControl"
+            }
+          },
+          {
+            "element_id": "elem_45",
+            "type": "editcontrol",
+            "control_type": "EditControl",
+            "bbox": [
+              274,
+              415,
+              1052,
+              444
+            ],
+            "text": "Last Payment Amount ($)",
+            "value": "",
+            "label": "Last Payment Amount ($)",
+            "automation_id": "-31625",
+            "class_name": "Edit",
+            "enabled": true,
+            "visible": true,
+            "focused": false,
+            "confidence": 1.0,
+            "source": "uia",
+            "app": "python.exe",
+            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_role": "background",
+            "pid": 31004,
+            "metadata": {
+              "depth": 4,
+              "ctrl_type": "EditControl"
+            }
+          },
+          {
+            "element_id": "elem_46",
+            "type": "panecontrol",
+            "control_type": "PaneControl",
+            "bbox": [
+              80,
+              456,
+              253,
+              475
+            ],
+            "text": "panel",
+            "value": "",
+            "label": "panel",
+            "automation_id": "-31624",
+            "class_name": "wxWindowNR",
+            "enabled": true,
+            "visible": true,
+            "focused": false,
+            "confidence": 1.0,
+            "source": "uia",
+            "app": "python.exe",
+            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_role": "background",
+            "pid": 31004,
+            "metadata": {
+              "depth": 4,
+              "ctrl_type": "PaneControl"
+            }
+          },
+          {
+            "element_id": "elem_47",
+            "type": "checkboxcontrol",
+            "control_type": "CheckBoxControl",
+            "bbox": [
+              93,
+              456,
+              241,
+              475
+            ],
+            "text": "Auto-Pay Enrolled",
+            "value": "",
+            "label": "Auto-Pay Enrolled",
+            "automation_id": "-31623",
+            "class_name": "Button",
+            "enabled": true,
+            "visible": true,
+            "focused": false,
+            "confidence": 1.0,
+            "source": "uia",
+            "app": "python.exe",
+            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_role": "background",
+            "pid": 31004,
+            "metadata": {
+              "depth": 5,
+              "ctrl_type": "CheckBoxControl"
+            }
+          },
+          {
+            "element_id": "elem_48",
+            "type": "panecontrol",
+            "control_type": "PaneControl",
+            "bbox": [
+              78,
+              498,
+              1062,
+              528
+            ],
+            "text": "section_payment_method",
+            "value": "",
+            "label": "section_payment_method",
+            "automation_id": "-31622",
+            "class_name": "wxWindowNR",
+            "enabled": true,
+            "visible": true,
+            "focused": false,
+            "confidence": 1.0,
+            "source": "uia",
+            "app": "python.exe",
+            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_role": "background",
+            "pid": 31004,
+            "metadata": {
+              "depth": 4,
+              "ctrl_type": "PaneControl"
+            }
+          },
+          {
+            "element_id": "elem_49",
+            "type": "textcontrol",
+            "control_type": "TextControl",
+            "bbox": [
+              78,
+              503,
+              206,
+              523
+            ],
+            "text": "Payment Method",
+            "value": "",
+            "label": "Payment Method",
+            "automation_id": "-31621",
+            "class_name": "Static",
+            "enabled": true,
+            "visible": true,
+            "focused": false,
+            "confidence": 1.0,
+            "source": "uia",
+            "app": "python.exe",
+            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_role": "background",
+            "pid": 31004,
+            "metadata": {
+              "depth": 5,
+              "ctrl_type": "TextControl"
+            }
+          },
+          {
+            "element_id": "elem_50",
+            "type": "textcontrol",
+            "control_type": "TextControl",
+            "bbox": [
+              88,
+              544,
+              139,
+              564
+            ],
+            "text": "Method",
+            "value": "",
+            "label": "Method",
+            "automation_id": "-31620",
+            "class_name": "Static",
+            "enabled": true,
+            "visible": true,
+            "focused": false,
+            "confidence": 1.0,
+            "source": "uia",
+            "app": "python.exe",
+            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_role": "background",
+            "pid": 31004,
+            "metadata": {
+              "depth": 4,
+              "ctrl_type": "TextControl"
+            }
+          },
+          {
+            "element_id": "elem_51",
+            "type": "comboboxcontrol",
+            "control_type": "ComboBoxControl",
+            "bbox": [
+              151,
+              540,
+              1051,
+              569
+            ],
+            "text": "Method",
+            "value": "Credit Card",
+            "label": "Method",
+            "automation_id": "-31619",
+            "class_name": "ComboBox",
+            "enabled": true,
+            "visible": true,
+            "focused": false,
+            "confidence": 1.0,
+            "source": "uia",
+            "app": "python.exe",
+            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_role": "background",
+            "pid": 31004,
+            "metadata": {
+              "depth": 4,
+              "ctrl_type": "ComboBoxControl"
+            }
+          },
+          {
+            "element_id": "elem_52",
+            "type": "textcontrol",
+            "control_type": "TextControl",
+            "bbox": [
+              4,
+              4,
+              875,
+              25
+            ],
+            "text": "Method",
+            "value": "Credit Card",
+            "label": "Method",
+            "automation_id": "",
+            "class_name": "",
+            "enabled": true,
+            "visible": true,
+            "focused": false,
+            "confidence": 1.0,
+            "source": "uia",
+            "app": "python.exe",
+            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_role": "background",
+            "pid": 31004,
+            "metadata": {
+              "depth": 5,
+              "ctrl_type": "TextControl"
+            }
+          },
+          {
+            "element_id": "elem_53",
+            "type": "buttoncontrol",
+            "control_type": "ButtonControl",
+            "bbox": [
+              1031,
+              541,
+              1050,
+              567
+            ],
+            "text": "Method",
+            "value": "",
+            "label": "Method",
+            "automation_id": "",
+            "class_name": "",
+            "enabled": true,
+            "visible": true,
+            "focused": false,
+            "confidence": 1.0,
+            "source": "uia",
+            "app": "python.exe",
+            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_role": "background",
+            "pid": 31004,
+            "metadata": {
+              "depth": 5,
+              "ctrl_type": "ButtonControl"
+            }
+          },
+          {
+            "element_id": "elem_54",
+            "type": "panecontrol",
+            "control_type": "PaneControl",
+            "bbox": [
+              78,
+              591,
+              1062,
+              621
+            ],
+            "text": "section_credit_/_debit_card",
+            "value": "",
+            "label": "section_credit_/_debit_card",
+            "automation_id": "-31618",
+            "class_name": "wxWindowNR",
+            "enabled": true,
+            "visible": true,
+            "focused": false,
+            "confidence": 1.0,
+            "source": "uia",
+            "app": "python.exe",
+            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_role": "background",
+            "pid": 31004,
+            "metadata": {
+              "depth": 4,
+              "ctrl_type": "PaneControl"
+            }
+          },
+          {
+            "element_id": "elem_55",
+            "type": "textcontrol",
+            "control_type": "TextControl",
+            "bbox": [
+              78,
+              596,
+              214,
+              616
+            ],
+            "text": "Credit / Debit Card",
+            "value": "",
+            "label": "Credit / Debit Card",
+            "automation_id": "-31617",
+            "class_name": "Static",
+            "enabled": true,
+            "visible": true,
+            "focused": false,
+            "confidence": 1.0,
+            "source": "uia",
+            "app": "python.exe",
+            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_role": "background",
+            "pid": 31004,
+            "metadata": {
+              "depth": 5,
+              "ctrl_type": "TextControl"
+            }
+          },
+          {
+            "element_id": "elem_56",
+            "type": "textcontrol",
+            "control_type": "TextControl",
+            "bbox": [
+              88,
+              638,
+              213,
+              658
+            ],
+            "text": "Cardholder Name",
+            "value": "",
+            "label": "Cardholder Name",
+            "automation_id": "-31616",
+            "class_name": "Static",
+            "enabled": true,
+            "visible": true,
+            "focused": false,
+            "confidence": 1.0,
+            "source": "uia",
+            "app": "python.exe",
+            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_role": "background",
+            "pid": 31004,
+            "metadata": {
+              "depth": 4,
+              "ctrl_type": "TextControl"
+            }
+          },
+          {
+            "element_id": "elem_57",
+            "type": "editcontrol",
+            "control_type": "EditControl",
+            "bbox": [
+              226,
+              634,
+              1051,
+              663
+            ],
+            "text": "Cardholder Name",
+            "value": "",
+            "label": "Cardholder Name",
+            "automation_id": "-31615",
+            "class_name": "Edit",
+            "enabled": true,
+            "visible": true,
+            "focused": false,
+            "confidence": 1.0,
+            "source": "uia",
+            "app": "python.exe",
+            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_role": "background",
+            "pid": 31004,
+            "metadata": {
+              "depth": 4,
+              "ctrl_type": "EditControl"
+            }
+          },
+          {
+            "element_id": "elem_58",
+            "type": "textcontrol",
+            "control_type": "TextControl",
+            "bbox": [
+              88,
+              673,
+              183,
+              693
+            ],
+            "text": "Card Number",
+            "value": "",
+            "label": "Card Number",
+            "automation_id": "-31614",
+            "class_name": "Static",
+            "enabled": true,
+            "visible": true,
+            "focused": false,
+            "confidence": 1.0,
+            "source": "uia",
+            "app": "python.exe",
+            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_role": "background",
+            "pid": 31004,
+            "metadata": {
+              "depth": 4,
+              "ctrl_type": "TextControl"
+            }
+          },
+          {
+            "element_id": "elem_59",
+            "type": "editcontrol",
+            "control_type": "EditControl",
+            "bbox": [
+              226,
+              669,
+              1051,
+              698
+            ],
+            "text": "Card Number",
+            "value": "",
+            "label": "Card Number",
+            "automation_id": "-31613",
+            "class_name": "Edit",
+            "enabled": true,
+            "visible": true,
+            "focused": false,
+            "confidence": 1.0,
+            "source": "uia",
+            "app": "python.exe",
+            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_role": "background",
+            "pid": 31004,
+            "metadata": {
+              "depth": 4,
+              "ctrl_type": "EditControl"
+            }
+          },
+          {
+            "element_id": "elem_60",
+            "type": "textcontrol",
+            "control_type": "TextControl",
+            "bbox": [
+              88,
+              708,
+              214,
+              728
+            ],
+            "text": "Expiration (MM/YY)",
+            "value": "",
+            "label": "Expiration (MM/YY)",
+            "automation_id": "-31612",
+            "class_name": "Static",
+            "enabled": true,
+            "visible": true,
+            "focused": false,
+            "confidence": 1.0,
+            "source": "uia",
+            "app": "python.exe",
+            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_role": "background",
+            "pid": 31004,
+            "metadata": {
+              "depth": 4,
+              "ctrl_type": "TextControl"
+            }
+          },
+          {
+            "element_id": "elem_61",
+            "type": "editcontrol",
+            "control_type": "EditControl",
+            "bbox": [
+              226,
+              704,
+              1051,
+              733
+            ],
+            "text": "Expiration (MM/YY)",
+            "value": "",
+            "label": "Expiration (MM/YY)",
+            "automation_id": "-31611",
+            "class_name": "Edit",
+            "enabled": true,
+            "visible": true,
+            "focused": false,
+            "confidence": 1.0,
+            "source": "uia",
+            "app": "python.exe",
+            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_role": "background",
+            "pid": 31004,
+            "metadata": {
+              "depth": 4,
+              "ctrl_type": "EditControl"
+            }
+          },
+          {
+            "element_id": "elem_62",
+            "type": "textcontrol",
+            "control_type": "TextControl",
+            "bbox": [
+              88,
+              743,
+              118,
+              763
+            ],
+            "text": "CVV",
+            "value": "",
+            "label": "CVV",
+            "automation_id": "-31610",
+            "class_name": "Static",
+            "enabled": true,
+            "visible": true,
+            "focused": false,
+            "confidence": 1.0,
+            "source": "uia",
+            "app": "python.exe",
+            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_role": "background",
+            "pid": 31004,
+            "metadata": {
+              "depth": 4,
+              "ctrl_type": "TextControl"
+            }
+          },
+          {
+            "element_id": "elem_63",
+            "type": "editcontrol",
+            "control_type": "EditControl",
+            "bbox": [
+              226,
+              739,
+              1051,
+              768
+            ],
+            "text": "CVV",
+            "value": "",
+            "label": "CVV",
+            "automation_id": "-31609",
+            "class_name": "Edit",
+            "enabled": true,
+            "visible": true,
+            "focused": false,
+            "confidence": 1.0,
+            "source": "uia",
+            "app": "python.exe",
+            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_role": "background",
+            "pid": 31004,
+            "metadata": {
+              "depth": 4,
+              "ctrl_type": "EditControl"
+            }
+          },
+          {
+            "element_id": "elem_64",
+            "type": "panecontrol",
+            "control_type": "PaneControl",
+            "bbox": [
+              78,
+              790,
+              1062,
+              820
+            ],
+            "text": "section_bank_account_(ach)",
+            "value": "",
+            "label": "section_bank_account_(ach)",
+            "automation_id": "-31608",
+            "class_name": "wxWindowNR",
+            "enabled": true,
+            "visible": true,
+            "focused": false,
+            "confidence": 1.0,
+            "source": "uia",
+            "app": "python.exe",
+            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_role": "background",
+            "pid": 31004,
+            "metadata": {
+              "depth": 4,
+              "ctrl_type": "PaneControl"
+            }
+          },
+          {
+            "element_id": "elem_65",
+            "type": "textcontrol",
+            "control_type": "TextControl",
+            "bbox": [
+              78,
+              795,
+              229,
+              815
+            ],
+            "text": "Bank Account (ACH)",
+            "value": "",
+            "label": "Bank Account (ACH)",
+            "automation_id": "-31607",
+            "class_name": "Static",
+            "enabled": true,
+            "visible": true,
+            "focused": false,
+            "confidence": 1.0,
+            "source": "uia",
+            "app": "python.exe",
+            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_role": "background",
+            "pid": 31004,
+            "metadata": {
+              "depth": 5,
+              "ctrl_type": "TextControl"
+            }
+          },
+          {
+            "element_id": "elem_66",
+            "type": "textcontrol",
+            "control_type": "TextControl",
+            "bbox": [
+              88,
+              836,
+              171,
+              856
+            ],
+            "text": "Bank Name",
+            "value": "",
+            "label": "Bank Name",
+            "automation_id": "-31606",
+            "class_name": "Static",
+            "enabled": true,
+            "visible": true,
+            "focused": false,
+            "confidence": 1.0,
+            "source": "uia",
+            "app": "python.exe",
+            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_role": "background",
+            "pid": 31004,
+            "metadata": {
+              "depth": 4,
+              "ctrl_type": "TextControl"
+            }
+          },
+          {
+            "element_id": "elem_67",
+            "type": "editcontrol",
+            "control_type": "EditControl",
+            "bbox": [
+              215,
+              833,
+              1051,
+              862
+            ],
+            "text": "Bank Name",
+            "value": "",
+            "label": "Bank Name",
+            "automation_id": "-31605",
+            "class_name": "Edit",
+            "enabled": true,
+            "visible": true,
+            "focused": false,
+            "confidence": 1.0,
+            "source": "uia",
+            "app": "python.exe",
+            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_role": "background",
+            "pid": 31004,
+            "metadata": {
+              "depth": 4,
+              "ctrl_type": "EditControl"
+            }
+          },
+          {
+            "element_id": "elem_68",
+            "type": "textcontrol",
+            "control_type": "TextControl",
+            "bbox": [
+              88,
+              871,
+              203,
+              891
+            ],
+            "text": "Routing Number",
+            "value": "",
+            "label": "Routing Number",
+            "automation_id": "-31604",
+            "class_name": "Static",
+            "enabled": true,
+            "visible": true,
+            "focused": false,
+            "confidence": 1.0,
+            "source": "uia",
+            "app": "python.exe",
+            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_role": "background",
+            "pid": 31004,
+            "metadata": {
+              "depth": 4,
+              "ctrl_type": "TextControl"
+            }
+          },
+          {
+            "element_id": "elem_69",
+            "type": "editcontrol",
+            "control_type": "EditControl",
+            "bbox": [
+              215,
+              868,
+              1051,
+              897
+            ],
+            "text": "Routing Number",
+            "value": "",
+            "label": "Routing Number",
+            "automation_id": "-31603",
+            "class_name": "Edit",
+            "enabled": true,
+            "visible": true,
+            "focused": false,
+            "confidence": 1.0,
+            "source": "uia",
+            "app": "python.exe",
+            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_role": "background",
+            "pid": 31004,
+            "metadata": {
+              "depth": 4,
+              "ctrl_type": "EditControl"
+            }
+          },
+          {
+            "element_id": "elem_70",
+            "type": "textcontrol",
+            "control_type": "TextControl",
+            "bbox": [
+              88,
+              906,
+              203,
+              926
+            ],
+            "text": "Account Number",
+            "value": "",
+            "label": "Account Number",
+            "automation_id": "-31602",
+            "class_name": "Static",
+            "enabled": true,
+            "visible": true,
+            "focused": false,
+            "confidence": 1.0,
+            "source": "uia",
+            "app": "python.exe",
+            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_role": "background",
+            "pid": 31004,
+            "metadata": {
+              "depth": 4,
+              "ctrl_type": "TextControl"
+            }
+          },
+          {
+            "element_id": "elem_71",
+            "type": "editcontrol",
+            "control_type": "EditControl",
+            "bbox": [
+              215,
+              903,
+              1051,
+              932
+            ],
+            "text": "Account Number",
+            "value": "",
+            "label": "Account Number",
+            "automation_id": "-31601",
+            "class_name": "Edit",
+            "enabled": true,
+            "visible": true,
+            "focused": false,
+            "confidence": 1.0,
+            "source": "uia",
+            "app": "python.exe",
+            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_role": "background",
+            "pid": 31004,
+            "metadata": {
+              "depth": 4,
+              "ctrl_type": "EditControl"
+            }
+          },
+          {
+            "element_id": "elem_72",
+            "type": "textcontrol",
+            "control_type": "TextControl",
+            "bbox": [
+              88,
+              941,
+              179,
+              961
+            ],
+            "text": "Account Type",
+            "value": "",
+            "label": "Account Type",
+            "automation_id": "-31600",
+            "class_name": "Static",
+            "enabled": true,
+            "visible": true,
+            "focused": false,
+            "confidence": 1.0,
+            "source": "uia",
+            "app": "python.exe",
+            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_role": "background",
+            "pid": 31004,
+            "metadata": {
+              "depth": 4,
+              "ctrl_type": "TextControl"
+            }
+          },
+          {
+            "element_id": "elem_73",
+            "type": "comboboxcontrol",
+            "control_type": "ComboBoxControl",
+            "bbox": [
+              215,
+              938,
+              1051,
+              967
+            ],
+            "text": "Account Type",
+            "value": "Checking",
+            "label": "Account Type",
+            "automation_id": "-31599",
+            "class_name": "ComboBox",
+            "enabled": true,
+            "visible": true,
+            "focused": false,
+            "confidence": 1.0,
+            "source": "uia",
+            "app": "python.exe",
+            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_role": "background",
+            "pid": 31004,
+            "metadata": {
+              "depth": 4,
+              "ctrl_type": "ComboBoxControl"
+            }
+          },
+          {
+            "element_id": "elem_74",
+            "type": "textcontrol",
+            "control_type": "TextControl",
+            "bbox": [
+              4,
+              4,
+              812,
+              25
+            ],
+            "text": "Account Type",
+            "value": "Checking",
+            "label": "Account Type",
+            "automation_id": "",
+            "class_name": "",
+            "enabled": true,
+            "visible": true,
+            "focused": false,
+            "confidence": 1.0,
+            "source": "uia",
+            "app": "python.exe",
+            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_role": "background",
+            "pid": 31004,
+            "metadata": {
+              "depth": 5,
+              "ctrl_type": "TextControl"
+            }
+          },
+          {
+            "element_id": "elem_75",
+            "type": "buttoncontrol",
+            "control_type": "ButtonControl",
+            "bbox": [
+              1031,
+              939,
+              1050,
+              965
+            ],
+            "text": "Account Type",
+            "value": "",
+            "label": "Account Type",
+            "automation_id": "",
+            "class_name": "",
+            "enabled": true,
+            "visible": true,
+            "focused": false,
+            "confidence": 1.0,
+            "source": "uia",
+            "app": "python.exe",
+            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_role": "background",
+            "pid": 31004,
+            "metadata": {
+              "depth": 5,
+              "ctrl_type": "ButtonControl"
+            }
+          },
+          {
+            "element_id": "elem_76",
+            "type": "panecontrol",
+            "control_type": "PaneControl",
+            "bbox": [
+              78,
+              989,
+              1062,
+              1019
+            ],
+            "text": "section_billing_address",
+            "value": "",
+            "label": "section_billing_address",
+            "automation_id": "-31598",
+            "class_name": "wxWindowNR",
+            "enabled": true,
+            "visible": true,
+            "focused": false,
+            "confidence": 1.0,
+            "source": "uia",
+            "app": "python.exe",
+            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_role": "background",
+            "pid": 31004,
+            "metadata": {
+              "depth": 4,
+              "ctrl_type": "PaneControl"
+            }
+          },
+          {
+            "element_id": "elem_77",
+            "type": "textcontrol",
+            "control_type": "TextControl",
+            "bbox": [
+              78,
+              994,
+              193,
+              1014
+            ],
+            "text": "Billing Address",
+            "value": "",
+            "label": "Billing Address",
+            "automation_id": "-31597",
+            "class_name": "Static",
+            "enabled": true,
+            "visible": true,
+            "focused": false,
+            "confidence": 1.0,
+            "source": "uia",
+            "app": "python.exe",
+            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_role": "background",
+            "pid": 31004,
+            "metadata": {
+              "depth": 5,
+              "ctrl_type": "TextControl"
+            }
+          },
+          {
+            "element_id": "elem_78",
+            "type": "textcontrol",
+            "control_type": "TextControl",
+            "bbox": [
+              88,
+              1035,
+              191,
+              1055
+            ],
+            "text": "Street Address",
+            "value": "",
+            "label": "Street Address",
+            "automation_id": "-31596",
+            "class_name": "Static",
+            "enabled": true,
+            "visible": true,
+            "focused": false,
+            "confidence": 1.0,
+            "source": "uia",
+            "app": "python.exe",
+            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_role": "background",
+            "pid": 31004,
+            "metadata": {
+              "depth": 4,
+              "ctrl_type": "TextControl"
+            }
+          },
+          {
+            "element_id": "elem_79",
+            "type": "editcontrol",
+            "control_type": "EditControl",
+            "bbox": [
+              203,
+              1031,
+              1052,
+              1060
+            ],
+            "text": "Street Address",
+            "value": "",
+            "label": "Street Address",
+            "automation_id": "-31595",
+            "class_name": "Edit",
+            "enabled": true,
+            "visible": true,
+            "focused": false,
+            "confidence": 1.0,
+            "source": "uia",
+            "app": "python.exe",
+            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_role": "background",
+            "pid": 31004,
+            "metadata": {
+              "depth": 4,
+              "ctrl_type": "EditControl"
+            }
+          },
+          {
+            "element_id": "elem_80",
+            "type": "textcontrol",
+            "control_type": "TextControl",
+            "bbox": [
+              88,
+              1070,
+              114,
+              1090
+            ],
+            "text": "City",
+            "value": "",
+            "label": "City",
+            "automation_id": "-31594",
+            "class_name": "Static",
+            "enabled": true,
+            "visible": true,
+            "focused": false,
+            "confidence": 1.0,
+            "source": "uia",
+            "app": "python.exe",
+            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_role": "background",
+            "pid": 31004,
+            "metadata": {
+              "depth": 4,
+              "ctrl_type": "TextControl"
+            }
+          },
+          {
+            "element_id": "elem_81",
+            "type": "editcontrol",
+            "control_type": "EditControl",
+            "bbox": [
+              203,
+              1066,
+              1052,
+              1095
+            ],
+            "text": "City",
+            "value": "",
+            "label": "City",
+            "automation_id": "-31593",
+            "class_name": "Edit",
+            "enabled": true,
+            "visible": true,
+            "focused": false,
+            "confidence": 1.0,
+            "source": "uia",
+            "app": "python.exe",
+            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_role": "background",
+            "pid": 31004,
+            "metadata": {
+              "depth": 4,
+              "ctrl_type": "EditControl"
+            }
+          },
+          {
+            "element_id": "elem_82",
+            "type": "textcontrol",
+            "control_type": "TextControl",
+            "bbox": [
+              88,
+              1105,
+              124,
+              1125
+            ],
+            "text": "State",
+            "value": "",
+            "label": "State",
+            "automation_id": "-31592",
+            "class_name": "Static",
+            "enabled": true,
+            "visible": true,
+            "focused": false,
+            "confidence": 1.0,
+            "source": "uia",
+            "app": "python.exe",
+            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_role": "background",
+            "pid": 31004,
+            "metadata": {
+              "depth": 4,
+              "ctrl_type": "TextControl"
+            }
+          },
+          {
+            "element_id": "elem_83",
+            "type": "comboboxcontrol",
+            "control_type": "ComboBoxControl",
+            "bbox": [
+              203,
+              1101,
+              1052,
+              1130
+            ],
+            "text": "State",
+            "value": "Alabama",
+            "label": "State",
+            "automation_id": "-31591",
+            "class_name": "ComboBox",
+            "enabled": true,
+            "visible": true,
+            "focused": false,
+            "confidence": 1.0,
+            "source": "uia",
+            "app": "python.exe",
+            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_role": "background",
+            "pid": 31004,
+            "metadata": {
+              "depth": 4,
+              "ctrl_type": "ComboBoxControl"
+            }
+          },
+          {
+            "element_id": "elem_84",
+            "type": "textcontrol",
+            "control_type": "TextControl",
+            "bbox": [
+              4,
+              4,
+              824,
+              25
+            ],
+            "text": "State",
+            "value": "Alabama",
+            "label": "State",
+            "automation_id": "",
+            "class_name": "",
+            "enabled": true,
+            "visible": true,
+            "focused": false,
+            "confidence": 1.0,
+            "source": "uia",
+            "app": "python.exe",
+            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_role": "background",
+            "pid": 31004,
+            "metadata": {
+              "depth": 5,
+              "ctrl_type": "TextControl"
+            }
+          },
+          {
+            "element_id": "elem_85",
+            "type": "buttoncontrol",
+            "control_type": "ButtonControl",
+            "bbox": [
+              1031,
+              1103,
+              1050,
+              1129
+            ],
+            "text": "State",
+            "value": "",
+            "label": "State",
+            "automation_id": "",
+            "class_name": "",
+            "enabled": true,
+            "visible": true,
+            "focused": false,
+            "confidence": 1.0,
+            "source": "uia",
+            "app": "python.exe",
+            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_role": "background",
+            "pid": 31004,
+            "metadata": {
+              "depth": 5,
+              "ctrl_type": "ButtonControl"
+            }
+          },
+          {
+            "element_id": "elem_86",
+            "type": "textcontrol",
+            "control_type": "TextControl",
+            "bbox": [
+              88,
+              1140,
+              153,
+              1160
+            ],
+            "text": "ZIP Code",
+            "value": "",
+            "label": "ZIP Code",
+            "automation_id": "-31590",
+            "class_name": "Static",
+            "enabled": true,
+            "visible": true,
+            "focused": false,
+            "confidence": 1.0,
+            "source": "uia",
+            "app": "python.exe",
+            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_role": "background",
+            "pid": 31004,
+            "metadata": {
+              "depth": 4,
+              "ctrl_type": "TextControl"
+            }
+          },
+          {
+            "element_id": "elem_87",
+            "type": "editcontrol",
+            "control_type": "EditControl",
+            "bbox": [
+              203,
+              1136,
+              1052,
+              1165
+            ],
+            "text": "ZIP Code",
+            "value": "",
+            "label": "ZIP Code",
+            "automation_id": "-31589",
+            "class_name": "Edit",
+            "enabled": true,
+            "visible": true,
+            "focused": false,
+            "confidence": 1.0,
+            "source": "uia",
+            "app": "python.exe",
+            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_role": "background",
+            "pid": 31004,
+            "metadata": {
+              "depth": 4,
+              "ctrl_type": "EditControl"
+            }
+          },
+          {
+            "element_id": "elem_88",
+            "type": "scrollbarcontrol",
+            "control_type": "ScrollBarControl",
+            "bbox": [
+              1071,
+              178,
+              1097,
+              988
+            ],
+            "text": "Vertical",
+            "value": "",
+            "label": "Vertical",
+            "automation_id": "NonClientVerticalScrollBar",
+            "class_name": "",
+            "enabled": true,
+            "visible": true,
+            "focused": false,
+            "confidence": 1.0,
+            "source": "uia",
+            "app": "python.exe",
+            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_role": "background",
+            "pid": 31004,
+            "metadata": {
+              "depth": 4,
+              "ctrl_type": "ScrollBarControl"
+            }
+          },
+          {
+            "element_id": "elem_89",
+            "type": "buttoncontrol",
+            "control_type": "ButtonControl",
+            "bbox": [
+              1071,
+              178,
+              1097,
+              199
+            ],
+            "text": "Line up",
+            "value": "",
+            "label": "Line up",
+            "automation_id": "UpButton",
+            "class_name": "",
+            "enabled": true,
+            "visible": true,
+            "focused": false,
+            "confidence": 1.0,
+            "source": "uia",
+            "app": "python.exe",
+            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_role": "background",
+            "pid": 31004,
+            "metadata": {
+              "depth": 5,
+              "ctrl_type": "ButtonControl"
+            }
+          },
+          {
+            "element_id": "elem_90",
+            "type": "buttoncontrol",
+            "control_type": "ButtonControl",
+            "bbox": [
+              1071,
+              199,
+              1097,
+              214
+            ],
+            "text": "Page up",
+            "value": "",
+            "label": "Page up",
+            "automation_id": "UpPageButton",
+            "class_name": "",
+            "enabled": true,
+            "visible": true,
+            "focused": false,
+            "confidence": 1.0,
+            "source": "uia",
+            "app": "python.exe",
+            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_role": "background",
+            "pid": 31004,
+            "metadata": {
+              "depth": 5,
+              "ctrl_type": "ButtonControl"
+            }
+          },
+          {
+            "element_id": "elem_91",
+            "type": "thumbcontrol",
+            "control_type": "ThumbControl",
+            "bbox": [
+              1071,
+              214,
+              1097,
+              687
+            ],
+            "text": "Position",
+            "value": "",
+            "label": "Position",
+            "automation_id": "ScrollbarThumb",
+            "class_name": "",
+            "enabled": true,
+            "visible": true,
+            "focused": false,
+            "confidence": 1.0,
+            "source": "uia",
+            "app": "python.exe",
+            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_role": "background",
+            "pid": 31004,
+            "metadata": {
+              "depth": 5,
+              "ctrl_type": "ThumbControl"
+            }
+          },
+          {
+            "element_id": "elem_92",
+            "type": "buttoncontrol",
+            "control_type": "ButtonControl",
+            "bbox": [
+              1071,
+              687,
+              1097,
+              967
+            ],
+            "text": "Page down",
+            "value": "",
+            "label": "Page down",
+            "automation_id": "DownPageButton",
+            "class_name": "",
+            "enabled": true,
+            "visible": true,
+            "focused": false,
+            "confidence": 1.0,
+            "source": "uia",
+            "app": "python.exe",
+            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_role": "background",
+            "pid": 31004,
+            "metadata": {
+              "depth": 5,
+              "ctrl_type": "ButtonControl"
+            }
+          },
+          {
+            "element_id": "elem_93",
+            "type": "buttoncontrol",
+            "control_type": "ButtonControl",
+            "bbox": [
+              1071,
+              967,
+              1097,
+              988
+            ],
+            "text": "Line down",
+            "value": "",
+            "label": "Line down",
+            "automation_id": "DownButton",
+            "class_name": "",
+            "enabled": true,
+            "visible": true,
+            "focused": false,
+            "confidence": 1.0,
+            "source": "uia",
+            "app": "python.exe",
+            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_role": "background",
+            "pid": 31004,
+            "metadata": {
+              "depth": 5,
+              "ctrl_type": "ButtonControl"
+            }
+          },
+          {
+            "element_id": "elem_94",
+            "type": "tabitemcontrol",
+            "control_type": "TabItemControl",
+            "bbox": [
+              65,
+              150,
+              125,
+              175
+            ],
+            "text": "Policy",
+            "value": "",
+            "label": "Policy",
+            "automation_id": "",
+            "class_name": "",
+            "enabled": true,
+            "visible": true,
+            "focused": false,
+            "confidence": 1.0,
+            "source": "uia",
+            "app": "python.exe",
+            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_role": "background",
+            "pid": 31004,
+            "metadata": {
+              "depth": 3,
+              "ctrl_type": "TabItemControl"
+            }
+          },
+          {
+            "element_id": "elem_95",
+            "type": "tabitemcontrol",
+            "control_type": "TabItemControl",
+            "bbox": [
+              125,
+              150,
+              223,
+              175
+            ],
+            "text": "Policyholder",
+            "value": "",
+            "label": "Policyholder",
+            "automation_id": "",
+            "class_name": "",
+            "enabled": true,
+            "visible": true,
+            "focused": false,
+            "confidence": 1.0,
+            "source": "uia",
+            "app": "python.exe",
+            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_role": "background",
+            "pid": 31004,
+            "metadata": {
+              "depth": 3,
+              "ctrl_type": "TabItemControl"
+            }
+          },
+          {
+            "element_id": "elem_96",
+            "type": "tabitemcontrol",
+            "control_type": "TabItemControl",
+            "bbox": [
+              223,
+              150,
+              284,
+              175
+            ],
+            "text": "Vehicle",
+            "value": "",
+            "label": "Vehicle",
+            "automation_id": "",
+            "class_name": "",
+            "enabled": true,
+            "visible": true,
+            "focused": false,
+            "confidence": 1.0,
+            "source": "uia",
+            "app": "python.exe",
+            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_role": "background",
+            "pid": 31004,
+            "metadata": {
+              "depth": 3,
+              "ctrl_type": "TabItemControl"
+            }
+          },
+          {
+            "element_id": "elem_97",
+            "type": "tabitemcontrol",
+            "control_type": "TabItemControl",
+            "bbox": [
+              284,
+              150,
+              362,
+              175
+            ],
+            "text": "Coverage",
+            "value": "",
+            "label": "Coverage",
+            "automation_id": "",
+            "class_name": "",
+            "enabled": true,
+            "visible": true,
+            "focused": false,
+            "confidence": 1.0,
+            "source": "uia",
+            "app": "python.exe",
+            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_role": "background",
+            "pid": 31004,
+            "metadata": {
+              "depth": 3,
+              "ctrl_type": "TabItemControl"
+            }
+          },
+          {
+            "element_id": "elem_98",
+            "type": "tabitemcontrol",
+            "control_type": "TabItemControl",
+            "bbox": [
+              361,
+              150,
+              421,
+              175
+            ],
+            "text": "Drivers",
+            "value": "",
+            "label": "Drivers",
+            "automation_id": "",
+            "class_name": "",
+            "enabled": true,
+            "visible": true,
+            "focused": false,
+            "confidence": 1.0,
+            "source": "uia",
+            "app": "python.exe",
+            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_role": "background",
+            "pid": 31004,
+            "metadata": {
+              "depth": 3,
+              "ctrl_type": "TabItemControl"
+            }
+          },
+          {
+            "element_id": "elem_99",
+            "type": "tabitemcontrol",
+            "control_type": "TabItemControl",
+            "bbox": [
+              421,
+              150,
+              484,
+              175
+            ],
+            "text": "History",
+            "value": "",
+            "label": "History",
+            "automation_id": "",
+            "class_name": "",
+            "enabled": true,
+            "visible": true,
+            "focused": false,
+            "confidence": 1.0,
+            "source": "uia",
+            "app": "python.exe",
+            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_role": "background",
+            "pid": 31004,
+            "metadata": {
+              "depth": 3,
+              "ctrl_type": "TabItemControl"
+            }
+          },
+          {
+            "element_id": "elem_100",
+            "type": "tabitemcontrol",
+            "control_type": "TabItemControl",
+            "bbox": [
+              484,
+              150,
+              544,
+              175
+            ],
+            "text": "Claims",
+            "value": "",
+            "label": "Claims",
+            "automation_id": "",
+            "class_name": "",
+            "enabled": true,
+            "visible": true,
+            "focused": false,
+            "confidence": 1.0,
+            "source": "uia",
+            "app": "python.exe",
+            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_role": "background",
+            "pid": 31004,
+            "metadata": {
+              "depth": 3,
+              "ctrl_type": "TabItemControl"
+            }
+          },
+          {
+            "element_id": "elem_101",
+            "type": "tabitemcontrol",
+            "control_type": "TabItemControl",
+            "bbox": [
+              544,
+              150,
+              618,
+              175
+            ],
+            "text": "Payment",
+            "value": "",
+            "label": "Payment",
+            "automation_id": "",
+            "class_name": "",
+            "enabled": true,
+            "visible": true,
+            "focused": false,
+            "confidence": 1.0,
+            "source": "uia",
+            "app": "python.exe",
+            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_role": "background",
+            "pid": 31004,
+            "metadata": {
+              "depth": 3,
+              "ctrl_type": "TabItemControl"
+            }
+          },
+          {
+            "element_id": "elem_102",
+            "type": "panecontrol",
+            "control_type": "PaneControl",
+            "bbox": [
+              53,
+              1003,
+              1108,
+              1044
+            ],
+            "text": "footer_panel",
+            "value": "",
+            "label": "footer_panel",
+            "automation_id": "-31588",
+            "class_name": "wxWindowNR",
+            "enabled": true,
+            "visible": true,
+            "focused": false,
+            "confidence": 1.0,
+            "source": "uia",
+            "app": "python.exe",
+            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_role": "background",
+            "pid": 31004,
+            "metadata": {
+              "depth": 2,
+              "ctrl_type": "PaneControl"
+            }
+          },
+          {
+            "element_id": "elem_103",
+            "type": "textcontrol",
+            "control_type": "TextControl",
+            "bbox": [
+              53,
+              1013,
+              112,
+              1033
+            ],
+            "text": "Cleared",
+            "value": "",
+            "label": "Cleared",
+            "automation_id": "-31587",
+            "class_name": "Static",
+            "enabled": true,
+            "visible": true,
+            "focused": false,
+            "confidence": 1.0,
+            "source": "uia",
+            "app": "python.exe",
+            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_role": "background",
+            "pid": 31004,
+            "metadata": {
+              "depth": 3,
+              "ctrl_type": "TextControl"
+            }
+          },
+          {
+            "element_id": "elem_104",
+            "type": "buttoncontrol",
+            "control_type": "ButtonControl",
+            "bbox": [
+              536,
+              1009,
+              630,
+              1038
+            ],
+            "text": "Submit",
+            "value": "",
+            "label": "Submit",
+            "automation_id": "-31586",
+            "class_name": "Button",
+            "enabled": true,
+            "visible": true,
+            "focused": false,
+            "confidence": 1.0,
+            "source": "uia",
+            "app": "python.exe",
+            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_role": "background",
+            "pid": 31004,
+            "metadata": {
+              "depth": 3,
+              "ctrl_type": "ButtonControl"
+            }
+          },
+          {
+            "element_id": "elem_105",
+            "type": "buttoncontrol",
+            "control_type": "ButtonControl",
+            "bbox": [
+              643,
+              1009,
+              737,
+              1038
+            ],
+            "text": "Clear All",
+            "value": "",
+            "label": "Clear All",
+            "automation_id": "-31585",
+            "class_name": "Button",
+            "enabled": true,
+            "visible": true,
+            "focused": false,
+            "confidence": 1.0,
+            "source": "uia",
+            "app": "python.exe",
+            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_role": "background",
+            "pid": 31004,
+            "metadata": {
+              "depth": 3,
+              "ctrl_type": "ButtonControl"
+            }
+          },
+          {
+            "element_id": "elem_106",
+            "type": "buttoncontrol",
+            "control_type": "ButtonControl",
+            "bbox": [
+              749,
+              1009,
+              862,
+              1038
+            ],
+            "text": "Print Preview",
+            "value": "",
+            "label": "Print Preview",
+            "automation_id": "-31584",
+            "class_name": "Button",
+            "enabled": true,
+            "visible": true,
+            "focused": false,
+            "confidence": 1.0,
+            "source": "uia",
+            "app": "python.exe",
+            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_role": "background",
+            "pid": 31004,
+            "metadata": {
+              "depth": 3,
+              "ctrl_type": "ButtonControl"
+            }
+          },
+          {
+            "element_id": "elem_107",
+            "type": "buttoncontrol",
+            "control_type": "ButtonControl",
+            "bbox": [
+              874,
+              1009,
+              983,
+              1038
+            ],
+            "text": "Load Record",
+            "value": "",
+            "label": "Load Record",
+            "automation_id": "-31583",
+            "class_name": "Button",
+            "enabled": true,
+            "visible": true,
+            "focused": false,
+            "confidence": 1.0,
+            "source": "uia",
+            "app": "python.exe",
+            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_role": "background",
+            "pid": 31004,
+            "metadata": {
+              "depth": 3,
+              "ctrl_type": "ButtonControl"
+            }
+          },
+          {
+            "element_id": "elem_108",
+            "type": "buttoncontrol",
+            "control_type": "ButtonControl",
+            "bbox": [
+              995,
+              1009,
+              1101,
+              1038
+            ],
+            "text": "Save Record",
+            "value": "",
+            "label": "Save Record",
+            "automation_id": "-31582",
+            "class_name": "Button",
+            "enabled": true,
+            "visible": true,
+            "focused": false,
+            "confidence": 1.0,
+            "source": "uia",
+            "app": "python.exe",
+            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_role": "background",
+            "pid": 31004,
+            "metadata": {
+              "depth": 3,
+              "ctrl_type": "ButtonControl"
+            }
+          },
+          {
+            "element_id": "elem_109",
+            "type": "titlebarcontrol",
+            "control_type": "TitleBarControl",
+            "bbox": [
+              73,
+              33,
+              1108,
+              68
+            ],
+            "text": "Car Insurance \u2014 Data Entry Form",
+            "value": "Car Insurance \u2014 Data Entry Form",
+            "label": "Car Insurance \u2014 Data Entry Form",
+            "automation_id": "",
+            "class_name": "",
+            "enabled": true,
+            "visible": true,
+            "focused": false,
+            "confidence": 1.0,
+            "source": "uia",
+            "app": "python.exe",
+            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_role": "background",
+            "pid": 31004,
+            "metadata": {
+              "depth": 1,
+              "ctrl_type": "TitleBarControl"
+            }
+          },
+          {
+            "element_id": "elem_110",
+            "type": "menubarcontrol",
+            "control_type": "MenuBarControl",
+            "bbox": [
+              53,
+              39,
+              81,
+              67
+            ],
+            "text": "System",
+            "value": "",
+            "label": "System",
+            "automation_id": "MenuBar",
+            "class_name": "",
+            "enabled": true,
+            "visible": true,
+            "focused": false,
+            "confidence": 1.0,
+            "source": "uia",
+            "app": "python.exe",
+            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_role": "background",
+            "pid": 31004,
+            "metadata": {
+              "depth": 2,
+              "ctrl_type": "MenuBarControl"
+            }
+          },
+          {
+            "element_id": "elem_111",
+            "type": "menuitemcontrol",
+            "control_type": "MenuItemControl",
+            "bbox": [
+              53,
+              39,
+              81,
+              67
+            ],
+            "text": "System",
+            "value": "",
+            "label": "System",
+            "automation_id": "",
+            "class_name": "",
+            "enabled": true,
+            "visible": true,
+            "focused": false,
+            "confidence": 1.0,
+            "source": "uia",
+            "app": "python.exe",
+            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_role": "background",
+            "pid": 31004,
+            "metadata": {
+              "depth": 3,
+              "ctrl_type": "MenuItemControl"
+            }
+          },
+          {
+            "element_id": "elem_112",
+            "type": "buttoncontrol",
+            "control_type": "ButtonControl",
+            "bbox": [
+              930,
+              30,
+              990,
+              68
+            ],
+            "text": "Minimize",
+            "value": "",
+            "label": "Minimize",
+            "automation_id": "",
+            "class_name": "",
+            "enabled": true,
+            "visible": true,
+            "focused": false,
+            "confidence": 1.0,
+            "source": "uia",
+            "app": "python.exe",
+            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_role": "background",
+            "pid": 31004,
+            "metadata": {
+              "depth": 2,
+              "ctrl_type": "ButtonControl"
+            }
+          },
+          {
+            "element_id": "elem_113",
+            "type": "buttoncontrol",
+            "control_type": "ButtonControl",
+            "bbox": [
+              990,
+              30,
+              1049,
+              68
+            ],
+            "text": "Maximize",
+            "value": "",
+            "label": "Maximize",
+            "automation_id": "",
+            "class_name": "",
+            "enabled": true,
+            "visible": true,
+            "focused": false,
+            "confidence": 1.0,
+            "source": "uia",
+            "app": "python.exe",
+            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_role": "background",
+            "pid": 31004,
+            "metadata": {
+              "depth": 2,
+              "ctrl_type": "ButtonControl"
+            }
+          },
+          {
+            "element_id": "elem_114",
+            "type": "buttoncontrol",
+            "control_type": "ButtonControl",
+            "bbox": [
+              1049,
+              30,
+              1109,
+              68
+            ],
+            "text": "Close",
+            "value": "",
+            "label": "Close",
+            "automation_id": "",
+            "class_name": "",
+            "enabled": true,
+            "visible": true,
+            "focused": false,
+            "confidence": 1.0,
+            "source": "uia",
+            "app": "python.exe",
+            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_role": "background",
+            "pid": 31004,
+            "metadata": {
+              "depth": 2,
+              "ctrl_type": "ButtonControl"
+            }
+          },
+          {
+            "element_id": "elem_115",
+            "type": "windowcontrol",
+            "control_type": "WindowControl",
+            "bbox": [
+              -9,
+              -9,
+              1929,
+              1149
+            ],
+            "text": "Settings",
+            "value": "",
+            "label": "Settings",
+            "automation_id": "",
+            "class_name": "ApplicationFrameWindow",
+            "enabled": true,
+            "visible": true,
+            "focused": false,
+            "confidence": 1.0,
+            "source": "uia",
+            "app": "ApplicationFrameHost.exe",
+            "window_title": "Settings",
+            "window_role": "background",
+            "pid": 15712,
+            "metadata": {
+              "depth": 0,
+              "ctrl_type": "WindowControl"
+            }
+          },
+          {
+            "element_id": "elem_116",
+            "type": "panecontrol",
+            "control_type": "PaneControl",
+            "bbox": [
+              0,
+              0,
+              1920,
+              1200
+            ],
+            "text": "NVIDIA GeForce Overlay",
+            "value": "",
+            "label": "NVIDIA GeForce Overlay",
+            "automation_id": "",
+            "class_name": "CEF-OSC-WIDGET",
+            "enabled": true,
+            "visible": true,
+            "focused": false,
+            "confidence": 1.0,
+            "source": "uia",
+            "app": "NVIDIA Share.exe",
+            "window_title": "NVIDIA GeForce Overlay",
+            "window_role": "background",
+            "pid": 8364,
+            "metadata": {
+              "depth": 0,
+              "ctrl_type": "PaneControl"
+            }
+          }
+        ],
+        "source": "uia"
+      },
+      "timestamp": 1774527746.164497,
+      "source": "correction"
+    }
+  ]
+}

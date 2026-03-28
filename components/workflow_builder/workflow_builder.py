@@ -77,6 +77,7 @@ GRID_COLOR  = "#1e2235"
 NODE_COLORS: Dict[str, str] = {
     "trigger":    "#7c3aed",   # purple
     "translator": "#0369a1",   # blue
+    "trainer":    "#166534",   # green
     "model":      "#0f766e",   # teal
     "executor":   "#b45309",   # amber
     "condition":  "#be185d",   # pink
@@ -186,6 +187,7 @@ def _default_label(node_type: str) -> str:
     return {
         "trigger":    "Screen Observer",
         "translator": "Trace Translator",
+        "trainer":    "BC Trainer",
         "model":      "AI Model",
         "executor":   "Action Executor",
         "condition":  "Condition",
@@ -694,14 +696,301 @@ class WorkflowCanvas(tk.Frame):
             ("executor",   "Action Executor",    720,  160),
             ("logger",     "Logger",             940,  160),
         ]
+        # Default configs for nodes that need configuration
+        default_configs = {
+            "trigger":  {"trace_type": "excel", "interval": 1.0,
+                         "output_dir": "data/output/traces/live"},
+            "trainer":  {"trace_dir":  "data/output/traces/live",
+                         "save_path":  "data/models/transformer_bc.pt",
+                         "epochs": 50, "batch_size": 16,
+                         "continual": True},
+            "model":    {"model_path": "data/models/transformer_bc.pt"},
+            "executor": {"model_path": "data/models/transformer_bc.pt",
+                         "max_steps": 20, "step_delay": 1.0,
+                         "trace_type": "gui", "dry_run": False,
+                         "goal": "", "provider": "none",
+                         "api_key": "", "lmstudio_url": "http://localhost:1234/v1"},
+            "logger":   {"log_path": "data/output/workflow_run.log"},
+        }
         nodes = []
         for nt, lbl, x, y in positions:
             n = Node(x, y, nt, lbl)
+            n.config = default_configs.get(nt, {})
             self._nodes.append(n)
             nodes.append(n)
         for i in range(len(nodes) - 1):
             self._edges.append(Edge(nodes[i], nodes[i + 1]))
         self._redraw()
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  WorkflowArchivePanel  — left sidebar listing all library workflows
+# ══════════════════════════════════════════════════════════════════════════════
+
+class WorkflowArchivePanel(tk.Frame):
+    """
+    Scrollable left sidebar that lists every workflow produced by the learning
+    layer, with ▶ Play  ⏸ Pause  🗑 Delete controls on each row.
+    """
+
+    def __init__(
+        self,
+        parent: tk.Widget,
+        library_dir: str,
+        canvas: "WorkflowCanvas",
+        panel: "WorkflowBuilderPanel",
+        **kw,
+    ):
+        super().__init__(parent, bg=BG_CARD, **kw)
+        self._library_dir = library_dir
+        self._canvas      = canvas
+        self._panel       = panel
+
+        self._entries:      List[dict]                    = []
+        self._threads:      Dict[str, threading.Thread]   = {}
+        self._pause_events: Dict[str, threading.Event]    = {}
+        self._paused:       Dict[str, bool]               = {}
+        self._row_widgets:  Dict[str, dict]               = {}
+
+        self._build()
+        self.refresh()
+
+    # ── Build ─────────────────────────────────────────────────────────────────
+
+    def _build(self):
+        # Header
+        hdr = tk.Frame(self, bg=BG_CARD, pady=8)
+        hdr.pack(fill="x")
+        tk.Label(
+            hdr, text="Workflow Archive",
+            font=("Segoe UI", 10, "bold"), bg=BG_CARD, fg=ACCENT,
+        ).pack(side="left", padx=12)
+        tk.Button(
+            hdr, text="↻", font=("Segoe UI", 11),
+            bg=BG_CARD, fg=TEXT_DIM, bd=0, relief="flat", cursor="hand2",
+            activebackground=BG_HOVER, activeforeground=TEXT,
+            command=self.refresh,
+        ).pack(side="right", padx=8)
+
+        tk.Frame(self, bg=BORDER, height=1).pack(fill="x")
+
+        # Scrollable list
+        list_outer = tk.Frame(self, bg=BG_CARD)
+        list_outer.pack(fill="both", expand=True)
+
+        self._list_cv = tk.Canvas(list_outer, bg=BG_CARD, highlightthickness=0)
+        _sb = tk.Scrollbar(list_outer, orient="vertical",
+                           command=self._list_cv.yview)
+        self._list_cv.configure(yscrollcommand=_sb.set)
+        _sb.pack(side="right", fill="y")
+        self._list_cv.pack(side="left", fill="both", expand=True)
+
+        self._scroll_frame = tk.Frame(self._list_cv, bg=BG_CARD)
+        self._scroll_win   = self._list_cv.create_window(
+            (0, 0), window=self._scroll_frame, anchor="nw",
+        )
+        self._scroll_frame.bind("<Configure>", self._on_inner_configure)
+        self._list_cv.bind("<Configure>",      self._on_outer_configure)
+        self._list_cv.bind(
+            "<MouseWheel>",
+            lambda e: self._list_cv.yview_scroll(
+                -1 if e.delta > 0 else 1, "units"),
+        )
+
+    def _on_inner_configure(self, _e):
+        self._list_cv.configure(scrollregion=self._list_cv.bbox("all"))
+
+    def _on_outer_configure(self, e):
+        self._list_cv.itemconfig(self._scroll_win, width=e.width)
+
+    # ── Refresh ───────────────────────────────────────────────────────────────
+
+    def refresh(self):
+        """Reload workflow entries from the library directory."""
+        for w in self._scroll_frame.winfo_children():
+            w.destroy()
+        self._row_widgets.clear()
+
+        try:
+            from workflow_learner.workflow_learner import WorkflowLearner
+            self._entries = WorkflowLearner(
+                library_dir=self._library_dir).list_all()
+        except Exception:
+            self._entries = []
+
+        if not self._entries:
+            tk.Label(
+                self._scroll_frame,
+                text='No workflows yet.\nUse "🧠 Learn" to create one.',
+                font=FONT_SMALL, bg=BG_CARD, fg=TEXT_DIM, justify="center",
+            ).pack(pady=24, padx=10)
+            return
+
+        for entry in self._entries:
+            self._build_row(entry)
+
+    # ── Row builder ───────────────────────────────────────────────────────────
+
+    def _build_row(self, entry: dict):
+        name       = entry["name"]
+        is_running = (name in self._threads and
+                      self._threads[name].is_alive())
+        is_paused  = self._paused.get(name, False)
+
+        card = tk.Frame(self._scroll_frame, bg=BG_HOVER)
+        card.pack(fill="x", padx=6, pady=3)
+
+        # Info
+        info = tk.Frame(card, bg=BG_HOVER)
+        info.pack(fill="x", padx=8, pady=(6, 2))
+        badge   = " 🧠" if entry.get("learned") else ""
+        created = (entry.get("created") or "")[:10] or "—"
+        tk.Label(
+            info, text=f"{name}{badge}",
+            font=("Segoe UI", 9, "bold"), bg=BG_HOVER, fg=TEXT, anchor="w",
+        ).pack(fill="x")
+        tk.Label(
+            info, text=f"{entry['node_count']} nodes · {created}",
+            font=("Segoe UI", 8), bg=BG_HOVER, fg=TEXT_DIM, anchor="w",
+        ).pack(fill="x")
+
+        # Buttons
+        btns = tk.Frame(card, bg=BG_HOVER)
+        btns.pack(fill="x", padx=8, pady=(2, 6))
+
+        play_btn = tk.Button(
+            btns, text="▶ Play",
+            font=("Segoe UI", 8, "bold"),
+            bg=TEXT_DIM if is_running else SUCCESS,
+            fg="white", bd=0, relief="flat", padx=8, pady=3,
+            cursor="hand2",
+            state="disabled" if is_running else "normal",
+            command=lambda e=entry: self._play(e),
+        )
+        play_btn.pack(side="left", padx=(0, 4))
+
+        pause_text = "▶ Resume" if is_paused else "⏸ Pause"
+        pause_bg   = ACCENT   if is_paused else WARNING
+        pause_btn  = tk.Button(
+            btns, text=pause_text,
+            font=("Segoe UI", 8, "bold"),
+            bg=TEXT_DIM if not is_running else pause_bg,
+            fg="white", bd=0, relief="flat", padx=8, pady=3,
+            cursor="hand2",
+            state="normal" if is_running else "disabled",
+            command=lambda n=name: self._toggle_pause(n),
+        )
+        pause_btn.pack(side="left", padx=(0, 4))
+
+        delete_btn = tk.Button(
+            btns, text="🗑",
+            font=("Segoe UI", 8, "bold"),
+            bg=DANGER, fg="white", bd=0, relief="flat", padx=8, pady=3,
+            cursor="hand2",
+            command=lambda e=entry: self._delete(e),
+        )
+        delete_btn.pack(side="left")
+
+        self._row_widgets[name] = {
+            "play_btn":  play_btn,
+            "pause_btn": pause_btn,
+        }
+
+    # ── Actions ───────────────────────────────────────────────────────────────
+
+    def _play(self, entry: dict):
+        name = entry["name"]
+        if name in self._threads and self._threads[name].is_alive():
+            return
+
+        try:
+            from workflow_learner.workflow_learner import WorkflowLearner
+            wf = WorkflowLearner(
+                library_dir=self._library_dir).load(entry["path"])
+            self._canvas.load_workflow(wf)
+        except Exception as exc:
+            messagebox.showerror("Load Error", str(exc))
+            return
+
+        pause_evt = threading.Event()
+        pause_evt.set()                          # starts unpaused
+        self._pause_events[name] = pause_evt
+        self._paused[name]       = False
+
+        order = _topo_sort(self._canvas.get_workflow())
+        self._panel._clear_log()
+        self._panel._canvas_widget.clear_highlights()
+        self._panel._log(
+            f"Archive: running '{name}' — {len(order)} node(s).", "bold")
+        self._panel._set_status(f"Running '{name}'…", WARNING)
+
+        widgets = self._row_widgets.get(name, {})
+        if widgets.get("play_btn"):
+            widgets["play_btn"].config(state="disabled", bg=TEXT_DIM)
+        if widgets.get("pause_btn"):
+            widgets["pause_btn"].config(
+                state="normal", bg=WARNING, text="⏸ Pause")
+
+        def run():
+            try:
+                self._panel._execute_workflow_pausable(order, pause_evt)
+            finally:
+                self.after(0, lambda: self._on_done(name))
+
+        t = threading.Thread(target=run, daemon=True)
+        self._threads[name] = t
+        t.start()
+
+    def _toggle_pause(self, name: str):
+        evt     = self._pause_events.get(name)
+        widgets = self._row_widgets.get(name, {})
+        if not evt:
+            return
+
+        if self._paused.get(name):
+            # Resume
+            self._paused[name] = False
+            evt.set()
+            if widgets.get("pause_btn"):
+                widgets["pause_btn"].config(text="⏸ Pause", bg=WARNING)
+            self._panel._set_status(f"Resumed '{name}'.", SUCCESS)
+            self._panel._log(f"Resumed '{name}'.", "ok")
+        else:
+            # Pause
+            self._paused[name] = True
+            evt.clear()
+            if widgets.get("pause_btn"):
+                widgets["pause_btn"].config(text="▶ Resume", bg=ACCENT)
+            self._panel._set_status(f"Paused '{name}'.", WARNING)
+            self._panel._log(f"Paused '{name}'.", "warn")
+
+    def _delete(self, entry: dict):
+        name = entry["name"]
+        if not messagebox.askyesno(
+            "Delete Workflow", f"Permanently delete '{name}'?"
+        ):
+            return
+        try:
+            from workflow_learner.workflow_learner import WorkflowLearner
+            WorkflowLearner(
+                library_dir=self._library_dir).delete(entry["path"])
+            self._panel._log(f"Deleted workflow '{name}'.", "warn")
+        except Exception as exc:
+            messagebox.showerror("Delete Error", str(exc))
+            return
+        self.refresh()
+
+    def _on_done(self, name: str):
+        """Restore button states after a workflow thread finishes."""
+        self._pause_events.pop(name, None)
+        self._paused.pop(name, None)
+        widgets = self._row_widgets.get(name, {})
+        if widgets.get("play_btn"):
+            widgets["play_btn"].config(state="normal", bg=SUCCESS)
+        if widgets.get("pause_btn"):
+            widgets["pause_btn"].config(
+                state="disabled", bg=TEXT_DIM, text="⏸ Pause")
+        self._panel._set_status("Workflow finished.", SUCCESS)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -720,10 +1009,30 @@ class WorkflowBuilderPanel(tk.Frame):
         self._build()
 
     def _build(self):
-        # Canvas must be created before toolbar (toolbar buttons reference it)
-        self._canvas_widget = WorkflowCanvas(self)
-        self._build_toolbar()
-        self._canvas_widget.pack(fill="both", expand=True)
+        # Canvas must be created before toolbar (toolbar buttons reference it).
+        # We place it inside a main_area frame so the archive sidebar can sit
+        # beside it using side="left" packing.
+        _main = tk.Frame(self, bg=BG)
+        self._canvas_widget = WorkflowCanvas(_main)
+
+        self._build_toolbar()          # packs into self → rendered above _main
+        _main.pack(fill="both", expand=True)
+
+        # Archive sidebar (left strip)
+        _arch_frame = tk.Frame(_main, bg=BG_CARD, width=260)
+        _arch_frame.pack(side="left", fill="y")
+        _arch_frame.pack_propagate(False)
+
+        tk.Frame(_main, bg=BORDER, width=1).pack(side="left", fill="y")
+
+        # Canvas (right, fills remaining space)
+        self._canvas_widget.pack(side="left", fill="both", expand=True)
+
+        self._archive = WorkflowArchivePanel(
+            _arch_frame, _LIBRARY_DIR, self._canvas_widget, self,
+        )
+        self._archive.pack(fill="both", expand=True)
+
         self._build_log_panel()
         self._build_statusbar()
         self._canvas_widget.load_default_pipeline()
@@ -749,6 +1058,7 @@ class WorkflowBuilderPanel(tk.Frame):
         for nt, label, color in [
             ("trigger",    "⚡ Trigger",    "#7c3aed"),
             ("translator", "🔄 Translator", "#0369a1"),
+            ("trainer",    "🎓 Trainer",    "#166534"),
             ("model",      "🧠 Model",      "#0f766e"),
             ("executor",   "▶ Executor",    "#b45309"),
             ("condition",  "⑂ Condition",  "#be185d"),
@@ -908,6 +1218,8 @@ class WorkflowBuilderPanel(tk.Frame):
             self._set_status(f"Learned '{name}' — {n} nodes, {e} edges. Saved to library.", SUCCESS)
             self._log(f"Learned workflow '{name}' from {trace_dir}", "ok")
             self._log(f"  {n} nodes · {e} edges → {path}", "dim")
+            if hasattr(self, "_archive"):
+                self._archive.refresh()
         except Exception as exc:
             messagebox.showerror("Learn Error", str(exc))
             self._log(f"Learn failed: {exc}", "err")
@@ -983,6 +1295,61 @@ class WorkflowBuilderPanel(tk.Frame):
             self._running = False
             self.after(0, lambda: self._run_btn.config(state="normal", text="▶ Run"))
 
+    def _execute_workflow_pausable(
+        self,
+        order: List[dict],
+        pause_event: threading.Event,
+    ):
+        """
+        Run nodes in topological order, blocking on *pause_event* between each
+        node so that WorkflowArchivePanel can pause/resume execution.
+        Does NOT touch self._running — archive runs are managed independently.
+        """
+        context: Dict[str, Any] = {}
+        try:
+            for node_dict in order:
+                pause_event.wait()          # blocks here while paused
+
+                nid    = node_dict["id"]
+                ntype  = node_dict["node_type"]
+                label  = node_dict["label"]
+                config = node_dict.get("config", {})
+
+                self.after(0, lambda i=nid:
+                           self._canvas_widget.highlight_node(i, WARNING))
+                self.after(0, lambda l=label:
+                           self._set_status(f"Running: {l}…", WARNING))
+                self.after(0, lambda l=label, t=ntype:
+                           self._log(f"▶  {l}  ({t.upper()})", "bold"))
+
+                ok, detail = self._dispatch_node(ntype, config, context)
+
+                if ok:
+                    self.after(0, lambda i=nid:
+                               self._canvas_widget.highlight_node(i, SUCCESS))
+                    self.after(0, lambda d=detail:
+                               self._log(f"   ✓ {d}", "ok"))
+                else:
+                    self.after(0, lambda i=nid:
+                               self._canvas_widget.highlight_node(i, DANGER))
+                    self.after(0, lambda d=detail:
+                               self._log(f"   ✗ {d}", "err"))
+                    self.after(0, lambda l=label:
+                               self._set_status(
+                                   f"Error in {l} — workflow stopped.",
+                                   DANGER))
+                    return
+
+                time.sleep(0.4)
+
+            self.after(0, lambda: self._set_status(
+                f"Workflow completed — {len(order)} node(s) executed.",
+                SUCCESS))
+            self.after(0, lambda: self._log(
+                "Workflow finished successfully.", "ok"))
+        except Exception as exc:
+            self.after(0, lambda: self._log(f"Execution error: {exc}", "err"))
+
     def _dispatch_node(
         self, ntype: str, config: dict, context: dict
     ) -> Tuple[bool, str]:
@@ -995,6 +1362,8 @@ class WorkflowBuilderPanel(tk.Frame):
                 return self._exec_trigger(config, context)
             elif ntype == "translator":
                 return self._exec_translator(config, context)
+            elif ntype == "trainer":
+                return self._exec_trainer(config, context)
             elif ntype == "model":
                 return self._exec_model(config, context)
             elif ntype == "executor":
@@ -1013,16 +1382,22 @@ class WorkflowBuilderPanel(tk.Frame):
     def _exec_trigger(self, config: dict, context: dict) -> Tuple[bool, str]:
         """Start ScreenObserver, capture one frame, store frames in context."""
         try:
-            from screen_observer.screen_observer import ScreenObserver
+            from recorder.recorder import ScreenObserver
         except ImportError:
-            return False, "screen_observer not importable — check your path."
+            return False, "recorder not importable — check your path."
 
         output_dir  = config.get("output_dir", "data/output/traces/live")
         trace_type  = config.get("trace_type", "gui")
         interval    = float(config.get("interval", 1.0))
 
         os.makedirs(output_dir, exist_ok=True)
-        observer = ScreenObserver(output_dir=output_dir, trace_type=trace_type)
+        # Pass ContinualLearner if the Trainer node already started one
+        cl = context.get("continual_learner")
+        observer = ScreenObserver(
+            output_dir=output_dir,
+            trace_type=trace_type,
+            continual_learner=cl,
+        )
         observer.start(interval_sec=interval)
         time.sleep(max(interval + 0.5, 1.5))   # capture at least one frame
         traces = observer.stop()
@@ -1040,12 +1415,12 @@ class WorkflowBuilderPanel(tk.Frame):
         return True, f"Captured {fc} frame(s), produced {tc} trace(s) → {output_dir}"
 
     def _exec_translator(self, config: dict, context: dict) -> Tuple[bool, str]:
-        """Run TraceTranslator on trace files in context."""
-        try:
-            from trace_translator.trace_translator import TraceTranslator
-        except ImportError:
-            return False, "trace_translator not importable — check your path."
+        """Load trace JSON files produced by ScreenObserver into context.
 
+        ScreenObserver already performs OCR and saves fully-structured trace
+        JSONs, so this step simply deserialises them and forwards them to the
+        model node as 'translated'.
+        """
         trace_paths = context.get("trace_paths", [])
         if not trace_paths:
             # Fall back to scanning output_dir
@@ -1058,19 +1433,83 @@ class WorkflowBuilderPanel(tk.Frame):
                 ]
 
         if not trace_paths:
-            return False, "No trace files to translate."
+            return False, "No trace files found to load."
 
-        translator = TraceTranslator()
         translated = []
         for path in trace_paths:
             try:
-                result = translator.translate(path)
-                translated.append(result)
-            except Exception as e:
-                pass   # skip individual failures, report at end
+                with open(path, "r", encoding="utf-8") as fh:
+                    data = json.load(fh)
+                translated.append(data)
+            except Exception:
+                pass  # skip unreadable files
 
         context["translated"] = translated
-        return True, f"Translated {len(translated)} / {len(trace_paths)} trace(s)."
+        return True, f"Loaded {len(translated)} / {len(trace_paths)} trace(s)."
+
+    def _exec_trainer(self, config: dict, context: dict) -> Tuple[bool, str]:
+        """
+        Train (or retrain) the TransformerAgentNetwork via BCTrainer.
+
+        Reads trace_dir for all session JSONs, trains for the configured number
+        of epochs, and saves the checkpoint to save_path.  When continual=True
+        a ContinualLearner is also started and injected into context so the
+        trigger node can hand it to ScreenObserver on the next run.
+        """
+        try:
+            from learning_models.intern_model.bc.behavioral_cloning import BCTrainer
+        except ImportError:
+            try:
+                from components.learning_models.intern_model.bc.behavioral_cloning import BCTrainer
+            except ImportError:
+                return False, "BCTrainer not importable — check your path."
+
+        trace_dir  = config.get("trace_dir",  "data/output/traces/live")
+        save_path  = config.get("save_path",  "data/models/transformer_bc.pt")
+        epochs     = int(config.get("epochs",     50))
+        batch_size = int(config.get("batch_size", 16))
+        continual  = bool(config.get("continual", True))
+
+        if not os.path.isdir(trace_dir):
+            return False, f"Trace directory not found: {trace_dir}"
+
+        self.after(0, lambda: self._log(
+            f"BCTrainer: training on {trace_dir}  epochs={epochs} …", "info"))
+
+        trainer = BCTrainer(
+            trace_dir=trace_dir,
+            save_path=save_path,
+            epochs=epochs,
+            batch_size=batch_size,
+        )
+        try:
+            trainer.train()
+        except Exception as exc:
+            return False, f"Training failed: {exc}"
+
+        context["model_path"] = save_path
+
+        # Optionally start a ContinualLearner for background retraining
+        if continual:
+            try:
+                try:
+                    from learning_models.intern_model.continual.learner import ContinualLearner
+                except ImportError:
+                    from components.learning_models.intern_model.continual.learner import ContinualLearner
+
+                cl = ContinualLearner(
+                    trace_dir=trace_dir,
+                    bc_trainer=trainer,
+                )
+                cl.start()
+                context["continual_learner"] = cl
+                self.after(0, lambda: self._log(
+                    "ContinualLearner started — background retraining active.", "ok"))
+            except Exception as cl_exc:
+                self.after(0, lambda: self._log(
+                    f"ContinualLearner could not start: {cl_exc}", "warn"))
+
+        return True, f"Training complete → {save_path}"
 
     def _exec_model(self, config: dict, context: dict) -> Tuple[bool, str]:
         """Run TransformerAgentNetwork.predict() on the latest translated trace."""
@@ -1086,8 +1525,9 @@ class WorkflowBuilderPanel(tk.Frame):
         if not translated:
             return False, "No translated traces available — run Translator first."
 
-        # Use last translated trace as current state
-        state = translated[-1] if isinstance(translated[-1], dict) else {}
+        # Extract the state dict from the trace (traces have a "state" key wrapping elements)
+        last = translated[-1] if isinstance(translated[-1], dict) else {}
+        state = last.get("state", last)
         model_path = config.get("model_path", "data/models/transformer_bc.pt")
         device_str = config.get("device", "auto")
 
@@ -1106,32 +1546,152 @@ class WorkflowBuilderPanel(tk.Frame):
 
     def _exec_executor(self, config: dict, context: dict) -> Tuple[bool, str]:
         """
-        Execute an action.  For learned workflows the action details live
-        directly in the node config.  For model-driven workflows they come
-        from context['prediction'].  Node config always takes priority.
+        Live agentic loop: observe → model-predict → execute → repeat.
+
+        Uses ExecutorAgent with a live observe_fn so the model always sees the
+        real current screen/Excel state rather than a frozen snapshot.
+        Falls back to the single model-prediction in context for one-shot use.
         """
         try:
-            from executor.executor import ActionExecutor
+            from agent.agent import LLMAgent as ExecutorAgent
         except ImportError:
-            return False, "executor not importable — check your path."
+            try:
+                from components.agent.agent import LLMAgent as ExecutorAgent
+            except ImportError:
+                return False, "agent not importable — check your path."
 
-        # Merge: node config wins over model prediction
-        prediction = dict(context.get("prediction") or {})
-        for key in ("action_type", "click_position", "keystrokes", "key_count"):
-            if key in config:
-                prediction[key] = config[key]
+        model_path  = config.get("model_path", "data/models/transformer_bc.pt")
+        dry_run     = config.get("dry_run", False)
+        max_steps   = int(config.get("max_steps", 20))
+        step_delay  = float(config.get("step_delay", 1.0))
+        device_str  = config.get("device", "auto")
+        trace_type  = context.get("trace_type", config.get("trace_type", "gui"))
 
-        if not prediction.get("action_type"):
-            return False, "No action_type in config or prediction."
+        if not os.path.isfile(model_path):
+            return False, f"Model checkpoint not found: {model_path}"
 
-        dry_run  = config.get("dry_run", True)
-        executor = ActionExecutor(dry_run=dry_run)
-        result   = executor.execute(prediction)
-        context["execution_result"] = result
-        tag    = "[DRY-RUN] " if dry_run else ""
-        ok_str = "✓" if result.success else "✗"
-        detail = result.position if result.action_type == "click" else result.keystrokes
-        return result.success, f"{tag}{ok_str} {result.action_type} @ {detail}"
+        # ── Build live observe_fn ─────────────────────────────────────────────
+        observe_fn = None
+        if trace_type == "excel":
+            try:
+                try:
+                    from excel_observer.excel_observer import ExcelObserver
+                except ImportError:
+                    from components.excel_observer.excel_observer import ExcelObserver
+                _xl_obs = ExcelObserver()
+                if _xl_obs.connect():
+                    observe_fn = _xl_obs.snapshot
+                    self.after(0, lambda: self._log("   Excel observer connected — live loop active.", "ok"))
+                else:
+                    self.after(0, lambda: self._log("   Excel observer could not connect — using frozen state.", "warn"))
+            except ImportError:
+                self.after(0, lambda: self._log("   excel_observer not available — using frozen state.", "warn"))
+
+        # GUI / web: use UIAutomationObserver for live re-observation after each step
+        if observe_fn is None:
+            try:
+                try:
+                    from ui_observer.ui_observer import UIAutomationObserver
+                except ImportError:
+                    from components.ui_observer.ui_observer import UIAutomationObserver
+                _uia_obs = UIAutomationObserver()
+                if _uia_obs.available:
+                    observe_fn = _uia_obs.snapshot
+                    self.after(0, lambda: self._log("   UIAutomation observer active — live loop enabled.", "ok"))
+                else:
+                    self.after(0, lambda: self._log("   UIAutomation unavailable — using frozen state.", "warn"))
+            except ImportError:
+                self.after(0, lambda: self._log("   ui_observer not available — using frozen state.", "warn"))
+
+        # ── Determine starting state ──────────────────────────────────────────
+        # Prefer the translated state from the pipeline; fall back to last trace
+        translated = context.get("translated", [])
+        if translated:
+            last = translated[-1] if isinstance(translated[-1], dict) else {}
+            initial_state = last.get("state", last)
+        else:
+            # Last resort: scan trace output dir for most-recent JSON
+            out_dir = context.get("output_dir", "data/output/traces/live")
+            initial_state = {}
+            if os.path.isdir(out_dir):
+                jsons = sorted(
+                    (f for f in os.listdir(out_dir) if f.endswith(".json")),
+                    reverse=True,
+                )
+                if jsons:
+                    try:
+                        with open(os.path.join(out_dir, jsons[0]), encoding="utf-8") as fh:
+                            initial_state = json.load(fh).get("state", {})
+                    except Exception:
+                        pass
+
+        if observe_fn is not None:
+            # Live mode: get a fresh state right now before the first step
+            try:
+                fresh = observe_fn()
+                if fresh and fresh.get("elements") is not None:
+                    initial_state = fresh
+            except Exception:
+                pass
+
+        # ── Use LLMAgent when a goal is set and API key is available ─────────
+        goal    = config.get("goal", "").strip()
+        api_key = config.get("api_key", "").strip() or os.environ.get("ANTHROPIC_API_KEY", "")
+
+        provider     = config.get("provider", "none").strip()
+        lmstudio_url = config.get("lmstudio_url", "http://localhost:1234/v1")
+
+        if goal and (provider != "none"):
+            try:
+                try:
+                    from agent.agent import LLMAgent
+                except ImportError:
+                    from components.agent.agent import LLMAgent
+
+                self.after(0, lambda: self._log(f"   LLMAgent active — provider={provider}  goal={goal!r}", "ok"))
+                llm_agent = LLMAgent(
+                    goal=goal,
+                    provider=provider,
+                    api_key=api_key,
+                    lmstudio_url=lmstudio_url,
+                    model_path=model_path,
+                    dry_run=dry_run,
+                    max_steps=max_steps,
+                    step_delay=step_delay,
+                    device_str=device_str,
+                )
+                step_results = llm_agent.run()
+                context["execution_results"] = step_results
+                n_tot = len(step_results)
+                tag   = "[DRY-RUN] " if dry_run else ""
+                return bool(step_results), (
+                    f"{tag}LLMAgent completed {n_tot} step(s)  goal={goal!r}"
+                )
+            except Exception as llm_exc:
+                self.after(0, lambda: self._log(f"   LLMAgent failed ({llm_exc}) — falling back to ExecutorAgent.", "warn"))
+
+        # ── Fallback: ExecutorAgent (transformer-only, no LLM) ────────────────
+        agent = ExecutorAgent(
+            model_path=model_path,
+            dry_run=dry_run,
+            max_steps=max_steps,
+            step_delay=step_delay,
+            device_str=device_str,
+        )
+
+        results = agent.run(
+            initial_state=initial_state,
+            observe_fn=observe_fn,
+        )
+
+        context["execution_results"] = results
+        n_ok  = sum(1 for r in results if r.success)
+        n_tot = len(results)
+        tag   = "[DRY-RUN] " if dry_run else ""
+        live  = "live-observe" if observe_fn else "frozen-state"
+        return bool(results), (
+            f"{tag}{n_ok}/{n_tot} steps succeeded  ({live}  max_steps={max_steps})"
+        )
 
     def _exec_logger(self, config: dict, context: dict) -> Tuple[bool, str]:
         """Write a structured log entry to a file."""
@@ -1343,6 +1903,8 @@ class LibraryDialog:
             WorkflowLearner(library_dir=self._library_dir).delete(e["path"])
             self._panel._log(f"Deleted workflow '{e['name']}' from library.", "warn")
             self._refresh()
+            if hasattr(self._panel, "_archive"):
+                self._panel._archive.refresh()
         except Exception as exc:
             messagebox.showerror("Delete Error", str(exc), parent=self._win)
 

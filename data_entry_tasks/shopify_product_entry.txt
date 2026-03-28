@@ -1,0 +1,624 @@
+================================================================================
+  HARROW & FINCH — SHOPIFY PRODUCT ENTRY PACKET
+  Internal Use Only | Prepared by: E-Commerce Manager
+  Packet Date: 2026-03-18 | Batch ID: HF-SHOP-0031
+================================================================================
+
+STORE URL: admin.shopify.com/store/harrow-finch
+
+INSTRUCTIONS FOR DATA ENTRY STAFF
+-----------------------------------
+Navigate to Products > Add Product for each record below.
+Work through each section top to bottom as it appears on the Shopify page.
+Products vary — some have variants, some don't. Some are digital. Read each
+record fully before starting. Pay attention to:
+
+  • Variants section — only fill if the record says "HAS VARIANTS: Yes"
+  • Shipping section — skip weight/dimensions for digital products
+  • SEO section — always fill, even if it looks pre-populated
+  • Status — set to Draft unless the record says "Publish immediately: Yes"
+
+After saving each product, copy the auto-generated Product ID into the
+"Entered By" box at the bottom of this sheet.
+
+Image filenames listed below are in the shared Google Drive folder:
+  drive.google.com/drive/folders/HF-ProductImages-Batch031
+Download and upload them in the order listed per product.
+
+================================================================================
+  PRODUCT 1 OF 6
+================================================================================
+
+TITLE                : Ashwood Ceramic Pour-Over Coffee Dripper
+
+STATUS               : Active
+PUBLISH IMMEDIATELY  : Yes
+
+------------------------------------------------------------------------
+DESCRIPTION  (paste into the rich text editor)
+------------------------------------------------------------------------
+Elevate your morning ritual with the Ashwood Ceramic Pour-Over Dripper —
+handcrafted for coffee enthusiasts who value both function and aesthetic.
+The wide-angle dripper cone promotes even water distribution for a clean,
+balanced extraction. Compatible with standard #4 paper filters or our
+reusable Ashwood mesh filter (sold separately).
+
+• Material: High-fired stoneware ceramic
+• Fits most standard mugs and carafes (opening diameter 3.2")
+• Dishwasher safe
+• Available in three earthy glazes
+• Capacity: Brews 1–4 cups
+
+------------------------------------------------------------------------
+MEDIA
+------------------------------------------------------------------------
+Upload images in this order:
+  1. ashwood_dripper_sage_front.jpg      ← set as featured image
+  2. ashwood_dripper_sage_top.jpg
+  3. ashwood_dripper_cream_front.jpg
+  4. ashwood_dripper_slate_front.jpg
+  5. ashwood_dripper_lifestyle.jpg
+
+------------------------------------------------------------------------
+PRICING
+------------------------------------------------------------------------
+Price                : 38.00
+Compare-at Price     : 48.00   ← shows crossed-out original price
+Cost per Item        : 11.20   ← internal only; not shown to customers
+Charge Tax           : Yes
+
+------------------------------------------------------------------------
+INVENTORY
+------------------------------------------------------------------------
+Track Quantity       : Yes
+SKU                  : AWC-DRIPPER-001
+Barcode (UPC)        : 850044382910
+Continue selling when out of stock : No
+
+Inventory per location:
+  Warehouse — Memphis  : 142
+  (no other locations)
+
+------------------------------------------------------------------------
+SHIPPING
+------------------------------------------------------------------------
+This is a physical product : Yes
+Weight               : 1.4 lb
+Weight unit          : lb
+HS Code              : 6912.00
+Country of Origin    : Portugal
+
+------------------------------------------------------------------------
+HAS VARIANTS         : Yes
+Variant Option Name  : Color
+Variant Values       : Sage Green, Cream, Slate Gray
+
+For each variant, fill in individually after clicking "Add variant":
+
+  Variant: Sage Green
+    Price              : 38.00
+    Compare-at         : 48.00
+    SKU                : AWC-DRIPPER-001-SG
+    Barcode            : 850044382910
+    Inventory (Memphis): 52
+    Image              : ashwood_dripper_sage_front.jpg
+
+  Variant: Cream
+    Price              : 38.00
+    Compare-at         : 48.00
+    SKU                : AWC-DRIPPER-001-CR
+    Barcode            : 850044382927
+    Inventory (Memphis): 61
+    Image              : ashwood_dripper_cream_front.jpg
+
+  Variant: Slate Gray
+    Price              : 38.00
+    Compare-at         : 48.00
+    SKU                : AWC-DRIPPER-001-SL
+    Barcode            : 850044382934
+    Inventory (Memphis): 29
+    Image              : ashwood_dripper_slate_front.jpg
+
+------------------------------------------------------------------------
+PRODUCT ORGANIZATION
+------------------------------------------------------------------------
+Product Category     : Home & Garden > Kitchen & Dining > Coffee & Tea
+Product Type         : Pour-Over Dripper
+Vendor               : Ashwood Ceramics Co.
+Collections          : Coffee Accessories, New Arrivals, Sale Items
+Tags                 : coffee, pour-over, ceramic, handmade, kitchen, dripper, sale
+
+------------------------------------------------------------------------
+SEO
+------------------------------------------------------------------------
+Page Title           : Ashwood Ceramic Pour-Over Coffee Dripper | Harrow & Finch
+Meta Description     : Shop the Ashwood handcrafted ceramic pour-over coffee
+                       dripper. Available in Sage Green, Cream, and Slate Gray.
+                       Free shipping on orders over $50.
+URL Handle           : ashwood-ceramic-pour-over-coffee-dripper
+
+------------------------------------------------------------------------
+SALES CHANNELS & MARKETS
+------------------------------------------------------------------------
+Online Store         : Yes
+Point of Sale        : No
+Google & YouTube     : Yes
+Facebook & Instagram : Yes
+
+Shopify Product ID (fill after saving): ______________________
+
+================================================================================
+  PRODUCT 2 OF 6
+================================================================================
+
+TITLE                : Merino Wool Everyday Crew Socks — 3-Pack
+
+STATUS               : Active
+PUBLISH IMMEDIATELY  : Yes
+
+------------------------------------------------------------------------
+DESCRIPTION
+------------------------------------------------------------------------
+Built for all-day comfort and lasting durability, our Merino Wool Everyday
+Crew Socks deliver natural temperature regulation, moisture-wicking, and
+odor resistance — whether you're at the office or on the trail.
+
+• 78% Merino Wool, 20% Nylon, 2% Elastane
+• Reinforced heel and toe
+• Seamless toe closure
+• Machine washable — cold, lay flat to dry
+• Pack of 3 pairs, all same color per pack
+
+------------------------------------------------------------------------
+MEDIA
+------------------------------------------------------------------------
+  1. merino_socks_charcoal_pack.jpg      ← set as featured image
+  2. merino_socks_charcoal_worn.jpg
+  3. merino_socks_navy_pack.jpg
+  4. merino_socks_oatmeal_pack.jpg
+  5. merino_socks_sizing_chart.jpg
+
+------------------------------------------------------------------------
+PRICING
+------------------------------------------------------------------------
+Price                : 29.00
+Compare-at Price     : (leave blank — not on sale)
+Cost per Item        : 9.40
+Charge Tax           : Yes
+
+------------------------------------------------------------------------
+INVENTORY
+------------------------------------------------------------------------
+Track Quantity       : Yes
+SKU                  : MRN-SOCK-3PK
+Barcode (UPC)        : 850044383108
+Continue selling when out of stock : No
+
+Inventory per location:
+  Warehouse — Memphis  : 310
+
+------------------------------------------------------------------------
+SHIPPING
+------------------------------------------------------------------------
+This is a physical product : Yes
+Weight               : 0.5 lb
+Weight unit          : lb
+HS Code              : 6115.95
+Country of Origin    : New Zealand
+
+------------------------------------------------------------------------
+HAS VARIANTS         : Yes
+Variant Option 1     : Size
+Variant Option 2     : Color
+
+Sizes  : S/M (Men 5–8 / Women 6–9), L/XL (Men 9–13 / Women 10–14)
+Colors : Charcoal, Navy, Oatmeal
+
+  ← Create all 6 size/color combinations. Fill each as follows:
+
+  S/M — Charcoal
+    SKU        : MRN-SOCK-3PK-SM-CH    Inventory: 58    Barcode: 850044383115
+  S/M — Navy
+    SKU        : MRN-SOCK-3PK-SM-NV    Inventory: 61    Barcode: 850044383122
+  S/M — Oatmeal
+    SKU        : MRN-SOCK-3PK-SM-OT    Inventory: 44    Barcode: 850044383139
+  L/XL — Charcoal
+    SKU        : MRN-SOCK-3PK-LX-CH    Inventory: 72    Barcode: 850044383146
+  L/XL — Navy
+    SKU        : MRN-SOCK-3PK-LX-NV    Inventory: 39    Barcode: 850044383153
+  L/XL — Oatmeal
+    SKU        : MRN-SOCK-3PK-LX-OT    Inventory: 36    Barcode: 850044383160
+
+  All variants: Price $29.00 | Compare-at blank | Charge tax Yes
+  Image per color — assign charcoal image to both charcoal variants, etc.
+
+------------------------------------------------------------------------
+PRODUCT ORGANIZATION
+------------------------------------------------------------------------
+Product Category     : Apparel & Accessories > Clothing > Socks & Hosiery
+Product Type         : Crew Socks
+Vendor               : Finch Essentials
+Collections          : Apparel, Men's, Women's, Gifts Under $50
+Tags                 : socks, merino wool, crew socks, 3-pack, everyday, unisex
+
+------------------------------------------------------------------------
+SEO
+------------------------------------------------------------------------
+Page Title           : Merino Wool Crew Socks 3-Pack | Harrow & Finch
+Meta Description     : Premium merino wool everyday crew socks — 3-pack. Natural
+                       temperature regulation, moisture-wicking, machine washable.
+                       Available in S/M and L/XL.
+URL Handle           : merino-wool-everyday-crew-socks-3-pack
+
+------------------------------------------------------------------------
+SALES CHANNELS & MARKETS
+------------------------------------------------------------------------
+Online Store         : Yes
+Point of Sale        : Yes   ← this one is also sold in-store
+Google & YouTube     : Yes
+Facebook & Instagram : No
+
+Shopify Product ID (fill after saving): ______________________
+
+================================================================================
+  PRODUCT 3 OF 6
+================================================================================
+
+TITLE                : Cold Brew Coffee Concentrate — 32 oz Bottle
+
+STATUS               : Active
+PUBLISH IMMEDIATELY  : Yes
+
+------------------------------------------------------------------------
+DESCRIPTION
+------------------------------------------------------------------------
+Small-batch cold brew steeped for 20 hours in filtered water. No heat,
+no bitterness — just smooth, rich coffee concentrate ready to dilute with
+your milk or water of choice. One bottle makes up to 8 drinks.
+
+Sourced from single-origin Colombian beans, medium roast.
+Refrigerate upon arrival. Best consumed within 14 days of opening.
+
+• 32 oz (946 mL) bottle
+• Concentrate ratio: 1 part coffee : 1–2 parts liquid
+• Calories: 15 per 4 oz serving (black)
+• No preservatives, no added sugar
+• Ships with ice pack — keep refrigerated
+
+------------------------------------------------------------------------
+MEDIA
+------------------------------------------------------------------------
+  1. coldbrew_bottle_front.jpg          ← set as featured image
+  2. coldbrew_bottle_pour.jpg
+  3. coldbrew_lifestyle_glass.jpg
+  4. coldbrew_label_closeup.jpg
+
+------------------------------------------------------------------------
+PRICING
+------------------------------------------------------------------------
+Price                : 18.00
+Compare-at Price     : (leave blank)
+Cost per Item        : 5.80
+Charge Tax           : Yes
+
+------------------------------------------------------------------------
+INVENTORY
+------------------------------------------------------------------------
+Track Quantity       : Yes
+SKU                  : CB-CONC-32OZ
+Barcode (UPC)        : 850044383207
+Continue selling when out of stock : No   ← perishable; never oversell
+
+Inventory per location:
+  Warehouse — Memphis  : 84   ← check with fulfillment before going live;
+                                 cold storage confirmed for this SKU
+
+------------------------------------------------------------------------
+SHIPPING
+------------------------------------------------------------------------
+This is a physical product : Yes
+Weight               : 2.6 lb   ← includes ice pack and insulated mailer
+Weight unit          : lb
+HS Code              : 2101.12
+Country of Origin    : United States
+
+------------------------------------------------------------------------
+HAS VARIANTS         : No   ← single product, no variants
+
+------------------------------------------------------------------------
+PRODUCT ORGANIZATION
+------------------------------------------------------------------------
+Product Category     : Food & Beverages > Beverages > Coffee & Tea
+Product Type         : Cold Brew Concentrate
+Vendor               : Harrow & Finch Kitchen
+Collections          : Coffee Accessories, Food & Beverage, Best Sellers
+Tags                 : cold brew, coffee, concentrate, small batch, colombian,
+                       refrigerated, perishable
+
+------------------------------------------------------------------------
+SEO
+------------------------------------------------------------------------
+Page Title           : Cold Brew Coffee Concentrate 32oz | Harrow & Finch
+Meta Description     : Small-batch cold brew coffee concentrate. 20-hour steep,
+                       single-origin Colombian beans. Makes up to 8 drinks per
+                       bottle. Ships with ice pack.
+URL Handle           : cold-brew-coffee-concentrate-32oz
+
+------------------------------------------------------------------------
+SALES CHANNELS & MARKETS
+------------------------------------------------------------------------
+Online Store         : Yes
+Point of Sale        : No   ← not available in-store; ships direct only
+Google & YouTube     : No   ← food/bev restrictions on Google Shopping
+Facebook & Instagram : No
+
+Shopify Product ID (fill after saving): ______________________
+
+================================================================================
+  PRODUCT 4 OF 6
+================================================================================
+
+TITLE                : Home Barista Starter Guide — Digital Download (PDF)
+
+STATUS               : Active
+PUBLISH IMMEDIATELY  : Yes
+
+------------------------------------------------------------------------
+DESCRIPTION
+------------------------------------------------------------------------
+Everything you need to start brewing café-quality coffee at home.
+This 68-page illustrated PDF guide covers espresso, pour-over, AeroPress,
+French press, and cold brew — with step-by-step instructions, brew ratio
+charts, grind size guides, and troubleshooting tips.
+
+Instant download after purchase. Compatible with any PDF reader.
+No physical item will be shipped.
+
+• 68 pages, full color
+• Optimized for screen and print
+• Includes printable brew ratio reference card
+• Lifetime access — re-download anytime from your order
+
+------------------------------------------------------------------------
+MEDIA
+------------------------------------------------------------------------
+  1. barista_guide_cover_mockup.jpg     ← set as featured image
+  2. barista_guide_pages_spread.jpg
+  3. barista_guide_ratio_chart.jpg
+
+------------------------------------------------------------------------
+PRICING
+------------------------------------------------------------------------
+Price                : 12.00
+Compare-at Price     : 18.00
+Cost per Item        : 0.00    ← digital; no production cost
+Charge Tax           : Yes     ← digital goods taxable in most states
+
+------------------------------------------------------------------------
+INVENTORY
+------------------------------------------------------------------------
+Track Quantity       : No      ← digital; unlimited
+SKU                  : DL-BARISTA-GUIDE-001
+Barcode (UPC)        : (leave blank — digital product)
+Continue selling when out of stock : (N/A — not tracking)
+
+------------------------------------------------------------------------
+SHIPPING
+------------------------------------------------------------------------
+This is a physical product : No   ← IMPORTANT: uncheck this box
+                                     No weight, no dimensions needed.
+
+------------------------------------------------------------------------
+HAS VARIANTS         : No
+
+------------------------------------------------------------------------
+PRODUCT ORGANIZATION
+------------------------------------------------------------------------
+Product Category     : Media > Books > Cooking, Food & Wine
+Product Type         : Digital Download
+Vendor               : Harrow & Finch Publishing
+Collections          : Digital Downloads, Gifts Under $25, Coffee Accessories
+Tags                 : digital download, pdf, coffee guide, home barista,
+                       brew guide, ebook, gift
+
+------------------------------------------------------------------------
+SEO
+------------------------------------------------------------------------
+Page Title           : Home Barista Starter Guide PDF | Harrow & Finch
+Meta Description     : Learn to brew café-quality coffee at home. 68-page
+                       illustrated PDF guide covering espresso, pour-over,
+                       AeroPress, French press, and cold brew. Instant download.
+URL Handle           : home-barista-starter-guide-pdf
+
+------------------------------------------------------------------------
+SALES CHANNELS & MARKETS
+------------------------------------------------------------------------
+Online Store         : Yes
+Point of Sale        : No
+Google & YouTube     : No   ← digital downloads excluded from Shopping
+Facebook & Instagram : Yes
+
+Shopify Product ID (fill after saving): ______________________
+
+================================================================================
+  PRODUCT 5 OF 6
+================================================================================
+
+TITLE                : Reclaimed Oak Serving Board — Large
+
+STATUS               : Draft   ← do NOT publish yet; awaiting final photo edit
+PUBLISH IMMEDIATELY  : No
+
+------------------------------------------------------------------------
+DESCRIPTION
+------------------------------------------------------------------------
+Each serving board is cut from reclaimed white oak, finished with food-safe
+beeswax oil, and sanded to a silky 400-grit finish. No two boards are alike —
+grain pattern, knots, and natural color variation are features, not flaws.
+
+Ideal for charcuterie, bread service, or as a standalone kitchen centerpiece.
+
+• Dimensions: Approximately 18" x 10" x 0.75" (natural variation ±0.5")
+• Material: Reclaimed white oak
+• Finish: Food-safe beeswax oil
+• Hand wash only — do not submerge or put in dishwasher
+• Includes a small tin of Harrow & Finch Board Butter for conditioning
+
+------------------------------------------------------------------------
+MEDIA
+------------------------------------------------------------------------
+  1. oak_board_large_top.jpg            ← set as featured image (PENDING EDIT)
+  2. oak_board_large_angle.jpg          (PENDING EDIT)
+  3. oak_board_lifestyle_cheese.jpg     ← this one is ready; upload now
+  4. oak_board_grain_closeup.jpg        (PENDING EDIT)
+
+  Upload only image 3 now. The rest will be added when edits are returned.
+
+------------------------------------------------------------------------
+PRICING
+------------------------------------------------------------------------
+Price                : 78.00
+Compare-at Price     : (leave blank)
+Cost per Item        : 24.50
+Charge Tax           : Yes
+
+------------------------------------------------------------------------
+INVENTORY
+------------------------------------------------------------------------
+Track Quantity       : Yes
+SKU                  : WD-OAK-BOARD-LG
+Barcode (UPC)        : 850044383412
+Continue selling when out of stock : No
+
+Inventory per location:
+  Warehouse — Memphis  : 23   ← limited stock; handmade
+
+------------------------------------------------------------------------
+SHIPPING
+------------------------------------------------------------------------
+This is a physical product : Yes
+Weight               : 4.2 lb
+Weight unit          : lb
+HS Code              : 4419.12
+Country of Origin    : United States
+
+------------------------------------------------------------------------
+HAS VARIANTS         : No
+
+------------------------------------------------------------------------
+PRODUCT ORGANIZATION
+------------------------------------------------------------------------
+Product Category     : Home & Garden > Kitchen & Dining > Serveware
+Product Type         : Serving Board
+Vendor               : Harrow & Finch Workshop
+Collections          : Kitchen & Home, Gifts, Handmade   ← do NOT add to
+                       New Arrivals or Sale Items yet (save for launch day)
+Tags                 : serving board, charcuterie, oak, reclaimed wood,
+                       handmade, kitchen, gift, beeswax
+
+------------------------------------------------------------------------
+SEO
+------------------------------------------------------------------------
+Page Title           : Reclaimed Oak Serving Board Large | Harrow & Finch
+Meta Description     : Handcrafted large serving board made from reclaimed
+                       white oak. Food-safe beeswax finish. No two boards alike.
+                       Includes board butter tin. Hand wash only.
+URL Handle           : reclaimed-oak-serving-board-large
+
+------------------------------------------------------------------------
+SALES CHANNELS & MARKETS
+------------------------------------------------------------------------
+Online Store         : Yes   ← saved as draft; won't be visible until published
+Point of Sale        : Yes
+Google & YouTube     : Yes
+Facebook & Instagram : Yes
+
+Shopify Product ID (fill after saving): ______________________
+
+================================================================================
+  PRODUCT 6 OF 6
+================================================================================
+
+TITLE                : Harrow & Finch Gift Card
+
+STATUS               : Active
+PUBLISH IMMEDIATELY  : Yes
+
+------------------------------------------------------------------------
+DESCRIPTION
+------------------------------------------------------------------------
+Give the gift of good taste. The Harrow & Finch digital gift card is
+delivered instantly by email and can be used on any order in our online store.
+Gift cards never expire and cannot be combined with other gift cards.
+
+------------------------------------------------------------------------
+MEDIA
+------------------------------------------------------------------------
+  1. gift_card_graphic_v2.jpg           ← set as featured image
+
+------------------------------------------------------------------------
+PRICING  ← NOTE: Gift cards use denomination variants, not a single price
+------------------------------------------------------------------------
+This is a gift card product — use the Gift Card product type in Shopify.
+(Products > Add product > select "Gift card" from the product type dropdown
+at the very top — this changes the form layout.)
+
+Denominations to add as variants:
+  $25.00
+  $50.00
+  $75.00
+  $100.00
+
+For each denomination:
+  SKU        : GC-[AMOUNT]  (e.g. GC-25, GC-50, GC-75, GC-100)
+  Taxable    : No   ← gift cards are not taxed at time of purchase
+  Track qty  : No
+
+------------------------------------------------------------------------
+SHIPPING
+------------------------------------------------------------------------
+This is a physical product : No   ← digital gift card only
+
+------------------------------------------------------------------------
+HAS VARIANTS         : Yes (denominations — added automatically by Shopify
+                        when you select the Gift Card product type)
+
+------------------------------------------------------------------------
+PRODUCT ORGANIZATION
+------------------------------------------------------------------------
+Product Category     : (leave blank — Shopify handles gift card categorization)
+Product Type         : Gift Card
+Vendor               : Harrow & Finch
+Collections          : Gifts, Gifts Under $50 ($25 variant only)
+Tags                 : gift card, digital, gift, e-gift
+
+------------------------------------------------------------------------
+SEO
+------------------------------------------------------------------------
+Page Title           : Gift Card | Harrow & Finch
+Meta Description     : Give the gift of good taste with a Harrow & Finch
+                       digital gift card. Delivered instantly by email.
+                       Available in $25, $50, $75, and $100.
+URL Handle           : harrow-finch-gift-card
+
+------------------------------------------------------------------------
+SALES CHANNELS & MARKETS
+------------------------------------------------------------------------
+Online Store         : Yes
+Point of Sale        : Yes
+Google & YouTube     : No   ← gift cards not eligible for Google Shopping
+Facebook & Instagram : No
+
+Shopify Product ID (fill after saving): ______________________
+
+================================================================================
+  END OF BATCH HF-SHOP-0031
+  Total Products: 6 | Entered By: ______________ | Date: ______________
+  Reviewed By:   ______________ | Date: ______________
+
+  Post-entry checklist:
+  [ ] All 6 Product IDs recorded above
+  [ ] Product 5 (Oak Board) confirmed as Draft — NOT published
+  [ ] Product 3 (Cold Brew) — confirm cold storage available before activating
+  [ ] Notify photo editor that Products 1, 2, 5 images have been uploaded
+================================================================================

@@ -1,0 +1,490 @@
+================================================================================
+  HARTWELL DISTRIBUTION CO. — QUARTERLY DATA ENTRY PACKET
+  Internal Use Only | Prepared by: Operations Manager
+  Packet Date: 2026-03-18 | Batch ID: HDC-Q1-2026
+================================================================================
+
+INSTRUCTIONS FOR DATA ENTRY STAFF
+-----------------------------------
+You will be working in the Q1_2026_Operations.xlsx workbook.
+The file has five tabs — navigate between them as instructed.
+Do NOT rename any tabs or columns. Use Tab to move between cells.
+Dates go in MM/DD/YYYY format. Currency cells already have $ formatting —
+enter numbers only (no $ sign). Negative values use a minus sign, not parentheses.
+
+If a cell has a dropdown list, use it — do not free-type into it.
+Cells marked [FORMULA — DO NOT EDIT] are locked; skip them.
+Flag any cell marked [VERIFY] to your supervisor before moving on.
+
+================================================================================
+  TAB 1: "Employee Roster"
+================================================================================
+
+This tab tracks all active and recently terminated employees.
+Column headers (row 1) are already in place. Enter the following rows
+starting at row 2. Leave the "Employee ID" column alone — it auto-fills.
+
+ROW 2
+  Last Name          : Fitzgerald
+  First Name         : Carol
+  Department         : Logistics
+  Title              : Warehouse Supervisor
+  Employment Type    : Full-Time
+  Start Date         : 03/14/2011
+  End Date           : (leave blank — still active)
+  Status             : Active
+  Manager            : R. Okonkwo
+  Location           : Memphis, TN
+  Salary / Hourly    : Salary
+  Pay Rate           : 67500
+  Benefits Eligible  : Yes
+  Emergency Contact  : Paul Fitzgerald — (901) 440-8812
+
+ROW 3
+  Last Name          : Samuels
+  First Name         : Darnell
+  Department         : Sales
+  Title              : Regional Account Manager
+  Employment Type    : Full-Time
+  Start Date         : 07/02/2019
+  End Date           : (leave blank)
+  Status             : Active
+  Manager            : L. Vance
+  Location           : Atlanta, GA
+  Salary / Hourly    : Salary
+  Pay Rate           : 82000
+  Benefits Eligible  : Yes
+  Emergency Contact  : Yolanda Samuels — (678) 554-3301
+
+ROW 4
+  Last Name          : Park
+  First Name         : Ji-yeon
+  Department         : Finance
+  Title              : Accounts Payable Specialist
+  Employment Type    : Full-Time
+  Start Date         : 11/18/2021
+  End Date           : (leave blank)
+  Status             : Active
+  Manager            : T. Herrera
+  Location           : Memphis, TN
+  Salary / Hourly    : Salary
+  Pay Rate           : 54000
+  Benefits Eligible  : Yes
+  Emergency Contact  : Min-jun Park — (901) 322-5540
+
+ROW 5
+  Last Name          : Ruiz
+  First Name         : Marco
+  Department         : Logistics
+  Title              : Delivery Driver
+  Employment Type    : Full-Time
+  Start Date         : 09/05/2022
+  End Date           : (leave blank)
+  Status             : Active
+  Manager            : C. Fitzgerald
+  Location           : Memphis, TN
+  Salary / Hourly    : Hourly
+  Pay Rate           : 22.75
+  Benefits Eligible  : Yes
+  Emergency Contact  : Teresa Ruiz — (901) 771-2290
+
+ROW 6
+  Last Name          : Holbrook
+  First Name         : Amanda
+  Department         : Sales
+  Title              : Inside Sales Rep
+  Employment Type    : Part-Time
+  Start Date         : 02/10/2025
+  End Date           : (leave blank)
+  Status             : Active
+  Manager            : L. Vance
+  Location           : Remote
+  Salary / Hourly    : Hourly
+  Pay Rate           : 19.50
+  Benefits Eligible  : No   ← part-time, under threshold
+  Emergency Contact  : Greg Holbrook — (615) 882-4451
+
+ROW 7
+  Last Name          : Weston
+  First Name         : Bryan
+  Department         : IT
+  Title              : Systems Administrator
+  Employment Type    : Full-Time
+  Start Date         : 04/22/2020
+  End Date           : 02/28/2026
+  Status             : Terminated   ← do not delete; keep for records
+  Manager            : D. Kim
+  Location           : Memphis, TN
+  Salary / Hourly    : Salary
+  Pay Rate           : 73000
+  Benefits Eligible  : No   ← terminated
+  Emergency Contact  : (leave blank — no longer required)
+
+================================================================================
+  TAB 2: "Q1 Sales"
+================================================================================
+
+This tab logs all sales transactions for January – March 2026.
+Navigate to the "Q1 Sales" tab. Start entering at row 2.
+The "Invoice #" column auto-increments — do not touch it.
+"Rep ID" values must match the dropdown (pulled from Employee Roster).
+"Region" dropdown values: East, West, Central, South, International.
+"Product Category" dropdown: Industrial Fasteners, Packaging Materials,
+  Safety Equipment, Cleaning Supplies, Office Consumables.
+
+ROW 2
+  Date               : 01/06/2026
+  Customer Name      : Apex Freight Solutions
+  Customer ID        : CUST-0041
+  Rep ID             : EMP-0023  (Darnell Samuels)
+  Region             : South
+  Product Category   : Industrial Fasteners
+  Product SKU        : IFA-4420-B
+  Product Name       : Hex Bolt Set — 1/2" x 2" (Box/100)
+  Quantity           : 48
+  Unit Price         : 14.75
+  Discount %         : 5
+  Subtotal           : [FORMULA — DO NOT EDIT]
+  Tax (8.5%)         : [FORMULA — DO NOT EDIT]
+  Total              : [FORMULA — DO NOT EDIT]
+  Payment Terms      : Net 30
+  Notes              : Repeat order; customer on auto-reorder program.
+
+ROW 3
+  Date               : 01/09/2026
+  Customer Name      : BlueRidge Packaging Inc.
+  Customer ID        : CUST-0078
+  Rep ID             : EMP-0031  (Amanda Holbrook)
+  Region             : East
+  Product Category   : Packaging Materials
+  Product SKU        : PKG-0812-T
+  Product Name       : Stretch Wrap Film — 80ga, 18"x1500ft (Case/4)
+  Quantity           : 120
+  Unit Price         : 22.40
+  Discount %         : 10   ← volume discount; pre-approved by L. Vance
+  Subtotal           : [FORMULA — DO NOT EDIT]
+  Tax (8.5%)         : [FORMULA — DO NOT EDIT]
+  Total              : [FORMULA — DO NOT EDIT]
+  Payment Terms      : Net 15
+  Notes              : New account — first large order. Flag for follow-up.
+
+ROW 4
+  Date               : 01/14/2026
+  Customer Name      : Greenway Foods Corp.
+  Customer ID        : CUST-0019
+  Rep ID             : EMP-0023  (Darnell Samuels)
+  Region             : South
+  Product Category   : Safety Equipment
+  Product SKU        : SAF-2200-V
+  Product Name       : High-Vis Safety Vest — Class 2 (Pack/5)
+  Quantity           : 30
+  Unit Price         : 31.00
+  Discount %         : 0
+  Subtotal           : [FORMULA — DO NOT EDIT]
+  Tax (8.5%)         : [FORMULA — DO NOT EDIT]
+  Total              : [FORMULA — DO NOT EDIT]
+  Payment Terms      : Net 30
+  Notes              : (none)
+
+ROW 5
+  Date               : 01/22/2026
+  Customer Name      : Summit Office Partners
+  Customer ID        : CUST-0102
+  Rep ID             : EMP-0031  (Amanda Holbrook)
+  Region             : Central
+  Product Category   : Office Consumables
+  Product SKU        : OFC-0091-P
+  Product Name       : Copy Paper — Letter, 20lb (Case/10 reams)
+  Quantity           : 75
+  Unit Price         : 38.50
+  Discount %         : 0
+  Subtotal           : [FORMULA — DO NOT EDIT]
+  Tax (8.5%)         : [FORMULA — DO NOT EDIT]
+  Total              : [FORMULA — DO NOT EDIT]
+  Payment Terms      : Net 30
+  Notes              : (none)
+
+ROW 6
+  Date               : 02/03/2026
+  Customer Name      : Apex Freight Solutions
+  Customer ID        : CUST-0041
+  Rep ID             : EMP-0023  (Darnell Samuels)
+  Region             : South
+  Product Category   : Cleaning Supplies
+  Product SKU        : CLN-3310-D
+  Product Name       : Industrial Degreaser — 1 Gallon (Case/4)
+  Quantity           : 60
+  Unit Price         : 18.90
+  Discount %         : 5
+  Subtotal           : [FORMULA — DO NOT EDIT]
+  Tax (8.5%)         : [FORMULA — DO NOT EDIT]
+  Total              : [FORMULA — DO NOT EDIT]
+  Payment Terms      : Net 30
+  Notes              : CUST-0041 also requested catalog for new SKU line —
+                       forward request to marketing.
+
+ROW 7
+  Date               : 02/18/2026
+  Customer Name      : Triton Industrial Supply
+  Customer ID        : CUST-0055
+  Rep ID             : EMP-0023  (Darnell Samuels)
+  Region             : South
+  Product Category   : Industrial Fasteners
+  Product SKU        : IFA-5500-S
+  Product Name       : Stainless Hex Nut — 3/8" (Bag/250)
+  Quantity           : 200
+  Unit Price         : 9.20
+  Discount %         : 15  ← contract pricing; see account file
+  Subtotal           : [FORMULA — DO NOT EDIT]
+  Tax (8.5%)         : [FORMULA — DO NOT EDIT]
+  Total              : [FORMULA — DO NOT EDIT]
+  Payment Terms      : Net 45
+  Notes              : Contract customer — terms set annually. Do not change.
+
+ROW 8
+  Date               : 03/05/2026
+  Customer Name      : BlueRidge Packaging Inc.
+  Customer ID        : CUST-0078
+  Rep ID             : EMP-0031  (Amanda Holbrook)
+  Region             : East
+  Product Category   : Packaging Materials
+  Product SKU        : PKG-0441-S
+  Product Name       : Packing Tape — 2" x 110yd (Case/36)
+  Quantity           : 40
+  Unit Price         : 27.00
+  Discount %         : 10
+  Subtotal           : [FORMULA — DO NOT EDIT]
+  Tax (8.5%)         : [FORMULA — DO NOT EDIT]
+  Total              : [FORMULA — DO NOT EDIT]
+  Payment Terms      : Net 15
+  Notes              : Same discount rate as 01/09 order. Confirmed by L. Vance.
+
+ROW 9
+  Date               : 03/19/2026
+  Customer Name      : Crestview Medical Group
+  Customer ID        : CUST-0114   ← new customer; add to customer master first
+  Rep ID             : EMP-0031  (Amanda Holbrook)
+  Region             : Central
+  Product Category   : Safety Equipment
+  Product SKU        : SAF-1100-G
+  Product Name       : Nitrile Exam Gloves — Medium (Case/10 boxes)
+  Quantity           : 25
+  Unit Price         : 44.00
+  Discount %         : 0
+  Subtotal           : [FORMULA — DO NOT EDIT]
+  Tax (8.5%)         : [FORMULA — DO NOT EDIT]
+  Total              : [FORMULA — DO NOT EDIT]
+  Payment Terms      : Net 30
+  Notes              : First-time order; credit check pending. Do not ship until
+                       Finance approves. [VERIFY with Ji-yeon Park]
+
+================================================================================
+  TAB 3: "Inventory"
+================================================================================
+
+Navigate to the "Inventory" tab.
+This tab tracks current stock levels. Update the following rows.
+Find each row by SKU — do not add new rows unless the SKU is missing.
+Update ONLY the columns listed; leave others untouched.
+
+SKU: IFA-4420-B
+  On-Hand Qty        : 312
+  Reserved Qty       : 192  (pending orders)
+  Available Qty      : [FORMULA — DO NOT EDIT]
+  Last Received Date : 01/04/2026
+  Reorder Point      : 100
+  Reorder Qty        : 500
+  Unit Cost          : 7.80
+  Notes              : Supplier lead time 7 days.
+
+SKU: PKG-0812-T
+  On-Hand Qty        : 88
+  Reserved Qty       : 120  ← NOTE: reserved > on-hand; backorder situation
+  Available Qty      : [FORMULA — DO NOT EDIT]
+  Last Received Date : 12/22/2025
+  Reorder Point      : 50
+  Reorder Qty        : 200
+  Unit Cost          : 11.30
+  Notes              : BACKORDER — PO#4418 placed 03/10/2026; ETA 03/28/2026.
+                       Alert BlueRidge Packaging of delay. [VERIFY with C. Fitzgerald]
+
+SKU: SAF-2200-V
+  On-Hand Qty        : 210
+  Reserved Qty       : 30
+  Available Qty      : [FORMULA — DO NOT EDIT]
+  Last Received Date : 02/01/2026
+  Reorder Point      : 75
+  Reorder Qty        : 250
+  Unit Cost          : 15.40
+  Notes              : (none)
+
+SKU: OFC-0091-P
+  On-Hand Qty        : 145
+  Reserved Qty       : 75
+  Available Qty      : [FORMULA — DO NOT EDIT]
+  Last Received Date : 01/30/2026
+  Reorder Point      : 80
+  Reorder Qty        : 300
+  Unit Cost          : 21.00
+  Notes              : Price increase expected Q2 — stock up if budget allows.
+
+SKU: CLN-3310-D
+  On-Hand Qty        : 95
+  Reserved Qty       : 60
+  Available Qty      : [FORMULA — DO NOT EDIT]
+  Last Received Date : 01/17/2026
+  Reorder Point      : 50
+  Reorder Qty        : 150
+  Unit Cost          : 9.45
+  Notes              : (none)
+
+SKU: IFA-5500-S
+  On-Hand Qty        : 1,850
+  Reserved Qty       : 200
+  Available Qty      : [FORMULA — DO NOT EDIT]
+  Last Received Date : 11/12/2025
+  Reorder Point      : 500
+  Reorder Qty        : 2000
+  Unit Cost          : 4.20
+  Notes              : High-volume SKU; bulk storage bin 7-C.
+
+SKU: PKG-0441-S
+  On-Hand Qty        : 220
+  Reserved Qty       : 40
+  Available Qty      : [FORMULA — DO NOT EDIT]
+  Last Received Date : 02/14/2026
+  Reorder Point      : 60
+  Reorder Qty        : 200
+  Unit Cost          : 13.50
+  Notes              : (none)
+
+SKU: SAF-1100-G
+  On-Hand Qty        : 62
+  Reserved Qty       : 0   ← order is pending credit check; do NOT reserve yet
+  Available Qty      : [FORMULA — DO NOT EDIT]
+  Last Received Date : 03/01/2026
+  Reorder Point      : 30
+  Reorder Qty        : 100
+  Unit Cost          : 22.80
+  Notes              : Hold reservation until Finance clears CUST-0114.
+
+================================================================================
+  TAB 4: "Expenses"
+================================================================================
+
+Navigate to the "Expenses" tab.
+Log the following Q1 expense items. Department dropdown values mirror the
+Employee Roster. Category dropdown: Travel, Office Supplies, Equipment,
+Software, Utilities, Maintenance, Marketing, Misc.
+Receipts attached to original paper packet — check "Receipt?" column accordingly.
+
+ROW 2
+  Date               : 01/08/2026
+  Submitted By       : Carol Fitzgerald
+  Department         : Logistics
+  Category           : Maintenance
+  Description        : Forklift #3 — quarterly hydraulic service
+  Vendor             : Mid-South Equipment Service
+  Amount             : 485.00
+  Approved By        : R. Okonkwo
+  Approval Date      : 01/09/2026
+  Receipt Attached   : Yes
+  Reimbursable       : No  (company expense)
+  Notes              : Scheduled maintenance; part of annual service contract.
+
+ROW 3
+  Date               : 01/14/2026
+  Submitted By       : Darnell Samuels
+  Department         : Sales
+  Category           : Travel
+  Description        : Client visit — Atlanta to Charlotte; mileage + hotel
+  Vendor             : (multiple — see receipts)
+  Amount             : 341.22
+  Approved By        : L. Vance
+  Approval Date      : 01/15/2026
+  Receipt Attached   : Yes
+  Reimbursable       : Yes  ← reimburse Samuels via next paycheck
+  Notes              : Hotel 1 night — Hampton Inn, $189. Mileage 312 miles @ $0.67/mi.
+
+ROW 4
+  Date               : 01/27/2026
+  Submitted By       : Bryan Weston
+  Department         : IT
+  Category           : Software
+  Description        : Annual license renewal — network monitoring tool
+  Vendor             : SolarWinds
+  Amount             : 1,200.00
+  Approved By        : D. Kim
+  Approval Date      : 01/24/2026  ← approved before submission; pre-authorized
+  Receipt Attached   : Yes
+  Reimbursable       : No
+  Notes              : Weston submitted before termination date; valid expense.
+                       License transfers to new sysadmin once hired.
+
+ROW 5
+  Date               : 02/11/2026
+  Submitted By       : Ji-yeon Park
+  Department         : Finance
+  Category           : Office Supplies
+  Description        : Printer toner cartridges x4, copy paper (2 cases)
+  Vendor             : Staples Business Advantage
+  Amount             : 218.74
+  Approved By        : T. Herrera
+  Approval Date      : 02/12/2026
+  Receipt Attached   : Yes
+  Reimbursable       : No
+  Notes              : (none)
+
+ROW 6
+  Date               : 02/25/2026
+  Submitted By       : Darnell Samuels
+  Department         : Sales
+  Category           : Marketing
+  Description        : Trade show booth materials — ProDistrib Expo 2026
+  Vendor             : FastSigns Memphis
+  Amount             : 774.50
+  Approved By        : L. Vance
+  Approval Date      : 02/20/2026
+  Receipt Attached   : Yes
+  Reimbursable       : No
+  Notes              : Banner, table cloth, brochure stand. Event: 03/11/2026.
+
+ROW 7
+  Date               : 03/12/2026
+  Submitted By       : Marco Ruiz
+  Department         : Logistics
+  Category           : Misc
+  Description        : Replacement hand truck — old one damaged in loading dock
+  Vendor             : Uline
+  Amount             : 112.00
+  Approved By        : C. Fitzgerald
+  Approval Date      : 03/13/2026
+  Receipt Attached   : No  ← receipt lost; manager signed off anyway
+  Reimbursable       : No
+  Notes              : [VERIFY] — missing receipt; flag for audit trail. Fitzgerald
+                       approved verbally; written note in physical file.
+
+================================================================================
+  TAB 5: "Q1 Summary"   [READ ONLY — do not edit]
+================================================================================
+
+This tab contains all summary pivot data and charts.
+It pulls automatically from tabs 1–4.
+After finishing all data entry, go to this tab and press Ctrl+Alt+F5
+to refresh all connections. Verify the following totals match:
+
+  Total Q1 Sales Revenue (gross)      : should calculate to $104,318.75
+  Total Q1 Sales Revenue (net/disc.)  : should calculate to $97,182.44
+  Active Headcount                    : should show 6
+  Total Q1 Expenses                   : should calculate to $3,131.46
+  SKUs Below Reorder Point            : should show 0   ← if it shows > 0, notify C. Fitzgerald
+  Backorder SKUs                      : should show 1   (PKG-0812-T)
+
+  If any of these totals do not match after refresh, DO NOT submit the file.
+  Alert the Operations Manager immediately.
+
+================================================================================
+  END OF BATCH HDC-Q1-2026
+  Entered By:  ______________ | Date: ______________
+  Reviewed By: ______________ | Date: ______________
+================================================================================

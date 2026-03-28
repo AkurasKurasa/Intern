@@ -20,7 +20,8 @@ import pytest
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from components.executor.executor import ActionExecutor, ExecutorAgent, ExecutionResult
+from components.agent.executor import ActionExecutor, ExecutionResult
+from components.agent.agent import LLMAgent as ExecutorAgent
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -124,7 +125,7 @@ class TestActionExecutor:
 
     def test_live_executor_raises_without_pyautogui(self, monkeypatch):
         """If pyautogui is missing, live ActionExecutor must raise ImportError."""
-        import components.executor.executor as mod
+        import components.agent.executor as mod
         monkeypatch.setattr(mod, "_PYAUTOGUI_AVAILABLE", False)
         with pytest.raises(ImportError, match="pyautogui"):
             ActionExecutor(dry_run=False)
@@ -140,7 +141,7 @@ class TestExecutorAgent:
         """Return an agent whose predict() is monkey-patched to return mock_pred."""
         agent = ExecutorAgent(dry_run=True, max_steps=5, step_delay=0.0)
         # Patch the predict import inside ExecutorAgent.step
-        import components.executor.executor as mod
+        import components.agent.executor as mod
         original_step = agent.step
 
         def patched_step(state):

@@ -46,6 +46,18 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader, Dataset, random_split
 
+# ── optional: sentence embeddings ─────────────────────────────────────────────
+try:
+    from sentence_transformers import SentenceTransformer as _ST
+    _SENT_MODEL_NAME = "all-MiniLM-L6-v2"
+    _EMBED_DIM       = 384
+    _sent_model: Optional[Any] = None          # loaded lazily
+    _embed_cache: Dict[str, List[float]] = {}  # text → embedding list
+    _SENTENCE_TRANSFORMERS_AVAILABLE = True
+except ImportError:
+    _SENTENCE_TRANSFORMERS_AVAILABLE = False
+    _EMBED_DIM = 1   # fallback: single hash value
+
 
 # ═══════════════════════════════════════════════════════════
 #  SECTION 1 — DATASET
@@ -55,24 +67,95 @@ ACTION_NOOP     = 0
 ACTION_CLICK    = 1
 ACTION_KEYBOARD = 2
 
-ELEM_FEATURES = 6
+# bbox(4) + confidence(1) + window_role(1) + is_focused(1) + ctrl_type(1) + text_embedding(384 or 1)
+ELEM_FEATURES = 8 + _EMBED_DIM
+
+# Numeric encoding for control types — focused/interactive types get distinct values
+_CTRL_TYPE_MAP = {
+    "editcontrol": 0.1, "comboboxcontrol": 0.2, "checkboxcontrol": 0.3,
+    "buttoncontrol": 0.4, "textcontrol": 0.5, "windowcontrol": 0.6,
+    "documentcontrol": 0.7, "listcontrol": 0.8,
+}
 VOCAB_SIZE    = 10_000
 DEFAULT_W     = 1920
 DEFAULT_H     = 1200
 
 
-def _encode_element(elem: dict, W: float, H: float) -> List[float]:
+def _get_sent_model():
+    """Lazily load the sentence transformer (once per process)."""
+    global _sent_model
+    if not _SENTENCE_TRANSFORMERS_AVAILABLE:
+        return None
+    if _sent_model is None:
+        print("[Encoder] Loading sentence model 'all-MiniLM-L6-v2' …", flush=True)
+        _sent_model = _ST(_SENT_MODEL_NAME)
+        print("[Encoder] Sentence model ready.", flush=True)
+    return _sent_model
+
+
+def _embed_text(text: str) -> List[float]:
+    """
+    Return a semantic embedding for *text*.
+    Uses sentence-transformers when available; falls back to a single
+    normalised hash value otherwise (preserving the old behaviour).
+    Results are cached so each unique string is encoded only once.
+    """
+    text = (text or "").strip()
+    if not _SENTENCE_TRANSFORMERS_AVAILABLE:
+        h = (abs(hash(text)) % VOCAB_SIZE) / VOCAB_SIZE if text else 0.0
+        return [h]
+
+    if text not in _embed_cache:
+        model = _get_sent_model()
+        if model is None:
+            _embed_cache[text] = [0.0] * _EMBED_DIM
+        else:
+            _embed_cache[text] = model.encode(
+                text, show_progress_bar=False, convert_to_numpy=True
+            ).tolist()
+    return _embed_cache[text]
+
+
+def _prime_embed_cache(texts: List[str]) -> None:
+    """
+    Batch-encode all unique *texts* at once (much faster than one-by-one).
+    Call this before building the dataset to pre-populate the cache.
+    """
+    if not _SENTENCE_TRANSFORMERS_AVAILABLE:
+        return
+    unseen = [t for t in set(texts) if t.strip() and t not in _embed_cache]
+    if not unseen:
+        return
+    model = _get_sent_model()
+    if model is None:
+        return
+    print(f"[Encoder] Batch-encoding {len(unseen)} unique text strings …", flush=True)
+    vecs = model.encode(unseen, show_progress_bar=True,
+                        batch_size=64, convert_to_numpy=True)
+    for t, v in zip(unseen, vecs):
+        _embed_cache[t] = v.tolist()
+    print(f"[Encoder] Cache primed ({len(_embed_cache)} entries).", flush=True)
+
+
+def _encode_element(elem: dict, W: float, H: float, focused_id=None) -> List[float]:
     x1, y1, x2, y2 = (float(v) for v in elem.get("bbox", [0, 0, 0, 0])[:4])
-    conf      = float(elem.get("confidence", 0.0))
-    text_hash = (abs(hash(elem.get("text", "") or "")) % VOCAB_SIZE) / VOCAB_SIZE
-    return [x1 / W, y1 / H, x2 / W, y2 / H, conf, text_hash]
+    conf       = float(elem.get("confidence", 0.0))
+    # window_role: 1.0 = background (data source), 0.0 = active/unknown
+    role       = 1.0 if elem.get("window_role") == "background" else 0.0
+    # is_focused: 1.0 if this element is the currently focused input — key signal for action type
+    is_focused = 1.0 if (focused_id and elem.get("element_id") == focused_id) else 0.0
+    # ctrl_type: numeric encoding of control type so model distinguishes Edit vs ComboBox etc.
+    ctrl_type  = _CTRL_TYPE_MAP.get((elem.get("type") or "").lower(), 0.0)
+    text_emb   = _embed_text(elem.get("text", "") or "")
+    return [x1 / W, y1 / H, x2 / W, y2 / H, conf, role, is_focused, ctrl_type] + text_emb
 
 
 def encode_state(state: dict, max_elements: int = 128) -> torch.Tensor:
-    """State dict -> FloatTensor (max_elements, 6), zero-padded."""
-    res  = state.get("screen_resolution", [DEFAULT_W, DEFAULT_H])
-    W, H = float(res[0]) or DEFAULT_W, float(res[1]) or DEFAULT_H
-    rows = [_encode_element(e, W, H) for e in state.get("elements", [])[:max_elements]]
+    """State dict -> FloatTensor (max_elements, ELEM_FEATURES), zero-padded."""
+    res        = state.get("screen_resolution", [DEFAULT_W, DEFAULT_H])
+    W, H       = float(res[0]) or DEFAULT_W, float(res[1]) or DEFAULT_H
+    focused_id = state.get("focused_element_id")
+    rows = [_encode_element(e, W, H, focused_id) for e in state.get("elements", [])[:max_elements]]
     while len(rows) < max_elements:
         rows.append([0.0] * ELEM_FEATURES)
     return torch.tensor(rows, dtype=torch.float32)
@@ -80,18 +163,55 @@ def encode_state(state: dict, max_elements: int = 128) -> torch.Tensor:
 
 def _decode_actions(
     mouse: dict, keyboard: dict, W: float, H: float
-) -> Tuple[int, float, float, float]:
-    """Return (action_type, cx_norm, cy_norm, key_norm)."""
+) -> Tuple[int, float, float, float, str]:
+    """Return (action_type, cx_norm, cy_norm, key_norm, typed_text)."""
     mouse_actions   = mouse.get("actions", [])
     keyboard_groups = keyboard.get("actions", [])
-    key_count = sum(len(g.get("strokes", [])) for g in keyboard_groups)
+    key_count  = sum(len(g.get("strokes", [])) for g in keyboard_groups)
+    # Prefer pasted_text (full clipboard paste) over raw key characters.
+    # Skip control characters (Ctrl+V = \x16, Ctrl+C = \x03, etc.)
+    parts = []
+    for g in keyboard_groups:
+        for s in g.get("strokes", []):
+            pt = s.get("pasted_text", "")
+            if pt:
+                parts.append(pt)
+            else:
+                k = s.get("key", "")
+                if len(k) == 1 and k.isprintable():
+                    parts.append(k)
+    typed_text = "".join(parts)
     clicks = [a for a in mouse_actions if a.get("type") == "click"]
     if clicks:
         pos = clicks[0].get("position", [0, 0])
-        return ACTION_CLICK, float(pos[0]) / W, float(pos[1]) / H, min(key_count / 100.0, 1.0)
+        return ACTION_CLICK, float(pos[0]) / W, float(pos[1]) / H, min(key_count / 100.0, 1.0), ""
     if key_count > 0:
-        return ACTION_KEYBOARD, 0.0, 0.0, min(key_count / 100.0, 1.0)
-    return ACTION_NOOP, 0.0, 0.0, 0.0
+        return ACTION_KEYBOARD, 0.0, 0.0, min(key_count / 100.0, 1.0), typed_text
+    return ACTION_NOOP, 0.0, 0.0, 0.0, ""
+
+
+def _find_source_elem_idx(typed_text: str, state: dict, max_elements: int) -> int:
+    """
+    For a keyboard action, find which background element's text contains
+    what was typed.  Returns the element index (0-based) or -1 if not found.
+    -1 tells the loss function to ignore this sample.
+    """
+    if not typed_text:
+        return -1
+    typed_lower = typed_text.lower().strip()
+    elements = state.get("elements", [])[:max_elements]
+    for idx, elem in enumerate(elements):
+        if elem.get("window_role") != "background":
+            continue
+        # Check both text and value fields — Notepad DocumentControl stores
+        # actual document content in "value", not "text" (which is just the name)
+        t = (elem.get("text") or "").lower().strip()
+        v = (elem.get("value") or "").lower().strip()
+        if not t and not v:
+            continue
+        if typed_lower in t or typed_lower in v or t in typed_lower:
+            return idx
+    return -1
 
 
 def _load_trace(fpath: Path) -> dict | None:
@@ -128,25 +248,66 @@ class TrajectoryDataset(Dataset):
         self.hist_len      = hist_len
         self.aug_drop_prob = aug_drop_prob
 
-        files = sorted(Path(data_dir).glob(glob))
+        # Collect traces from both flat dir and any session_* subfolders
+        root = Path(data_dir)
+        files = sorted(root.glob(glob))
+        for session_dir in sorted(root.glob("session_*")):
+            if session_dir.is_dir():
+                files += sorted(session_dir.glob(glob))
+        files = sorted(set(files))
         if not files:
-            raise FileNotFoundError(f"No trace JSONs in {data_dir!r}")
+            raise FileNotFoundError(f"No trace JSONs in {data_dir!r} (including session subfolders)")
+
+        # Load raw traces — skip traces with no active-window interactive
+        # controls (e.g. old Tkinter sessions where UIA saw 0 form elements)
+        _INTERACTIVE = {
+            "editcontrol", "comboboxcontrol", "checkboxcontrol",
+            "buttoncontrol", "listitemcontrol",
+        }
+        raw_traces: List[dict] = []
+        skipped = 0
+        for fpath in files:
+            t = _load_trace(fpath)
+            if t is None:
+                continue
+            elems = t.get("state", {}).get("elements", [])
+            active_interactive = sum(
+                1 for e in elems
+                if e.get("window_role") == "active"
+                and (e.get("type") or "").lower() in _INTERACTIVE
+            )
+            if active_interactive == 0:
+                skipped += 1
+                continue
+            raw_traces.append(t)
+        if skipped:
+            print(f"[Dataset] Skipped {skipped} traces with no active form controls.")
+
+        # Collect every unique text string across all elements, then encode in one batch
+        all_texts = [
+            elem.get("text", "") or ""
+            for t in raw_traces
+            for elem in t.get("state", {}).get("elements", [])
+        ]
+        _prime_embed_cache(all_texts)
 
         all_states:  List[torch.Tensor]              = []
-        all_actions: List[Tuple[int, float, float, float]] = []
+        all_actions: List[Tuple[int, float, float, float, str]] = []
+        all_src_idx: List[int]                       = []
 
-        for fpath in files:
-            trace = _load_trace(fpath)
-            if trace is None:
-                continue
+        for trace in raw_traces:
             state = trace.get("state", {})
             res   = state.get("screen_resolution", [DEFAULT_W, DEFAULT_H])
             W     = float(res[0]) or DEFAULT_W
             H_px  = float(res[1]) or DEFAULT_H
             all_states.append(encode_state(state, max_elements))
-            all_actions.append(_decode_actions(
+            action = _decode_actions(
                 trace.get("mouse", {}), trace.get("keyboard", {}), W, H_px
-            ))
+            )
+            all_actions.append(action)
+            # Source element pointer label for keyboard steps
+            src_idx = _find_source_elem_idx(action[4], state, max_elements) if action[0] == ACTION_KEYBOARD else -1
+            all_src_idx.append(src_idx)
 
         N = len(all_states)
         if N < hist_len:
@@ -156,20 +317,23 @@ class TrajectoryDataset(Dataset):
 
         self._samples = []
         for i in range(N - hist_len + 1):
-            ctx = all_actions[i : i + hist_len - 1]
-            tgt = all_actions[i + hist_len - 1]
+            ctx     = all_actions[i : i + hist_len - 1]
+            tgt     = all_actions[i + hist_len - 1]
+            src_idx = all_src_idx[i + hist_len - 1]
+            if tgt[0] == ACTION_NOOP:
+                continue   # no_op steps add noise — model should always click or type
             self._samples.append((
-                torch.stack(all_states[i : i + hist_len]),   # (H, T, 6)
+                torch.stack(all_states[i : i + hist_len]),   # (H, T, F)
                 [a[0] for a in ctx],                          # past types
                 [[a[1], a[2], a[3]] for a in ctx],            # past cont
-                tgt[0], (tgt[1], tgt[2]), tgt[3],            # target
+                tgt[0], (tgt[1], tgt[2]), tgt[3], src_idx,   # target + source ptr
             ))
 
     def __len__(self) -> int:
         return len(self._samples)
 
     def __getitem__(self, idx: int):
-        states, p_types, p_cont, tgt_type, tgt_click, tgt_key = self._samples[idx]
+        states, p_types, p_cont, tgt_type, tgt_click, tgt_key, src_idx = self._samples[idx]
 
         # Element dropout augmentation
         if self.aug_drop_prob > 0.0:
@@ -192,6 +356,7 @@ class TrajectoryDataset(Dataset):
             torch.tensor(tgt_type,        dtype=torch.long),
             torch.tensor(list(tgt_click), dtype=torch.float32),
             torch.tensor(tgt_key,         dtype=torch.float32),
+            torch.tensor(src_idx,         dtype=torch.long),   # -1 = ignore
         )
 
     def class_counts(self) -> dict:
@@ -211,9 +376,10 @@ class TrajectoryDataset(Dataset):
 # ═══════════════════════════════════════════════════════════
 
 class PolicyOutput(NamedTuple):
-    type_logits: torch.Tensor   # (B, num_actions)
-    click_xy:    torch.Tensor   # (B, 2)
-    key_count:   torch.Tensor   # (B, 1)
+    type_logits:  torch.Tensor   # (B, num_actions)
+    click_xy:     torch.Tensor   # (B, 2)
+    key_count:    torch.Tensor   # (B, 1)
+    source_elem:  torch.Tensor   # (B, max_elements) — which bg element to copy text from
 
 
 class StateEncoder(nn.Module):
@@ -281,10 +447,11 @@ class TransformerAgentNetwork(nn.Module):
         )
         self.encoder  = nn.TransformerEncoder(enc_layer, num_layers=num_layers,
                                                enable_nested_tensor=False)
-        self.out_norm  = nn.LayerNorm(d_model)
-        self.type_head  = nn.Linear(d_model, num_actions)
-        self.click_head = nn.Linear(d_model, 2)
-        self.key_head   = nn.Linear(d_model, 1)
+        self.out_norm       = nn.LayerNorm(d_model)
+        self.type_head      = nn.Linear(d_model, num_actions)
+        self.click_head     = nn.Linear(d_model, 2)
+        self.key_head       = nn.Linear(d_model, 1)
+        self.source_elem_head = nn.Linear(d_model, max_elements)  # Option 2: point to source element
 
         for m in self.modules():
             if isinstance(m, nn.Linear):
@@ -324,6 +491,7 @@ class TransformerAgentNetwork(nn.Module):
             self.type_head(last),
             torch.sigmoid(self.click_head(last)),
             torch.sigmoid(self.key_head(last)),
+            self.source_elem_head(last),   # raw logits — argmax = element index to copy from
         )
 
     def make_empty_history(self, B: int, device: torch.device):
@@ -357,24 +525,29 @@ def _masked_mse(pred, target, mask) -> torch.Tensor:
     return nn.functional.mse_loss(pred[mask], target[mask])
 
 
-def _run_epoch(model, loader, optimizer, device, lambda_click, lambda_key, label_smoothing):
+def _run_epoch(model, loader, optimizer, device, lambda_click, lambda_key, label_smoothing, class_weights=None):
     is_train = optimizer is not None
     model.train(is_train)
-    ce = nn.CrossEntropyLoss(label_smoothing=label_smoothing)
+    ce = nn.CrossEntropyLoss(label_smoothing=label_smoothing, weight=class_weights)
     totals = dict(loss=0.0, type=0.0, click=0.0, key=0.0, correct=0, samples=0, batches=0)
 
+    ce_src = nn.CrossEntropyLoss(ignore_index=-1)   # -1 = no source label for this step
     ctx = torch.enable_grad() if is_train else torch.no_grad()
     with ctx:
-        for states, p_types, p_cont, tgt_types, tgt_clicks, tgt_keys in loader:
+        for states, p_types, p_cont, tgt_types, tgt_clicks, tgt_keys, tgt_src in loader:
             states, p_types, p_cont = states.to(device), p_types.to(device), p_cont.to(device)
-            tgt_types, tgt_clicks, tgt_keys = (
-                tgt_types.to(device), tgt_clicks.to(device), tgt_keys.to(device)
+            tgt_types, tgt_clicks, tgt_keys, tgt_src = (
+                tgt_types.to(device), tgt_clicks.to(device),
+                tgt_keys.to(device),  tgt_src.to(device)
             )
-            out    = model(states, p_types, p_cont)
+            out     = model(states, p_types, p_cont)
             l_type  = ce(out.type_logits, tgt_types)
             l_click = _masked_mse(out.click_xy, tgt_clicks, tgt_types == ACTION_CLICK)
             l_key   = _masked_mse(out.key_count.squeeze(-1), tgt_keys, tgt_types == ACTION_KEYBOARD)
-            loss    = l_type + lambda_click * l_click + lambda_key * l_key
+            # Option 2 loss — skip if all targets are -1 (no keyboard steps with source)
+            valid_src = (tgt_src != -1)
+            l_src = ce_src(out.source_elem, tgt_src) if valid_src.any() else torch.tensor(0.0, device=device)
+            loss    = l_type + lambda_click * l_click + lambda_key * l_key + 0.5 * l_src
 
             if is_train:
                 optimizer.zero_grad(); loss.backward()
@@ -460,13 +633,25 @@ def train(
     val_loader   = DataLoader(val_ds,   batch_size=batch_size, shuffle=False, drop_last=False)
 
     model = TransformerAgentNetwork(
-        elem_features=6, max_elements=max_elements, d_model=d_model,
+        elem_features=ELEM_FEATURES, max_elements=max_elements, d_model=d_model,
         nhead=nhead, num_layers=num_layers, dim_feedforward=dim_feedforward,
         dropout=dropout, hist_len=hist_len,
     ).to(device)
 
     if verbose:
         print(f"[train] {model}")
+
+    # Compute inverse-frequency class weights so click/keyboard aren't drowned by no_op
+    _cc = dataset.class_counts()
+    _total = sum(_cc.values()) or 1
+    _class_weights = torch.tensor([
+        _total / max(_cc.get("no_op",    _total), 1),  # absent class → neutral weight 1.0
+        _total / max(_cc.get("click",    1), 1),
+        _total / max(_cc.get("keyboard", 1), 1),
+    ], dtype=torch.float32, device=device)
+    _class_weights = _class_weights / _class_weights.sum() * len(_class_weights)  # normalise
+    if verbose:
+        print(f"[train] class weights: no_op={_class_weights[0]:.3f}  click={_class_weights[1]:.3f}  keyboard={_class_weights[2]:.3f}")
 
     optimizer = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=weight_decay)
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=epochs, eta_min=lr / 100)
@@ -476,8 +661,8 @@ def train(
     save_path_p.parent.mkdir(parents=True, exist_ok=True)
 
     for epoch in range(1, epochs + 1):
-        train_m = _run_epoch(model, train_loader, optimizer, device, lambda_click, lambda_key, label_smoothing)
-        val_m   = _run_epoch(model, val_loader,   None,      device, lambda_click, lambda_key, label_smoothing)
+        train_m = _run_epoch(model, train_loader, optimizer, device, lambda_click, lambda_key, label_smoothing, _class_weights)
+        val_m   = _run_epoch(model, val_loader,   None,      device, lambda_click, lambda_key, label_smoothing, _class_weights)
         scheduler.step()
 
         if verbose:
@@ -487,14 +672,15 @@ def train(
                 f"val_loss={val_m['loss']:.4f}  val_acc={val_m['accuracy']:.3f}"
             )
 
-        if val_m["loss"] < best_val_loss:
-            best_val_loss = val_m["loss"]
+        save_loss = val_m["loss"] if not math.isnan(val_m["loss"]) else train_m["loss"]
+        if save_loss < best_val_loss:
+            best_val_loss = save_loss
             torch.save({
                 "epoch": epoch,
                 "model_state_dict": model.state_dict(),
                 "val_loss": best_val_loss,
                 "hyperparams": {
-                    "elem_features": 6, "max_elements": max_elements,
+                    "elem_features": ELEM_FEATURES, "max_elements": max_elements,
                     "d_model": d_model, "nhead": nhead, "num_layers": num_layers,
                     "dim_feedforward": dim_feedforward, "dropout": dropout,
                     "hist_len": hist_len,
@@ -506,8 +692,24 @@ def train(
     if verbose:
         print(f"[train] Done.  Best val_loss={best_val_loss:.4f} -> {save_path_p}")
 
-    ckpt = torch.load(save_path_p, map_location=device, weights_only=True)
-    model.load_state_dict(ckpt["model_state_dict"])
+    if save_path_p.exists():
+        ckpt = torch.load(save_path_p, map_location=device, weights_only=True)
+        model.load_state_dict(ckpt["model_state_dict"])
+    else:
+        # No checkpoint was saved (e.g. all losses were nan) — save current weights
+        torch.save({
+            "epoch": epochs,
+            "model_state_dict": model.state_dict(),
+            "val_loss": best_val_loss,
+            "hyperparams": {
+                "elem_features": ELEM_FEATURES, "max_elements": max_elements,
+                "d_model": d_model, "nhead": nhead, "num_layers": num_layers,
+                "dim_feedforward": dim_feedforward, "dropout": dropout,
+                "hist_len": hist_len,
+            },
+        }, save_path_p)
+        if verbose:
+            print(f"           -> Saved final checkpoint (no improvement detected)")
     model.eval()
     return model
 
@@ -614,7 +816,8 @@ def predict(
         cx, cy = out.click_xy[0].tolist()
         result["click_position"] = [round(cx * W, 1), round(cy * H_px, 1)]
     elif idx == ACTION_KEYBOARD:
-        result["key_count"] = max(1, round(out.key_count[0, 0].item() * 100))
+        result["key_count"]      = max(1, round(out.key_count[0, 0].item() * 100))
+        result["source_elem_idx"] = int(out.source_elem[0].argmax(-1).item())
     return result
 
 

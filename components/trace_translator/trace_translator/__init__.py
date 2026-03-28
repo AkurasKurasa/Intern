@@ -3,7 +3,7 @@ Trace Translator Package
 Unified UI detection system for web pages and screenshots.
 
 All core functionality and detection classes live in trace_translator.py.
-MouseInput and KeyboardInput live in screen_observer/screen_observer.py.
+MouseInput and KeyboardInput live in recorder/recorder.py.
 """
 
 from .trace_translator import (

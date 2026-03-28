@@ -161,11 +161,6 @@ class FormBuilder:
         return e
 
     def _combo(self, parent, var, values, width=26):
-        style = ttk.Style()
-        style.configure("Dark.TCombobox",
-                         fieldbackground=BG_HOVER, background=BG_HOVER,
-                         foreground=TEXT, selectbackground=ACCENT,
-                         selectforeground=TEXT)
         c = ttk.Combobox(parent, textvariable=var, values=values,
                           font=FONT_MONO, width=width, style="Dark.TCombobox",
                           state="readonly")
@@ -244,7 +239,13 @@ class CarInsuranceForm(tk.Tk):
                   foreground=[("selected", "white")])
         style.configure("Dark.TCombobox",
                          fieldbackground=BG_HOVER, background=BG_HOVER,
-                         foreground=TEXT)
+                         foreground=TEXT, bordercolor=BORDER,
+                         borderwidth=1, arrowcolor=TEXT,
+                         insertcolor=TEXT)
+        style.map("Dark.TCombobox",
+                  fieldbackground=[("readonly", BG_HOVER), ("disabled", BG_HOVER)],
+                  foreground=[("readonly", TEXT), ("disabled", TEXT)],
+                  bordercolor=[("focus", ACCENT), ("!focus", BORDER)])
 
     # ── Variables ─────────────────────────────────────────────────────────────
     def _init_vars(self):

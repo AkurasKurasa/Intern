@@ -32,7 +32,7 @@ for _p in (_ROOT, _COMP):
     if _p not in sys.path:
         sys.path.insert(0, _p)
 
-from screen_observer.screen_observer import ScreenObserver
+from recorder.recorder import ScreenObserver
 
 
 def parse_args():
