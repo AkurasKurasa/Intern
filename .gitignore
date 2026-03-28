@@ -44,3 +44,7 @@ test_data/
 # Temporary files
 *.tmp
 *.log
+
+# Environment variables (API keys)
+.env
+.env.local
