@@ -91,6 +91,18 @@ All generated files are organized in `data/output/`:
 - `visualizations/` - Element detection visualizations
 - `reports/` - Text reports
 
+## gstack
+
+Use the `/browse` skill from gstack for web browsing and testing. 
+
+Quick commands:
+- `/office-hours` — Describe what you're building and get strategic feedback
+- `/plan-ceo-review` — Rethink feature ideas before building
+- `/review` — Code review for any branch with changes
+- `/qa <url>` — Test your app and find bugs
+
+If gstack skills aren't working, run: `cd .claude/skills/gstack && ./setup`
+
 ## License
 
 MIT
