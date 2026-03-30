@@ -115,6 +115,14 @@ class ActionExecutor:
                 issued     = self._keyboard(key_count, keystrokes, text)
                 return ExecutionResult("keyboard", None, len(issued), issued, ts, self.dry_run, True, "")
 
+            elif action_type == "scroll":
+                pos       = prediction.get("click_position", [0, 0])
+                x, y      = int(round(pos[0])), int(round(pos[1]))
+                direction = prediction.get("direction", "down")
+                clicks    = int(prediction.get("clicks", 3))
+                self._scroll(x, y, direction, clicks)
+                return ExecutionResult("scroll", (x, y), 0, [], ts, self.dry_run, True, "")
+
             else:
                 logger.info("NO_OP%s", "  [DRY-RUN]" if self.dry_run else "")
                 return ExecutionResult("no_op", None, 0, [], ts, self.dry_run, True, "")
@@ -160,6 +168,16 @@ class ActionExecutor:
             logger.warning("KEYBOARD  key_count=%d — no text resolved, skipped.", key_count)
             return []
 
+    def _scroll(self, x: int, y: int, direction: str, clicks: int) -> None:
+        amount = -clicks if direction == "down" else clicks
+        logger.info("SCROLL  @ (%d, %d)  dir=%s  clicks=%d%s",
+                    x, y, direction, clicks, "  [DRY-RUN]" if self.dry_run else "")
+        if self.dry_run:
+            return
+        pyautogui.moveTo(x, y, duration=0.15)
+        pyautogui.scroll(amount, x=x, y=y)
+        time.sleep(self.post_click_delay)
+
     def _press_key(self, key: str) -> None:
         if key.startswith("Key."):
             pyautogui.press(key.split("Key.", 1)[1])
@@ -175,7 +193,8 @@ class ActionExecutor:
 
 _CLICKABLE_TYPES = {
     "editcontrol", "comboboxcontrol", "checkboxcontrol",
-    "buttoncontrol", "listitemcontrol", "tabitemcontrol",
+    "buttoncontrol", "listitemcontrol",
+    # tabitemcontrol excluded — tabs clicked via LLM label resolution only
 }
 
 def _snap_to_element(
@@ -230,22 +249,29 @@ class _TextResolver:
             return ""
 
         # Option 1: transformer source pointer
+        # Skip if the pointed element is a large text blob (e.g. Notepad text area) —
+        # in that case field-name matching (Option 2) is more accurate.
+        _BLOB_THRESHOLD = 200
         if 0 <= source_elem_idx < len(elements):
             pointed = elements[source_elem_idx]
             if pointed.get("window_role") == "background":
-                raw  = (pointed.get("value") or pointed.get("text") or "").strip()
-                text = self._clean_value(raw)
-                if text and text not in self._used_texts and text.lower() not in {
-                    "(none)", "none", "(leave blank)", "n/a", "(n/a)"
-                }:
-                    self._used_texts.add(text)
-                    logger.info("TextResolver: source_ptr[%d] → %r", source_elem_idx, text)
-                    return text
+                raw = (pointed.get("value") or pointed.get("text") or "").strip()
+                if len(raw) < _BLOB_THRESHOLD:
+                    text = self._clean_value(raw)
+                    if text and text not in self._used_texts and text.lower() not in {
+                        "(none)", "none", "(leave blank)", "n/a", "(n/a)"
+                    }:
+                        self._used_texts.add(text)
+                        logger.info("TextResolver: source_ptr[%d] → %r", source_elem_idx, text)
+                        return text
 
         # Option 2: field-name match
         focused_id = state.get("focused_element_id")
         focused    = next((e for e in elements if e.get("element_id") == focused_id), None)
         field_name = self._field_context(focused, elements) if focused else ""
+        # Fallback: use the focused element's own label/text if nearby-label search failed
+        if not field_name and focused:
+            field_name = (focused.get("label") or focused.get("text") or "").strip()
 
         if field_name:
             value = self._match_value(field_name, bg_elems)

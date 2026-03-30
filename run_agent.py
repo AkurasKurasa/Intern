@@ -46,18 +46,20 @@ logger = logging.getLogger("run_agent")
 
 # ── config ────────────────────────────────────────────────────────────────────
 GOAL       = "Fill the car insurance form using data from the open text file"
-PROVIDER   = "groq"
+PROVIDER   = "lmstudio"
 API_KEY    = os.environ.get("GROQ_API_KEY", "")
-MODEL_PATH = "data/models/transformer_bc.pt"
+MODEL_PATH = os.path.join(_ROOT, "data", "models", "transformer_bc.pt")
 DRY_RUN    = False
-MAX_STEPS  = 60
+MAX_STEPS  = 500   # agent stops itself via "done" action when complete
 STEP_DELAY = 1.5
 TASK_NAME  = "fill_insurance"
+RECORD_NUM = 1   # which record to fill (1-based)
 
 # ── run ───────────────────────────────────────────────────────────────────────
 if __name__ == "__main__":
-    if not API_KEY:
-        logger.error("GROQ_API_KEY not set. Add it to .env")
+    _needs_key = PROVIDER not in ("lmstudio", "none")
+    if _needs_key and not API_KEY:
+        logger.error("API key not set for provider %r. Add it to .env", PROVIDER)
         sys.exit(1)
 
     import time
@@ -78,6 +80,7 @@ if __name__ == "__main__":
         dry_run    = DRY_RUN,
         max_steps  = MAX_STEPS,
         step_delay = STEP_DELAY,
+        record_num = RECORD_NUM,
     )
     results = agent.run(max_steps=MAX_STEPS, task_name=TASK_NAME)
 

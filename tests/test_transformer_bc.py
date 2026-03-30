@@ -24,7 +24,7 @@ import torch
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from components.learning_models.transformer.dataset import (
+from components.intelligence.model.dataset import (
     TraceDataset,
     encode_state,
     ACTION_CLICK,
@@ -32,9 +32,9 @@ from components.learning_models.transformer.dataset import (
     ACTION_NOOP,
     ELEM_FEATURES,
 )
-from components.learning_models.transformer.model import TransformerPolicyNetwork
-from components.learning_models.transformer.train import train
-from components.learning_models.transformer.predict import predict
+from components.intelligence.model.model import TransformerPolicyNetwork
+from components.intelligence.model.train import train
+from components.intelligence.model.predict import predict
 
 
 # ── Paths ───────────────────────────────────────────────────────────────────
@@ -277,7 +277,7 @@ def test_train_creates_checkpoint(tmp_path):
 def test_train_loss_is_finite(tmp_path):
     """Training loss must be a finite number (no NaN / Inf)."""
     import math
-    from components.learning_models.transformer.train import _run_epoch
+    from components.intelligence.model.train import _run_epoch
     from torch.utils.data import DataLoader
 
     data_dir = tmp_path / "traces"

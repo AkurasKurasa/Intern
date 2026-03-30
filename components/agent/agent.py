@@ -112,26 +112,49 @@ You will receive the current screen state with three sections:
 Decide the SINGLE next action and respond with a JSON object only:
 
 {
-  "action_type": "click" | "type" | "hotkey" | "done" | "wait",
+  "action_type": "click" | "type" | "hotkey" | "scroll" | "done" | "wait",
   "target":      "<copy the EXACT string from FORM LABELS or FORM INPUTS>",
   "text":        "<exact value copied from BACKGROUND DATA — never invent values>",
-  "keys":        ["ctrl", "a"],
+  "keys":        ["tab"],
+  "direction":   "down" | "up",
+  "clicks":      3,
   "reason":      "<one sentence>"
 }
 
 Rules:
 - The form is ALREADY the active window. Do NOT try to click the window title
   or focus the window — go straight to filling the first empty field.
-- "click"  → focus a field. Set "target" to the EXACT label text from FORM LABELS.
+- "click"  → focus a field OR toggle a checkbox OR open a dropdown OR switch tabs.
+             Set "target" to the EXACT string from FORM LABELS or FORM INPUTS.
              Do not paraphrase, invent, or guess a name — copy it exactly.
-- "type"   → type into the currently focused field. Set "text" to the EXACT value
-             from BACKGROUND DATA. Never invent or guess values.
-- "hotkey" → keyboard shortcut, e.g. keys: ["tab"] to advance to the next field.
+- "type"   → type into the currently focused text field. Set "text" to the EXACT
+             value from BACKGROUND DATA. Never invent or guess values.
+- "hotkey" → keyboard shortcut. Use keys: ["tab"] to advance, ["down"] or ["up"]
+             to cycle dropdown options, ["return"] to confirm a selection.
+- "scroll" → scroll any window. Use "target" to aim at a window element, set
+             direction "down" or "up" and clicks = amount.
 - "done"   → all fields are fully filled and the task is complete.
 - "wait"   → UI is still loading.
-- Pattern: click label → type value → hotkey ["tab"] → repeat for next field.
-- If a field has no matching value in BACKGROUND DATA, skip it with keys: ["tab"].
-- Do NOT output anything outside the JSON object.
+
+Field type patterns:
+- Text field  → click field → type value  (Tab is sent automatically after type)
+- Dropdown    → FIRST check if the current value already matches BACKGROUND DATA.
+               If it matches → hotkey ["tab"] to skip (do NOT open the dropdown).
+               If it does NOT match:
+                 Step 1 — click the [comboboxcontrol] to open the list.
+                 Step 2 — WAIT: the list items appear as [listitemcontrol] in FORM INPUTS.
+                 Step 3 — click the EXACT [listitemcontrol] whose text matches BACKGROUND DATA.
+               NEVER type into a dropdown — it will not work.
+               NEVER click the current value label — click the TARGET value from the list.
+- Checkbox    → click the checkbox to check it. Only click if value should be YES/checked.
+- Tab switch  → after finishing all fields on the current tab, click the next tab
+               name from FORM INPUTS (e.g. "Policyholder", "Vehicle", "Coverage"…).
+
+CRITICAL RULES — follow exactly:
+1. If a field's "current value" already matches the value in BACKGROUND DATA → hotkey ["tab"] to skip. Do NOT open it. Do NOT retype it.
+2. If a field has no matching value in BACKGROUND DATA → hotkey ["tab"] to skip.
+3. NEVER type explanatory text — that would corrupt the form.
+4. Do NOT output anything outside the JSON object.
 """
 
 
@@ -139,7 +162,36 @@ Rules:
 #  State / history → text helpers
 # ══════════════════════════════════════════════════════════════════════════════
 
-def _state_to_text(state: Dict[str, Any]) -> str:
+def _parse_records(raw_text: str) -> dict:
+    """
+    Parse a multi-record intake text into {record_num: {field: value}}.
+    Expects records delimited by lines containing 'RECORD N OF M'.
+    Returns {} if no record headers are found (single-record or plain text).
+    """
+    import re
+    parts = re.split(r"={3,}[\s\S]*?RECORD\s+(\d+)\s+OF\s+\d+[\s\S]*?={3,}", raw_text)
+    if len(parts) <= 1:
+        return {}
+    records = {}
+    i = 1
+    while i + 1 < len(parts):
+        rn   = int(parts[i])
+        body = parts[i + 1]
+        data = {}
+        for line in body.splitlines():
+            if ":" in line:
+                key, _, val = line.partition(":")
+                key = re.sub(r"[\[\]]", "", key).strip()
+                val = re.sub(r"\s*\[.*", "", val)
+                val = re.sub(r"\s*←.*", "", val).strip()
+                if key and val and val.lower() not in {"(none)", "none", ""}:
+                    data[key] = val
+        records[rn] = data
+        i += 2
+    return records
+
+
+def _state_to_text(state: Dict[str, Any], record_num: int = 1) -> str:
     lines: List[str] = []
     lines.append(f"Active window: {state.get('application','?')} — {state.get('window_title','')!r}")
 
@@ -150,6 +202,18 @@ def _state_to_text(state: Dict[str, Any]) -> str:
         )
 
     lines.append("")
+    # ── CURRENT FOCUS banner ─────────────────────────────────────────────────
+    focused_id = state.get("focused_element_id")
+    all_elems  = state.get("elements", [])
+    focused_el = next((e for e in all_elems if e.get("element_id") == focused_id), None)
+    if focused_el:
+        _fn  = (focused_el.get("label") or focused_el.get("text") or "?").strip()
+        _fv  = (focused_el.get("value") or "").strip()
+        _ft  = focused_el.get("type", "?")
+        lines.append(f">>> CURRENTLY FOCUSED: [{_ft}] \"{_fn}\"" +
+                     (f"  current value: {_fv!r}" if _fv else "  (empty)") + " <<<")
+        lines.append("")
+
     active = [e for e in state.get("elements", []) if e.get("window_role") in ("active", None)]
     bg     = [e for e in state.get("elements", []) if e.get("window_role") == "background"]
 
@@ -171,14 +235,21 @@ def _state_to_text(state: Dict[str, Any]) -> str:
 
     all_elems = state.get("elements", [])
 
-    # Form elements = any window that contains interactive inputs.
+    # Form-specific control types — only these identify a window as a form.
+    # Excludes buttons/scrollbars that appear in ANY window (e.g. Notepad toolbar).
+    _FORM_CONTROLS = {
+        "input", "combobox", "checkbox", "radio",
+        "editcontrol", "comboboxcontrol", "checkboxcontrol", "radiobuttoncontrol",
+    }
+
+    # Form elements = windows that contain actual form-fill inputs.
     # This works even when the terminal has OS focus (form is "background").
     form_windows = {
         e.get("window_title") for e in all_elems
-        if e.get("type") in _INTERACTIVE
+        if e.get("type") in _FORM_CONTROLS
     }
 
-    # Fallback: if no interactive elements detected anywhere, treat the active
+    # Fallback: if no form-fill controls detected anywhere, treat the active
     # window as the form (handles wx apps where UIA maps controls to custom types)
     if not form_windows:
         active_title = state.get("window_title", "")
@@ -198,15 +269,15 @@ def _state_to_text(state: Dict[str, Any]) -> str:
 
     # Debug: log all unique types in the form so we can see what UIA reports
     all_types = sorted({e.get("type", "?") for e in form_elems})
-    lines.append(f"[debug] form element types: {all_types}")
+
 
     lines.append("FORM LABELS (use EXACT strings as 'target' when clicking a field):")
-    for e in labels[:60]:
+    for e in labels[:30]:
         focused = " [FOCUSED]" if e.get("focused") else ""
         lines.append(f"  \"{(e.get('text') or '').strip()}\"{focused}")
 
     lines.append(f"\nFORM INPUTS ({len(interactive)} interactive elements):")
-    for e in interactive[:60]:
+    for e in interactive[:30]:
         focused = " [FOCUSED]" if e.get("focused") else ""
         val   = (e.get("value") or "").strip()
         text  = (e.get("text") or "").strip()
@@ -215,11 +286,46 @@ def _state_to_text(state: Dict[str, Any]) -> str:
                      + (f"  current value: {val!r}" if val else ""))
 
     if data_elems:
-        lines.append(f"\nBACKGROUND DATA (values to type — read from here):")
-        for e in data_elems[:60]:
-            text = (e.get("text") or e.get("value") or "").strip()
-            if text:
-                lines.append(f"  {text}")
+        # Collect all background text blobs
+        bg_blobs = []
+        for e in data_elems:
+            val = (e.get("value") or "").strip()
+            if val:
+                bg_blobs.append(val)
+
+        logger.debug("Background elements: %d total, %d with text (blob sizes: %s)",
+                    len(data_elems), len(bg_blobs),
+                    [len(b) for b in bg_blobs])
+
+        if bg_blobs:
+            # Try each blob for record structure; prefer the one that parses
+            records  = {}
+            raw_text = ""
+            for blob in sorted(bg_blobs, key=len, reverse=True):
+                r = _parse_records(blob)
+                if r:
+                    records  = r
+                    raw_text = blob
+                    break
+            if not raw_text:
+                raw_text = max(bg_blobs, key=len)
+            logger.debug("_parse_records → %d record(s) found (blob size=%d)", len(records), len(raw_text))
+
+            if records:
+                total = len(records)
+                lines.append(f"\nBACKGROUND DATA ({total} record(s) found — filling Record {record_num}):")
+                rec = records.get(record_num, records.get(min(records), {}))
+                for field, value in rec.items():
+                    lines.append(f"  {field} : {value}")
+                # Also note other available records so LLM knows the range
+                other_nums = sorted(n for n in records if n != record_num)
+                if other_nums:
+                    lines.append(f"  [Other records available: {other_nums}]")
+            else:
+                # Plain text — dump up to 12 000 chars
+                lines.append(f"\nBACKGROUND DATA (values to type — read from here):")
+                chunk = raw_text[:12000]
+                lines.append(f"  {chunk}")
 
     return "\n".join(lines)
 
@@ -228,7 +334,7 @@ def _history_to_text(history: List[Dict[str, Any]]) -> str:
     if not history:
         return "No actions taken yet."
     lines = []
-    for i, h in enumerate(history[-8:], 1):
+    for i, h in enumerate(history[-3:], 1):
         at     = h.get("action_type", "?")
         txt    = h.get("typed_text", "")
         target = h.get("target", "")
@@ -338,6 +444,13 @@ def _resolve_target(target: str, state: Dict[str, Any]) -> Optional[List[float]]
             if best and best_dist < 300:
                 return _center(best)
 
+    # 5. Match by current element value (LLM sometimes uses the value as target)
+    for e in active_elems:
+        if e.get("type") in _INTERACTIVE:
+            val = (e.get("value") or "").lower().strip()
+            if val and val == tl:
+                return _center(e)
+
     return None
 
 
@@ -377,6 +490,7 @@ class LLMAgent:
         step_delay:    float          = 1.2,
         llm_every:     int            = 2,
         device_str:    str            = "auto",
+        record_num:    int            = 1,
     ):
         self.goal       = goal
         self.provider   = provider.lower().strip()
@@ -397,15 +511,15 @@ class LLMAgent:
         from agent.executor import ActionExecutor, _TextResolver, _snap_to_element
         self._snap = _snap_to_element
         try:
-            from components.ui_observer.ui_observer import UIAutomationObserver
+            from components.observers.ui_observer import UIAutomationObserver
         except ImportError:
-            from ui_observer.ui_observer import UIAutomationObserver
+            from observers.ui_observer import UIAutomationObserver
 
         try:
-            from components.recorder.state_validator import StateValidator
+            from components.agent.state_validator import StateValidator
             from components.recorder.correction_handler import CorrectionHandler
         except ImportError:
-            from recorder.state_validator import StateValidator
+            from agent.state_validator import StateValidator
             from recorder.correction_handler import CorrectionHandler
 
         self._executor          = ActionExecutor(dry_run=dry_run)
@@ -413,6 +527,7 @@ class LLMAgent:
         self._observer          = UIAutomationObserver()
         self._validator         = StateValidator()
         self._correction        = CorrectionHandler()
+        self._record_num: int               = record_num
         self._history:  List[Dict[str, Any]] = []
         self._results:  List[Dict[str, Any]] = []
         self._guidance: str = ""
@@ -490,6 +605,11 @@ class LLMAgent:
         _stuck_pos:   Optional[tuple] = None
         _stuck_count: int             = 0
         _STUCK_LIMIT: int             = 3
+        _llm_click_pos:   Optional[tuple] = None
+        _llm_click_count: int             = 0
+        _LLM_CLICK_LIMIT: int             = 1   # force type after this many repeated clicks
+        _no_change_streak: int            = 0
+        _NO_CHANGE_LIMIT:  int            = 3   # advance tab after this many consecutive no_change
 
         for step_idx in range(n):
             # 1. Observe
@@ -497,7 +617,113 @@ class LLMAgent:
             llm_action: Dict[str, Any] = {}
             logger.info("── Step %d/%d  (%d elements) ──", step_idx + 1, n, len(state.get("elements", [])))
 
-            # 2. LLM drives the action (if provider is set)
+            # 1b. Stuck guard: if no_change repeats, advance to next tab
+            if _no_change_streak >= _NO_CHANGE_LIMIT:
+                if self._try_advance_tab(state):
+                    _no_change_streak = 0
+                    time.sleep(self.step_delay)
+                    continue
+                else:
+                    logger.warning("Stuck guard: no next tab found — resetting streak.")
+                    _no_change_streak = 0
+
+            # 2. Auto-skip: if focused field already has the correct value, Tab past it
+            if self._llm_client and self._auto_skip(state):
+                logger.info("Auto-skip: focused field already has correct value — Tab.")
+                self._executor.execute({"action_type": "keyboard", "key_count": 1, "keystrokes": ["tab"]})
+                _no_change_streak = 0
+                time.sleep(self.step_delay)
+                continue
+
+            # 2a. Auto-fill: if focused field is empty but background data has a value, type it
+            auto_text = self._auto_fill(state)
+            if auto_text:
+                field_name_log, text_val = auto_text
+                logger.info("Auto-fill: '%s' → %r", field_name_log, text_val[:40])
+                self._executor.execute({
+                    "action_type": "keyboard",
+                    "key_count": len(text_val),
+                    "keystrokes": list(text_val),
+                    "text": text_val,
+                })
+                self._executor.execute({"action_type": "keyboard", "key_count": 1, "keystrokes": ["tab"]})
+                logger.info("Auto-Tab after auto-fill.")
+                _no_change_streak = 0
+                time.sleep(self.step_delay)
+                continue
+
+            # 2a2. Auto-check: if focused checkbox should be checked per background data, click it
+            auto_chk = self._auto_check(state)
+            if auto_chk is not None:
+                field_name_log, should_check = auto_chk
+                if should_check:
+                    elements   = state.get("elements", [])
+                    focused_id = state.get("focused_element_id")
+                    focused_el = next((e for e in elements if e.get("element_id") == focused_id), None)
+                    if focused_el and focused_el.get("bbox"):
+                        x1, y1, x2, y2 = focused_el["bbox"]
+                        cx, cy = (x1 + x2) / 2, (y1 + y2) / 2
+                        logger.info("Auto-check: '%s' → clicking @ (%.0f, %.0f)", field_name_log, cx, cy)
+                        self._executor.execute({"action_type": "click", "click_position": [cx, cy]})
+                    else:
+                        logger.warning("Auto-check: '%s' — no bbox, pressing space", field_name_log)
+                        self._executor.execute({"action_type": "keyboard", "key_count": 1, "keystrokes": ["space"]})
+                else:
+                    logger.info("Auto-check: '%s' should remain unchecked — Tab.", field_name_log)
+                self._executor.execute({"action_type": "keyboard", "key_count": 1, "keystrokes": ["tab"]})
+                _no_change_streak = 0
+                time.sleep(self.step_delay)
+                continue
+
+            # 2b. Auto-fix combobox: if focused combobox has WRONG value, select correct option
+            fix = self._combobox_needs_fix(state)
+            if fix:
+                field_name, current_val, expected_val = fix
+                elements   = state.get("elements", [])
+                # Check if dropdown is already open (listitemcontrols visible)
+                listitems = [e for e in elements
+                             if e.get("type") == "listitemcontrol"
+                             and e.get("window_role") != "background"]
+                if listitems:
+                    # Find the matching listitem and click it
+                    target = next(
+                        (e for e in listitems
+                         if (e.get("text") or e.get("label") or "").strip().lower()
+                            == expected_val.lower()),
+                        None,
+                    )
+                    if target and target.get("bbox"):
+                        x1, y1, x2, y2 = target["bbox"]
+                        cx, cy = (x1 + x2) / 2, (y1 + y2) / 2
+                        logger.info("Combobox-fix: clicking listitem %r @ (%.0f,%.0f)",
+                                    expected_val, cx, cy)
+                        self._executor.execute({"action_type": "click",
+                                                "click_position": [cx, cy]})
+                        time.sleep(self.step_delay)
+                        continue
+                    else:
+                        logger.warning("Combobox-fix: listitem %r not found in open list", expected_val)
+                else:
+                    # Dropdown is closed — open it
+                    focused_id = state.get("focused_element_id")
+                    focused    = next((e for e in elements if e.get("element_id") == focused_id), None)
+                    if focused and focused.get("bbox"):
+                        x1, y1, x2, y2 = focused["bbox"]
+                        cx, cy = (x1 + x2) / 2, (y1 + y2) / 2
+                        logger.info("Combobox-fix: '%s' = %r → need %r — opening dropdown",
+                                    field_name, current_val, expected_val)
+                        self._executor.execute({"action_type": "click",
+                                                "click_position": [cx, cy]})
+                        time.sleep(self.step_delay)
+                        continue
+
+            # 2. Transformer always runs — learns from user recordings
+            t_pred = self._predict(state)
+            t_type = t_pred.get("action_type", "no_op")
+            t_conf = max(t_pred.get("_scores", {}).values(), default=0.0)
+            logger.info("Transformer → %-8s  conf=%.2f", t_type, t_conf)
+
+            # 2b. LLM reasons about what to do + supplies text values
             if self._llm_client:
                 llm_action = self._ask_llm(state)
                 action_type = llm_action.get("action_type", "wait")
@@ -511,12 +737,29 @@ class LLMAgent:
                     time.sleep(2.0)
                     continue
 
-                prediction = self._llm_action_to_prediction(llm_action, state)
+                # ── Merge: LLM decides what, transformer decides where ──────
+                prediction = self._merge(t_pred, t_conf, llm_action, state)
 
-            # 2b. Transformer fallback (provider="none")
+                # Stuck-click guard
+                if prediction.get("action_type") == "click":
+                    pos = tuple(int(v) for v in prediction.get("click_position", [0, 0]))
+                    if pos == _llm_click_pos:
+                        _llm_click_count += 1
+                    else:
+                        _llm_click_pos, _llm_click_count = pos, 1
+                    if _llm_click_count > _LLM_CLICK_LIMIT:
+                        text = self._value_for_focused(state)
+                        if text:
+                            logger.warning("LLM stuck clicking — forcing type %r", text[:40])
+                            prediction = {"action_type": "keyboard", "key_count": len(text),
+                                          "keystrokes": list(text), "text": text}
+                            _llm_click_pos, _llm_click_count = None, 0
+                else:
+                    _llm_click_pos, _llm_click_count = None, 0
+
+            # 2c. Transformer-only fallback (provider="none")
             else:
-                prediction = self._predict(state)
-                logger.info("Transformer → %s", prediction)
+                prediction = t_pred
 
                 if prediction.get("action_type") == "click":
                     snapped = self._snap(prediction.get("click_position", [0, 0]), state)
@@ -548,6 +791,15 @@ class LLMAgent:
             result = self._executor.execute(prediction)
             logger.info("%s", result)
 
+            # After a successful type, automatically press Tab to advance the field.
+            # This prevents the LLM from getting stuck re-typing the same field.
+            if (self._llm_client
+                    and prediction.get("action_type") == "keyboard"
+                    and prediction.get("text")):
+                tab_pred = {"action_type": "keyboard", "key_count": 1, "keystrokes": ["tab"]}
+                self._executor.execute(tab_pred)
+                logger.info("Auto-Tab after type.")
+
             # 4. Validate
             state_after = self._observe()
             validation  = self._validator.validate(state, state_after, prediction)
@@ -556,6 +808,11 @@ class LLMAgent:
             if validation.status == "done":
                 logger.info("StateValidator: task appears complete.")
                 break
+
+            if validation.status == "no_change":
+                _no_change_streak += 1
+            else:
+                _no_change_streak = 0
 
             if validation.status in ("no_change", "unexpected", "error") and self._task_name:
                 logger.info("Validation failed (%s) — watching for user correction …", validation.status)
@@ -604,11 +861,345 @@ class LLMAgent:
     def history(self) -> List[Dict[str, Any]]:
         return list(self._history)
 
+    # ── Auto-skip helper ─────────────────────────────────────────────────────
+
+    def _auto_skip(self, state: Dict[str, Any]) -> bool:
+        """
+        Return True if the currently focused field already contains the value
+        that BACKGROUND DATA says it should have — no LLM call needed.
+        Only applies to non-empty fields (text inputs and dropdowns).
+        """
+        elements   = state.get("elements", [])
+        focused_id = state.get("focused_element_id")
+        if not focused_id:
+            return False
+        focused = next((e for e in elements if e.get("element_id") == focused_id), None)
+        if not focused:
+            return False
+        # Skip buttons — they are not fillable fields
+        if focused.get("type") in ("buttoncontrol",):
+            return False
+        current = (focused.get("value") or "").strip()
+        if not current:
+            return False   # empty field — let LLM decide
+
+        # Build the background record dict (same logic as _state_to_text)
+        bg_elems = [e for e in elements if e.get("window_role") == "background"]
+        bg_blobs = [(e.get("value") or "").strip() for e in bg_elems]
+        bg_blobs = [b for b in bg_blobs if b]
+        if not bg_blobs:
+            return False
+        records = {}
+        for blob in sorted(bg_blobs, key=len, reverse=True):
+            r = _parse_records(blob)
+            if r:
+                records = r
+                break
+        if not records:
+            return False
+        rec = records.get(self._record_num, records.get(min(records), {}))
+
+        # Find the field name from a nearby label
+        field_name = (focused.get("label") or focused.get("text") or "").strip()
+        if not field_name:
+            return False
+
+        expected = rec.get(field_name, "")
+        if not expected:
+            # case-insensitive lookup
+            fl = field_name.lower()
+            for k, v in rec.items():
+                if k.lower() == fl:
+                    expected = v
+                    break
+        if not expected:
+            return False
+
+        match = current.lower() == expected.lower()
+        if match:
+            logger.info("Auto-skip: '%s' already = %r", field_name, current)
+        return match
+
+    def _auto_fill(self, state: Dict[str, Any]) -> Optional[tuple]:
+        """
+        If the focused element is an empty text field that has a known value in
+        BACKGROUND DATA, return (field_name, value_to_type).
+        Otherwise return None.
+        Only fires for editcontrol — not comboboxes/checkboxes (those have separate handlers).
+        """
+        elements   = state.get("elements", [])
+        focused_id = state.get("focused_element_id")
+        if not focused_id:
+            return None
+        focused = next((e for e in elements if e.get("element_id") == focused_id), None)
+        if not focused:
+            return None
+        if focused.get("type") not in ("editcontrol",):
+            return None
+        current = (focused.get("value") or "").strip()
+        if current:
+            return None   # already has a value — let auto_skip handle it
+
+        field_name = (focused.get("label") or focused.get("text") or "").strip()
+        if not field_name:
+            return None
+
+        # Look up background record value
+        bg_elems = [e for e in elements if e.get("window_role") == "background"]
+        bg_blobs = [(e.get("value") or "").strip() for e in bg_elems]
+        bg_blobs = [b for b in bg_blobs if b]
+        if not bg_blobs:
+            return None
+        records = {}
+        for blob in sorted(bg_blobs, key=len, reverse=True):
+            r = _parse_records(blob)
+            if r:
+                records = r
+                break
+        if not records:
+            return None
+        rec = records.get(self._record_num, records.get(min(records), {}))
+
+        expected = rec.get(field_name, "")
+        if not expected:
+            fl = field_name.lower()
+            for k, v in rec.items():
+                if k.lower() == fl:
+                    expected = v
+                    break
+        if not expected:
+            return None
+
+        # Skip placeholder/non-value entries
+        _skip_vals = {"(none)", "none", "(leave blank)", "n/a", "yes (check)",
+                      "leave blank — liability only", "leave blank — owned outright"}
+        if expected.lower().strip("()") in _skip_vals:
+            return None
+
+        return (field_name, expected)
+
+    def _combobox_needs_fix(self, state: Dict[str, Any]) -> Optional[tuple]:
+        """
+        If the focused element is a combobox whose current value does NOT match
+        BACKGROUND DATA, return (field_name, current_value, expected_value).
+        Otherwise return None.
+        """
+        elements   = state.get("elements", [])
+        focused_id = state.get("focused_element_id")
+        focused    = next((e for e in elements if e.get("element_id") == focused_id), None)
+        if not focused:
+            return None
+        if focused.get("type") != "comboboxcontrol":
+            return None
+        current = (focused.get("value") or "").strip()
+        if not current:
+            return None
+
+        bg_elems = [e for e in elements if e.get("window_role") == "background"]
+        bg_blobs = [b for b in ((e.get("value") or "").strip() for e in bg_elems) if b]
+        records  = {}
+        for blob in sorted(bg_blobs, key=len, reverse=True):
+            r = _parse_records(blob)
+            if r:
+                records = r
+                break
+        if not records:
+            return None
+        rec        = records.get(self._record_num, records.get(min(records), {}))
+        field_name = (focused.get("label") or focused.get("text") or "").strip()
+        if not field_name:
+            return None
+        expected = rec.get(field_name, "")
+        if not expected:
+            fl = field_name.lower()
+            for k, v in rec.items():
+                if k.lower() == fl:
+                    expected = v
+                    break
+        if not expected or current.lower() == expected.lower():
+            return None
+        return (field_name, current, expected)
+
+    def _auto_check(self, state: Dict[str, Any]) -> Optional[tuple]:
+        """
+        If the focused element is a checkbox, look it up in BACKGROUND DATA.
+        Returns (field_name, should_check: bool) if the field is found, else None.
+        When should_check is True the caller clicks the checkbox; when False it tabs past.
+        """
+        elements   = state.get("elements", [])
+        focused_id = state.get("focused_element_id")
+        if not focused_id:
+            return None
+        focused = next((e for e in elements if e.get("element_id") == focused_id), None)
+        if not focused:
+            return None
+        if focused.get("type") != "checkboxcontrol":
+            return None
+
+        field_name = (focused.get("label") or focused.get("text") or "").strip()
+        if not field_name:
+            return None
+
+        bg_elems = [e for e in elements if e.get("window_role") == "background"]
+        bg_blobs = [(e.get("value") or "").strip() for e in bg_elems]
+        bg_blobs = [b for b in bg_blobs if b]
+        if not bg_blobs:
+            return None
+        records = {}
+        for blob in sorted(bg_blobs, key=len, reverse=True):
+            r = _parse_records(blob)
+            if r:
+                records = r
+                break
+        if not records:
+            return None
+        rec = records.get(self._record_num, records.get(min(records), {}))
+
+        expected = rec.get(field_name, "")
+        if not expected:
+            fl = field_name.lower()
+            for k, v in rec.items():
+                if k.lower() == fl:
+                    expected = v
+                    break
+        if not expected:
+            return None   # not in background data — let LLM decide
+
+        # "YES (check)", "yes", "true", "checked" → check it
+        ev = expected.lower().strip()
+        should_check = ev.startswith("yes") or ev in {"check", "true", "1", "checked"}
+        return (field_name, should_check)
+
+    def _try_advance_tab(self, state: Dict[str, Any]) -> bool:
+        """
+        When stuck (too many no_change steps), click the next form tab.
+        Returns True if a tab was found and clicked.
+        """
+        elements = state.get("elements", [])
+        tabs = [
+            e for e in elements
+            if e.get("type") == "tabitemcontrol"
+            and e.get("window_role") != "background"
+            and e.get("bbox")
+        ]
+        if not tabs:
+            return False
+
+        # Find the currently selected/active tab
+        current_idx = None
+        for i, tab in enumerate(tabs):
+            if tab.get("selected") or tab.get("focused"):
+                current_idx = i
+                break
+        if current_idx is None:
+            current_idx = 0
+
+        next_idx = current_idx + 1
+        if next_idx >= len(tabs):
+            logger.info("Stuck guard: already on last tab — signalling done.")
+            return False
+
+        next_tab = tabs[next_idx]
+        x1, y1, x2, y2 = next_tab["bbox"]
+        cx, cy = (x1 + x2) / 2, (y1 + y2) / 2
+        tab_name = (next_tab.get("text") or next_tab.get("label") or "?").strip()
+        logger.info("Stuck guard: advancing to tab %r @ (%.0f, %.0f)", tab_name, cx, cy)
+        self._executor.execute({"action_type": "click", "click_position": [cx, cy]})
+        return True
+
+    def _merge(
+        self,
+        t_pred:     Dict[str, Any],
+        t_conf:     float,
+        llm_action: Dict[str, Any],
+        state:      Dict[str, Any],
+    ) -> Dict[str, Any]:
+        """
+        Combine transformer + LLM outputs into one prediction.
+
+        Rule:
+          - LLM decides the action type (it has the reasoning).
+          - For CLICK: if transformer also says click with good confidence,
+            use its learned coordinates instead of label-resolution — this
+            reflects where the user actually clicks, not just element centres.
+          - For KEYBOARD/TYPE: LLM supplies the text value; transformer's
+            source_elem_idx acts as a fallback if LLM text is empty.
+          - For HOTKEY / SCROLL: LLM wins entirely.
+        """
+        l_type = llm_action.get("action_type", "wait")
+
+        # Hotkey / scroll — pure LLM reasoning, transformer can't help
+        if l_type in ("hotkey", "scroll"):
+            return self._llm_action_to_prediction(llm_action, state)
+
+        # Type — LLM provides the value; transformer source_elem_idx as backup
+        if l_type == "type":
+            text = llm_action.get("text", "")
+            if not text:
+                # Try transformer's source pointer as backup
+                src_idx = t_pred.get("source_elem_idx", -1)
+                text = self._text_resolver.resolve(state, source_elem_idx=src_idx)
+            if not text:
+                # No value found — Tab to skip
+                return {"action_type": "keyboard", "key_count": 1, "keystrokes": ["tab"]}
+            return {"action_type": "keyboard", "key_count": len(text),
+                    "keystrokes": list(text), "text": text}
+
+        # Click — use transformer's learned position when confident,
+        # but never let it snap to a tab/navigation element (that causes tab-jumping)
+        if l_type == "click":
+            _TRANSFORMER_CLICK_THRESHOLD = 0.55
+            if (t_pred.get("action_type") == "click"
+                    and t_conf >= _TRANSFORMER_CLICK_THRESHOLD
+                    and t_pred.get("click_position")):
+                pos     = t_pred["click_position"]
+                snapped = self._snap(pos, state)
+                coords  = snapped or pos
+                logger.info("Merge: transformer click @ (%.0f,%.0f)  conf=%.2f",
+                            coords[0], coords[1], t_conf)
+                return {"action_type": "click", "click_position": coords}
+            # Transformer not confident — fall back to LLM label resolution
+            return self._llm_action_to_prediction(llm_action, state)
+
+        # Fallback
+        return self._llm_action_to_prediction(llm_action, state)
+
+    def _value_for_focused(self, state: Dict[str, Any]) -> str:
+        """Return the background-record value for the currently focused field, or ''."""
+        elements   = state.get("elements", [])
+        focused_id = state.get("focused_element_id")
+        focused    = next((e for e in elements if e.get("element_id") == focused_id), None)
+        if not focused:
+            return ""
+        field_name = (focused.get("label") or focused.get("text") or "").strip()
+        if not field_name:
+            return ""
+        bg_elems = [e for e in elements if e.get("window_role") == "background"]
+        bg_blobs = [(e.get("value") or "").strip() for e in bg_elems]
+        bg_blobs = [b for b in bg_blobs if b]
+        if not bg_blobs:
+            return ""
+        records = {}
+        for blob in sorted(bg_blobs, key=len, reverse=True):
+            r = _parse_records(blob)
+            if r:
+                records = r
+                break
+        if not records:
+            return ""
+        rec = records.get(self._record_num, records.get(min(records), {}))
+        fl = field_name.lower()
+        for k, v in rec.items():
+            if k.lower() == fl:
+                skip = {"(none)", "none", "(leave blank)", "n/a", "no", "yes (check)"}
+                return "" if v.lower().strip("()") in skip else v
+        return ""
+
     # ── LLM dispatch ─────────────────────────────────────────────────────────
 
     def _ask_llm(self, state: Dict[str, Any]) -> Dict[str, Any]:
-        screen_text = _state_to_text(state)
-        logger.info("LLM screen context:\n%s", screen_text)
+        screen_text = _state_to_text(state, record_num=self._record_num)
+        logger.debug("LLM screen context:\n%s", screen_text)
         user_msg = (
             f"Task goal: {self.goal}\n\n"
             f"Current screen:\n{screen_text}\n\n"
@@ -647,8 +1238,8 @@ class LLMAgent:
         elif action_type == "type":
             text = llm_action.get("text", "")
             if not text:
-                logger.warning("LLM 'type' action has no text — skipping.")
-                return {"action_type": "no_op"}
+                logger.warning("LLM 'type' action has no text — pressing Tab to skip field.")
+                return {"action_type": "keyboard", "key_count": 1, "keystrokes": ["tab"]}
             return {"action_type": "keyboard", "key_count": len(text),
                     "keystrokes": list(text), "text": text}
 
@@ -658,6 +1249,19 @@ class LLMAgent:
                 return {"action_type": "no_op"}
             return {"action_type": "keyboard", "key_count": len(keys),
                     "keystrokes": keys}
+
+        elif action_type == "scroll":
+            target    = llm_action.get("target", "")
+            direction = llm_action.get("direction", "down")
+            clicks    = int(llm_action.get("clicks", 3))
+            # Resolve target to coordinates — scroll at that position
+            coords = _resolve_target(target, state) if target else None
+            if coords is None:
+                # Fall back to centre of screen if no target
+                res    = state.get("screen_resolution", [1920, 1080])
+                coords = [res[0] / 2, res[1] / 2]
+            return {"action_type": "scroll", "click_position": coords,
+                    "direction": direction, "clicks": clicks}
 
         return {"action_type": "no_op"}
 
@@ -700,9 +1304,9 @@ class LLMAgent:
     def _predict(self, state: Dict[str, Any]) -> Dict[str, Any]:
         try:
             try:
-                from components.learning_models.transformer.transformer import predict
+                from components.intelligence.model.transformer import predict
             except ImportError:
-                from learning_models.transformer.transformer import predict
+                from intelligence.model.transformer import predict
             return predict(
                 state=state,
                 history=self._history[-3:],

@@ -78,7 +78,7 @@ def main():
 
     os.makedirs(os.path.dirname(save_path), exist_ok=True)
 
-    from learning_models.intern_model.bc.behavioral_cloning import BCTrainer
+    from intelligence.training.bc.behavioral_cloning import BCTrainer
 
     trainer = BCTrainer(
         trace_dir=trace_dir,
@@ -112,7 +112,7 @@ def main():
     if args.continual:
         print("\n  Starting ContinualLearner — watching for new traces …")
         print("  Press Ctrl+C to stop.\n")
-        from learning_models.intern_model.continual.learner import ContinualLearner
+        from intelligence.training.continual.learner import ContinualLearner
         cl = ContinualLearner(trace_dir=trace_dir, bc_trainer=trainer)
         cl.start()
         try:

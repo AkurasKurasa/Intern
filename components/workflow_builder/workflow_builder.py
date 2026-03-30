@@ -59,6 +59,172 @@ for _p in (_ROOT, _COMP_DIR):
 # ── Library directory ─────────────────────────────────────────────────────────
 _LIBRARY_DIR = os.path.join(_ROOT, "data", "workflow_library")
 
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  WorkflowLearner  (trace → workflow graph converter + library manager)
+# ══════════════════════════════════════════════════════════════════════════════
+
+class WorkflowLearner:
+    """
+    Builds workflow graphs from recorded trace sequences and manages the
+    persistent workflow library.
+    """
+
+    NODE_SPACING_X = 220
+    NODE_Y         = 160
+
+    def __init__(self, library_dir: str = _LIBRARY_DIR):
+        self.library_dir = library_dir
+        os.makedirs(library_dir, exist_ok=True)
+
+    def learn_from_dir(
+        self,
+        trace_dir: str,
+        name: str,
+        include_pipeline_nodes: bool = True,
+        dry_run: bool = True,
+    ) -> Dict[str, Any]:
+        traces = self._load_traces(trace_dir)
+        if not traces:
+            raise ValueError(f"No trace JSON files found in: {trace_dir}")
+        nodes, edges = self._build_graph(traces, include_pipeline_nodes, dry_run)
+        return {
+            "name":  name,
+            "nodes": nodes,
+            "edges": edges,
+            "meta":  {
+                "created":    datetime.now().isoformat(),
+                "source_dir": trace_dir,
+                "step_count": len(traces),
+                "learned":    True,
+            },
+        }
+
+    def save(self, workflow: Dict[str, Any]) -> str:
+        name      = workflow.get("name", f"workflow_{int(time.time())}")
+        safe_name = _wl_safe_filename(name)
+        path      = os.path.join(self.library_dir, f"{safe_name}.json")
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(workflow, f, indent=2, ensure_ascii=False)
+        return path
+
+    def list_all(self) -> List[Dict[str, Any]]:
+        entries = []
+        for fname in sorted(os.listdir(self.library_dir), reverse=True):
+            if not fname.endswith(".json"):
+                continue
+            path = os.path.join(self.library_dir, fname)
+            try:
+                with open(path, encoding="utf-8") as f:
+                    wf = json.load(f)
+                meta = wf.get("meta", {})
+                entries.append({
+                    "name":       wf.get("name", fname[:-5]),
+                    "path":       path,
+                    "created":    meta.get("created", ""),
+                    "node_count": len(wf.get("nodes", [])),
+                    "edge_count": len(wf.get("edges", [])),
+                    "step_count": meta.get("step_count", 0),
+                    "source_dir": meta.get("source_dir", ""),
+                    "learned":    meta.get("learned", False),
+                })
+            except Exception:
+                pass
+        return entries
+
+    def load(self, path: str) -> Dict[str, Any]:
+        with open(path, encoding="utf-8") as f:
+            return json.load(f)
+
+    def delete(self, path: str) -> None:
+        if os.path.isfile(path):
+            os.remove(path)
+
+    def _load_traces(self, trace_dir: str) -> List[Dict[str, Any]]:
+        if not os.path.isdir(trace_dir):
+            return []
+        files = sorted(f for f in os.listdir(trace_dir) if f.endswith(".json"))
+        traces = []
+        for fname in files:
+            try:
+                with open(os.path.join(trace_dir, fname), encoding="utf-8") as f:
+                    traces.append(json.load(f))
+            except Exception:
+                pass
+        return traces
+
+    def _build_graph(
+        self,
+        traces: List[Dict[str, Any]],
+        include_pipeline: bool,
+        dry_run: bool,
+    ) -> Tuple[List[dict], List[dict]]:
+        nodes: List[dict] = []
+        edges: List[dict] = []
+        _nc = [0]; _ec = [0]; _x = [60]
+
+        def push_node(ntype: str, label: str, config: dict = None) -> str:
+            nid = f"node_{_nc[0]:04d}"; _nc[0] += 1
+            nodes.append({"id": nid, "x": _x[0], "y": self.NODE_Y,
+                          "node_type": ntype, "label": label, "config": config or {}})
+            _x[0] += self.NODE_SPACING_X
+            return nid
+
+        def connect(src: str, dst: str):
+            eid = f"edge_{_ec[0]:04d}"; _ec[0] += 1
+            edges.append({"id": eid, "src": src, "dst": dst})
+
+        first = traces[0]
+        prev = push_node("trigger", "Screen Observer", {
+            "trace_type": first.get("type", "gui"),
+            "output_dir": "data/output/traces/live",
+        })
+
+        if include_pipeline:
+            tid = push_node("translator", "Trace Translator", {})
+            connect(prev, tid); prev = tid
+
+        for trace in traces:
+            for action in trace.get("mouse", {}).get("actions", []):
+                pos   = action.get("position", [0, 0])
+                label = _wl_mouse_label(action.get("type", "click"), pos)
+                nid = push_node("executor", label, {
+                    "action_type": "click", "click_position": pos, "dry_run": dry_run,
+                })
+                connect(prev, nid); prev = nid
+
+            for kb_group in trace.get("keyboard", {}).get("actions", []):
+                keys = [s.get("key", s) if isinstance(s, dict) else s
+                        for s in kb_group.get("strokes", [])]
+                nid = push_node("executor", _wl_keyboard_label(keys), {
+                    "action_type": "keyboard", "keystrokes": keys, "dry_run": dry_run,
+                })
+                connect(prev, nid); prev = nid
+
+        lid = push_node("logger", "Logger", {"log_path": "data/output/workflow_run.log"})
+        connect(prev, lid)
+        return nodes, edges
+
+
+def _wl_safe_filename(name: str) -> str:
+    import re
+    s = re.sub(r"[^\w\s-]", "", name.strip().lower())
+    s = re.sub(r"\s+", "_", s)
+    return s[:64] or "workflow"
+
+def _wl_mouse_label(atype: str, pos: list) -> str:
+    x, y = int(pos[0]), int(pos[1])
+    return {"click": f"Click ({x}, {y})", "double_click": f"Double-click ({x}, {y})",
+            "drag": f"Drag from ({x}, {y})"}.get(atype, f"Mouse {atype} ({x}, {y})")
+
+def _wl_keyboard_label(keys: list) -> str:
+    text = "".join(k for k in keys if len(k) == 1)
+    if text:
+        preview = text[:14] + ("…" if len(text) > 14 else "")
+        return f"Type '{preview}'"
+    specials = [k for k in keys if len(k) > 1]
+    return f"Keys: {', '.join(specials[:3])}" if specials else "Keyboard"
+
 # ── Design tokens (match app/main.py palette) ─────────────────────────────────
 BG          = "#0f1117"
 BG_CARD     = "#1a1d27"
@@ -812,7 +978,6 @@ class WorkflowArchivePanel(tk.Frame):
         self._row_widgets.clear()
 
         try:
-            from workflow_learner.workflow_learner import WorkflowLearner
             self._entries = WorkflowLearner(
                 library_dir=self._library_dir).list_all()
         except Exception:
@@ -904,7 +1069,6 @@ class WorkflowArchivePanel(tk.Frame):
             return
 
         try:
-            from workflow_learner.workflow_learner import WorkflowLearner
             wf = WorkflowLearner(
                 library_dir=self._library_dir).load(entry["path"])
             self._canvas.load_workflow(wf)
@@ -971,7 +1135,6 @@ class WorkflowArchivePanel(tk.Frame):
         ):
             return
         try:
-            from workflow_learner.workflow_learner import WorkflowLearner
             WorkflowLearner(
                 library_dir=self._library_dir).delete(entry["path"])
             self._panel._log(f"Deleted workflow '{name}'.", "warn")
@@ -1207,7 +1370,6 @@ class WorkflowBuilderPanel(tk.Frame):
             return
 
         try:
-            from workflow_learner.workflow_learner import WorkflowLearner
             learner  = WorkflowLearner(library_dir=_LIBRARY_DIR)
             workflow = learner.learn_from_dir(trace_dir, name)
             path     = learner.save(workflow)
@@ -1457,10 +1619,10 @@ class WorkflowBuilderPanel(tk.Frame):
         trigger node can hand it to ScreenObserver on the next run.
         """
         try:
-            from learning_models.intern_model.bc.behavioral_cloning import BCTrainer
+            from intelligence.training.bc.behavioral_cloning import BCTrainer
         except ImportError:
             try:
-                from components.learning_models.intern_model.bc.behavioral_cloning import BCTrainer
+                from components.intelligence.training.bc.behavioral_cloning import BCTrainer
             except ImportError:
                 return False, "BCTrainer not importable — check your path."
 
@@ -1493,9 +1655,9 @@ class WorkflowBuilderPanel(tk.Frame):
         if continual:
             try:
                 try:
-                    from learning_models.intern_model.continual.learner import ContinualLearner
+                    from intelligence.training.continual.learner import ContinualLearner
                 except ImportError:
-                    from components.learning_models.intern_model.continual.learner import ContinualLearner
+                    from components.intelligence.training.continual.learner import ContinualLearner
 
                 cl = ContinualLearner(
                     trace_dir=trace_dir,
@@ -1514,10 +1676,10 @@ class WorkflowBuilderPanel(tk.Frame):
     def _exec_model(self, config: dict, context: dict) -> Tuple[bool, str]:
         """Run TransformerAgentNetwork.predict() on the latest translated trace."""
         try:
-            from components.learning_models.transformer.transformer import predict
+            from components.intelligence.model.transformer import predict
         except ImportError:
             try:
-                from learning_models.transformer.transformer import predict
+                from intelligence.model.transformer import predict
             except ImportError:
                 return False, "Transformer model not importable — check your path."
 
@@ -1575,9 +1737,9 @@ class WorkflowBuilderPanel(tk.Frame):
         if trace_type == "excel":
             try:
                 try:
-                    from excel_observer.excel_observer import ExcelObserver
+                    from observers.excel_observer import ExcelObserver
                 except ImportError:
-                    from components.excel_observer.excel_observer import ExcelObserver
+                    from components.observers.excel_observer import ExcelObserver
                 _xl_obs = ExcelObserver()
                 if _xl_obs.connect():
                     observe_fn = _xl_obs.snapshot
@@ -1591,9 +1753,9 @@ class WorkflowBuilderPanel(tk.Frame):
         if observe_fn is None:
             try:
                 try:
-                    from ui_observer.ui_observer import UIAutomationObserver
+                    from observers.ui_observer import UIAutomationObserver
                 except ImportError:
-                    from components.ui_observer.ui_observer import UIAutomationObserver
+                    from components.observers.ui_observer import UIAutomationObserver
                 _uia_obs = UIAutomationObserver()
                 if _uia_obs.available:
                     observe_fn = _uia_obs.snapshot
@@ -1822,7 +1984,6 @@ class LibraryDialog:
 
     def _refresh(self):
         try:
-            from workflow_learner.workflow_learner import WorkflowLearner
             learner = WorkflowLearner(library_dir=self._library_dir)
             self._entries = learner.list_all()
         except Exception:
@@ -1866,7 +2027,6 @@ class LibraryDialog:
         if not e:
             return
         try:
-            from workflow_learner.workflow_learner import WorkflowLearner
             wf = WorkflowLearner(library_dir=self._library_dir).load(e["path"])
             self._canvas.load_workflow(wf)
             self._panel._set_status(f"Loaded '{e['name']}' into canvas.", ACCENT)
@@ -1880,7 +2040,6 @@ class LibraryDialog:
         if not e:
             return
         try:
-            from workflow_learner.workflow_learner import WorkflowLearner
             wf = WorkflowLearner(library_dir=self._library_dir).load(e["path"])
             self._canvas.load_workflow(wf)
             self._win.destroy()
@@ -1899,7 +2058,6 @@ class LibraryDialog:
         ):
             return
         try:
-            from workflow_learner.workflow_learner import WorkflowLearner
             WorkflowLearner(library_dir=self._library_dir).delete(e["path"])
             self._panel._log(f"Deleted workflow '{e['name']}' from library.", "warn")
             self._refresh()

@@ -67,20 +67,24 @@ except ImportError:
     _PYPERCLIP_AVAILABLE = False
 
 try:
-    sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(
-        os.path.abspath(__file__))), "excel_observer"))
-    from excel_observer import ExcelObserver as _ExcelObserver
+    from observers.excel_observer import ExcelObserver as _ExcelObserver
     _EXCEL_OBSERVER_AVAILABLE = True
 except ImportError:
-    _EXCEL_OBSERVER_AVAILABLE = False
+    try:
+        from components.observers.excel_observer import ExcelObserver as _ExcelObserver
+        _EXCEL_OBSERVER_AVAILABLE = True
+    except ImportError:
+        _EXCEL_OBSERVER_AVAILABLE = False
 
 try:
-    sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(
-        os.path.abspath(__file__))), "ui_observer"))
-    from ui_observer import UIAutomationObserver as _UIAObserver
+    from observers.ui_observer import UIAutomationObserver as _UIAObserver
     _UIA_OBSERVER_AVAILABLE = True
 except ImportError:
-    _UIA_OBSERVER_AVAILABLE = False
+    try:
+        from components.observers.ui_observer import UIAutomationObserver as _UIAObserver
+        _UIA_OBSERVER_AVAILABLE = True
+    except ImportError:
+        _UIA_OBSERVER_AVAILABLE = False
 
 
 # =============================================================================
