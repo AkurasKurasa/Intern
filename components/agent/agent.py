@@ -184,8 +184,12 @@ def _parse_records(raw_text: str) -> dict:
                 key = re.sub(r"[\[\]]", "", key).strip()
                 val = re.sub(r"\s*\[.*", "", val)
                 val = re.sub(r"\s*←.*", "", val).strip()
-                if key and val and val.lower() not in {"(none)", "none", ""}:
-                    data[key] = val
+                if key:
+                    cleaned = val.lower().strip()
+                    if cleaned in {"(none)", "none"}:
+                        data[key] = ""        # explicitly blank — agent should leave empty
+                    elif val and cleaned != "":
+                        data[key] = val
         records[rn] = data
         i += 2
     return records
@@ -491,6 +495,7 @@ class LLMAgent:
         llm_every:     int            = 2,
         device_str:    str            = "auto",
         record_num:    int            = 1,
+        use_ocr:       bool           = False,   # EXPERIMENTAL: merge VisionObserver OCR results
     ):
         self.goal       = goal
         self.provider   = provider.lower().strip()
@@ -524,14 +529,34 @@ class LLMAgent:
 
         self._executor          = ActionExecutor(dry_run=dry_run)
         self._text_resolver     = _TextResolver()
-        self._observer          = UIAutomationObserver()
+        self._observer          = UIAutomationObserver(
+            max_elements_per_window=300,
+            max_total_elements=700,
+        )
         self._validator         = StateValidator()
         self._correction        = CorrectionHandler()
         self._record_num: int               = record_num
         self._history:  List[Dict[str, Any]] = []
         self._results:  List[Dict[str, Any]] = []
+        self._checked_fields: set           = set()   # checkboxes already clicked this run
+        self._current_tab_idx: int          = 0       # tracks which tab we're on
         self._guidance: str = ""
         self._task_name: str = ""   # set via run(task_name=...)
+
+        # EXPERIMENTAL — OCR overlay via VisionObserver
+        # Disabled by default; enable with use_ocr=True in LLMAgent(...)
+        self._use_ocr: bool = use_ocr
+        self._vision_observer: Optional[Any] = None
+        if use_ocr:
+            try:
+                try:
+                    from components.observers.vision_observer.vision_observer import VisionObserver
+                except ImportError:
+                    from observers.vision_observer.vision_observer import VisionObserver
+                self._vision_observer = VisionObserver()
+                logger.info("OCR overlay enabled (VisionObserver loaded)")
+            except Exception as exc:
+                logger.warning("OCR overlay requested but VisionObserver unavailable: %s", exc)
 
     # ── provider initialisation ───────────────────────────────────────────────
 
@@ -609,29 +634,58 @@ class LLMAgent:
         _llm_click_count: int             = 0
         _LLM_CLICK_LIMIT: int             = 1   # force type after this many repeated clicks
         _no_change_streak: int            = 0
-        _NO_CHANGE_LIMIT:  int            = 3   # advance tab after this many consecutive no_change
+        _NO_CHANGE_LIMIT:  int            = 4   # advance tab after this many consecutive no_change
+        _tab_just_switched: bool          = False
+        _last_auto_step:   int            = -1  # step_idx of last step where an auto-handler fired
+        _DROUGHT_LIMIT:    int            = 3   # scroll form after this many non-auto steps in a row
+        _tab_scroll_count: int            = 0   # scrolls performed on current tab
+        _MAX_TAB_SCROLLS:  int            = 6   # max drought-scrolls per tab before giving up
+        _steps_on_tab:     int            = 0   # steps spent on current tab — forces advance if too many
+        _TAB_STEP_LIMIT:   int            = 35  # force tab advance after this many steps on same tab
 
         for step_idx in range(n):
             # 1. Observe
             state      = self._observe()
             llm_action: Dict[str, Any] = {}
+            _steps_on_tab += 1
             logger.info("── Step %d/%d  (%d elements) ──", step_idx + 1, n, len(state.get("elements", [])))
 
-            # 1b. Stuck guard: if no_change repeats, advance to next tab
-            if _no_change_streak >= _NO_CHANGE_LIMIT:
+            # 1a. After a tab switch: scroll to top, re-observe, then click first empty field
+            if _tab_just_switched:
+                _tab_just_switched = False
+                _steps_on_tab      = 0
+                _tab_scroll_count  = 0
+                self._scroll_form_to_top(state)
+                time.sleep(0.6)
+                state = self._observe()   # get updated positions after scroll
+                self._focus_first_empty_field(state)
+                time.sleep(self.step_delay)
+                continue   # re-observe so the rest of the loop uses fresh post-click state
+
+            # 1b. Stuck guard: if no_change repeats OR too many steps on same tab, advance
+            _stuck = (_no_change_streak >= _NO_CHANGE_LIMIT
+                      or _steps_on_tab >= _TAB_STEP_LIMIT)
+            if _stuck:
+                if _steps_on_tab >= _TAB_STEP_LIMIT:
+                    logger.info("Stuck guard: %d steps on tab — forcing advance.", _steps_on_tab)
                 if self._try_advance_tab(state):
-                    _no_change_streak = 0
+                    _no_change_streak  = 0
+                    _tab_just_switched = True
+                    _tab_scroll_count  = 0
+                    _last_auto_step    = step_idx
                     time.sleep(self.step_delay)
                     continue
                 else:
                     logger.warning("Stuck guard: no next tab found — resetting streak.")
                     _no_change_streak = 0
+                    _steps_on_tab     = 0
 
             # 2. Auto-skip: if focused field already has the correct value, Tab past it
             if self._llm_client and self._auto_skip(state):
                 logger.info("Auto-skip: focused field already has correct value — Tab.")
                 self._executor.execute({"action_type": "keyboard", "key_count": 1, "keystrokes": ["tab"]})
                 _no_change_streak = 0
+                _last_auto_step = step_idx
                 time.sleep(self.step_delay)
                 continue
 
@@ -639,6 +693,7 @@ class LLMAgent:
             auto_text = self._auto_fill(state)
             if auto_text:
                 field_name_log, text_val = auto_text
+                self._peek_notepad(state, field_name_log)
                 logger.info("Auto-fill: '%s' → %r", field_name_log, text_val[:40])
                 self._executor.execute({
                     "action_type": "keyboard",
@@ -649,6 +704,7 @@ class LLMAgent:
                 self._executor.execute({"action_type": "keyboard", "key_count": 1, "keystrokes": ["tab"]})
                 logger.info("Auto-Tab after auto-fill.")
                 _no_change_streak = 0
+                _last_auto_step = step_idx
                 time.sleep(self.step_delay)
                 continue
 
@@ -657,21 +713,44 @@ class LLMAgent:
             if auto_chk is not None:
                 field_name_log, should_check = auto_chk
                 if should_check:
-                    elements   = state.get("elements", [])
-                    focused_id = state.get("focused_element_id")
-                    focused_el = next((e for e in elements if e.get("element_id") == focused_id), None)
-                    if focused_el and focused_el.get("bbox"):
-                        x1, y1, x2, y2 = focused_el["bbox"]
-                        cx, cy = (x1 + x2) / 2, (y1 + y2) / 2
-                        logger.info("Auto-check: '%s' → clicking @ (%.0f, %.0f)", field_name_log, cx, cy)
-                        self._executor.execute({"action_type": "click", "click_position": [cx, cy]})
+                    if field_name_log in self._checked_fields:
+                        # Already checked this run — don't toggle it off
+                        logger.info("Auto-check: '%s' already checked this run — Tab.", field_name_log)
                     else:
-                        logger.warning("Auto-check: '%s' — no bbox, pressing space", field_name_log)
-                        self._executor.execute({"action_type": "keyboard", "key_count": 1, "keystrokes": ["space"]})
+                        elements   = state.get("elements", [])
+                        focused_id = state.get("focused_element_id")
+                        focused_el = next((e for e in elements if e.get("element_id") == focused_id), None)
+                        if focused_el and focused_el.get("bbox"):
+                            x1, y1, x2, y2 = focused_el["bbox"]
+                            cx, cy = (x1 + x2) / 2, (y1 + y2) / 2
+                            # Check if already checked via Win32 BM_GETCHECK
+                            already_checked = False
+                            try:
+                                import win32gui as _wg
+                                import win32api as _wa
+                                BM_GETCHECK = 0x00F0
+                                _hwnd = _wg.WindowFromPoint((int(cx), int(cy)))
+                                if _hwnd:
+                                    already_checked = (_wa.SendMessage(_hwnd, BM_GETCHECK, 0, 0) == 1)
+                            except Exception:
+                                pass
+                            if already_checked:
+                                logger.info("Auto-check: '%s' already checked — Tab.", field_name_log)
+                                self._checked_fields.add(field_name_log)
+                            else:
+                                self._peek_notepad(state, field_name_log)
+                                logger.info("Auto-check: '%s' → clicking @ (%.0f, %.0f)", field_name_log, cx, cy)
+                                self._executor.execute({"action_type": "click", "click_position": [cx, cy]})
+                                self._checked_fields.add(field_name_log)
+                        else:
+                            logger.warning("Auto-check: '%s' — no bbox, pressing space", field_name_log)
+                            self._executor.execute({"action_type": "keyboard", "key_count": 1, "keystrokes": ["space"]})
+                            self._checked_fields.add(field_name_log)
                 else:
                     logger.info("Auto-check: '%s' should remain unchecked — Tab.", field_name_log)
                 self._executor.execute({"action_type": "keyboard", "key_count": 1, "keystrokes": ["tab"]})
                 _no_change_streak = 0
+                _last_auto_step = step_idx
                 time.sleep(self.step_delay)
                 continue
 
@@ -699,6 +778,7 @@ class LLMAgent:
                                     expected_val, cx, cy)
                         self._executor.execute({"action_type": "click",
                                                 "click_position": [cx, cy]})
+                        _last_auto_step = step_idx
                         time.sleep(self.step_delay)
                         continue
                     else:
@@ -710,12 +790,27 @@ class LLMAgent:
                     if focused and focused.get("bbox"):
                         x1, y1, x2, y2 = focused["bbox"]
                         cx, cy = (x1 + x2) / 2, (y1 + y2) / 2
+                        self._peek_notepad(state, field_name)
                         logger.info("Combobox-fix: '%s' = %r → need %r — opening dropdown",
                                     field_name, current_val, expected_val)
                         self._executor.execute({"action_type": "click",
                                                 "click_position": [cx, cy]})
+                        _last_auto_step = step_idx
                         time.sleep(self.step_delay)
                         continue
+
+            # 2c. Drought check: if too many steps without any auto-handler, scroll form down.
+            # Allowed up to _MAX_TAB_SCROLLS times per tab so multi-section tabs
+            # (e.g. Policyholder with 20+ fields) get revealed incrementally.
+            _drought = step_idx - _last_auto_step
+            if _drought >= _DROUGHT_LIMIT and _tab_scroll_count < _MAX_TAB_SCROLLS:
+                logger.info("Drought guard: %d steps without auto-handler — scrolling form (scroll %d/%d).",
+                            _drought, _tab_scroll_count + 1, _MAX_TAB_SCROLLS)
+                if self._scroll_form_down(state):
+                    _tab_scroll_count += 1
+                    _last_auto_step    = step_idx   # reset drought so it doesn't fire next step
+                    time.sleep(self.step_delay * 0.75)
+                    continue   # re-observe with scrolled form
 
             # 2. Transformer always runs — learns from user recordings
             t_pred = self._predict(state)
@@ -880,10 +975,8 @@ class LLMAgent:
         if focused.get("type") in ("buttoncontrol",):
             return False
         current = (focused.get("value") or "").strip()
-        if not current:
-            return False   # empty field — let LLM decide
 
-        # Build the background record dict (same logic as _state_to_text)
+        # Build the background record dict
         bg_elems = [e for e in elements if e.get("window_role") == "background"]
         bg_blobs = [(e.get("value") or "").strip() for e in bg_elems]
         bg_blobs = [b for b in bg_blobs if b]
@@ -904,21 +997,166 @@ class LLMAgent:
         if not field_name:
             return False
 
-        expected = rec.get(field_name, "")
-        if not expected:
-            # case-insensitive lookup
-            fl = field_name.lower()
+        # Check if field exists in record (including explicit blank "(none)" entries)
+        fl = field_name.lower()
+        expected = None
+        if field_name in rec:
+            expected = rec[field_name]
+        else:
             for k, v in rec.items():
                 if k.lower() == fl:
                     expected = v
                     break
-        if not expected:
-            return False
+        if expected is None:
+            return False   # field not in record — let LLM decide
+
+        # Both blank → field is intentionally empty, skip
+        if current == "" and expected == "":
+            logger.info("Auto-skip: '%s' is blank as expected (none) — Tab.", field_name)
+            return True
+
+        if not current:
+            return False   # empty field that needs filling — let auto-fill handle it
 
         match = current.lower() == expected.lower()
         if match:
             logger.info("Auto-skip: '%s' already = %r", field_name, current)
         return match
+
+    def _peek_notepad(self, state: Dict[str, Any], field_name: str) -> None:
+        """
+        Scroll Notepad to the line containing field_name, then hover the
+        mouse over it — gives the visual impression of reading.
+        Uses win32 EM_LINESCROLL so focus never leaves the form.
+        Works with both classic Notepad and Windows 11 Notepad (WinUI3).
+        """
+        try:
+            import pyautogui
+            import win32gui
+            import win32api
+
+            EM_GETFIRSTVISIBLELINE = 0x00CE
+            EM_LINESCROLL          = 0x00B6
+
+            # Find the raw text and background window title from state.
+            # Prefer text-file windows (.txt / Notepad) over terminal windows
+            # (PowerShell/CMD accumulate huge log buffers that confuse detection).
+            # Separate two concerns:
+            #   bg_window_title — used ONLY to find the Notepad hwnd; prefer .txt windows
+            #   raw_text        — used ONLY for line-number lookup; use largest blob from
+            #                     any background window (Win11 Notepad exposes only 1 char
+            #                     via UIA, but PowerShell accumulates full file content)
+            _TERMINAL_HINTS = {"powershell", "terminal", "command prompt", "cmd.exe"}
+            elements = state.get("elements", [])
+            bg_window_title = ""   # hwnd-lookup title (.txt preferred)
+            raw_text        = ""   # largest blob for line-number lookup
+            for e in elements:
+                if e.get("window_role") != "background":
+                    continue
+                win_title = (e.get("window_title") or "").strip()
+                blob      = (e.get("value") or "").strip()
+                # Track the .txt / Notepad window for hwnd regardless of blob size
+                if not bg_window_title:
+                    is_textfile = ".txt" in win_title or "notepad" in win_title.lower()
+                    if is_textfile:
+                        bg_window_title = win_title
+                # Track largest blob from any background window for line lookup
+                if blob and len(blob) > len(raw_text):
+                    raw_text = blob
+
+            logger.info("_peek_notepad: field=%r  bg_title=%r  raw_text_len=%d",
+                        field_name, bg_window_title, len(raw_text))
+            if not raw_text:
+                logger.info("_peek_notepad: no background text found — skipping scroll")
+                return
+
+            lines = raw_text.splitlines()
+            target_line = 0
+            fl = field_name.lower()
+            for i, line in enumerate(lines):
+                if fl in line.lower() and ":" in line:
+                    target_line = i
+                    break
+
+            # ── Find the Notepad window ───────────────────────────────────────
+            np_hwnd = None
+
+            # Strategy 1: use exact title from UIA background element (most reliable)
+            if bg_window_title:
+                np_hwnd = win32gui.FindWindow(None, bg_window_title)
+                if not np_hwnd:
+                    # Title might include app name suffix, e.g. "file.txt - Notepad"
+                    np_hwnd = win32gui.FindWindow(None, bg_window_title + " - Notepad")
+
+            # Strategy 2: enumerate top-level windows by class / title heuristic
+            if not np_hwnd:
+                def _find_np(hwnd, _):
+                    nonlocal np_hwnd
+                    if np_hwnd:
+                        return
+                    if not win32gui.IsWindowVisible(hwnd):
+                        return
+                    title = win32gui.GetWindowText(hwnd)
+                    cls   = win32gui.GetClassName(hwnd)
+                    if cls == "Notepad":
+                        np_hwnd = hwnd
+                    elif ".txt" in title or "notepad" in title.lower():
+                        np_hwnd = hwnd
+                win32gui.EnumWindows(_find_np, None)
+
+            logger.info("_peek_notepad: np_hwnd=%s  title=%r",
+                        np_hwnd, win32gui.GetWindowText(np_hwnd) if np_hwnd else None)
+            if not np_hwnd:
+                return
+
+            # ── Find the edit control (classic or Win11) ─────────────────────
+            _EDIT_CLASSES = {"Edit", "RichEditD2DPT", "RichEdit20W", "RICHEDIT50W"}
+            edit_hwnd = None
+
+            def _find_edit(hwnd, _):
+                nonlocal edit_hwnd
+                if edit_hwnd:
+                    return
+                try:
+                    cls = win32gui.GetClassName(hwnd)
+                    if cls in _EDIT_CLASSES:
+                        edit_hwnd = hwnd
+                except Exception:
+                    pass
+
+            # Enumerate direct children first
+            win32gui.EnumChildWindows(np_hwnd, _find_edit, None)
+
+            # Win11 Notepad nests the editor deeper — walk one level of grandchildren
+            if not edit_hwnd:
+                child = win32gui.GetWindow(np_hwnd, 5)   # GW_CHILD
+                while child and not edit_hwnd:
+                    win32gui.EnumChildWindows(child, _find_edit, None)
+                    child = win32gui.GetWindow(child, 2)  # GW_HWNDNEXT
+
+            logger.info("_peek_notepad: edit_hwnd=%s  target_line=%d", edit_hwnd, target_line)
+            if not edit_hwnd:
+                return
+
+            # ── Scroll to target line ─────────────────────────────────────────
+            first_visible = win32api.SendMessage(edit_hwnd, EM_GETFIRSTVISIBLELINE, 0, 0)
+            delta = target_line - first_visible - 3   # show 3 lines above target
+            logger.info("_peek_notepad: first_visible=%d  delta=%d", first_visible, delta)
+            if delta != 0:
+                win32api.SendMessage(edit_hwnd, EM_LINESCROLL, 0, delta)
+
+            # ── Hover mouse over the Notepad window (purely visual) ───────────
+            rect = win32gui.GetWindowRect(np_hwnd)
+            cx   = (rect[0] + rect[2]) / 2
+            cy   = (rect[1] + rect[3]) / 2
+            orig = pyautogui.position()
+
+            pyautogui.moveTo(cx, cy, duration=0.25)
+            time.sleep(0.4)
+            pyautogui.moveTo(orig.x, orig.y, duration=0.2)
+
+        except Exception:
+            pass   # never block the agent over a cosmetic action
 
     def _auto_fill(self, state: Dict[str, Any]) -> Optional[tuple]:
         """
@@ -1070,33 +1308,232 @@ class LLMAgent:
         should_check = ev.startswith("yes") or ev in {"check", "true", "1", "checked"}
         return (field_name, should_check)
 
+    def _scroll_form_down(self, state: Dict[str, Any]) -> bool:
+        """
+        Scroll the active form window down to reveal fields hidden below the visible area.
+        Uses pyautogui.scroll over the center of the active window elements.
+        Returns True if scroll was attempted.
+        """
+        try:
+            import pyautogui
+            elements = state.get("elements", [])
+            active = [e for e in elements
+                      if e.get("window_role") != "background" and e.get("bbox")]
+            if not active:
+                return False
+            # Use centroid of active form elements, capped to the middle of the
+            # screen so repeated scrolls don't push the target off the bottom edge.
+            xs = [(e["bbox"][0] + e["bbox"][2]) / 2 for e in active]
+            ys = [(e["bbox"][1] + e["bbox"][3]) / 2 for e in active]
+            cx = sum(xs) / len(xs)
+            cy = min(sum(ys) / len(ys), state.get("screen_resolution", [1920, 1080])[1] * 0.55)
+            orig = pyautogui.position()
+            pyautogui.moveTo(cx, cy, duration=0.15)
+            pyautogui.scroll(-5)   # 5 scroll units down
+            pyautogui.moveTo(orig.x, orig.y, duration=0.1)
+            logger.info("Scroll-form: scrolled down at form center (%.0f, %.0f)", cx, cy)
+            return True
+        except Exception as exc:
+            logger.warning("Scroll-form: failed — %s", exc)
+            return False
+
+    # ── EXPERIMENTAL: OCR background-window reader ───────────────────────────
+    # Uses Tesseract to screenshot the background window (Notepad, PDF, etc.)
+    # and convert detected text boxes into trace-format elements tagged
+    # source="ocr", window_role="background".  Only fires when UIA returns
+    # thin background data (≤1 char).  Result is cached per window title so
+    # Tesseract only runs once per unique background document, not every step.
+
+    _ocr_cache: Dict[str, List[Dict]] = {}   # window_title → ocr elements
+
+    def _ocr_background_window(self, state: Dict[str, Any]) -> List[Dict]:
+        """
+        Screenshot the background window and run Tesseract OCR on it.
+        Returns a list of trace-compatible elements (or [] on any error).
+        Results are cached by window title so OCR only runs once per document.
+        """
+        try:
+            import pytesseract
+            from PIL import ImageGrab
+            import win32gui
+        except ImportError:
+            return []
+
+        # Find the background window hwnd and title
+        bg_hwnd  = None
+        bg_title = ""
+        elements = state.get("elements", [])
+        for e in elements:
+            if e.get("window_role") != "background":
+                continue
+            win_title = (e.get("window_title") or "").strip()
+            if not win_title:
+                continue
+            hwnd = win32gui.FindWindow(None, win_title)
+            if hwnd:
+                bg_hwnd  = hwnd
+                bg_title = win_title
+                break
+
+        if not bg_hwnd or not bg_title:
+            return []
+
+        # Return cached result if we've already OCR'd this window
+        if bg_title in self._ocr_cache:
+            logger.debug("OCR cache hit for %r (%d elements)", bg_title,
+                         len(self._ocr_cache[bg_title]))
+            return self._ocr_cache[bg_title]
+
+        logger.info("OCR: scanning background window %r …", bg_title)
+
+        try:
+            # Screenshot only the background window region
+            rect = win32gui.GetWindowRect(bg_hwnd)   # (left, top, right, bottom)
+            img  = ImageGrab.grab(bbox=rect)
+            win_x, win_y = rect[0], rect[1]
+
+            # Run Tesseract — page segmentation mode 11 (sparse text) works
+            # well for mixed label+value layouts like insurance forms / PDFs.
+            data = pytesseract.image_to_data(
+                img,
+                output_type=pytesseract.Output.DICT,
+                config="--psm 11",
+            )
+
+            ocr_elems = []
+            n_boxes = len(data["text"])
+            for i in range(n_boxes):
+                conf = int(data["conf"][i])
+                text = (data["text"][i] or "").strip()
+                if conf < 30 or not text:
+                    continue
+
+                # Convert from image-relative coords to screen coords
+                x1 = win_x + data["left"][i]
+                y1 = win_y + data["top"][i]
+                x2 = x1    + data["width"][i]
+                y2 = y1    + data["height"][i]
+
+                # Infer element type from text shape
+                if text.endswith(":"):
+                    elem_type = "label"
+                elif len(text) > 3 and text[0].isdigit():
+                    elem_type = "input"
+                else:
+                    elem_type = "label"
+
+                ocr_elems.append({
+                    "element_id":   f"ocr_{i}",
+                    "type":         elem_type,
+                    "control_type": "OCR",
+                    "bbox":         [x1, y1, x2, y2],
+                    "text":         text,
+                    "value":        text,
+                    "label":        text,
+                    "enabled":      True,
+                    "visible":      True,
+                    "focused":      False,
+                    "confidence":   conf / 100.0,
+                    "source":       "ocr",
+                    "window_role":  "background",
+                    "window_title": bg_title,
+                    "app":          "",
+                    "metadata":     {"ocr_conf": conf},
+                })
+
+            logger.info("OCR: found %d text boxes in %r", len(ocr_elems), bg_title)
+            self._ocr_cache[bg_title] = ocr_elems
+            return ocr_elems
+
+        except Exception as exc:
+            logger.warning("OCR scan failed: %s", exc)
+            return []
+
+    def _scroll_form_to_top(self, state: Dict[str, Any]) -> None:
+        """
+        Scroll the active form window back to the top so that _focus_first_empty_field
+        always starts from the first visible field, not mid-page.
+        """
+        try:
+            import pyautogui
+            elements = state.get("elements", [])
+            active = [e for e in elements
+                      if e.get("window_role") != "background" and e.get("bbox")]
+            if not active:
+                return
+            xs = [(e["bbox"][0] + e["bbox"][2]) / 2 for e in active]
+            ys = [(e["bbox"][1] + e["bbox"][3]) / 2 for e in active]
+            cx = sum(xs) / len(xs)
+            cy = sum(ys) / len(ys)
+            orig = pyautogui.position()
+            pyautogui.moveTo(cx, cy, duration=0.15)
+            pyautogui.scroll(20)   # large upward scroll to reach top
+            pyautogui.moveTo(orig.x, orig.y, duration=0.1)
+            logger.info("Scroll-form-top: scrolled to top at (%.0f, %.0f)", cx, cy)
+        except Exception as exc:
+            logger.warning("Scroll-form-top: failed — %s", exc)
+
+    def _focus_first_empty_field(self, state: Dict[str, Any]) -> None:
+        """
+        After a tab switch, click the first empty editcontrol on the new tab
+        so Tab-navigation starts from the beginning rather than mid-tab.
+        """
+        elements = state.get("elements", [])
+        fillable = [
+            e for e in elements
+            if e.get("window_role") != "background"
+            and e.get("type") == "editcontrol"
+            and not (e.get("value") or "").strip()
+            and e.get("bbox")
+            and e.get("enabled", True)
+        ]
+        if not fillable:
+            return
+        # Sort top-to-bottom so we get the topmost field
+        fillable.sort(key=lambda e: (e["bbox"][1], e["bbox"][0]))
+        e = fillable[0]
+        x1, y1, x2, y2 = e["bbox"]
+        cx, cy = (x1 + x2) / 2, (y1 + y2) / 2
+        logger.info("Tab-advance focus: clicking first empty field %r @ (%.0f, %.0f)",
+                    (e.get("label") or e.get("text") or "?").strip(), cx, cy)
+        self._executor.execute({"action_type": "click", "click_position": [cx, cy]})
+
     def _try_advance_tab(self, state: Dict[str, Any]) -> bool:
         """
         When stuck (too many no_change steps), click the next form tab.
         Returns True if a tab was found and clicked.
         """
         elements = state.get("elements", [])
+        # Accept both UIA type names: "tabitem" (standard) and "tabitemcontrol" (wxPython)
         tabs = [
             e for e in elements
-            if e.get("type") == "tabitemcontrol"
+            if e.get("type") in ("tabitem", "tabitemcontrol")
             and e.get("window_role") != "background"
             and e.get("bbox")
         ]
+        logger.info("_try_advance_tab: found %d tab(s): %s",
+                    len(tabs),
+                    [((e.get("text") or e.get("label") or "?"), e.get("type")) for e in tabs])
         if not tabs:
-            return False
+            # Last resort: re-observe after scrolling form back to top so tab bar is visible
+            logger.warning("_try_advance_tab: no tabs found — scroll to top and re-observe.")
+            self._scroll_form_to_top(state)
+            import time; time.sleep(0.5)
+            state2 = self._observe()
+            tabs = [
+                e for e in state2.get("elements", [])
+                if e.get("type") in ("tabitem", "tabitemcontrol")
+                and e.get("window_role") != "background"
+                and e.get("bbox")
+            ]
+            logger.info("_try_advance_tab: after re-observe found %d tab(s)", len(tabs))
+            if not tabs:
+                return False
 
-        # Find the currently selected/active tab
-        current_idx = None
-        for i, tab in enumerate(tabs):
-            if tab.get("selected") or tab.get("focused"):
-                current_idx = i
-                break
-        if current_idx is None:
-            current_idx = 0
-
-        next_idx = current_idx + 1
+        next_idx = self._current_tab_idx + 1
         if next_idx >= len(tabs):
-            logger.info("Stuck guard: already on last tab — signalling done.")
+            logger.info("Stuck guard: already on last tab (%d tabs total) — signalling done.",
+                        len(tabs))
             return False
 
         next_tab = tabs[next_idx]
@@ -1105,6 +1542,7 @@ class LLMAgent:
         tab_name = (next_tab.get("text") or next_tab.get("label") or "?").strip()
         logger.info("Stuck guard: advancing to tab %r @ (%.0f, %.0f)", tab_name, cx, cy)
         self._executor.execute({"action_type": "click", "click_position": [cx, cy]})
+        self._current_tab_idx = next_idx
         return True
 
     def _merge(
@@ -1296,6 +1734,24 @@ class LLMAgent:
         try:
             state = self._observer.snapshot()
             if state and state.get("elements") is not None:
+                # EXPERIMENTAL: OCR background-window overlay.
+                # Only fires when use_ocr=True AND UIA background data is thin
+                # (≤1 char total), meaning the background app (Notepad, PDF viewer,
+                # etc.) isn't exposing its content via UIA.  Tesseract screenshots
+                # the background window, detects text boxes, and injects them as
+                # background elements so the LLM can read label→value pairs.
+                if self._use_ocr:
+                    bg_text_total = sum(
+                        len((e.get("value") or "").strip())
+                        for e in state.get("elements", [])
+                        if e.get("window_role") == "background"
+                    )
+                    if bg_text_total <= 1:
+                        ocr_elems = self._ocr_background_window(state)
+                        if ocr_elems:
+                            state["elements"] = state["elements"] + ocr_elems
+                            logger.info("OCR overlay: injected %d element(s) from background window",
+                                        len(ocr_elems))
                 return state
         except Exception as exc:
             logger.warning("Observer error: %s", exc)

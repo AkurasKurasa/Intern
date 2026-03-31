@@ -81,6 +81,7 @@ if __name__ == "__main__":
         max_steps  = MAX_STEPS,
         step_delay = STEP_DELAY,
         record_num = RECORD_NUM,
+        use_ocr    = True,   # EXPERIMENTAL: Tesseract OCR fallback for background windows
     )
     results = agent.run(max_steps=MAX_STEPS, task_name=TASK_NAME)
 

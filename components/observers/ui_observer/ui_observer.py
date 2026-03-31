@@ -108,8 +108,8 @@ _CTRL_TYPE_MAP: Dict[str, str] = {
 }
 
 _ALWAYS_INCLUDE = {"button", "input", "checkbox", "radio", "combobox",
-                   "listitem", "menuitem", "tabitem", "link", "dataitem",
-                   "splitbutton"}
+                   "listitem", "menuitem", "tabitem", "tabitemcontrol",
+                   "link", "dataitem", "splitbutton"}
 
 # Apps to skip — Intern control panel, system shell
 # NOTE: python.exe / pythonw.exe are intentionally NOT listed here so that
@@ -343,6 +343,70 @@ class UIAutomationObserver:
                                 value = " ".join(parts).strip()
                         except Exception:
                             pass
+
+            # Win32 fallback: for controls where UIA returns ≤1 char (e.g. Windows 11
+            # Notepad WinUI3, some PDF viewers).  Read directly from the Win32 edit
+            # control via WM_GETTEXT / WM_GETTEXTLENGTH, which bypasses UIA entirely.
+            if len(value) <= 1 and _WIN32_AVAILABLE:
+                _EDIT_CLASSES = {"Edit", "RichEditD2DPT", "RichEdit20W", "RICHEDIT50W",
+                                 "RICHEDIT60W", "RichEdit"}
+                try:
+                    import ctypes as _ct
+                    WM_GETTEXT       = 0x000D
+                    WM_GETTEXTLENGTH = 0x000E
+
+                    # Try the control's own HWND first
+                    _hwnd = None
+                    try:
+                        _hwnd = ctrl.NativeWindowHandle
+                    except Exception:
+                        pass
+
+                    _user32 = _ct.windll.user32
+
+                    def _read_hwnd_text(h):
+                        try:
+                            length = _user32.SendMessageW(h, WM_GETTEXTLENGTH, 0, 0)
+                            if length > 1:
+                                buf = _ct.create_unicode_buffer(length + 2)
+                                _user32.SendMessageW(h, WM_GETTEXT, length + 1, buf)
+                                return buf.value
+                        except Exception:
+                            pass
+                        return ""
+
+                    if _hwnd:
+                        _cls = win32gui.GetClassName(_hwnd)
+                        if _cls in _EDIT_CLASSES:
+                            value = _read_hwnd_text(_hwnd)
+
+                    # If the top-level HWND didn't work, walk child windows looking
+                    # for an edit class — handles Win11 Notepad's nested hierarchy.
+                    if len(value) <= 1 and _hwnd:
+                        _found_edit = [None]
+
+                        def _find_edit_child(h, _):
+                            if _found_edit[0]:
+                                return
+                            try:
+                                if win32gui.GetClassName(h) in _EDIT_CLASSES:
+                                    _found_edit[0] = h
+                            except Exception:
+                                pass
+
+                        win32gui.EnumChildWindows(_hwnd, _find_edit_child, None)
+
+                        # Also walk one level of grandchildren for WinUI3 nesting
+                        if not _found_edit[0]:
+                            child = win32gui.GetWindow(_hwnd, 5)   # GW_CHILD
+                            while child and not _found_edit[0]:
+                                win32gui.EnumChildWindows(child, _find_edit_child, None)
+                                child = win32gui.GetWindow(child, 2)  # GW_HWNDNEXT
+
+                        if _found_edit[0]:
+                            value = _read_hwnd_text(_found_edit[0])
+                except Exception:
+                    pass
 
             simple_type = _CTRL_TYPE_MAP.get(ctrl_type, ctrl_type.lower())
             text        = name or value
