@@ -713,7 +713,28 @@ class LLMAgent:
                 if self._focus_first_empty_field(state, min_y=_pane_y):
                     time.sleep(self.step_delay * 0.5)
                     continue
-                # No empty editcontrol found at/below pane (e.g. flags section with only checkboxes)
+                # No empty editcontrol found at/below pane. Check if the entire tab is done:
+                # if every editcontrol on the form either has a value OR was filled by us this tab,
+                # there's nothing left to do here → advance to the next tab.
+                _active_edits = [e for e in state.get("elements", [])
+                                 if e.get("window_role") != "background"
+                                 and e.get("type") == "editcontrol"
+                                 and e.get("enabled", True)]
+                _unfilled = [e for e in _active_edits
+                             if not (e.get("value") or "").strip()
+                             and (e.get("label") or e.get("text") or "").strip()
+                                not in self._filled_this_tab]
+                if not _unfilled and _active_edits:
+                    logger.info("Pane-escape: all %d editcontrols filled — advancing tab.", len(_active_edits))
+                    if self._try_advance_tab(state):
+                        _no_change_streak  = 0
+                        _tab_just_switched = True
+                        _tab_scroll_count  = 0
+                        _last_auto_step    = step_idx
+                        self._filled_this_tab.clear()
+                        self._refresh_record_cache(state)
+                        time.sleep(self.step_delay)
+                        continue
                 # Fall through so auto-check / LLM can handle the checkboxes.
 
             # 2. Auto-skip: if focused field already has the correct value, Tab past it
@@ -753,6 +774,7 @@ class LLMAgent:
             auto_chk = self._auto_check(state)
             if auto_chk is not None:
                 field_name_log, should_check = auto_chk
+                _did_new_check = False
                 if should_check:
                     if field_name_log in self._checked_fields:
                         # Already checked this run — don't toggle it off
@@ -783,16 +805,22 @@ class LLMAgent:
                                 logger.info("Auto-check: '%s' → clicking @ (%.0f, %.0f)", field_name_log, cx, cy)
                                 self._executor.execute({"action_type": "click", "click_position": [cx, cy]})
                                 self._checked_fields.add(field_name_log)
+                                _did_new_check = True
                         else:
                             logger.warning("Auto-check: '%s' — no bbox, pressing space", field_name_log)
                             self._executor.execute({"action_type": "keyboard", "key_count": 1, "keystrokes": ["space"]})
                             self._checked_fields.add(field_name_log)
+                            _did_new_check = True
                 else:
                     logger.info("Auto-check: '%s' should remain unchecked — Tab.", field_name_log)
                 self._executor.execute({"action_type": "keyboard", "key_count": 1, "keystrokes": ["tab"]})
                 _no_change_streak = 0
-                _steps_on_tab     = 0
-                _last_auto_step   = step_idx
+                if _did_new_check:
+                    # Only reset drought/tab counters when a new checkbox was actually clicked.
+                    # Revisits (already checked, should-remain-unchecked) let the guards accumulate
+                    # so the drought and stuck guards eventually advance the tab.
+                    _steps_on_tab   = 0
+                    _last_auto_step = step_idx
                 time.sleep(self.step_delay)
                 continue
 
