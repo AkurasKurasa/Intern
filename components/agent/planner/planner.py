@@ -123,23 +123,25 @@ class Planner:
 
     def __init__(
         self,
-        goal:          str   = "",
-        model_path:    str   = "data/models/transformer_bc.pt",
-        provider:      str   = "none",
-        api_key:       str   = "",
-        lmstudio_url:  str   = "http://localhost:1234",
-        model_id:      str   = "",
-        llm_every:     int   = 3,
-        device_str:    str   = "auto",
+        goal:                 str   = "",
+        model_path:           str   = "data/models/transformer_bc.pt",
+        provider:             str   = "none",
+        api_key:              str   = "",
+        lmstudio_url:         str   = "http://localhost:1234",
+        model_id:             str   = "",
+        llm_every:            int   = 3,
+        confidence_threshold: float = 0.80,
+        device_str:           str   = "auto",
     ):
-        self.goal         = goal
-        self.model_path   = model_path
-        self.provider     = provider.lower()
-        self.api_key      = api_key
-        self.lmstudio_url = lmstudio_url
-        self.model_id     = model_id
-        self.llm_every    = llm_every
-        self.device_str   = device_str
+        self.goal                 = goal
+        self.model_path           = model_path
+        self.provider             = provider.lower()
+        self.api_key              = api_key
+        self.lmstudio_url         = lmstudio_url
+        self.model_id             = model_id
+        self.llm_every            = llm_every
+        self.confidence_threshold = confidence_threshold
+        self.device_str           = device_str
 
         self._step         = 0
         self._history:  List[Dict] = []
@@ -164,8 +166,8 @@ class Planner:
         raw = self._transformer_predict(state, hist)
         decision = self._raw_to_decision(raw, source="transformer")
 
-        # Step 2: optional LLM override
-        if self.provider != "none" and (self._step % self.llm_every == 0):
+        # Step 2: optional LLM override — only when transformer is uncertain
+        if self.provider != "none" and decision.confidence < self.confidence_threshold:
             decision = self._llm_evaluate(state, hist, decision)
 
         self._step += 1
@@ -273,7 +275,8 @@ class Planner:
         pred_line = (
             f"action_type={decision.action_type}  "
             f"click_position={decision.click_position}  "
-            f"text={decision.text!r}"
+            f"text={decision.text!r}  "
+            f"confidence={decision.confidence:.0%}"
         )
 
         return (
