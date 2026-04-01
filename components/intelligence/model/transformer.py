@@ -815,6 +815,7 @@ def predict(
     probs = F.softmax(out.type_logits[0], dim=-1).tolist()
     result: Dict[str, Any] = {
         "action_type": _ACTION_LABELS.get(idx, "no_op"),
+        "confidence":  round(max(probs), 4),
         "_scores": {_ACTION_LABELS.get(i, str(i)): round(p, 3) for i, p in enumerate(probs)},
     }
     if idx == ACTION_CLICK:
