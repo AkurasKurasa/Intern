@@ -226,20 +226,26 @@ class LLMProvider:
     # ── provider calls ────────────────────────────────────────────────────────
 
     def _call(self, user_msg: str) -> str:
+        import uuid
+        # Unique tag per call forces LM Studio to start a fresh KV-cache context
+        # rather than appending to the accumulated session from previous calls.
+        session_tag = uuid.uuid4().hex[:12]
+        system_msg  = SYSTEM_PROMPT + f"\n[sid:{session_tag}]"
+
         p = self.provider
         if p == "anthropic":
             resp = self._client.messages.create(
-                model=self.model, max_tokens=256,
-                system=SYSTEM_PROMPT,
+                model=self.model, max_tokens=1024,
+                system=system_msg,
                 messages=[{"role": "user", "content": user_msg}],
             )
             return resp.content[0].text
 
         elif p in ("groq", "lmstudio"):
             resp = self._client.chat.completions.create(
-                model=self.model, max_tokens=256,
+                model=self.model, max_tokens=1024,
                 messages=[
-                    {"role": "system", "content": SYSTEM_PROMPT},
+                    {"role": "system", "content": system_msg},
                     {"role": "user",   "content": user_msg},
                 ],
             )

@@ -29,7 +29,7 @@
           },
           {
             "hwnd": 853192,
-            "title": "Car Insurance \u2014 Data Entry Form",
+            "title": "Car Insurance — Data Entry Form",
             "app": "python.exe",
             "pid": 31004,
             "role": "background",
@@ -208,9 +208,9 @@
               452,
               198
             ],
-            "text": "\ue711",
+            "text": "",
             "value": "",
-            "label": "\ue711",
+            "label": "",
             "automation_id": "",
             "class_name": "TextBlock",
             "enabled": true,
@@ -266,9 +266,9 @@
               517,
               206
             ],
-            "text": "\ue710",
+            "text": "",
             "value": "",
-            "label": "\ue710",
+            "label": "",
             "automation_id": "PrimaryButton",
             "class_name": "Button",
             "enabled": true,
@@ -295,9 +295,9 @@
               505,
               199
             ],
-            "text": "\ue710",
+            "text": "",
             "value": "",
-            "label": "\ue710",
+            "label": "",
             "automation_id": "",
             "class_name": "TextBlock",
             "enabled": true,
@@ -353,9 +353,9 @@
               1503,
               192
             ],
-            "text": "\ue921",
+            "text": "",
             "value": "",
-            "label": "\ue921",
+            "label": "",
             "automation_id": "",
             "class_name": "TextBlock",
             "enabled": true,
@@ -382,9 +382,9 @@
               1560,
               192
             ],
-            "text": "\ue922",
+            "text": "",
             "value": "",
-            "label": "\ue922",
+            "label": "",
             "automation_id": "",
             "class_name": "TextBlock",
             "enabled": true,
@@ -411,9 +411,9 @@
               1618,
               192
             ],
-            "text": "\ue8bb",
+            "text": "",
             "value": "",
-            "label": "\ue8bb",
+            "label": "",
             "automation_id": "",
             "class_name": "TextBlock",
             "enabled": true,
@@ -556,9 +556,9 @@
               1641,
               229
             ],
-            "text": "\ueddb",
+            "text": "",
             "value": "",
-            "label": "\ueddb",
+            "label": "",
             "automation_id": "",
             "class_name": "TextBlock",
             "enabled": true,
@@ -701,9 +701,9 @@
               1641,
               914
             ],
-            "text": "\ueddc",
+            "text": "",
             "value": "",
-            "label": "\ueddc",
+            "label": "",
             "automation_id": "",
             "class_name": "TextBlock",
             "enabled": true,
@@ -730,9 +730,9 @@
               1118,
               1054
             ],
-            "text": "Car Insurance \u2014 Data Entry Form",
+            "text": "Car Insurance — Data Entry Form",
             "value": "",
-            "label": "Car Insurance \u2014 Data Entry Form",
+            "label": "Car Insurance — Data Entry Form",
             "automation_id": "",
             "class_name": "wxWindowNR",
             "enabled": true,
@@ -741,7 +741,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -770,7 +770,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -799,7 +799,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -817,9 +817,9 @@
               478,
               117
             ],
-            "text": "Car Insurance \u2014 Data Entry Form",
+            "text": "Car Insurance — Data Entry Form",
             "value": "",
-            "label": "Car Insurance \u2014 Data Entry Form",
+            "label": "Car Insurance — Data Entry Form",
             "automation_id": "-31991",
             "class_name": "Static",
             "enabled": true,
@@ -828,7 +828,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -857,7 +857,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -886,7 +886,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -915,7 +915,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -944,7 +944,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -973,7 +973,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -1002,7 +1002,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -1031,7 +1031,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -1060,7 +1060,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -1089,7 +1089,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -1118,7 +1118,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -1147,7 +1147,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -1176,7 +1176,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -1205,7 +1205,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -1234,7 +1234,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -1263,7 +1263,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -1292,7 +1292,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -1321,7 +1321,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -1350,7 +1350,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -1379,7 +1379,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -1408,7 +1408,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -1437,7 +1437,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -1466,7 +1466,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -1495,7 +1495,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -1524,7 +1524,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -1553,7 +1553,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -1582,7 +1582,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -1611,7 +1611,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -1640,7 +1640,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -1669,7 +1669,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -1698,7 +1698,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -1727,7 +1727,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -1756,7 +1756,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -1785,7 +1785,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -1814,7 +1814,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -1843,7 +1843,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -1872,7 +1872,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -1901,7 +1901,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -1930,7 +1930,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -1959,7 +1959,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -1988,7 +1988,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -2017,7 +2017,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -2046,7 +2046,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -2075,7 +2075,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -2104,7 +2104,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -2133,7 +2133,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -2162,7 +2162,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -2191,7 +2191,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -2220,7 +2220,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -2249,7 +2249,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -2278,7 +2278,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -2307,7 +2307,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -2336,7 +2336,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -2365,7 +2365,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -2394,7 +2394,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -2423,7 +2423,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -2452,7 +2452,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -2481,7 +2481,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -2510,7 +2510,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -2539,7 +2539,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -2568,7 +2568,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -2597,7 +2597,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -2626,7 +2626,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -2655,7 +2655,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -2684,7 +2684,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -2713,7 +2713,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -2742,7 +2742,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -2771,7 +2771,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -2800,7 +2800,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -2829,7 +2829,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -2858,7 +2858,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -2887,7 +2887,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -2916,7 +2916,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -2945,7 +2945,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -2974,7 +2974,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -3003,7 +3003,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -3032,7 +3032,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -3061,7 +3061,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -3090,7 +3090,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -3119,7 +3119,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -3148,7 +3148,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -3177,7 +3177,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -3206,7 +3206,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -3224,9 +3224,9 @@
               1108,
               68
             ],
-            "text": "Car Insurance \u2014 Data Entry Form",
-            "value": "Car Insurance \u2014 Data Entry Form",
-            "label": "Car Insurance \u2014 Data Entry Form",
+            "text": "Car Insurance — Data Entry Form",
+            "value": "Car Insurance — Data Entry Form",
+            "label": "Car Insurance — Data Entry Form",
             "automation_id": "",
             "class_name": "",
             "enabled": true,
@@ -3235,7 +3235,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -3264,7 +3264,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -3293,7 +3293,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -3322,7 +3322,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -3351,7 +3351,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -3380,7 +3380,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -3478,7 +3478,7 @@
           },
           {
             "hwnd": 853192,
-            "title": "Car Insurance \u2014 Data Entry Form",
+            "title": "Car Insurance — Data Entry Form",
             "app": "python.exe",
             "pid": 31004,
             "role": "background",
@@ -3657,9 +3657,9 @@
               452,
               198
             ],
-            "text": "\ue711",
+            "text": "",
             "value": "",
-            "label": "\ue711",
+            "label": "",
             "automation_id": "",
             "class_name": "TextBlock",
             "enabled": true,
@@ -3715,9 +3715,9 @@
               517,
               206
             ],
-            "text": "\ue710",
+            "text": "",
             "value": "",
-            "label": "\ue710",
+            "label": "",
             "automation_id": "PrimaryButton",
             "class_name": "Button",
             "enabled": true,
@@ -3744,9 +3744,9 @@
               505,
               199
             ],
-            "text": "\ue710",
+            "text": "",
             "value": "",
-            "label": "\ue710",
+            "label": "",
             "automation_id": "",
             "class_name": "TextBlock",
             "enabled": true,
@@ -3802,9 +3802,9 @@
               1503,
               192
             ],
-            "text": "\ue921",
+            "text": "",
             "value": "",
-            "label": "\ue921",
+            "label": "",
             "automation_id": "",
             "class_name": "TextBlock",
             "enabled": true,
@@ -3831,9 +3831,9 @@
               1560,
               192
             ],
-            "text": "\ue922",
+            "text": "",
             "value": "",
-            "label": "\ue922",
+            "label": "",
             "automation_id": "",
             "class_name": "TextBlock",
             "enabled": true,
@@ -3860,9 +3860,9 @@
               1618,
               192
             ],
-            "text": "\ue8bb",
+            "text": "",
             "value": "",
-            "label": "\ue8bb",
+            "label": "",
             "automation_id": "",
             "class_name": "TextBlock",
             "enabled": true,
@@ -4005,9 +4005,9 @@
               1641,
               229
             ],
-            "text": "\ueddb",
+            "text": "",
             "value": "",
-            "label": "\ueddb",
+            "label": "",
             "automation_id": "",
             "class_name": "TextBlock",
             "enabled": true,
@@ -4150,9 +4150,9 @@
               1641,
               914
             ],
-            "text": "\ueddc",
+            "text": "",
             "value": "",
-            "label": "\ueddc",
+            "label": "",
             "automation_id": "",
             "class_name": "TextBlock",
             "enabled": true,
@@ -4179,9 +4179,9 @@
               1118,
               1054
             ],
-            "text": "Car Insurance \u2014 Data Entry Form",
+            "text": "Car Insurance — Data Entry Form",
             "value": "",
-            "label": "Car Insurance \u2014 Data Entry Form",
+            "label": "Car Insurance — Data Entry Form",
             "automation_id": "",
             "class_name": "wxWindowNR",
             "enabled": true,
@@ -4190,7 +4190,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -4219,7 +4219,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -4248,7 +4248,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -4266,9 +4266,9 @@
               478,
               117
             ],
-            "text": "Car Insurance \u2014 Data Entry Form",
+            "text": "Car Insurance — Data Entry Form",
             "value": "",
-            "label": "Car Insurance \u2014 Data Entry Form",
+            "label": "Car Insurance — Data Entry Form",
             "automation_id": "-31991",
             "class_name": "Static",
             "enabled": true,
@@ -4277,7 +4277,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -4306,7 +4306,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -4335,7 +4335,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -4364,7 +4364,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -4393,7 +4393,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -4422,7 +4422,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -4451,7 +4451,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -4480,7 +4480,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -4509,7 +4509,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -4538,7 +4538,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -4567,7 +4567,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -4596,7 +4596,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -4625,7 +4625,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -4654,7 +4654,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -4683,7 +4683,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -4712,7 +4712,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -4741,7 +4741,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -4770,7 +4770,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -4799,7 +4799,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -4828,7 +4828,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -4857,7 +4857,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -4886,7 +4886,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -4915,7 +4915,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -4944,7 +4944,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -4973,7 +4973,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -5002,7 +5002,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -5031,7 +5031,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -5060,7 +5060,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -5089,7 +5089,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -5118,7 +5118,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -5147,7 +5147,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -5176,7 +5176,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -5205,7 +5205,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -5234,7 +5234,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -5263,7 +5263,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -5292,7 +5292,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -5321,7 +5321,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -5350,7 +5350,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -5379,7 +5379,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -5408,7 +5408,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -5437,7 +5437,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -5466,7 +5466,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -5495,7 +5495,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -5524,7 +5524,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -5553,7 +5553,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -5582,7 +5582,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -5611,7 +5611,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -5640,7 +5640,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -5669,7 +5669,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -5698,7 +5698,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -5727,7 +5727,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -5756,7 +5756,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -5785,7 +5785,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -5814,7 +5814,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -5843,7 +5843,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -5872,7 +5872,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -5901,7 +5901,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -5930,7 +5930,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -5959,7 +5959,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -5988,7 +5988,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -6017,7 +6017,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -6046,7 +6046,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -6075,7 +6075,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -6104,7 +6104,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -6133,7 +6133,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -6162,7 +6162,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -6191,7 +6191,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -6220,7 +6220,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -6249,7 +6249,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -6278,7 +6278,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -6307,7 +6307,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -6336,7 +6336,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -6365,7 +6365,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -6394,7 +6394,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -6423,7 +6423,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -6452,7 +6452,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -6481,7 +6481,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -6510,7 +6510,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -6539,7 +6539,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -6568,7 +6568,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -6597,7 +6597,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -6626,7 +6626,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -6655,7 +6655,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -6673,9 +6673,9 @@
               1108,
               68
             ],
-            "text": "Car Insurance \u2014 Data Entry Form",
-            "value": "Car Insurance \u2014 Data Entry Form",
-            "label": "Car Insurance \u2014 Data Entry Form",
+            "text": "Car Insurance — Data Entry Form",
+            "value": "Car Insurance — Data Entry Form",
+            "label": "Car Insurance — Data Entry Form",
             "automation_id": "",
             "class_name": "",
             "enabled": true,
@@ -6684,7 +6684,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -6713,7 +6713,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -6742,7 +6742,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -6771,7 +6771,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -6800,7 +6800,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -6829,7 +6829,7 @@
             "confidence": 1.0,
             "source": "uia",
             "app": "python.exe",
-            "window_title": "Car Insurance \u2014 Data Entry Form",
+            "window_title": "Car Insurance — Data Entry Form",
             "window_role": "background",
             "pid": 31004,
             "metadata": {
@@ -6901,5 +6901,8 @@
       "timestamp": 1774527732.9961057,
       "source": "correction"
     }
-  ]
+  ],
+  "action": {
+    "action_type": "noop"
+  }
 }

@@ -536,6 +536,89 @@ class ScreenObserver:
 
     # ── pipeline (private) ────────────────────────────────────────────────────
 
+    @staticmethod
+    def _derive_action_from(
+        step_mouse: list,
+        step_strokes: list,
+        step_clipboard: list,
+    ) -> dict:
+        """
+        Convert raw mouse/keyboard/clipboard events for one trace step into
+        a structured action dict that BCTrainer can learn from.
+
+        Priority:
+          1. Clipboard paste  → action_type="paste"
+          2. Keyboard strokes → action_type="keyboard"
+          3. Mouse click/drag → action_type="click" / "double_click" / "drag"
+          4. Nothing          → action_type="noop"
+        """
+        # 1. Clipboard paste
+        if step_clipboard:
+            text = step_clipboard[-1].get("text", "")
+            click_pos = None
+            if step_mouse:
+                pos = step_mouse[-1].get("position", [])
+                if len(pos) == 2:
+                    click_pos = [int(pos[0]), int(pos[1])]
+            return {
+                "action_type":    "paste",
+                "text":           text,
+                "click_position": click_pos,
+            }
+
+        # 2. Keyboard text
+        if step_strokes:
+            _IGNORE = {"shift", "ctrl", "alt", "win", "caps lock",
+                       "tab", "esc", "escape", "up", "down", "left", "right",
+                       "page up", "page down", "home", "end", "insert", "delete",
+                       "f1","f2","f3","f4","f5","f6","f7","f8","f9","f10","f11","f12"}
+            chars = []
+            for stroke in step_strokes:
+                key = stroke.get("key", "")
+                low = key.lower()
+                if low == "backspace":
+                    if chars:
+                        chars.pop()
+                elif low == "space":
+                    chars.append(" ")
+                elif low == "enter" or low == "return":
+                    chars.append("\n")
+                elif low not in _IGNORE and len(key) == 1:
+                    chars.append(key)
+            typed_text = "".join(chars)
+            click_pos = None
+            if step_mouse:
+                pos = step_mouse[0].get("position", [])
+                if len(pos) == 2:
+                    click_pos = [int(pos[0]), int(pos[1])]
+            return {
+                "action_type":    "keyboard",
+                "text":           typed_text,
+                "keystrokes":     [s.get("key", "") for s in step_strokes],
+                "click_position": click_pos,
+            }
+
+        # 3. Mouse action
+        if step_mouse:
+            evt = step_mouse[-1]
+            evt_type = evt.get("type", "click")
+            pos  = evt.get("position", [])
+            pos2 = evt.get("end_position", [])
+            click_pos = [int(pos[0]), int(pos[1])] if len(pos) == 2 else None
+            if evt_type == "drag" and len(pos2) == 2:
+                return {
+                    "action_type":    "drag",
+                    "click_position": click_pos,
+                    "end_position":   [int(pos2[0]), int(pos2[1])],
+                }
+            return {
+                "action_type":    evt_type,   # "click" or "double_click"
+                "click_position": click_pos,
+            }
+
+        # 4. Nothing happened
+        return {"action_type": "noop"}
+
     def _translate_and_save(
         self,
         frames: List[Any],
@@ -642,6 +725,7 @@ class ScreenObserver:
                 "keyboard":   {"actions": step_kb},
                 "clipboard":  {"events": step_clipboard},
                 "diff":       diff,
+                "action":     ScreenObserver._derive_action_from(step_mouse, step_strokes, step_clipboard),
             }
             out_path = os.path.join(self.output_dir, f"live_step_{step_idx:04d}.json")
             with open(out_path, "w", encoding="utf-8") as f:

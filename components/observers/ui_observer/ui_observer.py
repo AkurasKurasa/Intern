@@ -429,7 +429,7 @@ class UIAutomationObserver:
                     "control_type":  ctrl_type,
                     "bbox":          [rect.left, rect.top, rect.right, rect.bottom],
                     "text":          text,
-                    "value":         value,
+                    "value":         value[:2000] if value and len(value) > 2000 else value,
                     "label":         text,
                     "automation_id": auto_id,
                     "class_name":    class_name,
