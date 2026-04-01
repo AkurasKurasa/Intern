@@ -714,8 +714,7 @@ class LLMAgent:
                     time.sleep(self.step_delay * 0.5)
                     continue
                 # No empty editcontrol found at/below pane. Check if the entire tab is done:
-                # if every editcontrol on the form either has a value OR was filled by us this tab,
-                # there's nothing left to do here → advance to the next tab.
+                # all editcontrols filled AND all required checkboxes handled.
                 _active_edits = [e for e in state.get("elements", [])
                                  if e.get("window_role") != "background"
                                  and e.get("type") == "editcontrol"
@@ -724,8 +723,22 @@ class LLMAgent:
                              if not (e.get("value") or "").strip()
                              and (e.get("label") or e.get("text") or "").strip()
                                 not in self._filled_this_tab]
-                if not _unfilled and _active_edits:
-                    logger.info("Pane-escape: all %d editcontrols filled — advancing tab.", len(_active_edits))
+                # Also check for checkboxes that still need to be clicked
+                _active_checks = [e for e in state.get("elements", [])
+                                  if e.get("window_role") != "background"
+                                  and e.get("type") == "checkboxcontrol"
+                                  and e.get("enabled", True)]
+                _unhandled_checks = []
+                for _chk_e in _active_checks:
+                    _chk_name = (_chk_e.get("label") or _chk_e.get("text") or "").strip()
+                    if _chk_name in self._checked_fields:
+                        continue
+                    _chk_exp = self._lookup_field(_chk_name)
+                    if _chk_exp and _chk_exp.lower().strip("()") in {"yes", "yes check", "true", "checked"}:
+                        _unhandled_checks.append(_chk_name)
+                if not _unfilled and _active_edits and not _unhandled_checks:
+                    logger.info("Pane-escape: all %d editcontrols filled, %d checkboxes handled — advancing tab.",
+                                len(_active_edits), len(_active_checks))
                     if self._try_advance_tab(state):
                         _no_change_streak  = 0
                         _tab_just_switched = True
@@ -749,12 +762,16 @@ class LLMAgent:
                 time.sleep(self.step_delay)
                 continue
 
-            # 2a. Auto-fill: if focused field is empty but background data has a value, type it
+            # 2a. Auto-fill: if focused field is empty (or has wrong leftover value), type correct value
             auto_text = self._auto_fill(state)
             if auto_text:
-                field_name_log, text_val = auto_text
+                field_name_log, text_val, needs_clear = auto_text
                 self._peek_notepad(state, field_name_log)
-                logger.info("Auto-fill: '%s' → %r", field_name_log, text_val[:40])
+                if needs_clear:
+                    logger.info("Auto-fill (overwrite): '%s' → %r", field_name_log, text_val[:40])
+                    self._executor.execute({"action_type": "keyboard", "key_count": 1, "keystrokes": ["ctrl+a"]})
+                else:
+                    logger.info("Auto-fill: '%s' → %r", field_name_log, text_val[:40])
                 self._executor.execute({
                     "action_type": "keyboard",
                     "key_count": len(text_val),
@@ -1560,8 +1577,6 @@ class LLMAgent:
         if focused.get("type") not in ("editcontrol",):
             return None
         current = (focused.get("value") or "").strip()
-        if current:
-            return None   # already has a value — let auto_skip handle it
 
         field_name = (focused.get("label") or focused.get("text") or "").strip()
         if not field_name:
@@ -1571,6 +1586,20 @@ class LLMAgent:
         # where the form clears numeric/spin fields on re-focus).
         if field_name in self._filled_this_tab:
             return None
+
+        if current:
+            # Field has a value — check if it's wrong (leftover from a previous run).
+            # If wrong, return it flagged for overwrite (Ctrl+A before typing).
+            expected_check = self._lookup_field(field_name)
+            _skip_check = {"(none)", "none", "(leave blank)", "n/a", "yes (check)",
+                           "leave blank — liability only", "leave blank — owned outright"}
+            if (expected_check
+                    and expected_check.lower().strip("()") not in _skip_check
+                    and current.lower() != expected_check.lower()):
+                logger.info("Auto-fill: '%s' has wrong value %r — will overwrite with %r",
+                            field_name, current, expected_check)
+                return (field_name, expected_check, True)   # True = needs Ctrl+A clear first
+            return None   # correct value or no expected — let auto_skip handle it
 
         # ── Primary: use the cached full record (bypasses 2000-char UIA cap) ──
         expected = self._lookup_field(field_name)
@@ -1597,7 +1626,7 @@ class LLMAgent:
         if expected.lower().strip("()") in _skip_vals:
             return None
 
-        return (field_name, expected)
+        return (field_name, expected, False)   # False = field is empty, no clear needed
 
     def _combobox_needs_fix(self, state: Dict[str, Any]) -> Optional[tuple]:
         """
