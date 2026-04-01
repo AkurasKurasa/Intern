@@ -798,10 +798,7 @@ class LLMAgent:
                         _last_auto_step = step_idx
                         time.sleep(self.step_delay)
                         continue
-
-            # 2c. Drought check: if too many steps without any auto-handler, scroll form down.
-            # Allowed up to _MAX_TAB_SCROLLS times per tab so multi-section tabs
-            # (e.g. Policyholder with 20+ fields) get revealed incrementally.
+                        
             _drought = step_idx - _last_auto_step
             if _drought >= _DROUGHT_LIMIT and _tab_scroll_count < _MAX_TAB_SCROLLS:
                 logger.info("Drought guard: %d steps without auto-handler — scrolling form (scroll %d/%d).",
@@ -812,14 +809,28 @@ class LLMAgent:
                     time.sleep(self.step_delay * 0.75)
                     continue   # re-observe with scrolled form
 
+            # 2. Transformer always runs — learned behavioral engine
+            llm_action = None
+            # 2c. Drought check: if too many steps without any auto-handler, scroll form down.
+            # Allowed up to _MAX_TAB_SCROLLS times per tab so multi-section tabs
+            # (e.g. Policyholder with 20+ fields) get revealed incrementally.
+            
+
             # 2. Transformer always runs — learns from user recordings
             t_pred = self._predict(state)
             t_type = t_pred.get("action_type", "no_op")
-            t_conf = max(t_pred.get("_scores", {}).values(), default=0.0)
+            t_conf = t_pred.get("confidence", max(t_pred.get("_scores", {}).values(), default=0.0))
             logger.info("Transformer → %-8s  conf=%.2f", t_type, t_conf)
 
-            # 2b. LLM reasons about what to do + supplies text values
-            if self._llm_client:
+            # Confidence-based routing:
+            #   >= 0.80  → execute directly, skip LLM (transformer is sure)
+            #   0.50–0.80 → LLM validates / may override
+            #   <  0.50  → LLM decides (transformer is uncertain)
+            _HIGH_CONF   = 0.80
+            _MED_CONF    = 0.50
+
+            # 2b. LLM only consulted when transformer is uncertain
+            if self._llm_client and t_conf < _HIGH_CONF:
                 llm_action = self._ask_llm(state)
                 action_type = llm_action.get("action_type", "wait")
                 logger.info("LLM[%s] → %s  reason=%r",
@@ -927,7 +938,7 @@ class LLMAgent:
                 "click_xy":    [pos[0] / W, pos[1] / H] if pos else [0.0, 0.0],
                 "key_count":   prediction.get("key_count", 0),
                 "typed_text":  prediction.get("text", ""),
-                "target":      llm_action.get("target", "") if self._llm_client else "",
+                "target":      llm_action.get("target", "") if self._llm_client and llm_action else "",
                 "validation":  validation.status,
             })
             self._results.append({
