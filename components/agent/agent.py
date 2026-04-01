@@ -719,11 +719,18 @@ class LLMAgent:
                                  if e.get("window_role") != "background"
                                  and e.get("type") == "editcontrol"
                                  and e.get("enabled", True)]
-                _unfilled = [e for e in _active_edits
-                             if not (e.get("value") or "").strip()
-                             and (e.get("label") or e.get("text") or "").strip()
-                                not in self._filled_this_tab]
-                # Also check for checkboxes that still need to be clicked
+                # A field is "pending" if the record has a value for it AND we
+                # haven't filled it ourselves this tab pass.  Non-empty values from
+                # a previous interrupted run still count as pending because they may
+                # be wrong and we haven't verified/overwritten them yet.
+                _pending_edits = [
+                    (e.get("label") or e.get("text") or "").strip()
+                    for e in _active_edits
+                    if (e.get("label") or e.get("text") or "").strip() not in self._filled_this_tab
+                    and self._lookup_field((e.get("label") or e.get("text") or "").strip())
+                ]
+                # Also check for checkboxes that still need to be clicked.
+                # Use startswith("yes") to match "YES (check)", "yes", "Yes", etc.
                 _active_checks = [e for e in state.get("elements", [])
                                   if e.get("window_role") != "background"
                                   and e.get("type") == "checkboxcontrol"
@@ -734,10 +741,10 @@ class LLMAgent:
                     if _chk_name in self._checked_fields:
                         continue
                     _chk_exp = self._lookup_field(_chk_name)
-                    if _chk_exp and _chk_exp.lower().strip("()") in {"yes", "yes check", "true", "checked"}:
+                    if _chk_exp and _chk_exp.lower().strip().startswith("yes"):
                         _unhandled_checks.append(_chk_name)
-                if not _unfilled and _active_edits and not _unhandled_checks:
-                    logger.info("Pane-escape: all %d editcontrols filled, %d checkboxes handled — advancing tab.",
+                if not _pending_edits and _active_edits and not _unhandled_checks:
+                    logger.info("Pane-escape: all %d editcontrols handled, %d checkboxes done — advancing tab.",
                                 len(_active_edits), len(_active_checks))
                     if self._try_advance_tab(state):
                         _no_change_streak  = 0
