@@ -111,6 +111,13 @@ class CarInsuranceFrame(wx.Frame):
 
         self._controls: dict = {}       # field_name → widget
         self._accessibles: list = []    # hold _CtrlAccessible refs — prevents Python GC freeing them
+        self._record_counter: int = 0   # increments on each Submit & New
+
+        # auto-save output directory (created on first use)
+        self._submissions_dir = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+            "data", "output", "submissions"
+        )
 
         self._build_ui()
         self.Centre()
@@ -160,6 +167,7 @@ class CarInsuranceFrame(wx.Frame):
         footer_sz.AddStretchSpacer()
 
         btn_specs = [
+            ("Submit & New",  "btn_submit_new",    self._on_submit_new),
             ("Submit",        "btn_submit",        self._on_submit),
             ("Clear All",     "btn_clear",         self._on_clear),
             ("Print Preview", "btn_print_preview", self._on_print_preview),
@@ -792,6 +800,26 @@ class CarInsuranceFrame(wx.Frame):
         if wx.MessageBox("Clear all fields? This cannot be undone.",
                          "Clear All", wx.YES_NO | wx.ICON_WARNING) != wx.YES:
             return
+        self._clear_all_fields()
+        self._status_lbl.SetLabel("  Cleared")
+
+    # ── shared helpers ────────────────────────────────────────────────────────
+
+    def _auto_save(self, data: dict) -> str:
+        """Save *data* to submissions dir; return the path (or '' on error)."""
+        try:
+            os.makedirs(self._submissions_dir, exist_ok=True)
+            ts   = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+            pol  = str(data.get("policy_number", "unknown")).replace(" ", "_")
+            path = os.path.join(self._submissions_dir, f"{pol}_{ts}.json")
+            with open(path, "w", encoding="utf-8") as f:
+                json.dump(data, f, indent=2)
+            return path
+        except Exception:
+            return ""
+
+    def _clear_all_fields(self):
+        """Reset every control to its blank / default state."""
         for ctrl in self._controls.values():
             if isinstance(ctrl, wx.TextCtrl):
                 ctrl.SetValue("")
@@ -799,7 +827,19 @@ class CarInsuranceFrame(wx.Frame):
                 ctrl.SetValue(False)
             elif isinstance(ctrl, wx.Choice) and ctrl.GetCount() > 0:
                 ctrl.SetSelection(0)
-        self._status_lbl.SetLabel("  Cleared")
+
+    # ── button handlers ───────────────────────────────────────────────────────
+
+    def _on_submit_new(self, event):
+        """Submit & New — save silently, clear form, go to tab 1.  No dialogs."""
+        data = self._collect_data()
+        self._auto_save(data)
+        self._record_counter += 1
+        self._clear_all_fields()
+        self.nb.SetSelection(0)
+        self._status_lbl.SetLabel(
+            f"  Submitted #{self._record_counter} — Ready for next record"
+        )
 
     def _on_submit(self, event):
         data = self._collect_data()
@@ -810,12 +850,14 @@ class CarInsuranceFrame(wx.Frame):
             wx.MessageBox("Please fill in required fields:\n• " + "\n• ".join(missing),
                           "Missing Fields", wx.OK | wx.ICON_WARNING)
             return
+        path = self._auto_save(data)
         wx.MessageBox(
             f"Record submitted successfully.\n"
             f"Policy : {data.get('policy_number','')}\n"
             f"Insured: {data.get('ph_first','')} {data.get('ph_last','')}\n"
             f"Vehicle: {data.get('v_year','')} {data.get('v_make','')} "
-            f"{data.get('v_model','')}",
+            f"{data.get('v_model','')}\n\n"
+            f"Saved to: {os.path.basename(path) if path else '(save failed)'}",
             "Submitted", wx.OK | wx.ICON_INFORMATION)
         self._status_lbl.SetLabel("  Submitted")
 

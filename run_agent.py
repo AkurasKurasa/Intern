@@ -45,15 +45,16 @@ logging.basicConfig(
 logger = logging.getLogger("run_agent")
 
 # ── config ────────────────────────────────────────────────────────────────────
-GOAL       = "Fill the car insurance form using data from the open text file"
-PROVIDER   = "lmstudio"
-API_KEY    = os.environ.get("GROQ_API_KEY", "")
-MODEL_PATH = os.path.join(_ROOT, "data", "models", "transformer_bc.pt")
-DRY_RUN    = False
-MAX_STEPS  = 500   # agent stops itself via "done" action when complete
-STEP_DELAY = 1.5
-TASK_NAME  = "fill_insurance"
-RECORD_NUM = 1   # which record to fill (1-based)
+GOAL          = "Fill the car insurance form using data from the open text file"
+PROVIDER      = "lmstudio"
+API_KEY       = os.environ.get("GROQ_API_KEY", "")
+MODEL_PATH    = os.path.join(_ROOT, "data", "models", "transformer_bc.pt")
+DRY_RUN       = False
+MAX_STEPS     = 500   # agent stops itself via "done" action when complete
+STEP_DELAY    = 1.5
+TASK_NAME     = "fill_insurance"
+RECORD_START  = 1    # first record to fill (1-based)
+RECORD_END    = 5    # last record to fill (inclusive); set > 1 to loop
 
 # ── run ───────────────────────────────────────────────────────────────────────
 if __name__ == "__main__":
@@ -71,23 +72,58 @@ if __name__ == "__main__":
         time.sleep(1)
     print("  GO!                 ")
 
-    logger.info("Starting LLMAgent  goal=%r  provider=%s  dry_run=%s", GOAL, PROVIDER, DRY_RUN)
-    agent = LLMAgent(
-        goal       = GOAL,
-        provider   = PROVIDER,
-        api_key    = API_KEY,
-        model_path = MODEL_PATH,
-        dry_run    = DRY_RUN,
-        max_steps  = MAX_STEPS,
-        step_delay = STEP_DELAY,
-        record_num = RECORD_NUM,
-        use_ocr    = True,   # EXPERIMENTAL: Tesseract OCR fallback for background windows
-    )
-    results = agent.run(max_steps=MAX_STEPS, task_name=TASK_NAME)
+    import pyautogui
+
+    total_records = RECORD_END - RECORD_START + 1
+    logger.info("Starting LLMAgent  goal=%r  provider=%s  records=%d-%d  dry_run=%s",
+                GOAL, PROVIDER, RECORD_START, RECORD_END, DRY_RUN)
+
+    all_results = []
+    for record_num in range(RECORD_START, RECORD_END + 1):
+        logger.info("=" * 60)
+        logger.info("RECORD %d / %d", record_num, RECORD_END)
+        logger.info("=" * 60)
+
+        agent = LLMAgent(
+            goal       = GOAL,
+            provider   = PROVIDER,
+            api_key    = API_KEY,
+            model_path = MODEL_PATH,
+            dry_run    = DRY_RUN,
+            max_steps  = MAX_STEPS,
+            step_delay = STEP_DELAY,
+            record_num = record_num,
+            use_ocr    = True,   # EXPERIMENTAL: Tesseract OCR fallback for background windows
+        )
+        results = agent.run(max_steps=MAX_STEPS, task_name=TASK_NAME)
+        all_results.extend(results)
+
+        # After the agent is done, click "Submit & New" to save + clear the form
+        if record_num < RECORD_END:
+            logger.info("Clicking 'Submit & New' to advance to record %d...", record_num + 1)
+            try:
+                import uiautomation as auto
+                btn = auto.ButtonControl(Name="Submit & New", searchDepth=6)
+                if btn.Exists(maxSearchSeconds=3):
+                    btn.Click()
+                    logger.info("Submit & New clicked via UIA.")
+                else:
+                    logger.warning("Submit & New button not found — trying image search.")
+                    loc = pyautogui.locateOnScreen("assets/btn_submit_new.png",
+                                                   confidence=0.8)
+                    if loc:
+                        pyautogui.click(pyautogui.center(loc))
+                    else:
+                        logger.error("Could not find Submit & New button — stopping loop.")
+                        break
+            except Exception as e:
+                logger.error("Submit & New click failed: %s", e)
+                break
+            time.sleep(2.0)   # wait for form to clear before next record
 
     logger.info("=" * 60)
-    logger.info("Run complete — %d steps", len(results))
-    for r in results:
+    logger.info("All done — %d record(s), %d total steps", total_records, len(all_results))
+    for r in all_results:
         step = r.get("step", "?")
         act  = r.get("action", {}).get("action_type", "?")
         val  = r.get("validation", "?")

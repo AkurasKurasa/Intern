@@ -181,7 +181,7 @@ def _decode_actions(
                 if len(k) == 1 and k.isprintable():
                     parts.append(k)
     typed_text = "".join(parts)
-    clicks = [a for a in mouse_actions if a.get("type") == "click"]
+    clicks = [a for a in mouse_actions if a.get("type") in ("click", "double_click")]
     if clicks:
         pos = clicks[0].get("position", [0, 0])
         return ACTION_CLICK, float(pos[0]) / W, float(pos[1]) / H, min(key_count / 100.0, 1.0), ""
@@ -259,8 +259,18 @@ class TrajectoryDataset(Dataset):
             raise FileNotFoundError(f"No trace JSONs in {data_dir!r} (including session subfolders)")
 
         # Load raw traces — skip traces with no active-window interactive
-        # controls (e.g. old Tkinter sessions where UIA saw 0 form elements)
+        # controls (e.g. old Tkinter sessions where UIA saw 0 form elements).
+        # Type names must match _CTRL_TYPE_MAP in ui_observer.py:
+        #   "Edit" → "input", "Button" → "button", "ComboBox" → "combobox", etc.
+        # wxPython controls not in _CTRL_TYPE_MAP fall through as lowercased
+        # ControlTypeName, e.g. "TabItemControl" → "tabitemcontrol".
         _INTERACTIVE = {
+            "input",          # Edit / text field  (was "editcontrol" — wrong)
+            "combobox",       # ComboBox           (was "comboboxcontrol" — wrong)
+            "checkbox",       # CheckBox           (was "checkboxcontrol" — wrong)
+            "button",         # Button             (was "buttoncontrol" — wrong)
+            "listitem",       # ListItem           (was "listitemcontrol" — wrong)
+            # wx fallback names (ControlTypeName.lower() when not in map)
             "editcontrol", "comboboxcontrol", "checkboxcontrol",
             "buttoncontrol", "listitemcontrol",
         }

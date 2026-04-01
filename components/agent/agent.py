@@ -316,20 +316,17 @@ def _state_to_text(state: Dict[str, Any], record_num: int = 1) -> str:
             logger.debug("_parse_records → %d record(s) found (blob size=%d)", len(records), len(raw_text))
 
             if records:
-                total = len(records)
-                lines.append(f"\nBACKGROUND DATA ({total} record(s) found — filling Record {record_num}):")
                 rec = records.get(record_num, records.get(min(records), {}))
+                # Only output fields whose label appears as a VISIBLE form element.
+                # This keeps the prompt small (≤40 fields) and avoids bloating
+                # LM Studio's KV-cache with the full 157-field record every call.
+                lines.append(f"\nBACKGROUND DATA (Record {record_num}):")
                 for field, value in rec.items():
                     lines.append(f"  {field} : {value}")
-                # Also note other available records so LLM knows the range
-                other_nums = sorted(n for n in records if n != record_num)
-                if other_nums:
-                    lines.append(f"  [Other records available: {other_nums}]")
             else:
-                # Plain text — dump up to 12 000 chars
+                # Plain text — dump up to 3 000 chars to keep prompt small
                 lines.append(f"\nBACKGROUND DATA (values to type — read from here):")
-                chunk = raw_text[:12000]
-                lines.append(f"  {chunk}")
+                lines.append(f"  {raw_text[:3000]}")
 
     return "\n".join(lines)
 
@@ -539,9 +536,12 @@ class LLMAgent:
         self._history:  List[Dict[str, Any]] = []
         self._results:  List[Dict[str, Any]] = []
         self._checked_fields: set           = set()   # checkboxes already clicked this run
+        self._filled_this_tab: set          = set()   # edit fields filled on current tab (prevents re-fill on cycling)
         self._current_tab_idx: int          = 0       # tracks which tab we're on
         self._guidance: str = ""
         self._task_name: str = ""   # set via run(task_name=...)
+        self._cached_record: Dict[str, str] = {}     # full parsed record from Notepad (bypasses 2000-char UIA cap)
+        self._ocr_cache: Dict[str, Any] = {}        # instance-level OCR cache (clears per record)
 
         # EXPERIMENTAL — OCR overlay via VisionObserver
         # Disabled by default; enable with use_ocr=True in LLMAgent(...)
@@ -627,6 +627,16 @@ class LLMAgent:
             self.goal, self.provider, n, self.dry_run,
         )
 
+        # Catch crashes in background threads (OCR, recorder, etc.) so they're visible
+        import threading as _threading, traceback as _tb_mod
+        def _thread_exc_hook(args):
+            print(f"\n=== BACKGROUND THREAD CRASH ({args.thread.name}) ===\n"
+                  + "".join(_tb_mod.format_exception(args.exc_type, args.exc_value, args.exc_traceback)),
+                  flush=True)
+            logger.error("Background thread %s crashed:\n%s", args.thread.name,
+                         "".join(_tb_mod.format_exception(args.exc_type, args.exc_value, args.exc_traceback)))
+        _threading.excepthook = _thread_exc_hook
+
         _stuck_pos:   Optional[tuple] = None
         _stuck_count: int             = 0
         _STUCK_LIMIT: int             = 3
@@ -635,32 +645,43 @@ class LLMAgent:
         _LLM_CLICK_LIMIT: int             = 1   # force type after this many repeated clicks
         _no_change_streak: int            = 0
         _NO_CHANGE_LIMIT:  int            = 4   # advance tab after this many consecutive no_change
-        _tab_just_switched: bool          = False
+        _tab_just_switched: bool          = True   # True on first step to focus first empty field
         _last_auto_step:   int            = -1  # step_idx of last step where an auto-handler fired
-        _DROUGHT_LIMIT:    int            = 3   # scroll form after this many non-auto steps in a row
+        _DROUGHT_LIMIT:    int            = 10  # scroll form after this many non-fill steps in a row
         _tab_scroll_count: int            = 0   # scrolls performed on current tab
         _MAX_TAB_SCROLLS:  int            = 6   # max drought-scrolls per tab before giving up
         _steps_on_tab:     int            = 0   # steps spent on current tab — forces advance if too many
-        _TAB_STEP_LIMIT:   int            = 35  # force tab advance after this many steps on same tab
+        _TAB_STEP_LIMIT:   int            = 40  # force tab advance after this many steps on same tab
+
+        _record_cache_loaded = False
 
         for step_idx in range(n):
+          try:
             # 1. Observe
             state      = self._observe()
             llm_action: Dict[str, Any] = {}
             _steps_on_tab += 1
             logger.info("── Step %d/%d  (%d elements) ──", step_idx + 1, n, len(state.get("elements", [])))
 
+            # Load record cache on first step
+            if not _record_cache_loaded:
+                self._refresh_record_cache(state)
+                _record_cache_loaded = True
+
             # 1a. After a tab switch: scroll to top, re-observe, then click first empty field
             if _tab_just_switched:
-                _tab_just_switched = False
-                _steps_on_tab      = 0
-                _tab_scroll_count  = 0
+                _tab_just_switched    = False
+                _steps_on_tab         = 0
+                _tab_scroll_count     = 0
+                _no_change_streak     = 0
+                _last_auto_step       = step_idx  # treat tab switch as an auto step
+                self._filled_this_tab.clear()     # new tab — reset filled-field tracking
                 self._scroll_form_to_top(state)
                 time.sleep(0.6)
                 state = self._observe()   # get updated positions after scroll
                 self._focus_first_empty_field(state)
                 time.sleep(self.step_delay)
-                continue   # re-observe so the rest of the loop uses fresh post-click state
+                continue   # re-observe so auto-handlers run first before LLM gets a chance
 
             # 1b. Stuck guard: if no_change repeats OR too many steps on same tab, advance
             _stuck = (_no_change_streak >= _NO_CHANGE_LIMIT
@@ -673,6 +694,7 @@ class LLMAgent:
                     _tab_just_switched = True
                     _tab_scroll_count  = 0
                     _last_auto_step    = step_idx
+                    self._refresh_record_cache(state)
                     time.sleep(self.step_delay)
                     continue
                 else:
@@ -680,12 +702,29 @@ class LLMAgent:
                     _no_change_streak = 0
                     _steps_on_tab     = 0
 
+            # 1b. Pane-focus escape: if focus is on a section header / container (panecontrol),
+            # Tab will do nothing. Jump directly to the first empty edit field instead.
+            _focused_id  = state.get("focused_element_id")
+            _focused_el  = next((e for e in state.get("elements", []) if e.get("element_id") == _focused_id), None)
+            if _focused_el and _focused_el.get("type") == "panecontrol":
+                _pane_label = (_focused_el.get("label") or _focused_el.get("text") or "?")[:40]
+                _pane_y     = _focused_el["bbox"][1] if _focused_el.get("bbox") else 0
+                logger.info("Focus on pane %r — clicking first empty field to escape.", _pane_label)
+                if self._focus_first_empty_field(state, min_y=_pane_y):
+                    time.sleep(self.step_delay * 0.5)
+                    continue
+                # No empty editcontrol found at/below pane (e.g. flags section with only checkboxes)
+                # Fall through so auto-check / LLM can handle the checkboxes.
+
             # 2. Auto-skip: if focused field already has the correct value, Tab past it
             if self._llm_client and self._auto_skip(state):
                 logger.info("Auto-skip: focused field already has correct value — Tab.")
                 self._executor.execute({"action_type": "keyboard", "key_count": 1, "keystrokes": ["tab"]})
                 _no_change_streak = 0
-                _last_auto_step = step_idx
+                _steps_on_tab     = 0
+                # NOTE: _last_auto_step is intentionally NOT reset here.
+                # Resetting on auto-skip would mask LLM back-cycling (clicking already-filled
+                # fields), preventing the drought guard from firing and scrolling down.
                 time.sleep(self.step_delay)
                 continue
 
@@ -704,7 +743,9 @@ class LLMAgent:
                 self._executor.execute({"action_type": "keyboard", "key_count": 1, "keystrokes": ["tab"]})
                 logger.info("Auto-Tab after auto-fill.")
                 _no_change_streak = 0
-                _last_auto_step = step_idx
+                _steps_on_tab     = 0
+                _last_auto_step   = step_idx
+                self._filled_this_tab.add(field_name_log)
                 time.sleep(self.step_delay)
                 continue
 
@@ -750,7 +791,8 @@ class LLMAgent:
                     logger.info("Auto-check: '%s' should remain unchecked — Tab.", field_name_log)
                 self._executor.execute({"action_type": "keyboard", "key_count": 1, "keystrokes": ["tab"]})
                 _no_change_streak = 0
-                _last_auto_step = step_idx
+                _steps_on_tab     = 0
+                _last_auto_step   = step_idx
                 time.sleep(self.step_delay)
                 continue
 
@@ -778,6 +820,7 @@ class LLMAgent:
                                     expected_val, cx, cy)
                         self._executor.execute({"action_type": "click",
                                                 "click_position": [cx, cy]})
+                        _steps_on_tab   = 0
                         _last_auto_step = step_idx
                         time.sleep(self.step_delay)
                         continue
@@ -795,19 +838,37 @@ class LLMAgent:
                                     field_name, current_val, expected_val)
                         self._executor.execute({"action_type": "click",
                                                 "click_position": [cx, cy]})
+                        _steps_on_tab   = 0
                         _last_auto_step = step_idx
                         time.sleep(self.step_delay)
                         continue
                         
             _drought = step_idx - _last_auto_step
-            if _drought >= _DROUGHT_LIMIT and _tab_scroll_count < _MAX_TAB_SCROLLS:
-                logger.info("Drought guard: %d steps without auto-handler — scrolling form (scroll %d/%d).",
-                            _drought, _tab_scroll_count + 1, _MAX_TAB_SCROLLS)
-                if self._scroll_form_down(state):
-                    _tab_scroll_count += 1
-                    _last_auto_step    = step_idx   # reset drought so it doesn't fire next step
-                    time.sleep(self.step_delay * 0.75)
-                    continue   # re-observe with scrolled form
+            if _drought >= _DROUGHT_LIMIT:
+                if _tab_scroll_count < _MAX_TAB_SCROLLS:
+                    logger.info("Drought guard: %d steps without auto-handler — scrolling form (scroll %d/%d).",
+                                _drought, _tab_scroll_count + 1, _MAX_TAB_SCROLLS)
+                    if self._scroll_form_down(state):
+                        _tab_scroll_count += 1
+                        _last_auto_step    = step_idx   # reset drought so it doesn't fire next step
+                        time.sleep(self.step_delay * 0.75)
+                        state = self._observe()          # re-observe so we see newly revealed fields
+                        self._focus_first_empty_field(state, after_scroll=True)  # skip already-filled
+                        time.sleep(0.3)
+                        continue   # re-observe with scrolled form + focused field
+                else:
+                    # All scroll attempts exhausted — all visible fields are done on this tab.
+                    # Proactively advance to the next tab instead of waiting for the stuck guard.
+                    logger.info("Drought guard: scrolls exhausted (%d/%d) — advancing tab.",
+                                _tab_scroll_count, _MAX_TAB_SCROLLS)
+                    if self._try_advance_tab(state):
+                        _no_change_streak  = 0
+                        _tab_just_switched = True
+                        _tab_scroll_count  = 0
+                        _last_auto_step    = step_idx
+                        self._refresh_record_cache(state)
+                        time.sleep(self.step_delay)
+                        continue
 
             # 2. Transformer always runs — learned behavioral engine
             llm_action = None
@@ -893,9 +954,128 @@ class LLMAgent:
                         prediction = dict(prediction)
                         prediction["text"] = text
 
-            # 3. Execute
+            # 3. Execute — guard against typing into non-edit elements or clicking submit early
+            _fid = state.get("focused_element_id")
+            _fel = next((e for e in state.get("elements", []) if e.get("element_id") == _fid), None)
+            _flabel = ((_fel.get("label") or _fel.get("text") or "?").strip() if _fel else "unknown")
+
+            if prediction.get("action_type") == "keyboard" and prediction.get("text"):
+                logger.info("Type target: focused=[%s] %r", _fel.get("type","?") if _fel else "?", _flabel)
+                # If the focused element is NOT an editable text field, typing will do nothing
+                # (or corrupt a pane/tab/button). Replace with Tab to advance focus instead.
+                if _fel and _fel.get("type") not in ("editcontrol", "input"):
+                    logger.warning("LLM type into non-edit [%s] %r — pressing Tab instead.",
+                                   _fel.get("type","?"), _flabel[:40])
+                    prediction = {"action_type": "keyboard", "key_count": 1, "keystrokes": ["tab"]}
+
+            if prediction.get("action_type") == "click":
+                _cp = prediction.get("click_position", [0, 0])
+                # Guard: block LLM from re-clicking already-checked checkboxes (would uncheck them)
+                _chk_at_cp = next(
+                    (e for e in state.get("elements", [])
+                     if e.get("type") in ("checkboxcontrol", "checkbox")
+                     and e.get("window_role") != "background"
+                     and e.get("bbox")
+                     and e["bbox"][0] <= _cp[0] <= e["bbox"][2]
+                     and e["bbox"][1] <= _cp[1] <= e["bbox"][3]),
+                    None
+                )
+                if _chk_at_cp:
+                    _chk_label = (_chk_at_cp.get("label") or _chk_at_cp.get("text") or "").strip()
+                    if _chk_label in self._checked_fields:
+                        # Use BM_GETCHECK (same as auto-check) — UIA toggle_state is often empty
+                        # for wxPython checkboxes so we can't rely on element attributes.
+                        _is_checked = False
+                        try:
+                            import win32gui as _wg2; import win32api as _wa2
+                            _cx2 = (_chk_at_cp["bbox"][0] + _chk_at_cp["bbox"][2]) / 2
+                            _cy2 = (_chk_at_cp["bbox"][1] + _chk_at_cp["bbox"][3]) / 2
+                            _hwnd2 = _wg2.WindowFromPoint((int(_cx2), int(_cy2)))
+                            if _hwnd2:
+                                _is_checked = (_wa2.SendMessage(_hwnd2, 0x00F0, 0, 0) == 1)
+                        except Exception:
+                            pass
+                        if _is_checked:
+                            logger.warning("Blocking LLM re-click on checked checkbox %r — Tab instead.", _chk_label)
+                            prediction = {"action_type": "keyboard", "key_count": 1, "keystrokes": ["tab"]}
+
+                _SUBMIT_KW = {"submit", "save", "ok", "accept", "done", "finish", "new"}
+                _btn_at_cp = next(
+                    (e for e in state.get("elements", [])
+                     if e.get("type") in ("buttoncontrol", "button")
+                     and e.get("window_role") != "background"
+                     and e.get("bbox")
+                     and any(kw in (e.get("text") or e.get("label") or "").lower()
+                             for kw in _SUBMIT_KW)
+                     and e["bbox"][0] <= _cp[0] <= e["bbox"][2]
+                     and e["bbox"][1] <= _cp[1] <= e["bbox"][3]),
+                    None
+                )
+                if _btn_at_cp:
+                    _btn_name = (_btn_at_cp.get("text") or _btn_at_cp.get("label") or "button")
+                    logger.warning("Blocking premature click on button %r — advancing tab instead.", _btn_name)
+                    if self._try_advance_tab(state):
+                        _no_change_streak  = 0
+                        _tab_just_switched = True
+                        _tab_scroll_count  = 0
+                        _last_auto_step    = step_idx
+                        self._refresh_record_cache(state)
+                        time.sleep(self.step_delay)
+                        continue
+                    prediction = {"action_type": "no_op"}
+
+            # Intercept LLM clicks that target a tab element — resolved coords can be wrong.
+            # Route through _try_advance_tab which uses the correct indexed bbox instead.
+            if prediction.get("action_type") == "click":
+                _cp = prediction.get("click_position", [0, 0])
+                _all_tabs = [e for e in state.get("elements", [])
+                             if e.get("type") in ("tabitem", "tabitemcontrol")
+                             and e.get("window_role") != "background"
+                             and e.get("bbox")]
+                _tab_hit = next(
+                    (e for e in _all_tabs
+                     if e["bbox"][0] <= _cp[0] <= e["bbox"][2]
+                     and e["bbox"][1] <= _cp[1] <= e["bbox"][3]),
+                    None,
+                )
+                if _tab_hit:
+                    _hit_name = (_tab_hit.get("text") or _tab_hit.get("label") or "?").strip()
+                    logger.info("LLM clicked tab element %r — routing through _try_advance_tab.", _hit_name)
+                    if self._try_advance_tab(state):
+                        _no_change_streak  = 0
+                        _tab_just_switched = True
+                        _tab_scroll_count  = 0
+                        _last_auto_step    = step_idx
+                        self._filled_this_tab.clear()
+                        self._refresh_record_cache(state)
+                        time.sleep(self.step_delay)
+                        continue
+                    # Tab advance failed (already on last tab) — fall through to execute
+                    prediction = {"action_type": "no_op"}
+
             result = self._executor.execute(prediction)
             logger.info("%s", result)
+
+            # Detect tab click: if the executed click landed on a tab element, mark a tab switch
+            # so the next step scrolls to top and focuses the first empty field.
+            if prediction.get("action_type") == "click":
+                _cp = prediction.get("click_position", [0, 0])
+                _all_tabs = [e for e in state.get("elements", [])
+                             if e.get("type") in ("tabitem", "tabitemcontrol")
+                             and e.get("window_role") != "background"
+                             and e.get("bbox")]
+                for _ti_idx, _ti_el in enumerate(_all_tabs):
+                    _tx1, _ty1, _tx2, _ty2 = _ti_el["bbox"]
+                    if _tx1 <= _cp[0] <= _tx2 and _ty1 <= _cp[1] <= _ty2:
+                        self._current_tab_idx = _ti_idx
+                        _tab_just_switched    = True
+                        _tab_scroll_count     = 0
+                        _no_change_streak     = 0
+                        _steps_on_tab         = 0
+                        logger.info("Tab click detected: switched to tab idx=%d  '%s'",
+                                    _ti_idx,
+                                    _ti_el.get("text") or _ti_el.get("label") or "?")
+                        break
 
             # After a successful type, automatically press Tab to advance the field.
             # This prevents the LLM from getting stuck re-typing the same field.
@@ -956,6 +1136,13 @@ class LLMAgent:
 
             time.sleep(self.step_delay)
 
+          except Exception as _step_exc:
+            import traceback as _tb
+            _tb_str = _tb.format_exc()
+            logger.error("STEP %d CRASHED:\n%s", step_idx + 1, _tb_str)
+            print(f"\n=== STEP {step_idx+1} CRASHED ===\n{_tb_str}", flush=True)
+            break
+
         logger.info("LLMAgent finished — %d step(s).", len(self._results))
         return list(self._results)
 
@@ -987,37 +1174,28 @@ class LLMAgent:
             return False
         current = (focused.get("value") or "").strip()
 
-        # Build the background record dict
-        bg_elems = [e for e in elements if e.get("window_role") == "background"]
-        bg_blobs = [(e.get("value") or "").strip() for e in bg_elems]
-        bg_blobs = [b for b in bg_blobs if b]
-        if not bg_blobs:
-            return False
-        records = {}
-        for blob in sorted(bg_blobs, key=len, reverse=True):
-            r = _parse_records(blob)
-            if r:
-                records = r
-                break
-        if not records:
-            return False
-        rec = records.get(self._record_num, records.get(min(records), {}))
-
-        # Find the field name from a nearby label
         field_name = (focused.get("label") or focused.get("text") or "").strip()
         if not field_name:
             return False
 
-        # Check if field exists in record (including explicit blank "(none)" entries)
-        fl = field_name.lower()
-        expected = None
-        if field_name in rec:
-            expected = rec[field_name]
+        # Use cached record (full Notepad text); fall back to bg_blobs
+        rec: Dict[str, str] = {}
+        if self._cached_record:
+            rec = self._cached_record
         else:
-            for k, v in rec.items():
-                if k.lower() == fl:
-                    expected = v
+            bg_elems = [e for e in elements if e.get("window_role") == "background"]
+            bg_blobs = [(e.get("value") or "").strip() for e in bg_elems if e.get("value")]
+            for blob in sorted(bg_blobs, key=len, reverse=True):
+                r = _parse_records(blob)
+                if r:
+                    rec = r.get(self._record_num, r.get(min(r), {}))
                     break
+
+        if not rec:
+            return False
+
+        fl = field_name.lower()
+        expected = rec.get(field_name) or next((v for k, v in rec.items() if k.lower() == fl), None)
         if expected is None:
             return False   # field not in record — let LLM decide
 
@@ -1033,6 +1211,151 @@ class LLMAgent:
         if match:
             logger.info("Auto-skip: '%s' already = %r", field_name, current)
         return match
+
+    def _read_notepad_full_text(self, state: Dict[str, Any]) -> str:
+        """
+        Read the full text from an open Notepad window via Win32 WM_GETTEXT.
+        Returns empty string if Notepad is not found or unavailable.
+        Bypasses the 2000-char UIA cap so the complete file is readable.
+        """
+        try:
+            import win32gui, win32api
+            WM_GETTEXTLENGTH = 0x000E
+            WM_GETTEXT       = 0x000D
+            _EDIT_CLASSES    = {"Edit", "RichEditD2DPT", "RichEdit20W", "RICHEDIT50W", "RICHEDIT60W"}
+            _TERMINAL_HINTS  = {"powershell", "terminal", "command prompt", "cmd.exe"}
+
+            elements = state.get("elements", [])
+            bg_window_title = ""
+            for e in elements:
+                if e.get("window_role") != "background":
+                    continue
+                wt = (e.get("window_title") or "").strip()
+                if ".txt" in wt or "notepad" in wt.lower():
+                    bg_window_title = wt
+                    break
+
+            np_hwnd = None
+            if bg_window_title:
+                np_hwnd = win32gui.FindWindow(None, bg_window_title)
+                if not np_hwnd:
+                    np_hwnd = win32gui.FindWindow(None, bg_window_title + " - Notepad")
+            if not np_hwnd:
+                def _find_np(hwnd, _):
+                    nonlocal np_hwnd
+                    if np_hwnd: return
+                    if not win32gui.IsWindowVisible(hwnd): return
+                    title = win32gui.GetWindowText(hwnd)
+                    cls   = win32gui.GetClassName(hwnd)
+                    if cls == "Notepad" or ".txt" in title or "notepad" in title.lower():
+                        np_hwnd = hwnd
+                win32gui.EnumWindows(_find_np, None)
+            if not np_hwnd:
+                return ""
+
+            edit_hwnd = None
+            def _find_edit(hwnd, _):
+                nonlocal edit_hwnd
+                if edit_hwnd: return
+                try:
+                    if win32gui.GetClassName(hwnd) in _EDIT_CLASSES:
+                        edit_hwnd = hwnd
+                except Exception:
+                    pass
+            win32gui.EnumChildWindows(np_hwnd, _find_edit, None)
+            if not edit_hwnd:
+                child = win32gui.GetWindow(np_hwnd, 5)
+                while child and not edit_hwnd:
+                    win32gui.EnumChildWindows(child, _find_edit, None)
+                    child = win32gui.GetWindow(child, 2)
+            if not edit_hwnd:
+                return ""
+
+            length = win32api.SendMessage(edit_hwnd, WM_GETTEXTLENGTH, 0, 0)
+            if length <= 0:
+                return ""
+            import ctypes
+            buf = ctypes.create_unicode_buffer(length + 2)
+            ctypes.windll.user32.SendMessageW(edit_hwnd, WM_GETTEXT, length + 1, buf)
+            return buf.value
+        except Exception:
+            return ""
+
+    def _refresh_record_cache(self, state: Dict[str, Any]) -> None:
+        """
+        Read the full Notepad text, parse all records, and cache the current
+        record's field→value dict in self._cached_record.
+        Called once at run start and after each tab advance.
+        Falls back to background UIA/OCR elements if Win32 read fails.
+        """
+        import re
+        full_text = self._read_notepad_full_text(state)
+
+        # Fallback: reconstruct text from background elements (UIA or OCR)
+        if not full_text:
+            elements = state.get("elements", [])
+            bg_elems = [e for e in elements if e.get("window_role") == "background"]
+
+            # Try UIA blobs first (they carry full multi-line text in a single value)
+            blobs = sorted(
+                [(e.get("value") or "").strip() for e in bg_elems],
+                key=len, reverse=True
+            )
+            for blob in blobs:
+                if blob and _parse_records(blob):
+                    full_text = blob
+                    logger.info("Record cache: Win32 failed — using UIA blob (%d chars)", len(blob))
+                    break
+            if not full_text and blobs and blobs[0]:
+                full_text = blobs[0]   # longest UIA blob even if unstructured
+                logger.info("Record cache: Win32 failed — using largest UIA blob (%d chars)", len(full_text))
+
+            # If UIA blobs were empty, try OCR elements: group by y-coord to rebuild lines
+            if not full_text:
+                ocr_elems = [e for e in bg_elems
+                             if e.get("source") == "ocr" and (e.get("text") or "")]
+                if ocr_elems:
+                    ocr_elems.sort(key=lambda e: (e["bbox"][1], e["bbox"][0]) if e.get("bbox") else (0, 0))
+                    lines, cur_line, cur_y = [], [], None
+                    for e in ocr_elems:
+                        y = e["bbox"][1] if e.get("bbox") else 0
+                        if cur_y is None or abs(y - cur_y) <= 10:
+                            cur_line.append(e.get("text", ""))
+                        else:
+                            if cur_line:
+                                lines.append(" ".join(cur_line))
+                            cur_line = [e.get("text", "")]
+                        cur_y = y
+                    if cur_line:
+                        lines.append(" ".join(cur_line))
+                    full_text = "\n".join(lines)
+                    logger.info("Record cache: Win32 failed — rebuilt %d lines from OCR boxes", len(lines))
+
+        if not full_text:
+            logger.warning("Record cache: no Notepad text available — cache unchanged (%d fields)", len(self._cached_record))
+            return
+
+        records = _parse_records(full_text)
+        if records:
+            rec = records.get(self._record_num, records.get(min(records), {}))
+            self._cached_record = rec
+            sample = list(rec.items())[:5]
+            logger.info("Record cache refreshed: %d fields for record %d  sample=%r",
+                        len(rec), self._record_num, sample)
+        else:
+            # Plain key:value text — parse directly
+            data: Dict[str, str] = {}
+            for line in full_text.splitlines():
+                if ":" in line:
+                    key, _, val = line.partition(":")
+                    key = re.sub(r"[\[\]]", "", key).strip()
+                    val = re.sub(r"\s*\[.*", "", val)
+                    val = re.sub(r"\s*←.*", "", val).strip()
+                    if key and val and val.lower() not in {"(none)", "none", "(leave blank)"}:
+                        data[key] = val
+            self._cached_record = data
+            sample = list(data.items())[:5]
+            logger.info("Record cache refreshed (plain text): %d fields  sample=%r", len(data), sample)
 
     def _peek_notepad(self, state: Dict[str, Any], field_name: str) -> None:
         """
@@ -1074,6 +1397,12 @@ class LLMAgent:
                 # Track largest blob from any background window for line lookup
                 if blob and len(blob) > len(raw_text):
                     raw_text = blob
+
+            # Prefer full Win32 text (bypasses the 2000-char UIA cap) for accurate line lookup.
+            # Fall back to raw_text from bg_blobs if Win32 read fails.
+            full_np_text = self._read_notepad_full_text(state)
+            if full_np_text:
+                raw_text = full_np_text
 
             logger.info("_peek_notepad: field=%r  bg_title=%r  raw_text_len=%d",
                         field_name, bg_window_title, len(raw_text))
@@ -1169,12 +1498,29 @@ class LLMAgent:
         except Exception:
             pass   # never block the agent over a cosmetic action
 
+    def _lookup_field(self, field_name: str) -> str:
+        """
+        Look up a field value from the cached record.
+        Returns empty string if not found or if value is a placeholder.
+        """
+        if not self._cached_record:
+            return ""
+        _skip_vals = {"(none)", "none", "(leave blank)", "n/a", "yes (check)",
+                      "leave blank — liability only", "leave blank — owned outright"}
+        rec = self._cached_record
+        fl  = field_name.lower()
+        val = rec.get(field_name) or next((v for k, v in rec.items() if k.lower() == fl), "")
+        if not val:
+            return ""
+        if val.lower().strip("()") in _skip_vals:
+            return ""
+        return val
+
     def _auto_fill(self, state: Dict[str, Any]) -> Optional[tuple]:
         """
         If the focused element is an empty text field that has a known value in
-        BACKGROUND DATA, return (field_name, value_to_type).
-        Otherwise return None.
-        Only fires for editcontrol — not comboboxes/checkboxes (those have separate handlers).
+        the record cache (or BACKGROUND DATA as fallback), return (field_name, value).
+        Only fires for editcontrol — not comboboxes/checkboxes.
         """
         elements   = state.get("elements", [])
         focused_id = state.get("focused_element_id")
@@ -1193,33 +1539,31 @@ class LLMAgent:
         if not field_name:
             return None
 
-        # Look up background record value
-        bg_elems = [e for e in elements if e.get("window_role") == "background"]
-        bg_blobs = [(e.get("value") or "").strip() for e in bg_elems]
-        bg_blobs = [b for b in bg_blobs if b]
-        if not bg_blobs:
-            return None
-        records = {}
-        for blob in sorted(bg_blobs, key=len, reverse=True):
-            r = _parse_records(blob)
-            if r:
-                records = r
-                break
-        if not records:
-            return None
-        rec = records.get(self._record_num, records.get(min(records), {}))
-
-        expected = rec.get(field_name, "")
-        if not expected:
-            fl = field_name.lower()
-            for k, v in rec.items():
-                if k.lower() == fl:
-                    expected = v
-                    break
-        if not expected:
+        # Skip re-filling a field we already filled this tab (prevents cycling loops
+        # where the form clears numeric/spin fields on re-focus).
+        if field_name in self._filled_this_tab:
             return None
 
-        # Skip placeholder/non-value entries
+        # ── Primary: use the cached full record (bypasses 2000-char UIA cap) ──
+        expected = self._lookup_field(field_name)
+
+        # ── Fallback: parse bg_blobs from UIA state ───────────────────────────
+        if not expected:
+            bg_elems = [e for e in elements if e.get("window_role") == "background"]
+            bg_blobs = [(e.get("value") or "").strip() for e in bg_elems if e.get("value")]
+            for blob in sorted(bg_blobs, key=len, reverse=True):
+                r = _parse_records(blob)
+                if r:
+                    rec = r.get(self._record_num, r.get(min(r), {}))
+                    fl  = field_name.lower()
+                    expected = rec.get(field_name) or next(
+                        (v for k, v in rec.items() if k.lower() == fl), "")
+                    if expected:
+                        break
+
+        if not expected:
+            return None
+
         _skip_vals = {"(none)", "none", "(leave blank)", "n/a", "yes (check)",
                       "leave blank — liability only", "leave blank — owned outright"}
         if expected.lower().strip("()") in _skip_vals:
@@ -1244,27 +1588,10 @@ class LLMAgent:
         if not current:
             return None
 
-        bg_elems = [e for e in elements if e.get("window_role") == "background"]
-        bg_blobs = [b for b in ((e.get("value") or "").strip() for e in bg_elems) if b]
-        records  = {}
-        for blob in sorted(bg_blobs, key=len, reverse=True):
-            r = _parse_records(blob)
-            if r:
-                records = r
-                break
-        if not records:
-            return None
-        rec        = records.get(self._record_num, records.get(min(records), {}))
         field_name = (focused.get("label") or focused.get("text") or "").strip()
         if not field_name:
             return None
-        expected = rec.get(field_name, "")
-        if not expected:
-            fl = field_name.lower()
-            for k, v in rec.items():
-                if k.lower() == fl:
-                    expected = v
-                    break
+        expected = self._lookup_field(field_name)
         if not expected or current.lower() == expected.lower():
             return None
         return (field_name, current, expected)
@@ -1289,28 +1616,7 @@ class LLMAgent:
         if not field_name:
             return None
 
-        bg_elems = [e for e in elements if e.get("window_role") == "background"]
-        bg_blobs = [(e.get("value") or "").strip() for e in bg_elems]
-        bg_blobs = [b for b in bg_blobs if b]
-        if not bg_blobs:
-            return None
-        records = {}
-        for blob in sorted(bg_blobs, key=len, reverse=True):
-            r = _parse_records(blob)
-            if r:
-                records = r
-                break
-        if not records:
-            return None
-        rec = records.get(self._record_num, records.get(min(records), {}))
-
-        expected = rec.get(field_name, "")
-        if not expected:
-            fl = field_name.lower()
-            for k, v in rec.items():
-                if k.lower() == fl:
-                    expected = v
-                    break
+        expected = self._lookup_field(field_name)
         if not expected:
             return None   # not in background data — let LLM decide
 
@@ -1328,8 +1634,20 @@ class LLMAgent:
         try:
             import pyautogui
             elements = state.get("elements", [])
+            # Filter to FORM control types only so the scroll lands on the form,
+            # not the terminal window (which can grab window_role when LLM errors occur).
+            _FORM_TYPES = {
+                "editcontrol", "comboboxcontrol", "checkboxcontrol",
+                "radiobuttoncontrol", "tabitemcontrol", "buttoncontrol",
+            }
             active = [e for e in elements
-                      if e.get("window_role") != "background" and e.get("bbox")]
+                      if e.get("type") in _FORM_TYPES
+                      and e.get("window_role") != "background"
+                      and e.get("bbox")]
+            # Fallback: any non-background element with bbox
+            if not active:
+                active = [e for e in elements
+                          if e.get("window_role") != "background" and e.get("bbox")]
             if not active:
                 return False
             # Use centroid of active form elements, capped to the middle of the
@@ -1354,8 +1672,6 @@ class LLMAgent:
     # source="ocr", window_role="background".  Only fires when UIA returns
     # thin background data (≤1 char).  Result is cached per window title so
     # Tesseract only runs once per unique background document, not every step.
-
-    _ocr_cache: Dict[str, List[Dict]] = {}   # window_title → ocr elements
 
     def _ocr_background_window(self, state: Dict[str, Any]) -> List[Dict]:
         """
@@ -1464,12 +1780,22 @@ class LLMAgent:
         """
         Scroll the active form window back to the top so that _focus_first_empty_field
         always starts from the first visible field, not mid-page.
+        Uses Ctrl+Home then multiple large scroll-up passes to guarantee reaching the top.
         """
         try:
             import pyautogui
             elements = state.get("elements", [])
+            _FORM_TYPES = {
+                "editcontrol", "comboboxcontrol", "checkboxcontrol",
+                "radiobuttoncontrol", "tabitemcontrol", "buttoncontrol",
+            }
             active = [e for e in elements
-                      if e.get("window_role") != "background" and e.get("bbox")]
+                      if e.get("type") in _FORM_TYPES
+                      and e.get("window_role") != "background"
+                      and e.get("bbox")]
+            if not active:
+                active = [e for e in elements
+                          if e.get("window_role") != "background" and e.get("bbox")]
             if not active:
                 return
             xs = [(e["bbox"][0] + e["bbox"][2]) / 2 for e in active]
@@ -1478,18 +1804,31 @@ class LLMAgent:
             cy = sum(ys) / len(ys)
             orig = pyautogui.position()
             pyautogui.moveTo(cx, cy, duration=0.15)
-            pyautogui.scroll(20)   # large upward scroll to reach top
+            # Three large upward scrolls to handle tall tabs like Policyholder
+            for _ in range(3):
+                pyautogui.scroll(50)
+                time.sleep(0.05)
             pyautogui.moveTo(orig.x, orig.y, duration=0.1)
             logger.info("Scroll-form-top: scrolled to top at (%.0f, %.0f)", cx, cy)
         except Exception as exc:
             logger.warning("Scroll-form-top: failed — %s", exc)
 
-    def _focus_first_empty_field(self, state: Dict[str, Any]) -> None:
+    def _focus_first_empty_field(
+        self,
+        state:        Dict[str, Any],
+        after_scroll: bool = False,
+        min_y:        float = 0,
+    ) -> bool:
         """
-        After a tab switch, click the first empty editcontrol on the new tab
-        so Tab-navigation starts from the beginning rather than mid-tab.
+        Click the first empty editcontrol on the current tab.
+        Returns True if a field was found and clicked, False otherwise.
+
+        after_scroll=True : skip fields in _filled_this_tab (already filled, may look empty in UIA).
+        min_y             : only consider fields whose top-edge y >= min_y (used by pane-escape
+                            to avoid jumping back to already-filled sections above the pane).
         """
         elements = state.get("elements", [])
+        _min_y   = max(100, min_y)   # always exclude title/tab-strip area (y ≤ 100)
         fillable = [
             e for e in elements
             if e.get("window_role") != "background"
@@ -1497,10 +1836,17 @@ class LLMAgent:
             and not (e.get("value") or "").strip()
             and e.get("bbox")
             and e.get("enabled", True)
+            and e["bbox"][1] >= _min_y
         ]
+        if after_scroll and self._filled_this_tab:
+            filled_lower = {s.lower() for s in self._filled_this_tab}
+            fillable = [
+                e for e in fillable
+                if (e.get("label") or e.get("text") or "").strip().lower() not in filled_lower
+            ]
         if not fillable:
-            return
-        # Sort top-to-bottom so we get the topmost field
+            return False
+        # Sort top-to-bottom so we get the topmost unfilled field
         fillable.sort(key=lambda e: (e["bbox"][1], e["bbox"][0]))
         e = fillable[0]
         x1, y1, x2, y2 = e["bbox"]
@@ -1508,6 +1854,7 @@ class LLMAgent:
         logger.info("Tab-advance focus: clicking first empty field %r @ (%.0f, %.0f)",
                     (e.get("label") or e.get("text") or "?").strip(), cx, cy)
         self._executor.execute({"action_type": "click", "click_position": [cx, cy]})
+        return True
 
     def _try_advance_tab(self, state: Dict[str, Any]) -> bool:
         """
@@ -1649,9 +1996,42 @@ class LLMAgent:
     def _ask_llm(self, state: Dict[str, Any]) -> Dict[str, Any]:
         screen_text = _state_to_text(state, record_num=self._record_num)
         logger.debug("LLM screen context:\n%s", screen_text)
+
+        # Build focused-field banner — put it FIRST so the LLM sees it immediately
+        focused_banner = ""
+        focused_id = state.get("focused_element_id")
+        if focused_id:
+            focused_el = next(
+                (e for e in state.get("elements", []) if e.get("element_id") == focused_id), None
+            )
+            if focused_el:
+                _fn = (focused_el.get("label") or focused_el.get("text") or "?").strip()
+                _fv = (focused_el.get("value") or "").strip()
+                _ft = focused_el.get("type", "?")
+                focused_banner = (
+                    f"⚠ CURRENTLY FOCUSED FIELD: [{_ft}] \"{_fn}\""
+                    + (f" — current value: {_fv!r}" if _fv else " — EMPTY")
+                    + "\nYou MUST act on THIS field only. Do NOT click other fields.\n\n"
+                )
+
+        # Build a compact already-filled summary so the LLM doesn't revisit fields
+        filled_fields = []
+        for e in state.get("elements", []):
+            if e.get("window_role") == "background":
+                continue
+            val = (e.get("value") or "").strip()
+            lbl = (e.get("label") or e.get("text") or "").strip()
+            if val and lbl:
+                filled_fields.append(f"  {lbl} = {val!r}")
+        filled_summary = ""
+        if filled_fields:
+            filled_summary = "\nAlready filled (DO NOT retype these):\n" + "\n".join(filled_fields[:20])
+
         user_msg = (
+            f"{focused_banner}"
             f"Task goal: {self.goal}\n\n"
-            f"Current screen:\n{screen_text}\n\n"
+            f"Current screen:\n{screen_text}"
+            f"{filled_summary}\n\n"
             f"Recent actions:\n{_history_to_text(self._history)}"
         )
         try:
@@ -1692,6 +2072,10 @@ class LLMAgent:
             return {"action_type": "keyboard", "key_count": len(text),
                     "keystrokes": list(text), "text": text}
 
+        elif action_type == "tab":
+            # LLM is signalling "advance to next field/tab" — press Tab key
+            return {"action_type": "keyboard", "key_count": 1, "keystrokes": ["tab"]}
+
         elif action_type == "hotkey":
             keys = llm_action.get("keys", [])
             if not keys:
@@ -1725,11 +2109,14 @@ class LLMAgent:
 
     def _call_openai_compat(self, user_msg: str) -> Dict[str, Any]:
         """Handles both Groq and LM Studio — both use the OpenAI client format."""
+        import uuid
+        # Unique tag per call breaks LM Studio's server-side KV-cache accumulation
+        system_msg = _SYSTEM_PROMPT + f"\n[sid:{uuid.uuid4().hex[:12]}]"
         resp = self._llm_client.chat.completions.create(
             model=self._llm_model,
-            max_tokens=256,
+            max_tokens=1024,
             messages=[
-                {"role": "system", "content": _SYSTEM_PROMPT},
+                {"role": "system", "content": system_msg},
                 {"role": "user",   "content": user_msg},
             ],
         )
