@@ -186,6 +186,13 @@ def _parse_records(raw_text: str) -> dict:
                 val = re.sub(r"\s*←.*", "", val).strip()
                 if key:
                     cleaned = val.lower().strip()
+                    # Only store the FIRST occurrence of each key.
+                    # Records have policyholder fields first then driver/vehicle
+                    # sections that repeat the same field names (e.g. "First Name").
+                    # The form's Policyholder tab wants the policyholder value, not
+                    # the driver's value — so first-one-wins is correct.
+                    if key in data:
+                        continue
                     if cleaned in {"(none)", "none"}:
                         data[key] = ""        # explicitly blank — agent should leave empty
                     elif val and cleaned != "":
@@ -652,6 +659,8 @@ class LLMAgent:
         _MAX_TAB_SCROLLS:  int            = 6   # max drought-scrolls per tab before giving up
         _steps_on_tab:     int            = 0   # steps spent on current tab — forces advance if too many
         _TAB_STEP_LIMIT:   int            = 40  # force tab advance after this many steps on same tab
+        _pane_escape_last_field: str      = ""  # last field pane-escape tried to click
+        _pane_escape_streak:     int      = 0   # consecutive tries on the same field without escaping
 
         _record_cache_loaded = False
 
@@ -675,6 +684,8 @@ class LLMAgent:
                 _tab_scroll_count     = 0
                 _no_change_streak     = 0
                 _last_auto_step       = step_idx  # treat tab switch as an auto step
+                _pane_escape_last_field = ""
+                _pane_escape_streak     = 0
                 self._filled_this_tab.clear()     # new tab — reset filled-field tracking
                 self._scroll_form_to_top(state)
                 time.sleep(0.6)
@@ -710,6 +721,31 @@ class LLMAgent:
                 _pane_label = (_focused_el.get("label") or _focused_el.get("text") or "?")[:40]
                 _pane_y     = _focused_el["bbox"][1] if _focused_el.get("bbox") else 0
                 logger.info("Focus on pane %r — clicking first empty field to escape.", _pane_label)
+                # Peek at which field we'd click before actually clicking it.
+                # If we've clicked the same field 3+ times with no escape (loop!), scroll down first.
+                _pane_candidates = sorted(
+                    [_pe for _pe in state.get("elements", [])
+                     if (_pe.get("window_role") != "background"
+                         and _pe.get("type") == "editcontrol"
+                         and not (_pe.get("value") or "").strip()
+                         and _pe.get("bbox") and _pe.get("enabled", True)
+                         and _pe["bbox"][1] >= max(100, _pane_y))],
+                    key=lambda e: (e["bbox"][1], e["bbox"][0])
+                )
+                _pane_next_el = _pane_candidates[0] if _pane_candidates else None
+                _pane_next_name = (_pane_next_el.get("label") or _pane_next_el.get("text") or "").strip() if _pane_next_el else ""
+                if _pane_next_name and _pane_next_name == _pane_escape_last_field:
+                    _pane_escape_streak += 1
+                else:
+                    _pane_escape_streak = 1
+                    _pane_escape_last_field = _pane_next_name
+                if _pane_escape_streak >= 3:
+                    logger.warning("Pane-escape: stuck on %r for %d tries — scrolling down to reveal it.",
+                                   _pane_next_name, _pane_escape_streak)
+                    self._scroll_form_down(state)
+                    time.sleep(self.step_delay * 0.5)
+                    _pane_escape_streak = 0  # reset after scroll so we try click once fresh
+                    continue
                 if self._focus_first_empty_field(state, min_y=_pane_y):
                     time.sleep(self.step_delay * 0.5)
                     continue
@@ -756,6 +792,47 @@ class LLMAgent:
                         time.sleep(self.step_delay)
                         continue
                 # Fall through so auto-check / LLM can handle the checkboxes.
+
+            # 1c. Submit-button escape: focus landed on a Submit/button after all tab work done.
+            # Pane-escape (1b) only fires for panecontrol; when focus is on a buttoncontrol
+            # (e.g. "Submit  New") the same "all done → advance tab" logic must also run.
+            elif _focused_el and _focused_el.get("type") == "buttoncontrol":
+                _btn_name = (_focused_el.get("label") or _focused_el.get("text") or "").strip()
+                if "submit" in _btn_name.lower():
+                    _active_edits_b = [e for e in state.get("elements", [])
+                                       if e.get("window_role") != "background"
+                                       and e.get("type") == "editcontrol"
+                                       and e.get("enabled", True)]
+                    _pending_edits_b = [
+                        (e.get("label") or e.get("text") or "").strip()
+                        for e in _active_edits_b
+                        if (e.get("label") or e.get("text") or "").strip() not in self._filled_this_tab
+                        and self._lookup_field((e.get("label") or e.get("text") or "").strip())
+                    ]
+                    _active_checks_b = [e for e in state.get("elements", [])
+                                        if e.get("window_role") != "background"
+                                        and e.get("type") == "checkboxcontrol"
+                                        and e.get("enabled", True)]
+                    _unhandled_checks_b = []
+                    for _chk_e in _active_checks_b:
+                        _chk_name = (_chk_e.get("label") or _chk_e.get("text") or "").strip()
+                        if _chk_name in self._checked_fields:
+                            continue
+                        _chk_exp = self._lookup_field(_chk_name)
+                        if _chk_exp and _chk_exp.lower().strip().startswith("yes"):
+                            _unhandled_checks_b.append(_chk_name)
+                    if not _pending_edits_b and _active_edits_b and not _unhandled_checks_b:
+                        logger.info("Submit-button escape: focus on %r, all %d edits done, %d checks done — advancing tab.",
+                                    _btn_name, len(_active_edits_b), len(_active_checks_b))
+                        if self._try_advance_tab(state):
+                            _no_change_streak  = 0
+                            _tab_just_switched = True
+                            _tab_scroll_count  = 0
+                            _last_auto_step    = step_idx
+                            self._filled_this_tab.clear()
+                            self._refresh_record_cache(state)
+                            time.sleep(self.step_delay)
+                            continue
 
             # 2. Auto-skip: if focused field already has the correct value, Tab past it
             if self._llm_client and self._auto_skip(state):
@@ -1403,7 +1480,7 @@ class LLMAgent:
                     key = re.sub(r"[\[\]]", "", key).strip()
                     val = re.sub(r"\s*\[.*", "", val)
                     val = re.sub(r"\s*←.*", "", val).strip()
-                    if key and val and val.lower() not in {"(none)", "none", "(leave blank)"}:
+                    if key and key not in data and val and val.lower() not in {"(none)", "none", "(leave blank)"}:
                         data[key] = val
             self._cached_record = data
             sample = list(data.items())[:5]
@@ -1892,7 +1969,17 @@ class LLMAgent:
                             to avoid jumping back to already-filled sections above the pane).
         """
         elements = state.get("elements", [])
-        _min_y   = max(100, min_y)   # always exclude title/tab-strip area (y ≤ 100)
+        # Compute actual tab-strip bottom so clicks never land on the tab bar.
+        # Used to clip cy (not to filter fields) because the field may start just
+        # inside the tab strip but extend below it — the click should land lower.
+        _tab_bottoms = [
+            e["bbox"][3] for e in elements
+            if e.get("type") in ("tabitem", "tabitemcontrol")
+            and e.get("window_role") != "background"
+            and e.get("bbox")
+        ]
+        _tab_floor = (max(_tab_bottoms) + 5) if _tab_bottoms else 110
+        _min_y = max(100, min_y)   # field selection: exclude title/scrollbar area
         fillable = [
             e for e in elements
             if e.get("window_role") != "background"
@@ -1915,8 +2002,26 @@ class LLMAgent:
         e = fillable[0]
         x1, y1, x2, y2 = e["bbox"]
         cx, cy = (x1 + x2) / 2, (y1 + y2) / 2
-        logger.info("Tab-advance focus: clicking first empty field %r @ (%.0f, %.0f)",
-                    (e.get("label") or e.get("text") or "?").strip(), cx, cy)
+        field_label = (e.get("label") or e.get("text") or "?").strip()
+        # Try UIA SetFocus first — avoids coordinate mis-clicks near the tab strip.
+        # Falls back to coordinate click if UIA search fails or times out.
+        if field_label and field_label != "?":
+            try:
+                import win32gui as _w32g
+                import uiautomation as _uia_mod
+                _fg = _w32g.GetForegroundWindow()
+                _root = _uia_mod.ControlFromHandle(_fg)
+                _edit = _root.EditControl(searchDepth=10, Name=field_label)
+                if _edit.Exists(maxSearchSeconds=0.3):
+                    _edit.SetFocus()
+                    logger.info("Tab-advance focus: UIA SetFocus on %r", field_label)
+                    return True
+            except Exception:
+                pass  # fall through to coordinate click
+        # Fallback: coordinate click, clipped to be within the field and below the tab strip
+        cy = max(cy, _tab_floor)
+        cy = min(cy, y2 - 2)
+        logger.info("Tab-advance focus: clicking first empty field %r @ (%.0f, %.0f)", field_label, cx, cy)
         self._executor.execute({"action_type": "click", "click_position": [cx, cy]})
         return True
 
