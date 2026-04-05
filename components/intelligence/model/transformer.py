@@ -190,6 +190,66 @@ def _decode_actions(
     return ACTION_NOOP, 0.0, 0.0, 0.0, ""
 
 
+# UI element types that count as real click targets. Clicks that land only on
+# decorative containers (pane/window/document) are labeled -1 and dropped from
+# the pointer loss — diagnostics showed ~16.5% of raw click labels resolved to
+# a single decorative pane, saturating training with uninformative signal.
+_CLICK_TARGET_CTRL_TYPES = {
+    # canonical (new-style) control type names
+    "input", "button", "combobox", "checkbox", "listitem",
+    "tabitem", "radiobutton", "hyperlink", "menuitem",
+    "text",           # click-to-focus labels (often covers the field hit area)
+    "datetime", "calendar",  # date/time pickers
+    # legacy wx fallback names (ControlTypeName.lower())
+    "editcontrol", "buttoncontrol", "comboboxcontrol", "checkboxcontrol",
+    "listitemcontrol", "tabitemcontrol", "radiobuttoncontrol",
+    "hyperlinkcontrol", "menuitemcontrol",
+    "textcontrol", "datetimecontrol", "calendarcontrol",
+}
+
+
+def _find_click_elem_idx(mouse: dict, state: dict, max_elements: int) -> int:
+    """
+    For a click action, find which *interactive* UI element's bbox contains the
+    click point. Returns the element index (0-based) in the same order/slice
+    that ``encode_state`` sees, or -1 if no interactive element covers it.
+
+    Only elements whose control type is in ``_CLICK_TARGET_CTRL_TYPES`` are
+    considered. Decorative containers (panes, windows, documents, static text)
+    are never returned, even if they're the only element whose bbox contains
+    the click — returning -1 sends the sample to the ignore-index branch of
+    the click pointer loss rather than teaching the model to click banners.
+
+    Among qualifying elements, the one with the smallest bbox area wins, so
+    nested child controls beat their parent.
+    """
+    clicks = [a for a in mouse.get("actions", []) if a.get("type") in ("click", "double_click")]
+    if not clicks:
+        return -1
+    pos = clicks[0].get("position", [0, 0])
+    px, py = float(pos[0]), float(pos[1])
+
+    elements = state.get("elements", [])[:max_elements]
+    best_idx  = -1
+    best_area = float("inf")
+    for idx, elem in enumerate(elements):
+        ctype = (elem.get("type") or "").lower()
+        if ctype not in _CLICK_TARGET_CTRL_TYPES:
+            continue
+        bbox = elem.get("bbox", [0, 0, 0, 0])
+        if len(bbox) < 4:
+            continue
+        x1, y1, x2, y2 = (float(v) for v in bbox[:4])
+        if x2 <= x1 or y2 <= y1:
+            continue
+        if x1 <= px <= x2 and y1 <= py <= y2:
+            area = (x2 - x1) * (y2 - y1)
+            if area < best_area:
+                best_area = area
+                best_idx  = idx
+    return best_idx
+
+
 def _find_source_elem_idx(typed_text: str, state: dict, max_elements: int) -> int:
     """
     For a keyboard action, find which background element's text contains
@@ -228,12 +288,13 @@ class TrajectoryDataset(Dataset):
     Sliding-window trajectory samples from consecutive trace JSON files.
 
     Each sample (window of H traces):
-      states         : FloatTensor (H, max_elements, 6)
-      past_act_types : LongTensor  (H-1,)
-      past_act_cont  : FloatTensor (H-1, 3)  [cx, cy, key_norm]
-      target_type    : LongTensor  scalar
-      target_click   : FloatTensor (2,)
-      target_key     : FloatTensor scalar
+      states           : FloatTensor (H, max_elements, ELEM_FEATURES)
+      past_act_types   : LongTensor  (H-1,)
+      past_act_cont    : FloatTensor (H-1, 3)  [cx, cy, key_norm]
+      target_type      : LongTensor  scalar
+      target_click_idx : LongTensor  scalar   — element index to click, -1 = ignore
+      target_key       : FloatTensor scalar
+      target_src_idx   : LongTensor  scalar   — source element index, -1 = ignore
     """
 
     def __init__(
@@ -248,17 +309,25 @@ class TrajectoryDataset(Dataset):
         self.hist_len      = hist_len
         self.aug_drop_prob = aug_drop_prob
 
-        # Collect traces from both flat dir and any session_* subfolders
+        # Collect trace files as *groups* — each group is a contiguous recording
+        # session whose traces are temporally adjacent.  The flat files in `root`
+        # form one group; each `session_*` subfolder forms its own group.  Sliding
+        # windows are later built *within* each group so history never crosses a
+        # session boundary (which would stitch together unrelated demonstrations).
         root = Path(data_dir)
-        files = sorted(root.glob(glob))
+        file_groups: List[List[Path]] = []
+        flat_files = sorted(root.glob(glob))
+        if flat_files:
+            file_groups.append(flat_files)
         for session_dir in sorted(root.glob("session_*")):
             if session_dir.is_dir():
-                files += sorted(session_dir.glob(glob))
-        files = sorted(set(files))
-        if not files:
+                session_files = sorted(session_dir.glob(glob))
+                if session_files:
+                    file_groups.append(session_files)
+        if not file_groups:
             raise FileNotFoundError(f"No trace JSONs in {data_dir!r} (including session subfolders)")
 
-        # Load raw traces — skip traces with no active-window interactive
+        # Load raw traces per group — skip traces with no active-window interactive
         # controls (e.g. old Tkinter sessions where UIA saw 0 form elements).
         # Type names must match _CTRL_TYPE_MAP in ui_observer.py:
         #   "Edit" → "input", "Button" → "button", "ComboBox" → "combobox", etc.
@@ -274,76 +343,101 @@ class TrajectoryDataset(Dataset):
             "editcontrol", "comboboxcontrol", "checkboxcontrol",
             "buttoncontrol", "listitemcontrol",
         }
-        raw_traces: List[dict] = []
+        grouped_traces: List[List[dict]] = []
         skipped = 0
-        for fpath in files:
-            t = _load_trace(fpath)
-            if t is None:
-                continue
-            elems = t.get("state", {}).get("elements", [])
-            active_interactive = sum(
-                1 for e in elems
-                if e.get("window_role") == "active"
-                and (e.get("type") or "").lower() in _INTERACTIVE
-            )
-            if active_interactive == 0:
-                skipped += 1
-                continue
-            raw_traces.append(t)
+        for group_files in file_groups:
+            group: List[dict] = []
+            for fpath in group_files:
+                t = _load_trace(fpath)
+                if t is None:
+                    continue
+                elems = t.get("state", {}).get("elements", [])
+                active_interactive = sum(
+                    1 for e in elems
+                    if e.get("window_role") == "active"
+                    and (e.get("type") or "").lower() in _INTERACTIVE
+                )
+                if active_interactive == 0:
+                    skipped += 1
+                    continue
+                group.append(t)
+            if group:
+                grouped_traces.append(group)
         if skipped:
             print(f"[Dataset] Skipped {skipped} traces with no active form controls.")
+        if not grouped_traces:
+            raise ValueError("No usable traces after filtering.")
 
-        # Collect every unique text string across all elements, then encode in one batch
+        # Collect every unique text string across ALL groups, then encode in one batch
         all_texts = [
             elem.get("text", "") or ""
-            for t in raw_traces
+            for group in grouped_traces
+            for t in group
             for elem in t.get("state", {}).get("elements", [])
         ]
         _prime_embed_cache(all_texts)
 
-        all_states:  List[torch.Tensor]              = []
-        all_actions: List[Tuple[int, float, float, float, str]] = []
-        all_src_idx: List[int]                       = []
-
-        for trace in raw_traces:
-            state = trace.get("state", {})
-            res   = state.get("screen_resolution", [DEFAULT_W, DEFAULT_H])
-            W     = float(res[0]) or DEFAULT_W
-            H_px  = float(res[1]) or DEFAULT_H
-            all_states.append(encode_state(state, max_elements))
-            action = _decode_actions(
-                trace.get("mouse", {}), trace.get("keyboard", {}), W, H_px
-            )
-            all_actions.append(action)
-            # Source element pointer label for keyboard steps
-            src_idx = _find_source_elem_idx(action[4], state, max_elements) if action[0] == ACTION_KEYBOARD else -1
-            all_src_idx.append(src_idx)
-
-        N = len(all_states)
-        if N < hist_len:
-            raise ValueError(
-                f"Need >= {hist_len} traces (hist_len={hist_len}), found {N}."
-            )
-
         self._samples = []
-        for i in range(N - hist_len + 1):
-            ctx     = all_actions[i : i + hist_len - 1]
-            tgt     = all_actions[i + hist_len - 1]
-            src_idx = all_src_idx[i + hist_len - 1]
-            if tgt[0] == ACTION_NOOP:
-                continue   # no_op steps add noise — model should always click or type
-            self._samples.append((
-                torch.stack(all_states[i : i + hist_len]),   # (H, T, F)
-                [a[0] for a in ctx],                          # past types
-                [[a[1], a[2], a[3]] for a in ctx],            # past cont
-                tgt[0], (tgt[1], tgt[2]), tgt[3], src_idx,   # target + source ptr
-            ))
+        total_traces = 0
+        dropped_short_groups = 0
+        for group in grouped_traces:
+            g_states:  List[torch.Tensor]              = []
+            g_actions: List[Tuple[int, float, float, float, str]] = []
+            g_src_idx:   List[int]                     = []
+            g_click_idx: List[int]                     = []
+            for trace in group:
+                state = trace.get("state", {})
+                res   = state.get("screen_resolution", [DEFAULT_W, DEFAULT_H])
+                W     = float(res[0]) or DEFAULT_W
+                H_px  = float(res[1]) or DEFAULT_H
+                g_states.append(encode_state(state, max_elements))
+                action = _decode_actions(
+                    trace.get("mouse", {}), trace.get("keyboard", {}), W, H_px
+                )
+                g_actions.append(action)
+                src_idx = _find_source_elem_idx(action[4], state, max_elements) if action[0] == ACTION_KEYBOARD else -1
+                g_src_idx.append(src_idx)
+                click_idx = _find_click_elem_idx(trace.get("mouse", {}), state, max_elements) if action[0] == ACTION_CLICK else -1
+                g_click_idx.append(click_idx)
+
+            N = len(g_states)
+            total_traces += N
+            if N < hist_len:
+                dropped_short_groups += 1
+                continue   # too few traces in this session to form even one window
+
+            for i in range(N - hist_len + 1):
+                ctx       = g_actions[i : i + hist_len - 1]
+                tgt       = g_actions[i + hist_len - 1]
+                src_idx   = g_src_idx[i + hist_len - 1]
+                click_idx = g_click_idx[i + hist_len - 1]
+                if tgt[0] == ACTION_NOOP:
+                    continue   # no_op steps add noise — model should always click or type
+                # For click targets, require a resolved element index — clicks
+                # that fall outside every bbox become "-1" and are ignored by
+                # the pointer loss (ignore_index). Skipping them entirely here
+                # would also hide the type label, so we keep the sample but the
+                # pointer head sees -1.
+                self._samples.append((
+                    torch.stack(g_states[i : i + hist_len]),     # (H, T, F)
+                    [a[0] for a in ctx],                          # past types
+                    [[a[1], a[2], a[3]] for a in ctx],            # past cont
+                    tgt[0], click_idx, tgt[3], src_idx,          # target + click ptr + source ptr
+                ))
+
+        if total_traces < hist_len:
+            raise ValueError(
+                f"Need >= {hist_len} traces (hist_len={hist_len}), found {total_traces}."
+            )
+        if dropped_short_groups:
+            print(f"[Dataset] Skipped {dropped_short_groups} session(s) shorter than hist_len={hist_len}.")
+        print(f"[Dataset] Built {len(self._samples)} samples from {len(grouped_traces)} session(s), {total_traces} traces.")
 
     def __len__(self) -> int:
         return len(self._samples)
 
     def __getitem__(self, idx: int):
-        states, p_types, p_cont, tgt_type, tgt_click, tgt_key, src_idx = self._samples[idx]
+        states, p_types, p_cont, tgt_type, tgt_click_idx, tgt_key, src_idx = self._samples[idx]
 
         # Element dropout augmentation
         if self.aug_drop_prob > 0.0:
@@ -363,10 +457,10 @@ class TrajectoryDataset(Dataset):
             states,
             past_types,
             past_cont,
-            torch.tensor(tgt_type,        dtype=torch.long),
-            torch.tensor(list(tgt_click), dtype=torch.float32),
-            torch.tensor(tgt_key,         dtype=torch.float32),
-            torch.tensor(src_idx,         dtype=torch.long),   # -1 = ignore
+            torch.tensor(tgt_type,      dtype=torch.long),
+            torch.tensor(tgt_click_idx, dtype=torch.long),    # -1 = ignore (no element matched)
+            torch.tensor(tgt_key,       dtype=torch.float32),
+            torch.tensor(src_idx,       dtype=torch.long),    # -1 = ignore
         )
 
     def class_counts(self) -> dict:
@@ -387,22 +481,34 @@ class TrajectoryDataset(Dataset):
 
 class PolicyOutput(NamedTuple):
     type_logits:  torch.Tensor   # (B, num_actions)
-    click_xy:     torch.Tensor   # (B, 2)
+    click_elem:   torch.Tensor   # (B, max_elements) — which element to click (raw logits)
     key_count:    torch.Tensor   # (B, 1)
     source_elem:  torch.Tensor   # (B, max_elements) — which bg element to copy text from
 
 
 class StateEncoder(nn.Module):
-    """Mean-pool UI elements (mask padding) -> d_model."""
+    """
+    Project each UI element to d_model *independently*, returning per-element
+    embeddings and a boolean padding mask. The caller decides whether to mean-
+    pool the elements (for sequence tokenization) or keep them per-element
+    (for pointer heads that must identify a specific element).
+
+    Returns:
+        elem_emb : FloatTensor (B, T, d_model) — per-element embeddings
+        mask     : BoolTensor  (B, T)          — True for real elements, False for padding
+    """
     def __init__(self, elem_features: int, d_model: int):
         super().__init__()
         self.proj = nn.Linear(elem_features, d_model)
         self.norm = nn.LayerNorm(d_model)
 
-    def forward(self, state: torch.Tensor) -> torch.Tensor:
-        mask  = (state.abs().sum(-1) > 0).float().unsqueeze(-1)  # (B, T, 1)
-        denom = mask.sum(1).clamp(min=1.0)
-        return self.norm((self.proj(state) * mask).sum(1) / denom)
+    def forward(self, state: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+        mask = state.abs().sum(-1) > 0                       # (B, T) bool
+        elem_emb = self.norm(self.proj(state))               # (B, T, d_model)
+        # Zero out padding rows so the pooled sequence token (computed upstream)
+        # doesn't mix padding noise into the mean.
+        elem_emb = elem_emb * mask.unsqueeze(-1).float()
+        return elem_emb, mask
 
 
 class ActionEncoder(nn.Module):
@@ -431,7 +537,7 @@ class TransformerAgentNetwork(nn.Module):
 
     def __init__(
         self,
-        elem_features:   int   = 6,
+        elem_features:   int   = ELEM_FEATURES,
         max_elements:    int   = 128,
         d_model:         int   = 128,
         nhead:           int   = 4,
@@ -458,10 +564,26 @@ class TransformerAgentNetwork(nn.Module):
         self.encoder  = nn.TransformerEncoder(enc_layer, num_layers=num_layers,
                                                enable_nested_tensor=False)
         self.out_norm       = nn.LayerNorm(d_model)
-        self.type_head      = nn.Linear(d_model, num_actions)
-        self.click_head     = nn.Linear(d_model, 2)
-        self.key_head       = nn.Linear(d_model, 1)
-        self.source_elem_head = nn.Linear(d_model, max_elements)  # Option 2: point to source element
+        # Cross-attention decoder: the last transformer token (derived from
+        # pooled state summaries) queries the per-element embeddings of the
+        # CURRENT state, so all downstream heads can read specific elements
+        # rather than reasoning from the pooled summary alone. This addresses
+        # the observed ceiling where per-element pointer heads could not form
+        # discriminative queries from a pooled sequence token.
+        self.cross_attn = nn.MultiheadAttention(
+            embed_dim=d_model, num_heads=nhead, dropout=dropout, batch_first=True,
+        )
+        self.cross_norm = nn.LayerNorm(d_model)
+        self.type_head = nn.Linear(d_model, num_actions)
+        self.key_head  = nn.Linear(d_model, 1)
+        # Pointer heads: dot-product attention between a query derived from the
+        # cross-attended context token and per-element embeddings from the
+        # current state. Separate query/key projections let click and source
+        # learn different "what am I looking for" signatures.
+        self.click_q = nn.Linear(d_model, d_model)
+        self.click_k = nn.Linear(d_model, d_model)
+        self.src_q   = nn.Linear(d_model, d_model)
+        self.src_k   = nn.Linear(d_model, d_model)
 
         for m in self.modules():
             if isinstance(m, nn.Linear):
@@ -472,14 +594,22 @@ class TransformerAgentNetwork(nn.Module):
 
     def forward(
         self,
-        states:     torch.Tensor,   # (B, H, T, 6)
+        states:     torch.Tensor,   # (B, H, T, F)
         past_types: torch.Tensor,   # (B, H-1)
         past_cont:  torch.Tensor,   # (B, H-1, 3)
     ) -> PolicyOutput:
-        B, H = states.shape[:2]
+        B, H, T, _ = states.shape
 
-        # Encode states: (B, H, d)
-        s = self.state_enc(states.view(B * H, *states.shape[2:])).view(B, H, -1)
+        # Per-element encoding: (B*H, T, d), mask (B*H, T)
+        flat_states = states.view(B * H, T, -1)
+        elem_emb, elem_mask = self.state_enc(flat_states)
+        elem_emb  = elem_emb.view(B, H, T, -1)               # (B, H, T, d)
+        elem_mask = elem_mask.view(B, H, T)                  # (B, H, T)
+
+        # Pool each state into a single sequence token via masked mean.
+        # Pointer heads will use the *unpooled* per-element embeddings below.
+        denom = elem_mask.sum(-1, keepdim=True).clamp(min=1).float()  # (B, H, 1)
+        s = elem_emb.sum(-2) / denom                                  # (B, H, d)
 
         # Build sequence [s1, a1, s2, a2, ..., sH]
         seq_len = 2 * H - 1
@@ -493,15 +623,44 @@ class TransformerAgentNetwork(nn.Module):
         tokens = tokens + self.pos_enc(pos)
 
         # Causal attention
-        mask = nn.Transformer.generate_square_subsequent_mask(seq_len, device=states.device)
-        out  = self.encoder(tokens, mask=mask, is_causal=True)
+        attn_mask = nn.Transformer.generate_square_subsequent_mask(seq_len, device=states.device)
+        out  = self.encoder(tokens, mask=attn_mask, is_causal=True)
+        last = self.out_norm(out[:, -1])                              # (B, d)
 
-        last = self.out_norm(out[:, -1])
+        cur_elem_emb  = elem_emb[:, -1]                               # (B, T, d)
+        cur_elem_mask = elem_mask[:, -1]                              # (B, T)
+
+        # Cross-attention decoder: let `last` read specific elements of the
+        # current state. key_padding_mask expects True = IGNORE, so invert our
+        # mask (where True = real element).
+        q_in   = last.unsqueeze(1)                                    # (B, 1, d)
+        ctx, _ = self.cross_attn(
+            query=q_in, key=cur_elem_emb, value=cur_elem_emb,
+            key_padding_mask=~cur_elem_mask,
+            need_weights=False,
+        )
+        # Residual + norm: preserve the transformer's temporal reasoning while
+        # adding the element-specific information it retrieved.
+        ctx = self.cross_norm(last + ctx.squeeze(1))                  # (B, d)
+
+        # Pointer heads: dot-product between query (from cross-attended ctx)
+        # and per-element keys (from the CURRENT state's per-element embeddings).
+        scale = self.d_model ** 0.5
+        click_q = self.click_q(ctx)                                   # (B, d)
+        click_k = self.click_k(cur_elem_emb)                          # (B, T, d)
+        click_logits = torch.einsum('bd,btd->bt', click_q, click_k) / scale
+        click_logits = click_logits.masked_fill(~cur_elem_mask, -1e9)
+
+        src_q = self.src_q(ctx)                                       # (B, d)
+        src_k = self.src_k(cur_elem_emb)                              # (B, T, d)
+        src_logits = torch.einsum('bd,btd->bt', src_q, src_k) / scale
+        src_logits = src_logits.masked_fill(~cur_elem_mask, -1e9)
+
         return PolicyOutput(
-            self.type_head(last),
-            torch.sigmoid(self.click_head(last)),
-            torch.sigmoid(self.key_head(last)),
-            self.source_elem_head(last),   # raw logits — argmax = element index to copy from
+            self.type_head(ctx),
+            click_logits,                       # (B, T=max_elements)
+            torch.sigmoid(self.key_head(ctx)),
+            src_logits,                         # (B, T=max_elements)
         )
 
     def make_empty_history(self, B: int, device: torch.device):
@@ -531,7 +690,7 @@ TransformerPolicyNetwork = TransformerAgentNetwork
 
 def _masked_mse(pred, target, mask) -> torch.Tensor:
     if mask.sum() == 0:
-        return torch.tensor(0.0, device=pred.device, requires_grad=True)
+        return pred.sum() * 0.0  # zero loss that stays connected to the graph
     return nn.functional.mse_loss(pred[mask], target[mask])
 
 
@@ -539,25 +698,36 @@ def _run_epoch(model, loader, optimizer, device, lambda_click, lambda_key, label
     is_train = optimizer is not None
     model.train(is_train)
     ce = nn.CrossEntropyLoss(label_smoothing=label_smoothing, weight=class_weights)
-    totals = dict(loss=0.0, type=0.0, click=0.0, key=0.0, correct=0, samples=0, batches=0)
+    totals = dict(loss=0.0, type=0.0, click=0.0, key=0.0,
+                  correct=0, click_correct=0, click_total=0,
+                  samples=0, batches=0)
 
-    ce_src = nn.CrossEntropyLoss(ignore_index=-1)   # -1 = no source label for this step
+    ce_click = nn.CrossEntropyLoss(ignore_index=-1)  # -1 = non-click step or click didn't match any element
+    ce_src   = nn.CrossEntropyLoss(ignore_index=-1)  # -1 = no source label for this step
     ctx = torch.enable_grad() if is_train else torch.no_grad()
     with ctx:
-        for states, p_types, p_cont, tgt_types, tgt_clicks, tgt_keys, tgt_src in loader:
+        for states, p_types, p_cont, tgt_types, tgt_click_idx, tgt_keys, tgt_src in loader:
             states, p_types, p_cont = states.to(device), p_types.to(device), p_cont.to(device)
-            tgt_types, tgt_clicks, tgt_keys, tgt_src = (
-                tgt_types.to(device), tgt_clicks.to(device),
+            tgt_types, tgt_click_idx, tgt_keys, tgt_src = (
+                tgt_types.to(device), tgt_click_idx.to(device),
                 tgt_keys.to(device),  tgt_src.to(device)
             )
-            out     = model(states, p_types, p_cont)
-            l_type  = ce(out.type_logits, tgt_types)
-            l_click = _masked_mse(out.click_xy, tgt_clicks, tgt_types == ACTION_CLICK)
-            l_key   = _masked_mse(out.key_count.squeeze(-1), tgt_keys, tgt_types == ACTION_KEYBOARD)
-            # Option 2 loss — skip if all targets are -1 (no keyboard steps with source)
+            out    = model(states, p_types, p_cont)
+            l_type = ce(out.type_logits, tgt_types)
+
+            # Click pointer loss — ignore non-click steps (tgt=-1) and unmatched clicks
+            valid_click = (tgt_click_idx != -1)
+            l_click = (ce_click(out.click_elem, tgt_click_idx)
+                       if valid_click.any() else out.click_elem.sum() * 0.0)
+
+            l_key = _masked_mse(out.key_count.squeeze(-1), tgt_keys, tgt_types == ACTION_KEYBOARD)
+
+            # Source-element pointer loss — only keyboard steps with a resolved source
             valid_src = (tgt_src != -1)
-            l_src = ce_src(out.source_elem, tgt_src) if valid_src.any() else torch.tensor(0.0, device=device)
-            loss    = l_type + lambda_click * l_click + lambda_key * l_key + 0.5 * l_src
+            l_src = (ce_src(out.source_elem, tgt_src)
+                     if valid_src.any() else out.source_elem.sum() * 0.0)
+
+            loss = l_type + lambda_click * l_click + lambda_key * l_key + 0.5 * l_src
 
             if is_train:
                 optimizer.zero_grad(); loss.backward()
@@ -569,16 +739,21 @@ def _run_epoch(model, loader, optimizer, device, lambda_click, lambda_key, label
             totals["click"]  += l_click.item()
             totals["key"]    += l_key.item()
             totals["correct"] += (out.type_logits.argmax(-1) == tgt_types).sum().item()
+            if valid_click.any():
+                click_pred = out.click_elem[valid_click].argmax(-1)
+                totals["click_correct"] += (click_pred == tgt_click_idx[valid_click]).sum().item()
+                totals["click_total"]   += int(valid_click.sum().item())
             totals["samples"] += tgt_types.size(0)
             totals["batches"] += 1
 
     n = max(totals["batches"], 1)
     return {
-        "loss":     totals["loss"]  / n,
-        "l_type":   totals["type"]  / n,
-        "l_click":  totals["click"] / n,
-        "l_key":    totals["key"]   / n,
-        "accuracy": totals["correct"] / max(totals["samples"], 1),
+        "loss":       totals["loss"]  / n,
+        "l_type":     totals["type"]  / n,
+        "l_click":    totals["click"] / n,
+        "l_key":      totals["key"]   / n,
+        "accuracy":   totals["correct"] / max(totals["samples"], 1),
+        "click_acc":  totals["click_correct"] / max(totals["click_total"], 1),
     }
 
 
@@ -602,6 +777,8 @@ def train(
     num_layers: int = 4,
     dim_feedforward: int = 256,
     dropout: float = 0.1,
+    class_weight_mode: str = "none",          # "none" | "inverse" | "sqrt_inverse"
+    balanced_sampler: bool = True,             # WeightedRandomSampler for type imbalance (default on — see Run 6)
     device_str: str = "auto",
     verbose: bool = True,
 ) -> TransformerAgentNetwork:
@@ -639,8 +816,32 @@ def train(
     g       = torch.Generator().manual_seed(seed)
     train_ds, val_ds = random_split(dataset, [n_train, n_val], generator=g)
 
-    train_loader = DataLoader(train_ds, batch_size=batch_size, shuffle=True,  drop_last=False)
-    val_loader   = DataLoader(val_ds,   batch_size=batch_size, shuffle=False, drop_last=False)
+    # Optional WeightedRandomSampler to balance click vs keyboard in each batch.
+    # Each sample's sampling weight = 1 / (class_count) for its target type, so
+    # each class is seen roughly equally often per epoch regardless of raw size.
+    # Mechanism is orthogonal to class_weight_mode and tends to be more stable
+    # on small imbalanced datasets than loss-weight balancing.
+    train_sampler = None
+    if balanced_sampler:
+        from torch.utils.data import WeightedRandomSampler
+        from collections import Counter as _Counter
+        tgt_types_in_train = [dataset._samples[i][3] for i in train_ds.indices]
+        type_counts = _Counter(tgt_types_in_train)
+        sample_weights = [1.0 / max(type_counts[t], 1) for t in tgt_types_in_train]
+        train_sampler = WeightedRandomSampler(
+            weights=sample_weights,
+            num_samples=len(tgt_types_in_train),
+            replacement=True,
+        )
+        if verbose:
+            print(f"[train] balanced sampler ON — per-class counts in train: "
+                  f"{dict(type_counts)}")
+
+    train_loader = DataLoader(
+        train_ds, batch_size=batch_size,
+        shuffle=(train_sampler is None), sampler=train_sampler, drop_last=False,
+    )
+    val_loader   = DataLoader(val_ds, batch_size=batch_size, shuffle=False, drop_last=False)
 
     model = TransformerAgentNetwork(
         elem_features=ELEM_FEATURES, max_elements=max_elements, d_model=d_model,
@@ -651,17 +852,37 @@ def train(
     if verbose:
         print(f"[train] {model}")
 
-    # Compute inverse-frequency class weights so click/keyboard aren't drowned by no_op
+    # Class weights for the type head. Diagnostics showed inverse-frequency
+    # weighting caused the keyboard weight to dominate (2.14 vs 0.47 for click)
+    # and produced wild val accuracy oscillations (0.15 ↔ 0.85 across epochs)
+    # on the small val set. Default is now "none" — let label_smoothing handle
+    # the imbalance. "inverse" and "sqrt_inverse" are kept for experimentation.
     _cc = dataset.class_counts()
     _total = sum(_cc.values()) or 1
-    _class_weights = torch.tensor([
-        _total / max(_cc.get("no_op",    _total), 1),  # absent class → neutral weight 1.0
-        _total / max(_cc.get("click",    1), 1),
-        _total / max(_cc.get("keyboard", 1), 1),
-    ], dtype=torch.float32, device=device)
-    _class_weights = _class_weights / _class_weights.sum() * len(_class_weights)  # normalise
-    if verbose:
-        print(f"[train] class weights: no_op={_class_weights[0]:.3f}  click={_class_weights[1]:.3f}  keyboard={_class_weights[2]:.3f}")
+    if class_weight_mode == "none":
+        _class_weights = None
+        if verbose:
+            print("[train] class weights: none (uniform)")
+    else:
+        if class_weight_mode == "inverse":
+            raw = [
+                _total / max(_cc.get("no_op",    _total), 1),
+                _total / max(_cc.get("click",    1), 1),
+                _total / max(_cc.get("keyboard", 1), 1),
+            ]
+        elif class_weight_mode == "sqrt_inverse":
+            raw = [
+                (_total / max(_cc.get("no_op",    _total), 1)) ** 0.5,
+                (_total / max(_cc.get("click",    1), 1)) ** 0.5,
+                (_total / max(_cc.get("keyboard", 1), 1)) ** 0.5,
+            ]
+        else:
+            raise ValueError(f"Unknown class_weight_mode: {class_weight_mode!r}")
+        _class_weights = torch.tensor(raw, dtype=torch.float32, device=device)
+        _class_weights = _class_weights / _class_weights.sum() * len(_class_weights)
+        if verbose:
+            print(f"[train] class weights ({class_weight_mode}): "
+                  f"no_op={_class_weights[0]:.3f}  click={_class_weights[1]:.3f}  keyboard={_class_weights[2]:.3f}")
 
     optimizer = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=weight_decay)
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=epochs, eta_min=lr / 100)
@@ -678,8 +899,8 @@ def train(
         if verbose:
             print(
                 f"Epoch {epoch:>3}/{epochs}  |  "
-                f"train_loss={train_m['loss']:.4f}  train_acc={train_m['accuracy']:.3f}  |  "
-                f"val_loss={val_m['loss']:.4f}  val_acc={val_m['accuracy']:.3f}"
+                f"train_loss={train_m['loss']:.4f}  acc={train_m['accuracy']:.3f}  click_acc={train_m['click_acc']:.3f}  |  "
+                f"val_loss={val_m['loss']:.4f}  acc={val_m['accuracy']:.3f}  click_acc={val_m['click_acc']:.3f}"
             )
 
         save_loss = val_m["loss"] if not math.isnan(val_m["loss"]) else train_m["loss"]
@@ -739,7 +960,7 @@ def _load_model(model_path: str, device: torch.device) -> TransformerAgentNetwor
         ckpt = torch.load(model_path, map_location=device, weights_only=True)
         hp   = ckpt.get("hyperparams", {})
         m    = TransformerAgentNetwork(
-            elem_features=hp.get("elem_features", 6), max_elements=hp.get("max_elements", 128),
+            elem_features=hp.get("elem_features", ELEM_FEATURES), max_elements=hp.get("max_elements", 128),
             d_model=hp.get("d_model", 128), nhead=hp.get("nhead", 4),
             num_layers=hp.get("num_layers", 4), dim_feedforward=hp.get("dim_feedforward", 256),
             dropout=hp.get("dropout", 0.1), hist_len=hp.get("hist_len", 4),
@@ -829,14 +1050,28 @@ def predict(
         "_scores": {_ACTION_LABELS.get(i, str(i)): round(p, 3) for i, p in enumerate(probs)},
     }
     if idx == ACTION_CLICK:
-        cx, cy = out.click_xy[0].tolist()
-        result["click_position"] = [round(cx * W, 1), round(cy * H_px, 1)]
+        click_idx  = int(out.click_elem[0].argmax(-1).item())
+        click_conf = F.softmax(out.click_elem[0], dim=-1).max().item()
+        result["click_elem_idx"] = click_idx
+        result["_click_conf"]    = round(click_conf, 3)
+        # Resolve pointer -> pixel click position by looking up the bbox
+        # in the *current* state (same slice the encoder saw).
+        elems = state.get("elements", [])[:max_elements]
+        if 0 <= click_idx < len(elems):
+            bbox = elems[click_idx].get("bbox", [0, 0, 0, 0])
+            if len(bbox) >= 4:
+                cx_px = (float(bbox[0]) + float(bbox[2])) / 2.0
+                cy_px = (float(bbox[1]) + float(bbox[3])) / 2.0
+                result["click_position"] = [round(cx_px, 1), round(cy_px, 1)]
+            else:
+                result["click_position"] = [0.0, 0.0]
+        else:
+            # Pointer landed on a padding slot — no valid element to click.
+            result["click_position"] = [0.0, 0.0]
     elif idx == ACTION_KEYBOARD:
         result["key_count"]       = max(1, round(out.key_count[0, 0].item() * 100))
-        src_idx = int(out.source_elem[0].argmax(-1).item())
-        src_conf = float(out.source_elem[0].max(-1).values.item()) if hasattr(out.source_elem[0], 'values') else 0.0
-        result["source_elem_idx"]  = src_idx
-        result["_source_conf"]     = round(F.softmax(out.source_elem[0], dim=-1).max().item(), 3)
+        result["source_elem_idx"] = int(out.source_elem[0].argmax(-1).item())
+        result["_source_conf"]    = round(F.softmax(out.source_elem[0], dim=-1).max().item(), 3)
     return result
 
 
@@ -866,6 +1101,12 @@ def _parse_args() -> argparse.Namespace:
     p.add_argument("--num_layers",      default=4,    type=int)
     p.add_argument("--dim_feedforward", default=256,  type=int)
     p.add_argument("--dropout",         default=0.1,  type=float)
+    p.add_argument("--class_weight_mode", default="none",
+                   choices=["none", "inverse", "sqrt_inverse"],
+                   help="Type-head class weighting strategy (default: none; balanced_sampler handles imbalance)")
+    p.add_argument("--balanced_sampler", action=argparse.BooleanOptionalAction, default=True,
+                   help="Use WeightedRandomSampler to balance click vs keyboard per epoch "
+                        "(default: on — disable with --no-balanced_sampler)")
     # Predict args
     p.add_argument("--trace_path",      default=None)
     return p.parse_args()
@@ -881,6 +1122,8 @@ if __name__ == "__main__":
             label_smoothing=args.label_smoothing, aug_drop_prob=args.aug_drop_prob,
             d_model=args.d_model, nhead=args.nhead, num_layers=args.num_layers,
             dim_feedforward=args.dim_feedforward, dropout=args.dropout,
+            class_weight_mode=args.class_weight_mode,
+            balanced_sampler=args.balanced_sampler,
             device_str=args.device_str,
         )
     else:
