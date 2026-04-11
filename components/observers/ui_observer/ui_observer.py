@@ -111,6 +111,25 @@ _ALWAYS_INCLUDE = {"button", "input", "checkbox", "radio", "combobox",
                    "listitem", "menuitem", "tabitem", "tabitemcontrol",
                    "link", "dataitem", "splitbutton"}
 
+# Decorative container types — wxPython, WPF, and similar UI frameworks wrap
+# their actual interactive controls inside layers of named panes ("tab_policy",
+# "DesktopWindowXamlSource", divider banners, etc.). These containers are NOT
+# clickable targets but they DO have non-empty text, so the default
+# should_add filter would include them in the output and consume per-window
+# element slots that the cap then takes away from the real children further
+# down the tree.
+#
+# Diagnostic on 4,485 recorded traces (scripts/diagnose_click_rejections.py)
+# showed 95.9% of rejected clicks landing on panecontrol elements that the
+# walker DID visit — but whose interactive children were never captured
+# because the pane consumed the slot first. We exclude these types from the
+# output (but the walker still recurses into them) so the per-window cap is
+# spent on real interactive controls.
+_DECORATIVE_CONTAINER_TYPES = {
+    "pane", "window", "group", "custom", "splitter",
+    "document", "titlebar", "header", "headeritem",
+}
+
 # Apps to skip — Intern control panel, system shell
 # NOTE: python.exe / pythonw.exe are intentionally NOT listed here so that
 # target apps running as Python scripts (e.g. the car insurance form) are
@@ -137,9 +156,9 @@ class UIAutomationObserver:
 
     def __init__(
         self,
-        max_depth: int = 8,
-        max_elements_per_window: int = 150,
-        max_total_elements: int = 400,
+        max_depth: int = 14,
+        max_elements_per_window: int = 250,
+        max_total_elements: int = 500,
         min_size: int = 4,
     ):
         self.max_depth               = max_depth
@@ -419,7 +438,18 @@ class UIAutomationObserver:
                 and rect.bottom == focused_rect.bottom
             )
 
-            should_add = bool(text) or simple_type in _ALWAYS_INCLUDE or is_focused
+            # Exclude decorative containers (panes, windows, groups, etc.)
+            # from the output even when they have text — but ALWAYS recurse
+            # into them below so their interactive children are still visited.
+            # The focused element is the one exception: never drop it.
+            is_decorative_container = (
+                simple_type in _DECORATIVE_CONTAINER_TYPES and not is_focused
+            )
+
+            should_add = (
+                (bool(text) or simple_type in _ALWAYS_INCLUDE or is_focused)
+                and not is_decorative_container
+            )
 
             if should_add:
                 elem_id = f"elem_{elem_offset + len(out)}"
