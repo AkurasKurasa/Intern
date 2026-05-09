@@ -249,9 +249,10 @@ class CarInsuranceFrame(wx.Frame):
         return ctrl
 
     def _choice(self, parent, name: str, choices: list, default: str = ""):
-        ctrl = wx.Choice(parent, choices=choices, name=name)
+        _choices = [""] + choices   # blank first option for "(leave blank)" support
+        ctrl = wx.Choice(parent, choices=_choices, name=name)
         ctrl.SetFont(_font(*FONT_LABEL))
-        idx = choices.index(default) if default in choices else 0
+        idx = _choices.index(default) if default in _choices else 0
         ctrl.SetSelection(idx)
         self._controls[name] = ctrl
         return ctrl
@@ -645,6 +646,13 @@ class CarInsuranceFrame(wx.Frame):
                            style=wx.TE_MULTILINE | wx.TE_WORDWRAP,
                            size=(-1, 80))
         desc.SetFont(_font(*FONT_MONO))
+        try:
+            desc.MoveAfterInTabOrder(desc_lbl)
+            acc = _CtrlAccessible("Description")
+            self._accessibles.append(acc)
+            desc.SetAccessible(acc)
+        except Exception:
+            pass
         self._controls["claim_desc"] = desc
         sz.Add(desc, 0, wx.EXPAND | wx.ALL, 8)
 

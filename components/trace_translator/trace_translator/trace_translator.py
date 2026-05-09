@@ -137,9 +137,9 @@ class TraceTranslator:
             raise ImportError("Pillow required: pip install Pillow")
 
         try:
-            from observers.vision_observer.vision_observer import VisionObserver
+            from observers.vlm.vision_observer.vision_observer import VisionObserver
         except ImportError:
-            from components.observers.vision_observer.vision_observer import VisionObserver
+            from components.observers.vlm.vision_observer.vision_observer import VisionObserver
 
         vision = VisionObserver()
 
