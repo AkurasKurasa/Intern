@@ -74,7 +74,199 @@ def _normalize(v: Any) -> str:
     return str(v).strip().lower().replace("\n", "").replace("\r", "")
 
 
+# ── intake label → submission key mapping ────────────────────────────────────
+_LABEL_TO_KEY: dict[str, str] = {
+    # Policy tab
+    "policy number":              "policy_number",
+    "policy status":              "policy_status",
+    "policy type":                "policy_type",
+    "policy term":                "policy_term",
+    "effective date":             "effective_date",
+    "expiration date":            "expiration_date",
+    "agent id":                   "agent_id",
+    "agent name":                 "agent_name",
+    "agency name":                "agency_name",
+    "underwriter":                "underwriter",
+    "renewal policy":             "renewal_flag",
+    "paperless / e-delivery":     "paperless",
+    "e-signature obtained":       "esign",
+    # Policyholder tab
+    "first name":                 "ph_first",
+    "middle name":                "ph_middle",
+    "last name":                  "ph_last",
+    "suffix":                     "ph_suffix",
+    "date of birth":              "ph_dob",
+    "gender":                     "ph_gender",
+    "ssn":                        "ph_ssn",
+    "marital status":             "ph_marital",
+    "occupation":                 "ph_occupation",
+    "education level":            "ph_education",
+    "credit score":               "ph_credit_score",
+    "years continuously insured": "ph_years_insured",
+    "email address":              "ph_email",
+    "home phone":                 "ph_phone_home",
+    "cell phone":                 "ph_phone_cell",
+    "work phone":                 "ph_phone_work",
+    "street address 1":           "ph_addr1",
+    "street address 2":           "ph_addr2",
+    "city":                       "ph_city",
+    "state":                      "ph_state",
+    "zip code":                   "ph_zip",
+    "county":                     "ph_county",
+    "country":                    "ph_country",
+    "years at address":           "ph_years_at_addr",
+    "homeowner":                  "ph_homeowner",
+    "dl number":                  "ph_drivers_license",
+    "dl issuing state":           "ph_dl_state",
+    "dl expiration":              "ph_dl_exp",
+    "prior insurer":              "ph_prior_insurer",
+    "prior policy no.":           "ph_prior_policy_no",
+    "prior expiry date":          "ph_prior_expiry",
+    "prior liability limits":     "ph_prior_liability",
+    # Vehicle tab
+    "vin":                        "v_vin",
+    "year":                       "v_year",
+    "make":                       "v_make",
+    "model":                      "v_model",
+    "trim / sub-model":           "v_trim",
+    "body type":                  "v_body",
+    "color":                      "v_color",
+    "number of doors":            "v_doors",
+    "cylinders":                  "v_cylinders",
+    "displacement (l)":           "v_displacement",
+    "fuel type":                  "v_fuel",
+    "transmission":               "v_transmission",
+    "drive type":                 "v_drive",
+    "current mileage":            "v_mileage",
+    "annual miles est.":          "v_annual_miles",
+    "primary use":                "v_usage",
+    "garaging location":          "v_garaging",
+    "purchase date":              "v_purchase_date",
+    "purchase price ($)":         "v_purchase_price",
+    "current market value ($)":   "v_market_value",
+    "vehicle condition":          "v_condition",
+    "title state":                "v_title_state",
+    "lienholder/lender":          "v_lienholder",
+    "lienholder address":         "v_lienholder_addr",
+    "loan / lease no.":           "v_loan_number",
+    "salvage title":              "v_salvage",
+    "anti-theft device":          "v_anti_theft",
+    "airbags":                    "v_airbags",
+    "abs brakes":                 "v_abs",
+    "daytime running lights":     "v_daytime_lights",
+    "backup camera":              "v_backup_camera",
+    "gps tracking":               "v_gps",
+    "parking sensors":            "v_parking_sensors",
+    "lane departure warning":     "v_lane_assist",
+    "adaptive cruise control":    "v_adaptive_cruise",
+}
+
+
+def _parse_bool(v: str) -> bool:
+    return v.strip().upper().startswith("YES")
+
+
+def _parse_intake_record(text: str, record_num: int = 1) -> dict:
+    """
+    Parse one record from the intake .txt file into a {submission_key: value} dict.
+    record_num is 1-based.
+    """
+    # Split into records
+    import re
+    records = re.split(r"={40,}[\s\S]*?RECORD\s+\d+\s+OF\s+\d+[\s\S]*?={40,}", text)
+    # Alternatively split on RECORD N OF M headers
+    parts = re.split(r"RECORD\s+(\d+)\s+OF\s+\d+", text)
+    # parts = [pre, '1', record1_body, '2', record2_body, ...]
+    if len(parts) < 3:
+        return {}
+
+    # Find the target record
+    target_body = ""
+    for i in range(1, len(parts), 2):
+        if int(parts[i]) == record_num:
+            target_body = parts[i + 1] if i + 1 < len(parts) else ""
+            break
+
+    if not target_body:
+        return {}
+
+    result = {}
+    for line in target_body.splitlines():
+        line = line.strip()
+        if ":" not in line or line.startswith("=") or line.startswith("-") or line.startswith("["):
+            continue
+        label_raw, _, value_raw = line.partition(":")
+        label = label_raw.strip().rstrip(".").lower()
+        value = value_raw.strip()
+
+        # Strip [VERIFY] annotations
+        value = re.sub(r"\[VERIFY\]", "", value).strip()
+
+        # Skip empty or placeholder values
+        if not value or value.lower() in ("(none)", "n/a", ""):
+            continue
+
+        key = _LABEL_TO_KEY.get(label)
+        if key is None:
+            continue
+
+        # Parse booleans
+        bool_keys = {
+            "renewal_flag", "paperless", "esign", "ph_homeowner",
+            "v_salvage", "v_anti_theft", "v_airbags", "v_abs",
+            "v_daytime_lights", "v_backup_camera", "v_gps",
+            "v_parking_sensors", "v_lane_assist", "v_adaptive_cruise",
+        }
+        if key in bool_keys:
+            result[key] = _parse_bool(value)
+        else:
+            result[key] = value
+
+    return result
+
+
 # ── set reference ──────────────────────────────────────────────────────────────
+
+def set_reference_from_source(source_path: Path, record_num: int = 1) -> None:
+    """
+    Build gold standard directly from the intake .txt file.
+    No perfect human run needed — source data IS the ground truth.
+    """
+    for enc in ("utf-8", "utf-8-sig", "cp1252", "latin-1"):
+        try:
+            text = source_path.read_text(encoding=enc)
+            break
+        except UnicodeDecodeError:
+            continue
+    else:
+        print(f"ERROR: could not decode {source_path}")
+        sys.exit(1)
+
+    fields = _parse_intake_record(text, record_num)
+    if not fields:
+        print(f"ERROR: no fields parsed for record {record_num} from {source_path}")
+        sys.exit(1)
+
+    REFERENCE_PATH.parent.mkdir(parents=True, exist_ok=True)
+
+    tabs = sorted({_tab_of(k) for k in fields})
+    ref = {
+        "source":                 source_path.name,
+        "record_num":             record_num,
+        "recorded":               datetime.now().isoformat(),
+        "tab_order":              tabs,
+        "fields":                 fields,
+        "total_scorable_fields":  len(fields),
+    }
+
+    REFERENCE_PATH.write_text(json.dumps(ref, indent=2), encoding="utf-8")
+    print(f"Gold standard set from source (record {record_num}) -> {REFERENCE_PATH}")
+    print(f"  {len(fields)} scorable fields across tabs: {tabs}")
+    # Show a sample
+    sample = list(fields.items())[:5]
+    for k, v in sample:
+        print(f"    {k}: {v!r}")
+
 
 def set_reference(submission_path: Path) -> None:
     """Save a submission JSON as the gold standard reference."""
@@ -297,13 +489,19 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="BC fidelity scorer")
     parser.add_argument("--set-reference", metavar="SUBMISSION_JSON",
                         help="Set this submission as the gold standard reference.")
+    parser.add_argument("--set-reference-from-source", metavar="INTAKE_TXT",
+                        help="Build gold standard from intake .txt file (no perfect run needed).")
+    parser.add_argument("--record", type=int, default=1,
+                        help="Which record number to use from the intake file (default: 1).")
     parser.add_argument("--submission", metavar="SUBMISSION_JSON",
                         help="Score this submission against the gold standard.")
     parser.add_argument("--progress", action="store_true",
                         help="Show BC progress trend.")
     args = parser.parse_args()
 
-    if args.set_reference:
+    if args.set_reference_from_source:
+        set_reference_from_source(Path(args.set_reference_from_source), args.record)
+    elif args.set_reference:
         set_reference(Path(args.set_reference))
     elif args.progress:
         show_progress()
