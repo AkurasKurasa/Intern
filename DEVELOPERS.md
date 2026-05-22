@@ -168,9 +168,10 @@ These are blocking every downstream improvement.
 
 - [x] **Bootstrap the correctional task spec** *(→ Finished Tasks)* — `scripts/bootstrap_spec.py` ran `correct()` across all 19 sessions. `form_filling.md` exists and injects into agent system prompt.
 - [x] **Commit all staged changes** *(→ Finished Tasks)* — All files committed and pushed.
-- [ ] **Set BC gold standard** — Run `python scripts/bc_fidelity.py --set-reference data/output/submissions/<best_submission>.json` once. All future runs scored against it. Required before fidelity scores appear.
-- [ ] **Re-run bootstrap with fixed compressor** — `python scripts/bootstrap_spec.py` — `_compress_session()` is now fixed; re-run will produce spec with real tab names, field names, and behavior patterns.
-- [ ] **Fix LLM checkbox clicking** — Will emerge naturally from spec once bootstrap re-runs. Traces show humans never click checkboxes first.
+- [x] **Set BC gold standard** *(→ Finished Tasks)* — `scripts/bc_fidelity.py --set-reference-from-source` parses intake .txt directly. 75 fields. No perfect human run needed. Gold standard active.
+- [ ] **Get current fidelity baseline** — Run `python run_task.py` once. Check the fidelity score printed at the end. This is your starting point. Then `python scripts/bc_fidelity.py --progress` to see it.
+- [ ] **Re-run bootstrap with fixed compressor** — `python scripts/bootstrap_spec.py` — `_compress_session()` is now fixed; re-run produces spec with real tab names, field names, and behavior patterns.
+- [ ] **Fix LLM checkbox clicking** — Will emerge naturally from spec once bootstrap re-runs.
 
 ---
 
@@ -179,8 +180,9 @@ These are blocking every downstream improvement.
 The transformer's click accuracy is ~40% after 19 sessions. It needs to see each field ~50+ times before positions become reliable.
 
 - [ ] **Record 30+ total sessions** — Each session = one complete form fill (all 5 records, all 8 tabs). Currently at 19. Target: 50 sessions = ~25,000 traces before expecting reliable click accuracy.
-- [ ] **Run correctional spec after every new session** — `record_trace.py` now calls `RuleExtractor.correct()` automatically on stop. Confirm it runs and `form_filling.md` updates each time.
-- [ ] **Retrain after every 5 new sessions** — Dataset cache makes init ~5 sec. Full 50-epoch GPU retrain takes ~20 min. Do this incrementally rather than waiting until 50 sessions are done.
+- [ ] **Run correctional spec after every new session** — `record_trace.py` calls `RuleExtractor.correct()` automatically on stop. Confirm `form_filling.md` updates each time.
+- [ ] **Retrain after every 5 new sessions** — Dataset cache makes init ~5 sec. Full 50-epoch GPU retrain ~20 min. Command: `NO_SENT_TRANSFORMERS=1 python -m components.intelligence.model.transformer --mode train --data_dir data/output/traces/forms --model_path data/models/transformer_form.pt --epochs 50 --d_model 64 --num_layers 2 --max_elements 64 --aug_drop_prob 0.1`
+- [ ] **Check fidelity after every retrain** — Run agent → `python scripts/bc_fidelity.py --progress`. Fidelity number goes up = improvement confirmed. Target: ≥80%.
 
 ---
 
