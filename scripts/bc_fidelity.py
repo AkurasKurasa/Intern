@@ -299,6 +299,155 @@ def set_reference(submission_path: Path) -> None:
     print(f"  {len(fields)} scorable fields across tabs: {tabs}")
 
 
+# ── behavioral sequence scoring ───────────────────────────────────────────────
+
+def _extract_sequence_from_traces(session_dir: Path) -> list[tuple[str, str, str]]:
+    """Extract (tab, field, action_type) sequence from a recorded session."""
+    seq = []
+    for fpath in sorted(session_dir.glob("*.json")):
+        if fpath.name == "session_manifest.json":
+            continue
+        t = _load_json(fpath)
+        if not t:
+            continue
+        action = t.get("action", {})
+        a_type = action.get("action_type", "")
+        if not a_type or a_type == "noop":
+            continue
+        state = t.get("state", {})
+        elems = state.get("elements", [])
+        fid   = state.get("focused_element_id", "")
+        tab   = next((
+            e.get("label") or e.get("text") or ""
+            for e in elems
+            if e.get("type", "").lower() in ("tabitem", "tab") and e.get("selected")
+        ), "")
+        field = next((
+            e.get("label") or e.get("text") or ""
+            for e in elems if e.get("element_id") == fid
+        ), "")
+        if a_type in ("click", "keyboard") and (tab or field):
+            seq.append((tab, field, a_type))
+    return seq
+
+
+def _extract_sequence_from_results(results: list[dict]) -> list[tuple[str, str, str]]:
+    """Extract (tab, field, action_type) sequence from agent run results."""
+    seq = []
+    for r in results:
+        action = r.get("action", {})
+        a_type = action.get("action_type", "")
+        if not a_type or a_type in ("noop", "wait"):
+            continue
+        state = r.get("state", {})
+        elems = state.get("elements", [])
+        fid   = state.get("focused_element_id", "")
+        tab   = next((
+            e.get("label") or e.get("text") or ""
+            for e in elems
+            if e.get("type", "").lower() in ("tabitem", "tab") and e.get("selected")
+        ), "")
+        field = next((
+            e.get("label") or e.get("text") or ""
+            for e in elems if e.get("element_id") == fid
+        ), "")
+        if a_type in ("click", "keyboard") and (tab or field):
+            seq.append((tab, field, a_type))
+    return seq
+
+
+def _levenshtein_normalized(s1: list, s2: list) -> float:
+    """Normalized edit distance between two sequences. Returns similarity 0-1."""
+    if not s1 and not s2:
+        return 1.0
+    if not s1 or not s2:
+        return 0.0
+    m, n = len(s1), len(s2)
+    # Cap length to keep it fast
+    s1, s2 = s1[:200], s2[:200]
+    m, n = len(s1), len(s2)
+    dp = list(range(n + 1))
+    for i in range(1, m + 1):
+        prev = dp[:]
+        dp[0] = i
+        for j in range(1, n + 1):
+            cost = 0 if s1[i-1] == s2[j-1] else 1
+            dp[j] = min(dp[j] + 1, dp[j-1] + 1, prev[j-1] + cost)
+    distance = dp[n]
+    return 1.0 - distance / max(m, n)
+
+
+def build_behavior_reference(traces_dir: Path) -> list[tuple[str, str, str]]:
+    """
+    Build reference sequence from all human sessions.
+    Uses the session whose sequence is closest to the median (min avg distance to all others).
+    Returns the representative sequence.
+    """
+    sessions = sorted([d for d in traces_dir.iterdir()
+                       if d.is_dir() and d.name.startswith("session_")])
+    sequences = []
+    for s in sessions:
+        seq = _extract_sequence_from_traces(s)
+        if len(seq) >= 10:
+            sequences.append(seq)
+
+    if not sequences:
+        return []
+    if len(sequences) == 1:
+        return sequences[0]
+
+    # Find sequence with highest average similarity to all others (the median)
+    best_seq, best_score = sequences[0], -1.0
+    for i, seq in enumerate(sequences):
+        scores = [_levenshtein_normalized(seq, sequences[j])
+                  for j in range(len(sequences)) if j != i]
+        avg = sum(scores) / len(scores)
+        if avg > best_score:
+            best_score = avg
+            best_seq = seq
+    return best_seq
+
+
+def score_behavior(agent_results: list[dict], reference_sequence: list) -> dict:
+    """Score agent's action sequence against the human reference sequence."""
+    if not reference_sequence:
+        return {"behavioral_match": 0.0, "detail": "No reference sequence available."}
+
+    agent_seq = _extract_sequence_from_results(agent_results)
+    if not agent_seq:
+        return {"behavioral_match": 0.0, "detail": "Agent produced no scorable actions."}
+
+    sim = _levenshtein_normalized(agent_seq, reference_sequence)
+
+    # Tab order match — did agent visit tabs in same order as reference?
+    ref_tabs  = [t for t, _, _ in reference_sequence if t]
+    agent_tabs = [t for t, _, _ in agent_seq if t]
+    # Deduplicate preserving order
+    def _dedup(lst):
+        seen, out = set(), []
+        for x in lst:
+            if x and x not in seen:
+                seen.add(x); out.append(x)
+        return out
+    ref_tab_order   = _dedup(ref_tabs)
+    agent_tab_order = _dedup(agent_tabs)
+    tab_order_match = _levenshtein_normalized(ref_tab_order, agent_tab_order)
+
+    behavioral_match = sim * 0.7 + tab_order_match * 0.3
+
+    return {
+        "behavioral_match":  behavioral_match,
+        "sequence_sim":      sim,
+        "tab_order_match":   tab_order_match,
+        "agent_seq_len":     len(agent_seq),
+        "reference_seq_len": len(reference_sequence),
+        "detail": (
+            f"seq_sim={sim*100:.1f}%  tab_order={tab_order_match*100:.1f}%  "
+            f"agent={len(agent_seq)} actions  ref={len(reference_sequence)} actions"
+        ),
+    }
+
+
 # ── score ──────────────────────────────────────────────────────────────────────
 
 def score_submission(agent_submission: dict, results: list[dict] | None = None) -> dict:
@@ -409,6 +558,15 @@ def score_run(results: list[dict], goal: str = "") -> dict | None:
         print(f"[BC Fidelity] {scores['error']}")
         return None
 
+    # Behavioral sequence score
+    traces_dir = ROOT / "data" / "output" / "traces" / "forms"
+    ref_seq = build_behavior_reference(traces_dir) if traces_dir.exists() else []
+    beh = score_behavior(results, ref_seq)
+    scores.update(beh)
+
+    # Combined BC score
+    scores["bc_score"] = scores["fidelity"] * 0.5 + scores["behavioral_match"] * 0.5
+
     _print_report(scores, goal, latest.name)
     _append_progress(scores, goal, latest.name)
     return scores
@@ -416,21 +574,27 @@ def score_run(results: list[dict], goal: str = "") -> dict | None:
 
 def _print_report(s: dict, goal: str, submission_name: str) -> None:
     border = "=" * 60
-    star   = "★" if s["fidelity"] >= 0.80 else " "
+    bc     = s.get("bc_score", s["fidelity"])
+    star   = "DONE" if bc >= 0.80 else f"{bc*100:.1f}% / 80%"
     print(f"\n{border}")
-    print(f"  BC FIDELITY SCORE  {star}")
+    print(f"  BC SCORE: {bc*100:.1f}%  [{star}]")
     print(f"  Goal: {goal[:52]}")
-    print(f"  vs. gold standard")
     print(border)
-    print(f"  Fidelity Score         {s['fidelity']*100:>6.1f}%")
-    print(f"  Field Match Rate       {s['field_match_rate']*100:>6.1f}%"
+    print(f"  Task Fidelity          {s['fidelity']*100:>6.1f}%   (correct values vs intake)")
+    print(f"    Field Match Rate     {s['field_match_rate']*100:>6.1f}%"
           f"   ({s['fields_matched']}/{s['fields_total']} fields correct)")
-    print(f"  Value Accuracy         {s['value_accuracy']*100:>6.1f}%"
+    print(f"    Value Accuracy       {s['value_accuracy']*100:>6.1f}%"
           f"   (of {s['fields_filled']} filled)")
-    print(f"  Tab Coverage           {s['tab_coverage']*100:>6.1f}%"
+    print(f"    Tab Coverage         {s['tab_coverage']*100:>6.1f}%"
           f"   {s['tabs_covered']}")
-    print(f"  Completion Bonus       {'100.0' if s['completed'] else '  0.0'}%")
-    if s["mismatches"]:
+    print(f"    Completion           {'100.0' if s['completed'] else '  0.0'}%")
+    bm = s.get("behavioral_match")
+    if bm is not None:
+        print(f"  Behavioral Match       {bm*100:>6.1f}%   (sequence vs human sessions)")
+        print(f"    Sequence Similarity  {s.get('sequence_sim',0)*100:>6.1f}%")
+        print(f"    Tab Order Match      {s.get('tab_order_match',0)*100:>6.1f}%")
+        print(f"    {s.get('detail','')}")
+    if s.get("mismatches"):
         print(f"\n  Top mismatches:")
         for m in s["mismatches"][:5]:
             print(f"    {m['field']}: expected {m['expected']!r}, got {m['got']!r}")
@@ -441,16 +605,20 @@ def _print_report(s: dict, goal: str, submission_name: str) -> None:
 def _append_progress(s: dict, goal: str, submission_name: str) -> None:
     PROGRESS_LOG.parent.mkdir(parents=True, exist_ok=True)
     entry = {
-        "timestamp":         datetime.now().isoformat(),
-        "goal":              goal,
-        "submission":        submission_name,
-        "fidelity":          round(s["fidelity"], 4),
-        "field_match_rate":  round(s["field_match_rate"], 4),
-        "value_accuracy":    round(s["value_accuracy"], 4),
-        "tab_coverage":      round(s["tab_coverage"], 4),
-        "completed":         s["completed"],
-        "fields_matched":    s["fields_matched"],
-        "fields_total":      s["fields_total"],
+        "timestamp":          datetime.now().isoformat(),
+        "goal":               goal,
+        "submission":         submission_name,
+        "bc_score":           round(s.get("bc_score", s["fidelity"]), 4),
+        "fidelity":           round(s["fidelity"], 4),
+        "behavioral_match":   round(s.get("behavioral_match", 0.0), 4),
+        "field_match_rate":   round(s["field_match_rate"], 4),
+        "value_accuracy":     round(s["value_accuracy"], 4),
+        "tab_coverage":       round(s["tab_coverage"], 4),
+        "sequence_sim":       round(s.get("sequence_sim", 0.0), 4),
+        "tab_order_match":    round(s.get("tab_order_match", 0.0), 4),
+        "completed":          s["completed"],
+        "fields_matched":     s["fields_matched"],
+        "fields_total":       s["fields_total"],
     }
     with PROGRESS_LOG.open("a", encoding="utf-8") as f:
         f.write(json.dumps(entry) + "\n")
@@ -468,17 +636,19 @@ def show_progress() -> None:
     print(f"\n{'='*70}")
     print("  BC FIDELITY PROGRESS")
     print(f"{'='*70}")
-    print(f"  {'#':<4} {'Date':<20} {'Fidelity':>9} {'Field Match':>12} {'Value Acc':>10} {'Done':<6}")
+    print(f"  {'#':<4} {'Date':<20} {'BC Score':>9} {'Fidelity':>9} {'Behavior':>9} {'Done':<6}")
     print(f"  {'-'*64}")
     for i, e in enumerate(entries, 1):
         ts   = e["timestamp"][:16].replace("T", " ")
         done = "YES" if e["completed"] else "no"
-        print(f"  {i:<4} {ts:<20} {e['fidelity']*100:>8.1f}%"
-              f" {e['field_match_rate']*100:>11.1f}%"
-              f" {e['value_accuracy']*100:>9.1f}%  {done}")
-    best = max(entries, key=lambda e: e["fidelity"])
-    print(f"\n  Best: {best['fidelity']*100:.1f}% on {best['timestamp'][:10]}")
-    print(f"  Target: 80.0%  {'REACHED' if best['fidelity'] >= 0.80 else 'not yet'}")
+        bc   = e.get("bc_score", e["fidelity"])
+        beh  = e.get("behavioral_match", 0.0)
+        print(f"  {i:<4} {ts:<20} {bc*100:>8.1f}%"
+              f" {e['fidelity']*100:>8.1f}%"
+              f" {beh*100:>8.1f}%  {done}")
+    best = max(entries, key=lambda e: e.get("bc_score", e["fidelity"]))
+    print(f"\n  Best BC Score: {best.get('bc_score', best['fidelity'])*100:.1f}% on {best['timestamp'][:10]}")
+    print(f"  Target: 80.0%  {'REACHED' if best.get('bc_score', best['fidelity']) >= 0.80 else 'not yet'}")
     print(f"{'='*70}\n")
 
 
