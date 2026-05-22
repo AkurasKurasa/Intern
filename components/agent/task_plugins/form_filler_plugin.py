@@ -47,13 +47,15 @@ class FormFillerPlugin(TaskPlugin):
         record_num:  int   = 1,
         step_delay:  float = 1.2,
         observe_fn=None,                 # () -> state dict; set by LLMAgent after init
+        form_title_fragment: str = "",   # fragment of form window title for focus check
     ) -> None:
-        self._executor      = executor
-        self._data_source   = data_source
-        self._visual_reader = visual_reader
-        self._record_num    = record_num
-        self.step_delay     = step_delay
-        self._observe_fn    = observe_fn
+        self._executor            = executor
+        self._data_source         = data_source
+        self._visual_reader       = visual_reader
+        self._record_num          = record_num
+        self.step_delay           = step_delay
+        self._observe_fn          = observe_fn
+        self._form_title_fragment = form_title_fragment.lower() if form_title_fragment else ""
 
         # ── Mirrors of agent instance state that was previously on LLMAgent ──
         self._filled_this_tab:    Set[str] = set()
@@ -84,12 +86,19 @@ class FormFillerPlugin(TaskPlugin):
         self._pane_escape_last_field: str = ""
         self._pane_escape_streak:     int = 0
         self._record_cache_loaded: bool   = False
+        # fill-retry tracking: counts paste attempts per field name.
+        # After _FILL_RETRY_LIMIT failures the field is added to
+        # _confirmed_blank_fields so the agent moves on rather than looping.
+        self._fill_retries:   Dict[str, int] = {}
+        self._FILL_RETRY_LIMIT: int          = 3
 
         # Constants (could be overridden if needed)
-        self._NO_CHANGE_LIMIT: int  = 4
-        self._TAB_STEP_LIMIT:  int  = 40
-        self._DROUGHT_LIMIT:   int  = 10
-        self._MAX_TAB_SCROLLS: int  = 6
+        self._NO_CHANGE_LIMIT:   int   = 4
+        self._TAB_STEP_LIMIT:    int   = 120
+        self._DROUGHT_LIMIT:     int   = 10
+        self._MAX_TAB_SCROLLS:   int   = 6
+        self._TAB_TIMEOUT_SECS:  float = 180.0  # wall-clock cap, only fires with no progress
+        self._tab_start_time:    float = time.time()
 
     # ── Public API ────────────────────────────────────────────────────────────
 
@@ -104,6 +113,21 @@ class FormFillerPlugin(TaskPlugin):
         """
         self._steps_on_tab += 1
 
+        # ── 0. Focus check — bail if a different window grabbed foreground ───
+        if self._form_title_fragment:
+            try:
+                import win32gui as _wg_fc
+                _fg_title = _wg_fc.GetWindowText(_wg_fc.GetForegroundWindow()).lower()
+                if self._form_title_fragment not in _fg_title:
+                    logger.warning(
+                        "Focus check: foreground is %r, not the form — pausing 1 s.",
+                        _fg_title[:60],
+                    )
+                    time.sleep(1.0)
+                    return (True, True)
+            except Exception:
+                pass
+
         # Load record cache on first step
         if not self._record_cache_loaded:
             self._refresh_record_cache(state)
@@ -116,13 +140,19 @@ class FormFillerPlugin(TaskPlugin):
             self._tab_scroll_count            = 0
             self._no_change_streak            = 0
             self._last_auto_step              = step_idx
+            self._tab_start_time              = time.time()
             self._pane_escape_last_field      = ""
             self._pane_escape_streak          = 0
             self._filled_this_tab.clear()
             self._confirmed_blank_fields.clear()
             self._tc_advance_verified         = False
             self._rescan_attempts_this_tab    = 0
+            self._fill_retries.clear()
             self._scan_tab_visual(state)
+            # Re-observe before scrolling — old state has previous tab's element
+            # positions; scroll target (cx,cy) would be wrong without refresh.
+            if self._observe_fn:
+                state = self._observe_fn()
             self._scroll_form_to_top(state)
             time.sleep(0.6)
             if self._observe_fn:
@@ -132,10 +162,20 @@ class FormFillerPlugin(TaskPlugin):
             return (True, True)
 
         # ── 1b. Stuck guard ──────────────────────────────────────────────────
+        _tab_elapsed   = time.time() - self._tab_start_time
+        _drought_steps = step_idx - self._last_auto_step
+        # Wall-clock timeout only fires when ALSO no productive action for
+        # _DROUGHT_LIMIT steps — prevents firing while fields are actively filling.
+        _timed_out = (_tab_elapsed >= self._TAB_TIMEOUT_SECS
+                      and _drought_steps >= self._DROUGHT_LIMIT)
         _stuck = (self._no_change_streak >= self._NO_CHANGE_LIMIT
-                  or self._steps_on_tab   >= self._TAB_STEP_LIMIT)
+                  or self._steps_on_tab   >= self._TAB_STEP_LIMIT
+                  or _timed_out)
         if _stuck:
-            if self._steps_on_tab >= self._TAB_STEP_LIMIT:
+            if _timed_out:
+                logger.warning("Stuck guard: tab timed out (%.0f s, no progress for %d steps) — forcing advance.",
+                               _tab_elapsed, _drought_steps)
+            elif self._steps_on_tab >= self._TAB_STEP_LIMIT:
                 logger.info("Stuck guard: %d steps on tab — forcing advance.", self._steps_on_tab)
             elif self._no_change_streak >= self._NO_CHANGE_LIMIT:
                 _foc_id = state.get("focused_element_id")
@@ -143,8 +183,13 @@ class FormFillerPlugin(TaskPlugin):
                                 if e.get("element_id") == _foc_id), None)
                 _foc_nm = ((_foc_el.get("label") or _foc_el.get("text") or "?")
                            if _foc_el else "?")
+                _foc_sec = self._detect_section(state, _foc_el) if _foc_el else ""
+                _foc_key = f"{_foc_sec} {_foc_nm}" if _foc_sec else _foc_nm
                 logger.info("Stuck guard: no_change x%d on %r — Tab past field.",
                             self._no_change_streak, _foc_nm)
+                # Mark field as handled so _tc_has_pending doesn't re-flag it
+                self._confirmed_blank_fields.add(_foc_nm.lower())
+                self._filled_this_tab.add(_foc_key)
                 self._executor.execute({"action_type": "keyboard",
                                         "key_count": 1, "keystrokes": ["tab"]})
                 self._no_change_streak = 0
@@ -173,7 +218,8 @@ class FormFillerPlugin(TaskPlugin):
                 time.sleep(0.4)
                 if self._observe_fn:
                     _tcav_state = self._observe_fn()
-                for _tcav_i in range(6):
+                _tcav_clean_streak = 0
+                for _tcav_i in range(self._MAX_TAB_SCROLLS):
                     if self._tc_has_pending(_tcav_state):
                         _pend_names = [
                             (e.get("label") or e.get("text") or "?")
@@ -190,9 +236,14 @@ class FormFillerPlugin(TaskPlugin):
                         logger.info("Tab-complete scan (pass %d): pending fields found: %s",
                                     _tcav_i, _pend_names)
                         _tcav_found = True
+                        _tcav_clean_streak = 0
                         self._tc_advance_verified = False
                         self._focus_first_empty_field(_tcav_state)
                         time.sleep(self.step_delay)
+                        break
+                    _tcav_clean_streak += 1
+                    if _tcav_clean_streak >= 2:
+                        # Two consecutive scroll positions all clear — bottom reached
                         break
                     self._scroll_form_down(_tcav_state)
                     time.sleep(0.25)
@@ -220,7 +271,7 @@ class FormFillerPlugin(TaskPlugin):
                 _submitted = False
                 try:
                     import uiautomation as _uia_sub
-                    for _btn_name in ("Submit  New", "Submit & New", "Submit"):
+                    for _btn_name in ("Submit & New", "Submit"):
                         _btn = _uia_sub.ButtonControl(Name=_btn_name, searchDepth=8)
                         if _btn.Exists(maxSearchSeconds=0.5):
                             logger.info("Tab complete: last tab — UIA click Submit %r", _btn_name)
@@ -277,21 +328,45 @@ class FormFillerPlugin(TaskPlugin):
                 (_pane_next_el.get("label") or _pane_next_el.get("text") or "").strip()
                 if _pane_next_el else ""
             )
-            if _pane_next_name and _pane_next_name == self._pane_escape_last_field:
-                self._pane_escape_streak += 1
+            # Increment streak whenever stuck on same (or no) candidate.
+            if _pane_next_name and _pane_next_name != self._pane_escape_last_field:
+                self._pane_escape_streak     = 1
+                self._pane_escape_last_field = _pane_next_name
             else:
-                self._pane_escape_streak      = 1
-                self._pane_escape_last_field  = _pane_next_name
-            if self._pane_escape_streak >= 3:
-                logger.warning("Pane-escape: stuck on %r for %d tries — scrolling down.",
-                               _pane_next_name, self._pane_escape_streak)
-                self._scroll_form_down(state)
-                time.sleep(self.step_delay * 0.5)
+                # Empty candidates OR same field repeated — still stuck.
+                self._pane_escape_streak += 1
+
+            # After enough failed attempts, try advancing tab.
+            if (self._pane_escape_streak >= 3
+                    or self._tab_scroll_count >= self._MAX_TAB_SCROLLS):
+                logger.warning(
+                    "Pane-escape: stuck for %d tries (tab_scroll=%d) — "
+                    "attempting tab advance.",
+                    self._pane_escape_streak, self._tab_scroll_count,
+                )
                 self._pane_escape_streak = 0
+                if self._try_advance_tab(state):
+                    self._no_change_streak  = 0
+                    self._tab_just_switched = True
+                    self._tab_scroll_count  = 0
+                    self._last_auto_step    = step_idx
+                    self._refresh_record_cache(state)
+                    time.sleep(self.step_delay)
+                    return (True, True)
+                # Last tab — fall through to submit logic via tc_advance_verified
+                logger.info("Pane-escape: no next tab — letting submit path handle it.")
+                self._tc_advance_verified = False
                 return (True, True)
+
             if self._focus_first_empty_field(state, min_y=_pane_y):
                 time.sleep(self.step_delay * 0.5)
                 return (True, True)
+            # No fillable field visible — scroll down, track scroll count.
+            logger.info("Pane-escape: no reachable field — scrolling down.")
+            self._scroll_form_down(state)
+            self._tab_scroll_count += 1
+            time.sleep(self.step_delay * 0.5)
+            return (True, True)
 
         # ── 1c-btn. Button-focus escape ──────────────────────────────────────
         if (_focused_el and _focused_el.get("type") == "buttoncontrol"
@@ -304,10 +379,22 @@ class FormFillerPlugin(TaskPlugin):
                 time.sleep(self.step_delay * 0.5)
                 return (True, True)
             if self._tab_scroll_count < self._MAX_TAB_SCROLLS:
+                _foc_id_pe = state.get("focused_element_id")
+                _foc_el_pe = next((e for e in state.get("elements", [])
+                                   if e.get("element_id") == _foc_id_pe), None)
+                _pe_scroll_y = float(_foc_el_pe["bbox"][1]) if (
+                    _foc_el_pe and _foc_el_pe.get("bbox")) else 0.0
                 if self._scroll_form_down(state):
                     self._tab_scroll_count += 1
                     self._last_auto_step    = step_idx
                     time.sleep(self.step_delay * 0.5)
+                    if self._observe_fn:
+                        state = self._observe_fn()
+                    focused = (self._focus_first_empty_field(state, after_scroll=True,
+                                                             min_y=_pe_scroll_y)
+                               or self._focus_first_empty_field(state))
+                    if focused:
+                        self._no_change_streak = 0
                     return (True, True)
             # Scrolls exhausted — no reachable pending field; advance tab
             logger.info("Button-focus escape: scrolls exhausted — advancing tab.")
@@ -351,16 +438,20 @@ class FormFillerPlugin(TaskPlugin):
                     self._peek_notepad(state, _fn_p)
                     auto_text = self._auto_fill(state)
                     if not auto_text:
-                        logger.info("Auto-fill: '%s' not found after peek — treating as blank, Tab.",
-                                    _fn_p)
-                        self._confirmed_blank_fields.add(_fn_lower_p)
-                        self._filled_this_tab.add(_fk_p)
-                        self._executor.execute({"action_type": "keyboard",
-                                                "key_count": 1, "keystrokes": ["tab"]})
-                        self._no_change_streak = 0
-                        self._last_auto_step   = step_idx
-                        time.sleep(self.step_delay)
-                        return (True, True)
+                        if _fe_p.get("type") == "comboboxcontrol":
+                            # Value now in cache — fall through to combobox handler below
+                            logger.info("Auto-fill: '%s' is combobox — deferring to combobox handler.", _fn_p)
+                        else:
+                            logger.info("Auto-fill: '%s' not found after peek — treating as blank, Tab.",
+                                        _fn_p)
+                            self._confirmed_blank_fields.add(_fn_lower_p)
+                            self._filled_this_tab.add(_fk_p)
+                            self._executor.execute({"action_type": "keyboard",
+                                                    "key_count": 1, "keystrokes": ["tab"]})
+                            self._no_change_streak = 0
+                            self._last_auto_step   = step_idx
+                            time.sleep(self.step_delay)
+                            return (True, True)
 
         # 2a-dup: duplicate UIA label — field empty but label already in _filled_this_tab
         if not auto_text:
@@ -384,17 +475,16 @@ class FormFillerPlugin(TaskPlugin):
                         self._visual_cache[_nk]  = _nv
                         logger.info("Dup-label fill: actual field=%r  value=%r  (UIA label=%r)",
                                     _nk, _nv, _fn_dup)
-                        self._executor.execute({"action_type": "keyboard",
-                                                "key_count": 1, "keystrokes": ["ctrl+a"]})
-                        self._executor.execute({
-                            "action_type": "keyboard",
-                            "key_count": len(_nv),
-                            "keystrokes": list(_nv),
-                            "text": _nv,
-                        })
+                        _dup_ok = self._paste_and_verify(_nk, _nv, needs_clear=True)
                         self._executor.execute({"action_type": "keyboard",
                                                 "key_count": 1, "keystrokes": ["tab"]})
-                        self._filled_this_tab.add(_nk)
+                        if _dup_ok:
+                            self._filled_this_tab.add(_nk)
+                            self._fill_retries.pop(_nk, None)
+                        else:
+                            if self._fill_retries.get(_nk, 0) >= self._FILL_RETRY_LIMIT:
+                                self._confirmed_blank_fields.add(_nk.lower())
+                                self._filled_this_tab.add(_nk)
                         self._no_change_streak = 0
                         self._steps_on_tab     = 0
                         self._last_auto_step   = step_idx
@@ -413,23 +503,27 @@ class FormFillerPlugin(TaskPlugin):
         if auto_text:
             field_name_log, text_val, needs_clear = auto_text
             self._peek_notepad(state, field_name_log)
-            if needs_clear:
-                logger.info("Auto-fill (overwrite): '%s' → %r", field_name_log, text_val[:40])
-                self._executor.execute({"action_type": "keyboard", "key_count": 1, "keystrokes": ["ctrl+a"]})
-            else:
-                logger.info("Auto-fill: '%s' → %r", field_name_log, text_val[:40])
-            self._executor.execute({
-                "action_type": "keyboard",
-                "key_count": len(text_val),
-                "keystrokes": list(text_val),
-                "text": text_val,
-            })
+            logger.info("Auto-fill%s: '%s' → %r",
+                        " (overwrite)" if needs_clear else "",
+                        field_name_log, text_val[:40])
+            _fill_ok = self._paste_and_verify(field_name_log, text_val, needs_clear)
             self._executor.execute({"action_type": "keyboard", "key_count": 1, "keystrokes": ["tab"]})
-            logger.info("Auto-Tab after auto-fill.")
+            logger.info("Auto-Tab after auto-fill (verified=%s).", _fill_ok)
             self._no_change_streak = 0
             self._steps_on_tab     = 0
             self._last_auto_step   = step_idx
-            self._filled_this_tab.add(field_name_log)
+            if _fill_ok:
+                self._filled_this_tab.add(field_name_log)
+                self._fill_retries.pop(field_name_log, None)
+            else:
+                # Value never landed — don't mark filled so tc_has_pending
+                # keeps the field in scope for retry.  But if retry limit hit,
+                # give up and treat as blank so the agent can move forward.
+                if self._fill_retries.get(field_name_log, 0) >= self._FILL_RETRY_LIMIT:
+                    self._confirmed_blank_fields.add(field_name_log.lower())
+                    self._filled_this_tab.add(field_name_log)
+                    logger.warning("Auto-fill: '%s' surrendered after %d attempts.",
+                                   field_name_log, self._FILL_RETRY_LIMIT)
             time.sleep(self.step_delay)
             return (True, True)
 
@@ -580,13 +674,25 @@ class FormFillerPlugin(TaskPlugin):
             if self._tab_scroll_count < self._MAX_TAB_SCROLLS:
                 logger.info("Drought guard: %d steps without auto-handler — scrolling (scroll %d/%d).",
                             _drought, self._tab_scroll_count + 1, self._MAX_TAB_SCROLLS)
+                # Record y of current focused field — after scroll it moves up,
+                # so min_y filters it out and targets only newly revealed fields below.
+                _pre_scroll_y = 0.0
+                _foc_id_pre = state.get("focused_element_id")
+                _foc_el_pre = next((e for e in state.get("elements", [])
+                                    if e.get("element_id") == _foc_id_pre), None)
+                if _foc_el_pre and _foc_el_pre.get("bbox"):
+                    _pre_scroll_y = float(_foc_el_pre["bbox"][1])
                 if self._scroll_form_down(state):
                     self._tab_scroll_count += 1
                     self._last_auto_step    = step_idx
                     time.sleep(self.step_delay * 0.75)
                     if self._observe_fn:
                         state = self._observe_fn()
-                    self._focus_first_empty_field(state, after_scroll=True)
+                    focused = (self._focus_first_empty_field(state, after_scroll=True,
+                                                             min_y=_pre_scroll_y)
+                               or self._focus_first_empty_field(state))
+                    if focused:
+                        self._no_change_streak = 0
                     time.sleep(0.3)
                     return (True, True)
             else:
@@ -633,6 +739,83 @@ class FormFillerPlugin(TaskPlugin):
 
     # ── Helpers (extracted from LLMAgent) ────────────────────────────────────
 
+    # ── Post-fill verification helpers ───────────────────────────────────────
+
+    def _get_focused_value(self) -> str:
+        """Return current value of the focused edit control via UIA, '' on failure."""
+        try:
+            import uiautomation as _uia
+            ctrl = _uia.GetFocusedControl()
+            if ctrl is None:
+                return ""
+            try:
+                vp = ctrl.GetValuePattern()
+                if vp:
+                    return (vp.Value or "").strip()
+            except Exception:
+                pass
+            return (ctrl.Name or "").strip()
+        except Exception:
+            return ""
+
+    def _paste_and_verify(
+        self,
+        field_key: str,
+        text_val: str,
+        needs_clear: bool,
+    ) -> bool:
+        """
+        Paste text_val into the currently focused field, verify it landed,
+        retry once on failure.  Returns True if the value was confirmed.
+
+        Tracks retries per field in self._fill_retries.  After
+        _FILL_RETRY_LIMIT failed attempts the field is surrendered (caller
+        should add it to _confirmed_blank_fields and move on).
+        """
+        def _do_paste(clear: bool) -> None:
+            # Always ctrl+a: UIA may report empty while the field has a hidden
+            # value (wxPython/UIA discrepancy), so unconditional select-all
+            # prevents content from being appended instead of replaced.
+            self._executor.execute({"action_type": "keyboard",
+                                    "key_count": 1, "keystrokes": ["ctrl+a"]})
+            time.sleep(0.05)
+            self._executor.execute({
+                "action_type": "keyboard",
+                "key_count":   len(text_val),
+                "keystrokes":  list(text_val),
+                "text":        text_val,
+            })
+
+        _do_paste(needs_clear)
+        time.sleep(0.15)   # give wxPython time to process paste + validators
+
+        actual = self._get_focused_value()
+        if actual.lower() == text_val.lower():
+            return True
+
+        # First verify failed — log and retry once
+        self._fill_retries[field_key] = self._fill_retries.get(field_key, 0) + 1
+        logger.warning(
+            "Auto-fill verify (%d/%d): '%s' got %r, expected %r — retrying.",
+            self._fill_retries[field_key], self._FILL_RETRY_LIMIT,
+            field_key, actual[:60], text_val[:60],
+        )
+
+        if self._fill_retries.get(field_key, 0) >= self._FILL_RETRY_LIMIT:
+            logger.warning("Auto-fill: '%s' failed %d times — surrendering field.",
+                           field_key, self._FILL_RETRY_LIMIT)
+            return False
+
+        _do_paste(clear=True)     # always clear before retry
+        time.sleep(0.25)
+        actual = self._get_focused_value()
+        if actual.lower() == text_val.lower():
+            return True
+
+        self._fill_retries[field_key] = self._fill_retries.get(field_key, 0) + 1
+        logger.warning("Auto-fill: '%s' still wrong after retry — got %r.", field_key, actual[:60])
+        return False
+
     def _tc_has_pending(self, state: Dict[str, Any]) -> bool:
         """Return True if any visible edit/combobox/checkbox still needs attention."""
         _fl      = {s.lower() for s in self._filled_this_tab}
@@ -645,21 +828,32 @@ class FormFillerPlugin(TaskPlugin):
             _fn  = (_e.get("label") or _e.get("text") or "").strip()
             _sec = self._detect_section(state, _e)
             _fk  = (f"{_sec} {_fn}" if _sec else _fn).lower()
-            if _fk in _fl or _fn.lower() in _fl:
-                continue
             if _fk in _cb_lower or _fn.lower() in _cb_lower:
                 continue
             _known = self._lookup_field(_fn, section=_sec)
             _val   = (_e.get("value") or "").strip()
+            _skip_vals = {"(none)", "none", "(leave blank)", "n/a"}
+            if _fk in _fl or _fn.lower() in _fl:
+                # Re-verify value wasn't rejected by wxPython validation after tab-away
+                if (_known
+                        and _known.lower().strip("()") not in _skip_vals
+                        and (not _val or _val.lower() != _known.lower())):
+                    # Remove from filled set so auto-fill retries it
+                    for _item in list(self._filled_this_tab):
+                        if _item.lower() in (_fk, _fn.lower()):
+                            self._filled_this_tab.discard(_item)
+                    logger.info("Post-fill verify: '%s' value rejected (got %r, expected %r) — retrying.",
+                                _fn, _val[:40], _known[:40])
+                    return True
+                continue
             if _known:
-                _skip_vals = {"(none)", "none", "(leave blank)", "n/a"}
                 if _known.lower().strip("()") in _skip_vals:
                     continue
                 if not _val or _val.lower() != _known.lower():
                     return True
                 continue
-            if not _val and _e.get("type") in ("editcontrol", "comboboxcontrol"):
-                return True
+            # No known expected value — field is optional or cache miss.
+            # Don't block tab advance for fields we can't determine status of.
         for _chk in state.get("elements", []):
             if (_chk.get("window_role") == "background"
                     or _chk.get("type") != "checkboxcontrol"
@@ -756,10 +950,12 @@ class FormFillerPlugin(TaskPlugin):
                 )
                 if not new_fields:
                     break
-                self._cached_record.update(new_fields)
-                self._visual_cache.update(new_fields)
-                if self._data_source and hasattr(self._data_source, "_cache"):
-                    self._data_source._cache.update(new_fields)
+                for _k, _v in new_fields.items():
+                    if _v and not self._cached_record.get(_k):
+                        self._cached_record[_k] = _v
+                        self._visual_cache[_k] = _v
+                        if self._data_source and hasattr(self._data_source, "_cache"):
+                            self._data_source._cache[_k] = _v
                 v = _hit()
                 if v:
                     logger.info("Lookup recovered %r → %r via VLM rescan", field_name, v)
@@ -813,11 +1009,6 @@ class FormFillerPlugin(TaskPlugin):
                 (v for k, v in rec.items() if k.lower() == fl), None)
         if expected is None:
             return False
-
-        if current == "" and expected == "":
-            logger.info("Auto-skip: '%s' is blank as expected — Tab.", filled_key)
-            self._filled_this_tab.add(filled_key)
-            return True
 
         _leave_blank_raws = {"(none)", "none", "(leave blank)", "n/a",
                              "leave blank — liability only", "leave blank — owned outright"}
@@ -967,9 +1158,11 @@ class FormFillerPlugin(TaskPlugin):
         try:
             import pyautogui
             elements = state.get("elements", [])
+            # Exclude tabitemcontrol — tab bar items span the full form width
+            # and pull the scroll target far off the scrollable content area.
             _SAFE_TYPES = {
                 "editcontrol", "checkboxcontrol",
-                "radiobuttoncontrol", "tabitemcontrol", "buttoncontrol",
+                "radiobuttoncontrol", "buttoncontrol",
             }
             active = [e for e in elements
                       if e.get("type") in _SAFE_TYPES
@@ -977,7 +1170,8 @@ class FormFillerPlugin(TaskPlugin):
                       and e.get("bbox")]
             if not active:
                 active = [e for e in elements
-                          if e.get("type") != "comboboxcontrol"
+                          if e.get("type") not in (
+                              "comboboxcontrol", "tabitemcontrol", "panecontrol")
                           and e.get("window_role") != "background" and e.get("bbox")]
             if not active:
                 return False
@@ -993,6 +1187,10 @@ class FormFillerPlugin(TaskPlugin):
                     cx = max(bx1 - 40, 10)
                     break
             orig = pyautogui.position()
+            # Dismiss any open dropdown before scrolling — scroll would otherwise
+            # navigate the dropdown list instead of the form.
+            pyautogui.press("escape")
+            time.sleep(0.05)
             pyautogui.moveTo(cx, cy, duration=0.15)
             pyautogui.scroll(-5)
             pyautogui.moveTo(orig.x, orig.y, duration=0.1)
@@ -1009,7 +1207,7 @@ class FormFillerPlugin(TaskPlugin):
             elements = state.get("elements", [])
             _SAFE_TYPES = {
                 "editcontrol", "checkboxcontrol",
-                "radiobuttoncontrol", "tabitemcontrol", "buttoncontrol",
+                "radiobuttoncontrol", "buttoncontrol",
             }
             active = [e for e in elements
                       if e.get("type") in _SAFE_TYPES
@@ -1262,7 +1460,7 @@ class FormFillerPlugin(TaskPlugin):
 
     def _peek_notepad(self, state: Dict[str, Any], field_name: str) -> None:
         """Scroll Notepad to the field and extract its value into caches."""
-        if field_name in self._cached_record:
+        if self._cached_record.get(field_name):
             return
         if self._data_source and hasattr(self._data_source, "peek"):
             val = self._data_source.peek(
@@ -1310,10 +1508,26 @@ class FormFillerPlugin(TaskPlugin):
                 recs = _parse_records(full_text_safety)
                 if recs:
                     win32_rec = recs.get(self._record_num, {})
-                    before = len(self._cached_record)
+                    before        = len(self._cached_record)
+                    corrected     = 0
                     for _wk, _wv in win32_rec.items():
-                        self._cached_record.setdefault(_wk, _wv)
+                        if _wv:
+                            # Win32 reads Notepad text directly — deterministic.
+                            # Override VLM even when VLM has a value: VLM can
+                            # hallucinate or read form defaults instead of source.
+                            old = self._cached_record.get(_wk, "")
+                            if old != _wv:
+                                corrected += 1
+                            self._cached_record[_wk] = _wv
+                        else:
+                            # Win32 found the key but value is empty — only add
+                            # if VLM also has nothing (don't clobber VLM value
+                            # with empty string).
+                            self._cached_record.setdefault(_wk, _wv)
                     added = len(self._cached_record) - before
+                    if corrected:
+                        logger.info("Record cache: Win32 corrected %d VLM value(s) "
+                                    "(VLM hallucinated or read form defaults)", corrected)
                     if added:
                         logger.info("Record cache: Win32 filled %d gap(s) VLM missed", added)
                     if self._data_source and hasattr(self._data_source, "_cache"):

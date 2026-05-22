@@ -674,6 +674,53 @@ class ScreenObserver:
 
         _clipboard_events = clipboard_events or []
 
+        # ── session manifest (background text, written once per session) ───────
+        # Background elements (e.g. Notepad) contain the full source document in
+        # their `text` field (up to 815 KB). Storing this in every step bloats
+        # traces to ~4 MB each (22 GB total across sessions). We extract the full
+        # text once, write it to session_manifest.json, and strip it from step
+        # files. Training code reads the manifest to restore the text for
+        # _find_source_elem_idx without losing any model training signal.
+        _manifest_path = os.path.join(self.output_dir, "session_manifest.json")
+        if not os.path.exists(_manifest_path):
+            _bg_store: Dict[str, Any] = {}
+            for _s in states:
+                for _e in _s.get("elements", []):
+                    if _e.get("window_role") != "background":
+                        continue
+                    _t = (_e.get("text")  or "")
+                    _v = (_e.get("value") or "")
+                    if len(_t) <= 500 and len(_v) <= 500:
+                        continue  # not a large blob; no need to externalise
+                    _key = ((_e.get("window_title") or "") + "|"
+                            + (_e.get("app") or ""))
+                    if _key not in _bg_store:
+                        _bg_store[_key] = {
+                            "window_title": _e.get("window_title", ""),
+                            "app":          _e.get("app", ""),
+                            "text":         _t,
+                            "value":        _v,
+                        }
+            if _bg_store:
+                with open(_manifest_path, "w", encoding="utf-8") as _mf:
+                    json.dump({"background": _bg_store}, _mf, ensure_ascii=False)
+
+        def _strip_bg(state_dict: Dict[str, Any]) -> Dict[str, Any]:
+            """Return state with background element text stripped (stored in manifest)."""
+            elems = state_dict.get("elements", [])
+            stripped = []
+            for _e in elems:
+                if (_e.get("window_role") == "background"
+                        and (len(_e.get("text", "") or "") > 500
+                             or len(_e.get("value", "") or "") > 500)):
+                    _e = dict(_e)
+                    _e["text"]  = ""
+                    _e["value"] = (_e.get("value") or "")[:500]
+                stripped.append(_e)
+            out = dict(state_dict)
+            out["elements"] = stripped
+            return out
+
         for i in range(len(states) - 1):
             t_start = frame_ts[i]
             t_end   = frame_ts[i + 1]
@@ -715,17 +762,19 @@ class ScreenObserver:
                                                  trace_id=f"live_step_{step_idx:04d}")
                 diff = raw.get("diff", {})
             trace = {
-                "trace_id":   f"live_step_{step_idx:04d}",
-                "timestamp":  t_start,
-                "duration":   duration,
-                "type":       self.trace_type,
-                "state":      _fmt_state(states[i]),
-                "next_state": _fmt_state(states[i + 1]),
-                "mouse":      {"actions": step_mouse},
-                "keyboard":   {"actions": step_kb},
-                "clipboard":  {"events": step_clipboard},
-                "diff":       diff,
-                "action":     ScreenObserver._derive_action_from(step_mouse, step_strokes, step_clipboard),
+                "trace_id":  f"live_step_{step_idx:04d}",
+                "timestamp": t_start,
+                "duration":  duration,
+                "type":      self.trace_type,
+                "state":     _strip_bg(_fmt_state(states[i])),
+                # next_state removed — it equals the next step's state.
+                # Training code never reads it; eval reads consecutive files.
+                # Full background text externalised to session_manifest.json.
+                "mouse":     {"actions": step_mouse},
+                "keyboard":  {"actions": step_kb},
+                "clipboard": {"events": step_clipboard},
+                "diff":      diff,
+                "action":    ScreenObserver._derive_action_from(step_mouse, step_strokes, step_clipboard),
             }
             out_path = os.path.join(self.output_dir, f"live_step_{step_idx:04d}.json")
             with open(out_path, "w", encoding="utf-8") as f:

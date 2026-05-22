@@ -288,19 +288,77 @@ class NotepadDataSource(DataSource):
 
             np_hwnd = self._find_notepad_hwnd(state)
             if not np_hwnd:
+                logger.warning("read_full_text: Notepad HWND not found")
                 return ""
 
             edit_hwnd = self._find_edit_hwnd(np_hwnd)
-            if not edit_hwnd:
+            if edit_hwnd:
+                length = win32api.SendMessage(edit_hwnd, WM_GETTEXTLENGTH, 0, 0)
+                if length > 0:
+                    buf = ctypes.create_unicode_buffer(length + 2)
+                    ctypes.windll.user32.SendMessageW(edit_hwnd, WM_GETTEXT, length + 1, buf)
+                    text = buf.value
+                    if text:
+                        logger.debug("read_full_text: WM_GETTEXT got %d chars", len(text))
+                        return text
+                logger.warning("read_full_text: WM_GETTEXTLENGTH=%d — trying clipboard fallback", length)
+            else:
+                logger.warning("read_full_text: edit HWND not found (np_hwnd=%d) — trying clipboard fallback", np_hwnd)
+
+            # Clipboard fallback: Ctrl+A, Ctrl+C (works for Win11 UWP Notepad)
+            return self._read_via_clipboard(np_hwnd, state)
+        except Exception:
+            logger.exception("read_full_text: unexpected error")
+            return ""
+
+    def _read_via_clipboard(self, np_hwnd: int,
+                            state: Optional[Dict[str, Any]] = None) -> str:
+        """Ctrl+A → Ctrl+C in Notepad, return clipboard text. Restores clipboard + focus."""
+        try:
+            import win32gui
+            import pyperclip
+            import pyautogui
+            import time
+
+            if not np_hwnd:
+                np_hwnd = self._find_notepad_hwnd(state)
+            if not np_hwnd:
                 return ""
 
-            length = win32api.SendMessage(edit_hwnd, WM_GETTEXTLENGTH, 0, 0)
-            if length <= 0:
-                return ""
-            buf = ctypes.create_unicode_buffer(length + 2)
-            ctypes.windll.user32.SendMessageW(edit_hwnd, WM_GETTEXT, length + 1, buf)
-            return buf.value
+            prev_fg   = win32gui.GetForegroundWindow()
+            old_clip  = ""
+            try:
+                old_clip = pyperclip.paste()
+            except Exception:
+                pass
+
+            win32gui.SetForegroundWindow(np_hwnd)
+            time.sleep(0.25)
+            pyautogui.hotkey("ctrl", "a")
+            time.sleep(0.1)
+            pyautogui.hotkey("ctrl", "c")
+            time.sleep(0.35)
+            text = pyperclip.paste()
+
+            # Restore clipboard and focus
+            try:
+                pyperclip.copy(old_clip)
+            except Exception:
+                pass
+            try:
+                if prev_fg and prev_fg != np_hwnd:
+                    win32gui.SetForegroundWindow(prev_fg)
+            except Exception:
+                pass
+
+            result = text if (text and text != old_clip) else ""
+            if result:
+                logger.info("read_full_text: clipboard fallback got %d chars", len(result))
+            else:
+                logger.warning("read_full_text: clipboard fallback returned no new text")
+            return result
         except Exception:
+            logger.exception("read_full_text: clipboard fallback failed")
             return ""
 
     def peek(self, field_name: str, state: Dict[str, Any],
@@ -314,9 +372,6 @@ class NotepadDataSource(DataSource):
         When visual_reader is provided and field not found via Win32 text:
           falls back to VLM screenshot scan.
         """
-        if field_name in self._cache:
-            return self._cache.get(field_name)
-
         try:
             import pyautogui
             import win32gui
@@ -376,6 +431,12 @@ class NotepadDataSource(DataSource):
             if found_val:
                 return found_val
 
+            # Cache fallback (Win32 couldn't find it — use last known value if any)
+            cached = self._cache.get(field_name)
+            if cached:
+                logger.debug("NotepadDataSource.peek: using cached value for field=%r", field_name)
+                return cached
+
             # VLM fallback
             if visual_reader and np_hwnd:
                 form_hwnd = win32gui.GetForegroundWindow()
@@ -390,10 +451,14 @@ class NotepadDataSource(DataSource):
                     except Exception:
                         pass
 
+                    # Scroll to top of Notepad so VLM scans from beginning of record
+                    pyautogui.hotkey("ctrl", "home")
+                    time.sleep(0.3)
+
                     seen_hashes: set = set()
                     fl_lower = field_name.lower()
 
-                    for attempt in range(10):
+                    for attempt in range(15):
                         screenshot = pyautogui.screenshot()
                         img_hash   = hash(screenshot.tobytes())
 
@@ -414,7 +479,7 @@ class NotepadDataSource(DataSource):
                                         field_name, found_val, attempt + 1)
                             break
 
-                        logger.info("NotepadDataSource.peek: VLM scrolling for field=%r (attempt %d)",
+                        logger.info("NotepadDataSource.peek: VLM scrolling down for field=%r (attempt %d)",
                                     field_name, attempt + 1)
                         pyautogui.scroll(-10)
                         time.sleep(0.35)

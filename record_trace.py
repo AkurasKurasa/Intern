@@ -32,6 +32,15 @@ for _p in (_ROOT, _COMP):
     if _p not in sys.path:
         sys.path.insert(0, _p)
 
+_env_path = os.path.join(_ROOT, ".env")
+if os.path.exists(_env_path):
+    with open(_env_path) as _f:
+        for _line in _f:
+            _line = _line.strip()
+            if _line and not _line.startswith("#") and "=" in _line:
+                _k, _v = _line.split("=", 1)
+                os.environ.setdefault(_k.strip(), _v.strip())
+
 from recorder.recorder import ScreenObserver
 
 
@@ -60,6 +69,23 @@ def parse_args():
         "--duration", type=float, default=None,
         help="Auto-stop after this many seconds (omit for manual Ctrl+C stop)."
     )
+    parser.add_argument(
+        "--goal", default="Fill the car insurance form using data from the open text file",
+        help="Task goal — used by rule extractor to correct the task spec."
+    )
+    parser.add_argument(
+        "--task", default="form_filling",
+        help="Task name — identifies the persistent spec file."
+    )
+    parser.add_argument(
+        "--provider", default="lmstudio",
+        choices=["lmstudio", "anthropic", "groq", "none"],
+        help="LLM provider for rule extraction (default: lmstudio)."
+    )
+    parser.add_argument(
+        "--no-extract", action="store_true",
+        help="Skip rule extraction after recording."
+    )
     return parser.parse_args()
 
 
@@ -85,7 +111,29 @@ def main():
         except KeyboardInterrupt:
             traces = observer.stop()
 
-    print(f"\nDone — {len(traces)} trace(s) saved to: {args.output}")
+    session_dir = observer.output_dir
+    print(f"\nDone — {len(traces)} trace(s) saved to: {session_dir}")
+
+    # ── correctional rule extraction ──────────────────────────────────────────
+    if not args.no_extract and args.provider != "none" and len(traces) >= 5:
+        print("\nRunning correctional rule extraction …")
+        try:
+            from intelligence.rule_extractor import RuleExtractor
+            api_key = os.environ.get("ANTHROPIC_API_KEY", "") or os.environ.get("GROQ_API_KEY", "")
+            extractor = RuleExtractor(
+                provider   = args.provider,
+                api_key    = api_key,
+                output_dir = "data/output/rulesets",
+            )
+            extractor.correct(
+                session_dir = session_dir,
+                goal        = args.goal,
+                task_name   = args.task,
+            )
+        except Exception as exc:
+            print(f"Rule extraction failed: {exc}")
+    elif len(traces) < 5:
+        print("(Skipping rule extraction — session too short, < 5 traces)")
 
 
 if __name__ == "__main__":

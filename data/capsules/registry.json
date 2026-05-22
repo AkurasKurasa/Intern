@@ -1,0 +1,22 @@
+{
+  "capsules": [
+    {
+      "name": "form_filling",
+      "description": "Fill GUI forms from a structured data source",
+      "model_path": "C:\\Users\\paula\\OneDrive\\Desktop\\Intern\\data\\models\\transformer_form.pt",
+      "trigger_keywords": [
+        "form",
+        "fill",
+        "insurance",
+        "data entry",
+        "intake"
+      ],
+      "trigger_apps": [
+        "Car Insurance",
+        "Data Entry"
+      ],
+      "trace_dir": "C:\\Users\\paula\\OneDrive\\Desktop\\Intern\\data\\output\\traces\\forms",
+      "created": "2026-05-17T17:52:45"
+    }
+  ]
+}

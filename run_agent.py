@@ -52,7 +52,7 @@ GEMINI_API_KEY   = os.environ.get("GEMINI_API_KEY", "")
 GROQ_API_KEY     = os.environ.get("GROQ_API_KEY", "")
 MODEL_PATH       = os.path.join(_ROOT, "data", "models", "transformer_bc.pt")
 DRY_RUN          = False
-MAX_STEPS        = 150   # agent stops itself via "done" action when complete
+MAX_STEPS        = 400   # agent stops itself via "done" action when complete
 STEP_DELAY       = 1.5
 TASK_NAME        = "fill_insurance"
 RECORD_START     = 1    # first record to fill (1-based)
@@ -131,11 +131,12 @@ if __name__ == "__main__":
         # via Win32 record-aware parsing per record_num.
 
         plugin = FormFillerPlugin(
-            executor      = None,        # executor is wired in by LLMAgent.__init__
-            data_source   = data_src,
-            visual_reader = _reader if USE_VLM else None,
-            record_num    = record_num,
-            step_delay    = STEP_DELAY,
+            executor             = None,        # executor is wired in by LLMAgent.__init__
+            data_source          = data_src,
+            visual_reader        = _reader if USE_VLM else None,
+            record_num           = record_num,
+            step_delay           = STEP_DELAY,
+            form_title_fragment  = "Car Insurance",
         )
         # Per-record VLM cache becomes primary data for this record.
         # Falls back to flat cache if VLM didn't bucket this record (unscrolled

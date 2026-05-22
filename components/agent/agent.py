@@ -100,61 +100,45 @@ _DEFAULT_MODELS = {
 
 # ── system prompt (shared across all providers) ───────────────────────────────
 _SYSTEM_PROMPT = """\
-You are an automation agent for Intern, a desktop AI that fills forms by \
-controlling the mouse and keyboard.
+You are Intern, a desktop automation agent. You observe any GUI and control the
+mouse and keyboard to accomplish goals — forms, email, Excel, web, file management,
+or anything else visible on screen.
 
-You will receive the current screen state with three sections:
-  FORM LABELS      — the exact text of every visible label in the active window.
-  FORM INPUTS      — every interactive element (inputs, buttons, dropdowns).
-  BACKGROUND DATA  — raw text from background windows (Notepad etc.) containing
-                     the values you must type into the form.
+You receive three sections each step:
+  GOAL             — what the user wants accomplished.
+  SCREEN           — every visible UI element (type, label, current value).
+  DATA SOURCES     — text visible in background windows (Notepad, files, etc.)
+                     Use these values when you need to type something.
+  LAST ACTIONS     — your recent actions and whether they changed the screen.
 
-Decide the SINGLE next action and respond with a JSON object only:
+Respond with ONE JSON action only — no other text:
 
 {
   "action_type": "click" | "type" | "hotkey" | "scroll" | "done" | "wait",
-  "target":      "<copy the EXACT string from FORM LABELS or FORM INPUTS>",
-  "text":        "<exact value copied from BACKGROUND DATA — never invent values>",
+  "target":      "<EXACT label or text from SCREEN — never paraphrase>",
+  "text":        "<exact value from DATA SOURCES — never invent>",
   "keys":        ["tab"],
   "direction":   "down" | "up",
   "clicks":      3,
   "reason":      "<one sentence>"
 }
 
-Rules:
-- The form is ALREADY the active window. Do NOT try to click the window title
-  or focus the window — go straight to filling the first empty field.
-- "click"  → focus a field OR toggle a checkbox OR open a dropdown OR switch tabs.
-             Set "target" to the EXACT string from FORM LABELS or FORM INPUTS.
-             Do not paraphrase, invent, or guess a name — copy it exactly.
-- "type"   → type into the currently focused text field. Set "text" to the EXACT
-             value from BACKGROUND DATA. Never invent or guess values.
-- "hotkey" → keyboard shortcut. Use keys: ["tab"] to advance, ["down"] or ["up"]
-             to cycle dropdown options, ["return"] to confirm a selection.
-- "scroll" → scroll any window. Use "target" to aim at a window element, set
-             direction "down" or "up" and clicks = amount.
-- "done"   → all fields are fully filled and the task is complete.
-- "wait"   → UI is still loading.
+Action rules:
+- "click"  → any element: field, button, checkbox, dropdown, tab, menu item.
+             target = EXACT string from SCREEN. Never guess or paraphrase.
+- "type"   → types into the focused field. text = value from DATA SOURCES only.
+- "hotkey" → keyboard shortcut. keys: ["tab"] advances focus, ["return"] confirms,
+             ["ctrl+c"] copies, ["alt+f4"] closes, etc.
+- "scroll" → scroll in any direction. target = element to scroll near.
+- "done"   → goal is fully achieved. Only use when certain.
+- "wait"   → UI is loading or animating. Use sparingly.
 
-Field type patterns:
-- Text field  → click field → type value  (Tab is sent automatically after type)
-- Dropdown    → FIRST check if the current value already matches BACKGROUND DATA.
-               If it matches → hotkey ["tab"] to skip (do NOT open the dropdown).
-               If it does NOT match:
-                 Step 1 — click the [comboboxcontrol] to open the list.
-                 Step 2 — WAIT: the list items appear as [listitemcontrol] in FORM INPUTS.
-                 Step 3 — click the EXACT [listitemcontrol] whose text matches BACKGROUND DATA.
-               NEVER type into a dropdown — it will not work.
-               NEVER click the current value label — click the TARGET value from the list.
-- Checkbox    → click the checkbox to check it. Only click if value should be YES/checked.
-- Tab switch  → after finishing all fields on the current tab, click the next tab
-               name from FORM INPUTS (e.g. "Policyholder", "Vehicle", "Coverage"…).
-
-CRITICAL RULES — follow exactly:
-1. If a field's "current value" already matches the value in BACKGROUND DATA → hotkey ["tab"] to skip. Do NOT open it. Do NOT retype it.
-2. If a field has no matching value in BACKGROUND DATA → hotkey ["tab"] to skip.
-3. NEVER type explanatory text — that would corrupt the form.
-4. Do NOT output anything outside the JSON object.
+General rules:
+1. Never invent values — only type text you can see in DATA SOURCES.
+2. If a field already has the correct value → hotkey ["tab"] to move on.
+3. If you need a value not in DATA SOURCES → say so in "reason" and skip with tab.
+4. Interact with whatever app is on screen — do not assume it is a form.
+5. Output JSON only. No explanation outside the object.
 """
 
 
@@ -247,7 +231,7 @@ def _state_to_text(state: Dict[str, Any], record_num: int = 1, visual_cache: Opt
     all_types = sorted({e.get("type", "?") for e in form_elems})
 
 
-    lines.append("FORM LABELS (use EXACT strings as 'target' when clicking a field):")
+    lines.append("SCREEN (use EXACT strings as 'target' when clicking):")
     for e in labels[:30]:
         focused = " [FOCUSED]" if e.get("focused") else ""
         txt = (e.get('text') or '').strip()
@@ -255,7 +239,7 @@ def _state_to_text(state: Dict[str, Any], record_num: int = 1, visual_cache: Opt
             continue  # skip source-data blobs misclassified as labels
         lines.append(f"  \"{txt}\"{focused}")
 
-    lines.append(f"\nFORM INPUTS ({len(interactive)} interactive elements):")
+    lines.append(f"\nINTERACTIVE ELEMENTS ({len(interactive)} elements):")
     for e in interactive[:30]:
         focused = " [FOCUSED]" if e.get("focused") else ""
         val   = (e.get("value") or "").strip()
@@ -270,7 +254,7 @@ def _state_to_text(state: Dict[str, Any], record_num: int = 1, visual_cache: Opt
 
     if visual_cache:
         # Visual cache is populated — use it directly (avoids reading 80k+ token Notepad blobs)
-        lines.append(f"\nBACKGROUND DATA (Record {record_num}):")
+        lines.append(f"\nDATA SOURCES (Record {record_num}):")
         for field, value in visual_cache.items():
             lines.append(f"  {field} : {value}")
     elif data_elems:
@@ -301,12 +285,12 @@ def _state_to_text(state: Dict[str, Any], record_num: int = 1, visual_cache: Opt
 
             if records:
                 rec = records.get(record_num, records.get(min(records), {}))
-                lines.append(f"\nBACKGROUND DATA (Record {record_num}):")
+                lines.append(f"\nDATA SOURCES (Record {record_num}):")
                 for field, value in rec.items():
                     lines.append(f"  {field} : {value}")
             else:
                 # Plain text — dump up to 3 000 chars to keep prompt small
-                lines.append(f"\nBACKGROUND DATA (values to type — read from here):")
+                lines.append(f"\nDATA SOURCES:")
                 lines.append(f"  {raw_text[:3000]}")
 
     return "\n".join(lines)
@@ -476,11 +460,25 @@ class LLMAgent:
         use_ocr:       bool           = False,
         visual_cache:  Optional[Dict[str, str]] = None,  # Gemini-extracted {field: value}
         visual_reader: Optional[Any]  = None,   # VisualDataReader for per-tab scanning
-        source_window: str            = "",     # title fragment of source data window
-        task_plugin:   Optional[Any]  = None,   # TaskPlugin for task-specific logic
+        source_window:     str            = "",     # title fragment of source data window
+        task_plugin:       Optional[Any]  = None,   # TaskPlugin for task-specific logic
+        pure_transformer:  bool           = False,  # skip all hardcoded handlers; transformer+LLM only
     ):
         self.goal       = goal
         self.provider   = provider.lower().strip()
+        # Capsule routing: if a registered capsule matches goal/window, use its model
+        try:
+            from agent.capsule import CapsuleRegistry
+            _reg = CapsuleRegistry()
+            _window = ""  # window title not known yet at init; re-route on first observe
+            _routed = _reg.route(goal, _window, fallback=model_path)
+            if _routed != model_path:
+                import logging as _lg
+                _lg.getLogger(__name__).info(
+                    "Capsule router: matched '%s' → %s", goal[:60], _routed)
+            model_path = _routed
+        except Exception:
+            pass
         self.model_path = model_path
         self.dry_run    = dry_run
         self.max_steps  = max_steps
@@ -531,6 +529,8 @@ class LLMAgent:
         self._cached_record: Dict[str, str] = {}     # full parsed record from Notepad (bypasses 2000-char UIA cap)
         self._ocr_cache: Dict[str, Any] = {}        # instance-level OCR cache (clears per record)
 
+        self._pure_transformer: bool = pure_transformer
+
         # ── Task plugin (optional — encapsulates task-specific logic) ───────────
         self._task_plugin: Optional[Any] = task_plugin
         if task_plugin is not None:
@@ -565,6 +565,26 @@ class LLMAgent:
                 logger.info("OCR overlay enabled (VisionObserver loaded)")
             except Exception as exc:
                 logger.warning("OCR overlay requested but VisionObserver unavailable: %s", exc)
+
+        # ── Load persistent task spec → inject into system prompt ─────────────
+        self._system_prompt: str = _SYSTEM_PROMPT
+        _spec_path = os.path.join(
+            os.path.dirname(os.path.abspath(__file__)),  # components/agent/
+            "..", "..", "data", "output", "rulesets", "form_filling.md",
+        )
+        _spec_path = os.path.normpath(_spec_path)
+        if os.path.exists(_spec_path):
+            try:
+                _spec = open(_spec_path, encoding="utf-8").read().strip()
+                if _spec:
+                    self._system_prompt = (
+                        _SYSTEM_PROMPT
+                        + "\n\n## TASK SPECIFICATION (learned from demonstrations)\n"
+                        + _spec
+                    )
+                    logger.info("LLMAgent: loaded task spec from %s", _spec_path)
+            except Exception as _se:
+                logger.warning("LLMAgent: failed to load task spec: %s", _se)
 
     # ── provider initialisation ───────────────────────────────────────────────
 
@@ -695,9 +715,13 @@ class LLMAgent:
                     continue
                 # Not handled — fall through to transformer/LLM below
 
-            # When a plugin is active, skip all legacy form-specific auto-handlers.
-            # The plugin owns all task logic; we fall through to the transformer/LLM only.
-            _plugin_active = (self._task_plugin is not None)
+            # When a plugin is active OR pure-transformer mode, skip all legacy
+            # form-specific auto-handlers and fall through to transformer/LLM only.
+            _plugin_active = (self._task_plugin is not None) or self._pure_transformer
+
+            # In pure_transformer mode, still run VLM tab scan on tab switches
+            if self._pure_transformer and _tab_just_switched and self._visual_reader:
+                self._scan_tab_visual(state)
 
             # 1a. After a tab switch: scroll to top, re-observe, then click first empty field
             if not _plugin_active and _tab_just_switched:
@@ -1253,12 +1277,7 @@ class LLMAgent:
 
             # 2. Transformer always runs — learned behavioral engine
             llm_action = None
-            # 2c. Drought check: if too many steps without any auto-handler, scroll form down.
-            # Allowed up to _MAX_TAB_SCROLLS times per tab so multi-section tabs
-            # (e.g. Policyholder with 20+ fields) get revealed incrementally.
-            
 
-            # 2. Transformer always runs — learns from user recordings
             t_pred = self._predict(state)
             t_type = t_pred.get("action_type", "no_op")
             t_conf = t_pred.get("confidence", max(t_pred.get("_scores", {}).values(), default=0.0))
@@ -1268,7 +1287,7 @@ class LLMAgent:
             #   >= 0.80  → execute directly, skip LLM (transformer is sure)
             #   0.50–0.80 → LLM validates / may override
             #   <  0.50  → LLM decides (transformer is uncertain)
-            _HIGH_CONF   = 0.80
+            _HIGH_CONF   = 0.995
             _MED_CONF    = 0.50
 
             # 2b. LLM only consulted when transformer is uncertain
@@ -1613,12 +1632,6 @@ class LLMAgent:
                 (v for k, v in rec.items() if k.lower() == fl), None)
         if expected is None:
             return False   # field not in record — let LLM decide
-
-        # Both blank → field is intentionally empty, skip
-        if current == "" and expected == "":
-            logger.info("Auto-skip: '%s' is blank as expected (none) — Tab.", filled_key)
-            self._filled_this_tab.add(filled_key)
-            return True
 
         # (leave blank) / (none) in data → leave field as-is regardless of current value
         _leave_blank_raws = {"(none)", "none", "(leave blank)", "n/a",
@@ -2832,9 +2845,18 @@ class LLMAgent:
             return {"action_type": "keyboard", "key_count": len(text),
                     "keystrokes": list(text), "text": text}
 
-        # Click — use transformer's learned position when confident,
-        # but never let it snap to a tab/navigation element (that causes tab-jumping)
+        # Click — prefer LLM's named target (resolved to element bbox center),
+        # fall back to transformer coords only when no resolvable label is available.
         if l_type == "click":
+            # First: resolve LLM's named target from the live UIA element tree
+            target = llm_action.get("target", "")
+            if target:
+                coords = _resolve_target(target, state)
+                if coords is not None:
+                    logger.info("Merge: LLM target %r → (%.0f, %.0f)", target, coords[0], coords[1])
+                    return {"action_type": "click", "click_position": coords}
+
+            # Second: transformer click when confident and LLM had no resolvable target
             _TRANSFORMER_CLICK_THRESHOLD = 0.55
             if (t_pred.get("action_type") == "click"
                     and t_conf >= _TRANSFORMER_CLICK_THRESHOLD
@@ -2842,10 +2864,9 @@ class LLMAgent:
                 pos     = t_pred["click_position"]
                 snapped = self._snap(pos, state)
                 coords  = snapped or pos
-                logger.info("Merge: transformer click @ (%.0f,%.0f)  conf=%.2f",
+                logger.info("Merge: transformer click @ (%.0f,%.0f)  conf=%.2f  (no LLM target resolved)",
                             coords[0], coords[1], t_conf)
                 return {"action_type": "click", "click_position": coords}
-            # Transformer not confident — fall back to LLM label resolution
             return self._llm_action_to_prediction(llm_action, state)
 
         # Fallback
@@ -3014,7 +3035,7 @@ class LLMAgent:
         resp = self._llm_client.messages.create(
             model=self._llm_model,
             max_tokens=256,
-            system=_SYSTEM_PROMPT,
+            system=self._system_prompt,
             messages=[{"role": "user", "content": user_msg}],
         )
         return _parse_llm_response(resp.content[0].text)
@@ -3023,7 +3044,7 @@ class LLMAgent:
         """Handles both Groq and LM Studio — both use the OpenAI client format."""
         import uuid
         # Unique tag per call breaks LM Studio's server-side KV-cache accumulation
-        system_msg = _SYSTEM_PROMPT + f"\n[sid:{uuid.uuid4().hex[:12]}]"
+        system_msg = self._system_prompt + f"\n[sid:{uuid.uuid4().hex[:12]}]"
         resp = self._llm_client.chat.completions.create(
             model=self._llm_model,
             max_tokens=1024,

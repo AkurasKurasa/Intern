@@ -46,17 +46,14 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader, Dataset, random_split
 
-# ── optional: sentence embeddings ─────────────────────────────────────────────
-try:
-    from sentence_transformers import SentenceTransformer as _ST
-    _SENT_MODEL_NAME = "all-MiniLM-L6-v2"
-    _EMBED_DIM       = 384
-    _sent_model: Optional[Any] = None          # loaded lazily
-    _embed_cache: Dict[str, List[float]] = {}  # text → embedding list
-    _SENTENCE_TRANSFORMERS_AVAILABLE = True
-except ImportError:
-    _SENTENCE_TRANSFORMERS_AVAILABLE = False
-    _EMBED_DIM = 1   # fallback: single hash value
+# ── sentence embeddings — fully lazy (no import at module level) ───────────────
+_SENT_MODEL_NAME = "all-MiniLM-L6-v2"
+_EMBED_DIM       = 384              # matches trained checkpoint (elem_features=392 = 8+384)
+_sent_model: Optional[Any] = None  # loaded on first predict call
+_embed_cache: Dict[str, List[float]] = {}
+_SENTENCE_TRANSFORMERS_AVAILABLE: Optional[bool] = None  # None = not yet checked
+_EMBED_CACHE_PATH: Optional[str] = None   # set by train() to save alongside model
+_loaded_embed_caches: set = set()          # tracks which pkl files were loaded this process
 
 
 # ═══════════════════════════════════════════════════════════
@@ -82,47 +79,75 @@ DEFAULT_H     = 1200
 
 
 def _get_sent_model():
-    """Lazily load the sentence transformer (once per process)."""
-    global _sent_model
-    if not _SENTENCE_TRANSFORMERS_AVAILABLE:
+    """Lazily import sentence-transformers and load the model (once per process)."""
+    global _sent_model, _SENTENCE_TRANSFORMERS_AVAILABLE
+    import os as _os2
+    if _os2.environ.get("NO_SENT_TRANSFORMERS") or _SENTENCE_TRANSFORMERS_AVAILABLE is False:
         return None
     if _sent_model is None:
-        print("[Encoder] Loading sentence model 'all-MiniLM-L6-v2' …", flush=True)
-        _sent_model = _ST(_SENT_MODEL_NAME)
-        print("[Encoder] Sentence model ready.", flush=True)
+        _os2.environ["TQDM_DISABLE"] = "1"
+        _os2.environ.setdefault("TRANSFORMERS_VERBOSITY", "error")
+        try:
+            from sentence_transformers import SentenceTransformer as _ST
+            _sent_model = _ST(_SENT_MODEL_NAME)
+            _SENTENCE_TRANSFORMERS_AVAILABLE = True
+        except Exception:
+            _SENTENCE_TRANSFORMERS_AVAILABLE = False
+            return None
     return _sent_model
 
 
 def _embed_text(text: str) -> List[float]:
     """
-    Return a semantic embedding for *text*.
-    Uses sentence-transformers when available; falls back to a single
-    normalised hash value otherwise (preserving the old behaviour).
-    Results are cached so each unique string is encoded only once.
+    384-dim embedding for a UI element label.
+    Inference path: fast deterministic hash (no ML model, no download).
+    Training path: sentence-transformers used only when _prime_embed_cache() is called.
     """
     text = (text or "").strip()
-    if not _SENTENCE_TRANSFORMERS_AVAILABLE:
-        h = (abs(hash(text)) % VOCAB_SIZE) / VOCAB_SIZE if text else 0.0
-        return [h]
-
     if text not in _embed_cache:
-        model = _get_sent_model()
-        if model is None:
+        if not text:
             _embed_cache[text] = [0.0] * _EMBED_DIM
         else:
-            _embed_cache[text] = model.encode(
-                text, show_progress_bar=False, convert_to_numpy=True
-            ).tolist()
+            import hashlib
+            raw = hashlib.sha256(text.encode()).digest()  # 32 bytes
+            repeated = (raw * 12)[:_EMBED_DIM]           # repeat to fill 384 bytes
+            _embed_cache[text] = [((b / 127.5) - 1.0) for b in repeated]
     return _embed_cache[text]
+
+
+def _save_embed_cache(path: str) -> None:
+    """Persist the current _embed_cache dict to a pickle file."""
+    import pickle
+    try:
+        with open(path, "wb") as _f:
+            pickle.dump(dict(_embed_cache), _f)
+        print(f"[Encoder] Embed cache saved ({len(_embed_cache)} entries) → {path}", flush=True)
+    except Exception as _e:
+        print(f"[Encoder] WARNING: could not save embed cache: {_e}", flush=True)
+
+
+def _load_embed_cache(path: str) -> None:
+    """Load a pickled embed cache into _embed_cache (merged, not replaced)."""
+    import pickle, os as _os2
+    global _loaded_embed_caches
+    if path in _loaded_embed_caches or not _os2.path.exists(path):
+        return
+    try:
+        with open(path, "rb") as _f:
+            loaded = pickle.load(_f)
+        _embed_cache.update(loaded)
+        _loaded_embed_caches.add(path)
+        print(f"[Encoder] Embed cache loaded ({len(loaded)} entries) from {path}", flush=True)
+    except Exception as _e:
+        print(f"[Encoder] WARNING: could not load embed cache: {_e}", flush=True)
 
 
 def _prime_embed_cache(texts: List[str]) -> None:
     """
     Batch-encode all unique *texts* at once (much faster than one-by-one).
     Call this before building the dataset to pre-populate the cache.
+    After encoding, saves the cache to _EMBED_CACHE_PATH if set.
     """
-    if not _SENTENCE_TRANSFORMERS_AVAILABLE:
-        return
     unseen = [t for t in set(texts) if t.strip() and t not in _embed_cache]
     if not unseen:
         return
@@ -135,6 +160,8 @@ def _prime_embed_cache(texts: List[str]) -> None:
     for t, v in zip(unseen, vecs):
         _embed_cache[t] = v.tolist()
     print(f"[Encoder] Cache primed ({len(_embed_cache)} entries).", flush=True)
+    if _EMBED_CACHE_PATH:
+        _save_embed_cache(_EMBED_CACHE_PATH)
 
 
 def _encode_element(elem: dict, W: float, H: float, focused_id=None) -> List[float]:
@@ -250,11 +277,21 @@ def _find_click_elem_idx(mouse: dict, state: dict, max_elements: int) -> int:
     return best_idx
 
 
-def _find_source_elem_idx(typed_text: str, state: dict, max_elements: int) -> int:
+def _find_source_elem_idx(
+    typed_text: str,
+    state: dict,
+    max_elements: int,
+    bg_manifest: Optional[Dict[str, Any]] = None,
+) -> int:
     """
     For a keyboard action, find which background element's text contains
     what was typed.  Returns the element index (0-based) or -1 if not found.
     -1 tells the loss function to ignore this sample.
+
+    bg_manifest: dict loaded from session_manifest.json["background"].
+    Keys are "window_title|app". When an element's text was stripped to save
+    space, the manifest provides the full text for substring matching so no
+    training signal is lost.
     """
     if not typed_text:
         return -1
@@ -263,10 +300,15 @@ def _find_source_elem_idx(typed_text: str, state: dict, max_elements: int) -> in
     for idx, elem in enumerate(elements):
         if elem.get("window_role") != "background":
             continue
-        # Check both text and value fields — Notepad DocumentControl stores
-        # actual document content in "value", not "text" (which is just the name)
         t = (elem.get("text") or "").lower().strip()
         v = (elem.get("value") or "").lower().strip()
+        # If element text was externalised to session_manifest.json (empty in
+        # step file), restore it from the manifest for substring matching.
+        if bg_manifest and len(t) < 200:
+            _key = (elem.get("window_title") or "") + "|" + (elem.get("app") or "")
+            _bg  = bg_manifest.get(_key, {})
+            t = (_bg.get("text") or t).lower().strip()
+            v = (_bg.get("value") or v).lower().strip()
         if not t and not v:
             continue
         if typed_lower in t or typed_lower in v or t in typed_lower:
@@ -327,6 +369,41 @@ class TrajectoryDataset(Dataset):
         if not file_groups:
             raise FileNotFoundError(f"No trace JSONs in {data_dir!r} (including session subfolders)")
 
+        # ── Dataset init cache ──────────────────────────────────────────────────
+        # Reading 10k+ JSONs at init takes 2-10 min. Cache stores filtered file
+        # paths + action metadata; invalidated when any session is newer than cache.
+        import pickle as _pickle
+        _cache_path = root / ".dataset_cache.pkl"
+        _cache_key  = (max_elements, hist_len, aug_drop_prob)
+
+        def _cache_valid() -> bool:
+            if not _cache_path.exists():
+                return False
+            cache_mtime = _cache_path.stat().st_mtime
+            for group in file_groups:
+                for fp in group:
+                    if fp.stat().st_mtime > cache_mtime:
+                        return False
+                # also check manifest
+                mp = group[0].parent / "session_manifest.json"
+                if mp.exists() and mp.stat().st_mtime > cache_mtime:
+                    return False
+            return True
+
+        if _cache_valid():
+            try:
+                with _cache_path.open("rb") as _cf:
+                    _cached = _pickle.load(_cf)
+                if _cached.get("key") == _cache_key:
+                    self._grouped_files     = _cached["grouped_files"]
+                    self._grouped_manifests = _cached["grouped_manifests"]
+                    self._samples           = _cached["samples"]
+                    print(f"[Dataset] Loaded from cache: {len(self._samples)} samples "
+                          f"from {len(self._grouped_files)} session(s).")
+                    return
+            except Exception as _ce:
+                print(f"[Dataset] Cache load failed ({_ce}), rebuilding.")
+
         # Load raw traces per group — skip traces with no active-window interactive
         # controls (e.g. old Tkinter sessions where UIA saw 0 form elements).
         # Type names must match _CTRL_TYPE_MAP in ui_observer.py:
@@ -339,19 +416,52 @@ class TrajectoryDataset(Dataset):
             "checkbox",       # CheckBox           (was "checkboxcontrol" — wrong)
             "button",         # Button             (was "buttoncontrol" — wrong)
             "listitem",       # ListItem           (was "listitemcontrol" — wrong)
+            "tabitem",        # tab strip items (user clicks tabs to navigate)
+            "radiobutton",    # radio buttons
             # wx fallback names (ControlTypeName.lower() when not in map)
             "editcontrol", "comboboxcontrol", "checkboxcontrol",
-            "buttoncontrol", "listitemcontrol",
+            "buttoncontrol", "listitemcontrol", "tabitemcontrol",
+            "radiobuttoncontrol",
         }
-        grouped_traces: List[List[dict]] = []
+
+        # Load session_manifest.json for each group (background text externalised
+        # from step files to save disk space; restored here for _find_source_elem_idx
+        # so keyboard training labels remain intact).
+        def _load_manifest(group_files: List[Path]) -> Optional[Dict[str, Any]]:
+            if not group_files:
+                return None
+            mp = group_files[0].parent / "session_manifest.json"
+            if not mp.exists():
+                return None
+            try:
+                with mp.open(encoding="utf-8") as _mf:
+                    return json.load(_mf).get("background", {})
+            except Exception:
+                return None
+
+        # ── Phase 1: filter traces, extract lightweight metadata only (no tensors) ──
+        # States are NOT encoded here — done lazily in __getitem__ to avoid OOM
+        # on large datasets. Only action metadata (ints/floats) stored at init.
+        self._grouped_files:    List[List[Path]]                    = []
+        self._grouped_manifests: List[Optional[Dict[str, Any]]]     = []
         skipped = 0
+        grouped_action_meta: List[List[Tuple[int, float, float, float, str]]] = []
+        grouped_src_idx:     List[List[int]] = []
+        grouped_click_idx:   List[List[int]] = []
+
         for group_files in file_groups:
-            group: List[dict] = []
+            valid_files:  List[Path]  = []
+            g_actions:    List[Tuple] = []
+            g_src_idx:    List[int]   = []
+            g_click_idx:  List[int]   = []
+            manifest = _load_manifest(group_files)
+
             for fpath in group_files:
                 t = _load_trace(fpath)
                 if t is None:
                     continue
-                elems = t.get("state", {}).get("elements", [])
+                state = t.get("state", {})
+                elems = state.get("elements", [])
                 active_interactive = sum(
                     1 for e in elems
                     if e.get("window_role") == "active"
@@ -360,69 +470,60 @@ class TrajectoryDataset(Dataset):
                 if active_interactive == 0:
                     skipped += 1
                     continue
-                group.append(t)
-            if group:
-                grouped_traces.append(group)
+                res  = state.get("screen_resolution", [DEFAULT_W, DEFAULT_H])
+                W    = float(res[0]) or DEFAULT_W
+                H_px = float(res[1]) or DEFAULT_H
+                action = _decode_actions(t.get("mouse", {}), t.get("keyboard", {}), W, H_px)
+                src_idx = (
+                    _find_source_elem_idx(action[4], state, max_elements, manifest)
+                    if action[0] == ACTION_KEYBOARD else -1
+                )
+                click_idx = (
+                    _find_click_elem_idx(t.get("mouse", {}), state, max_elements)
+                    if action[0] == ACTION_CLICK else -1
+                )
+                valid_files.append(fpath)
+                g_actions.append(action)
+                g_src_idx.append(src_idx)
+                g_click_idx.append(click_idx)
+
+            if valid_files:
+                self._grouped_files.append(valid_files)
+                self._grouped_manifests.append(manifest)
+                grouped_action_meta.append(g_actions)
+                grouped_src_idx.append(g_src_idx)
+                grouped_click_idx.append(g_click_idx)
+
         if skipped:
             print(f"[Dataset] Skipped {skipped} traces with no active form controls.")
-        if not grouped_traces:
+        if not self._grouped_files:
             raise ValueError("No usable traces after filtering.")
 
-        # Collect every unique text string across ALL groups, then encode in one batch
-        all_texts = [
-            elem.get("text", "") or ""
-            for group in grouped_traces
-            for t in group
-            for elem in t.get("state", {}).get("elements", [])
-        ]
-        _prime_embed_cache(all_texts)
-
+        # ── Phase 2: build sample index (lightweight — just ints, no tensors) ──
+        # Each sample: (group_idx, window_start, past_types, past_cont,
+        #               tgt_type, tgt_click_idx, tgt_key, src_idx)
         self._samples = []
         total_traces = 0
         dropped_short_groups = 0
-        for group in grouped_traces:
-            g_states:  List[torch.Tensor]              = []
-            g_actions: List[Tuple[int, float, float, float, str]] = []
-            g_src_idx:   List[int]                     = []
-            g_click_idx: List[int]                     = []
-            for trace in group:
-                state = trace.get("state", {})
-                res   = state.get("screen_resolution", [DEFAULT_W, DEFAULT_H])
-                W     = float(res[0]) or DEFAULT_W
-                H_px  = float(res[1]) or DEFAULT_H
-                g_states.append(encode_state(state, max_elements))
-                action = _decode_actions(
-                    trace.get("mouse", {}), trace.get("keyboard", {}), W, H_px
-                )
-                g_actions.append(action)
-                src_idx = _find_source_elem_idx(action[4], state, max_elements) if action[0] == ACTION_KEYBOARD else -1
-                g_src_idx.append(src_idx)
-                click_idx = _find_click_elem_idx(trace.get("mouse", {}), state, max_elements) if action[0] == ACTION_CLICK else -1
-                g_click_idx.append(click_idx)
-
-            N = len(g_states)
+        for gi, g_actions in enumerate(grouped_action_meta):
+            N = len(g_actions)
             total_traces += N
             if N < hist_len:
                 dropped_short_groups += 1
-                continue   # too few traces in this session to form even one window
-
+                continue
             for i in range(N - hist_len + 1):
                 ctx       = g_actions[i : i + hist_len - 1]
                 tgt       = g_actions[i + hist_len - 1]
-                src_idx   = g_src_idx[i + hist_len - 1]
-                click_idx = g_click_idx[i + hist_len - 1]
+                src_idx   = grouped_src_idx[gi][i + hist_len - 1]
+                click_idx = grouped_click_idx[gi][i + hist_len - 1]
                 if tgt[0] == ACTION_NOOP:
-                    continue   # no_op steps add noise — model should always click or type
-                # For click targets, require a resolved element index — clicks
-                # that fall outside every bbox become "-1" and are ignored by
-                # the pointer loss (ignore_index). Skipping them entirely here
-                # would also hide the type label, so we keep the sample but the
-                # pointer head sees -1.
+                    continue
                 self._samples.append((
-                    torch.stack(g_states[i : i + hist_len]),     # (H, T, F)
-                    [a[0] for a in ctx],                          # past types
-                    [[a[1], a[2], a[3]] for a in ctx],            # past cont
-                    tgt[0], click_idx, tgt[3], src_idx,          # target + click ptr + source ptr
+                    gi,                                # group index
+                    i,                                 # window start
+                    [a[0] for a in ctx],               # past action types
+                    [[a[1], a[2], a[3]] for a in ctx], # past cont (cx, cy, key_norm)
+                    tgt[0], click_idx, tgt[3], src_idx,
                 ))
 
         if total_traces < hist_len:
@@ -431,18 +532,44 @@ class TrajectoryDataset(Dataset):
             )
         if dropped_short_groups:
             print(f"[Dataset] Skipped {dropped_short_groups} session(s) shorter than hist_len={hist_len}.")
-        print(f"[Dataset] Built {len(self._samples)} samples from {len(grouped_traces)} session(s), {total_traces} traces.")
+        n_groups = len(self._grouped_files)
+        print(f"[Dataset] Built {len(self._samples)} samples from {n_groups} session(s), {total_traces} traces.")
+
+        # Save cache for next run
+        try:
+            with _cache_path.open("wb") as _cf:
+                _pickle.dump({
+                    "key":               _cache_key,
+                    "grouped_files":     self._grouped_files,
+                    "grouped_manifests": self._grouped_manifests,
+                    "samples":           self._samples,
+                }, _cf, protocol=4)
+            print(f"[Dataset] Cache saved → {_cache_path}")
+        except Exception as _se:
+            print(f"[Dataset] Cache save failed ({_se}), continuing without cache.")
 
     def __len__(self) -> int:
         return len(self._samples)
 
     def __getitem__(self, idx: int):
-        states, p_types, p_cont, tgt_type, tgt_click_idx, tgt_key, src_idx = self._samples[idx]
+        gi, win_start, p_types, p_cont, tgt_type, tgt_click_idx, tgt_key, src_idx = self._samples[idx]
+
+        # Lazy state loading — load only the H files for this window
+        files = self._grouped_files[gi][win_start : win_start + self.hist_len]
+        state_tensors = []
+        for fpath in files:
+            t = _load_trace(fpath)
+            state = t.get("state", {}) if t else {}
+            state_tensors.append(encode_state(state, self.max_elements))
+        # Pad if window is shorter than hist_len (shouldn't happen but be safe)
+        while len(state_tensors) < self.hist_len:
+            state_tensors.insert(0, torch.zeros(self.max_elements, ELEM_FEATURES))
+        states = torch.stack(state_tensors)  # (H, T, F)
 
         # Element dropout augmentation
         if self.aug_drop_prob > 0.0:
             states = states.clone()
-            mask = torch.rand(states.shape[:3]) < self.aug_drop_prob  # (H, T)
+            mask = torch.rand(states.shape[0], states.shape[1]) < self.aug_drop_prob
             states[mask] = 0.0
 
         H = self.hist_len
@@ -458,15 +585,15 @@ class TrajectoryDataset(Dataset):
             past_types,
             past_cont,
             torch.tensor(tgt_type,      dtype=torch.long),
-            torch.tensor(tgt_click_idx, dtype=torch.long),    # -1 = ignore (no element matched)
+            torch.tensor(tgt_click_idx, dtype=torch.long),
             torch.tensor(tgt_key,       dtype=torch.float32),
-            torch.tensor(src_idx,       dtype=torch.long),    # -1 = ignore
+            torch.tensor(src_idx,       dtype=torch.long),
         )
 
     def class_counts(self) -> dict:
         from collections import Counter
         names = {0: "no_op", 1: "click", 2: "keyboard"}
-        return {names[k]: v for k, v in Counter(s[3] for s in self._samples).items()}
+        return {names[k]: v for k, v in Counter(s[4] for s in self._samples).items()}
 
     def __repr__(self) -> str:
         return (
@@ -759,7 +886,7 @@ def _run_epoch(model, loader, optimizer, device, lambda_click, lambda_key, label
 
 def train(
     data_dir: str = "data/output/traces/live",
-    epochs: int = 20,
+    epochs: int = 50,
     batch_size: int = 16,
     lr: float = 1e-3,
     weight_decay: float = 1e-4,
@@ -767,7 +894,7 @@ def train(
     hist_len: int = 4,
     val_split: float = 0.2,
     save_path: str = "data/models/transformer_bc.pt",
-    lambda_click: float = 1.0,
+    lambda_click: float = 2.0,
     lambda_key: float = 0.5,
     label_smoothing: float = 0.1,
     aug_drop_prob: float = 0.0,
@@ -793,6 +920,7 @@ def train(
     weight_decay    : float (default 1e-4) — increase to 1e-3 for small data
     d_model / num_layers — shrink to 64 / 2 for very small datasets
     """
+    global _EMBED_CACHE_PATH
     torch.manual_seed(seed)
     if device_str == "auto":
         device = (torch.device("cuda") if torch.cuda.is_available()
@@ -803,6 +931,10 @@ def train(
 
     if verbose:
         print(f"[train] Device: {device}")
+
+    # Wire embed cache: load any prior saved cache, then prime will save back after encoding
+    _EMBED_CACHE_PATH = str(Path(save_path).with_name("embed_cache.pkl"))
+    _load_embed_cache(_EMBED_CACHE_PATH)
 
     dataset = TrajectoryDataset(
         data_dir, max_elements=max_elements, hist_len=hist_len,
@@ -825,7 +957,7 @@ def train(
     if balanced_sampler:
         from torch.utils.data import WeightedRandomSampler
         from collections import Counter as _Counter
-        tgt_types_in_train = [dataset._samples[i][3] for i in train_ds.indices]
+        tgt_types_in_train = [dataset._samples[i][4] for i in train_ds.indices]
         type_counts = _Counter(tgt_types_in_train)
         sample_weights = [1.0 / max(type_counts[t], 1) for t in tgt_types_in_train]
         train_sampler = WeightedRandomSampler(
@@ -999,6 +1131,10 @@ def predict(
     if clear_cache:
         _model_cache.pop(f"{model_path}:{device}", None)
 
+    # Load semantic embed cache saved alongside this model (once per process per path)
+    _pkl_path = str(Path(model_path).with_name("embed_cache.pkl"))
+    _load_embed_cache(_pkl_path)
+
     model        = _load_model(model_path, device)
     H            = model.hist_len
     max_elements = model.max_elements
@@ -1087,7 +1223,7 @@ def _parse_args() -> argparse.Namespace:
     p.add_argument("--device",          default="auto", dest="device_str")
     # Train args
     p.add_argument("--data_dir",        default="data/output/traces/live")
-    p.add_argument("--epochs",          default=20,   type=int)
+    p.add_argument("--epochs",          default=50,   type=int)
     p.add_argument("--batch_size",      default=16,   type=int)
     p.add_argument("--lr",              default=1e-3, type=float)
     p.add_argument("--weight_decay",    default=1e-4, type=float)

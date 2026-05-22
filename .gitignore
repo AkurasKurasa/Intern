@@ -41,10 +41,15 @@ test_data/
 *.pt
 !data/models/*.pt
 
+# Dataset init cache (auto-generated, invalidated on new traces)
+.dataset_cache.pkl
+
 # Trace output — each recording session produces many large JSON files
 data/output/traces/live/
 data/output/traces/live_good/
 data/output/traces/live/session_*/
+data/output/traces/forms/
+data/output/traces/forms_aug/
 
 # Trained model weights (large binaries)
 data/models/*.pt
