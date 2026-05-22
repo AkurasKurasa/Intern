@@ -166,9 +166,11 @@ What needs to happen, in order, to reach the BC completion criterion (transforme
 
 These are blocking every downstream improvement.
 
-- [ ] **Bootstrap the correctional task spec** — Run `RuleExtractor.correct()` on all 19 existing sessions to generate the initial `data/output/rulesets/form_filling.md`. Until this exists, the spec injection into the LLM system prompt is a no-op.
-- [ ] **Fix LLM: stop clicking checkboxes** — Agent wasted steps 1-3 on E-Signature/Paperless checkboxes. Add explicit rule to `_SYSTEM_PROMPT`: *"Do not click checkboxes unless source data explicitly says Yes/True for that field."*
-- [ ] **Commit all staged changes** — `agent.py`, `rule_extractor.py`, `transformer.py`, `record_trace.py`, `.gitignore`, `augment_traces.py`, `run_task.py`, `build_capsule.py` all modified/new and uncommitted.
+- [x] **Bootstrap the correctional task spec** *(→ Finished Tasks)* — `scripts/bootstrap_spec.py` ran `correct()` across all 19 sessions. `form_filling.md` exists and injects into agent system prompt.
+- [x] **Commit all staged changes** *(→ Finished Tasks)* — All files committed and pushed.
+- [ ] **Set BC gold standard** — Run `python scripts/bc_fidelity.py --set-reference data/output/submissions/<best_submission>.json` once. All future runs scored against it. Required before fidelity scores appear.
+- [ ] **Re-run bootstrap with fixed compressor** — `python scripts/bootstrap_spec.py` — `_compress_session()` is now fixed; re-run will produce spec with real tab names, field names, and behavior patterns.
+- [ ] **Fix LLM checkbox clicking** — Will emerge naturally from spec once bootstrap re-runs. Traces show humans never click checkboxes first.
 
 ---
 
@@ -225,20 +227,21 @@ Priority order — top = most blocking right now.
 
 ### 🔴 P1 — Blocking (do first)
 
-- [x] **Fix LLM click position** — `_merge()` now resolves LLM target by label via `_resolve_target()` first; transformer click coords only used as fallback when no LLM target resolves. Confirmed working in logs.
-- [x] **Boost click loss weight** — `lambda_click=2.0` in training. Implemented.
-- [x] **Train longer** — Default epochs 20 → 50. GPU training active (RTX 4050, CUDA 12.4). Best val_loss=7.21 @ epoch 21.
-- [x] **GPU training** — CUDA PyTorch 2.6.0+cu124 installed. Training uses RTX 4050.
-- [x] **Dataset init cache** — `TrajectoryDataset.__init__` saves filtered metadata to `.dataset_cache.pkl`. Second+ retrains load in ~1 sec.
-- [ ] **Bootstrap correctional spec** — Run `RuleExtractor.correct()` on all existing sessions. See Stage 0.
-- [ ] **Fix LLM checkbox clicking** — Agent clicks E-Signature/Paperless checkboxes at step 1-3. Add explicit rule. See Stage 0.
+- [x] **Fix LLM click position** *(→ Finished Tasks)* — `_merge()` resolves LLM target by label first; transformer click only used as fallback.
+- [x] **Boost click loss weight** *(→ Finished Tasks)* — `lambda_click=2.0`.
+- [x] **Train longer** *(→ Finished Tasks)* — Default epochs 20 → 50, GPU training on RTX 4050.
+- [x] **GPU training** *(→ Finished Tasks)* — CUDA PyTorch 2.6.0+cu124 installed.
+- [x] **Dataset init cache** *(→ Finished Tasks)* — `.dataset_cache.pkl` cuts retrain init from 10 min to ~1 sec.
+- [x] **Bootstrap correctional spec** *(→ Finished Tasks)* — `scripts/bootstrap_spec.py` ran `correct()` across all 19 sessions.
+- [ ] **Fix _compress_session()** — Trace compressor produces near-empty output because JSON structure doesn't match expected fields. LLM gets no specific data → spec stays generic. Must fix before next bootstrap.
+- [ ] **Fix LLM checkbox clicking** — Inferred from spec, not hardcoded. Needs `_compress_session()` fixed first so traces surface checkbox behavior patterns.
 - [ ] **Record more training traces** — 19 sessions. Target 50. Click_acc ~40%, needs ~75% for reliable fills. See Stage 1.
 
 ### 🟡 P2 — Important (do after P1)
 
-- [x] **Correctional ruleset system** — `RuleExtractor.correct()` reads existing spec + new session traces → overwrites `form_filling.md` with corrected task spec. `record_trace.py` calls it automatically on session end.
-- [x] **Spec injection into agent** — `LLMAgent.__init__` loads `form_filling.md` and appends to LLM system prompt. Every agent run uses the latest corrected spec.
-- [ ] **Increase model capacity** — Bump to `d_model=128, num_layers=4` after 30+ sessions. Current 164k-param model will underfit at scale.
+- [x] **Correctional ruleset system** *(→ Finished Tasks)* — `RuleExtractor.correct()` + `record_trace.py` auto-calls on session end.
+- [x] **Spec injection into agent** *(→ Finished Tasks)* — `LLMAgent.__init__` loads `form_filling.md` into LLM system prompt.
+- [ ] **Increase model capacity** — Bump to `d_model=128, num_layers=4` after 30+ sessions.
 - [ ] **PROVIDER="none" smoke test** — Run agent with LLM disabled. Measures pure transformer capability. See Stage 3.
 - [ ] **Automate correction → retrain loop** — After each session, if spec changed, queue retrain. See Stage 3.
 
@@ -361,6 +364,38 @@ picking it up has the failure mode in hand.
 - [ ] Excel
 - [ ] Shopify
 - [ ] Generalization
+
+## Finished Tasks
+
+Completed work, preserved for reference. Items here were once in P1/P2/P3 or the Wish List.
+
+### Intelligence & Training
+- **GPU training** — CUDA 12.4 / PyTorch 2.6.0+cu124 installed. RTX 4050 Laptop GPU active. Was: P1 Blocking.
+- **Boost click loss weight** — `lambda_click` raised 1.0 → 2.0. Extra gradient pressure on click head. Was: P1 Blocking.
+- **Train longer** — Default epochs 20 → 50. val_loss still trending at epoch 21 so budget increased. Best checkpoint auto-saved. Was: P1 Blocking.
+- **Dataset init cache** — `TrajectoryDataset.__init__` saves filtered file paths + action metadata to `.dataset_cache.pkl`. Invalidated when any session file is newer than cache. Cuts retrain init from 10 min to ~1 sec on second+ run. Was: P1 Blocking.
+- **Lazy loading** — State tensors built on demand in `__getitem__`, not at init. Fixes OOM crash on 11k-trace datasets. Was: implicit P1 blocker (MemoryError).
+- **NO_SENT_TRANSFORMERS bypass** — Sentence-transformers caused segfault (exit 139) with torch 2.6.0. Env var skips loading entirely. Was: implicit P1 blocker.
+- **Balanced sampler** — Per-class sampling so click/keyboard classes train equally despite imbalance. Fixed index bug after lazy-load tuple reorder. Was: P2.
+- **Data augmentation** — `scripts/augment_traces.py` creates ×4 copies per session with bbox jitter ±5px, click jitter ±4px, confidence noise ±0.03. Was: P2.
+
+### Agent & Merge Logic
+- **Fix LLM click position** — `_merge()` now calls `_resolve_target()` on the LLM's named target first. Uses element bbox center directly. Transformer click coords only used as fallback when LLM target doesn't resolve. Confirmed working: logs show "LLM target 'E-Signature Obtained' → (1357, 670)". Was: P1 Blocking.
+
+### Ruleset & Spec System
+- **Correctional ruleset system** — `RuleExtractor.correct(session_dir, goal)` reads existing `form_filling.md` + new session traces → sends both to LLM → overwrites spec with corrected version. Single truth file, not one file per session. Was: P2.
+- **Spec injection into agent** — `LLMAgent.__init__` loads `data/output/rulesets/form_filling.md` at startup and appends to LLM system prompt. Every agent run uses the latest inferred spec. Was: P2.
+- **Auto-extract on record** — `record_trace.py` calls `RuleExtractor.correct()` automatically when a session ends (≥5 traces). Spec improves with every recording without manual steps. Was: P2.
+- **Bootstrap correctional spec** — `scripts/bootstrap_spec.py` ran `correct()` sequentially across all 19 existing sessions to build the initial `form_filling.md`. Was: Stage 0 blocker.
+
+### Evaluation
+- **Per-run evaluation metrics** — `evaluate_run(results)` in `scripts/eval_metrics.py` computes Task Completion Rate, Action Prediction Accuracy, and Execution Success Rate from in-memory agent results. Wired into `run_task.py` via `try/finally` — fires on every run including crashes, early stops, and Ctrl+C. Was: not implemented.
+- **`_compress_session()` fixed** — Trace compressor now reads actual JSON structure (`action.action_type`, `action.text`, `action.click_position`, active tab from selected tabitem elements, focused field by `element_id`, click target by bbox proximity). Was: producing near-empty output. Was: P1 blocker for bootstrap quality.
+- **BC fidelity scorer** — `scripts/bc_fidelity.py` scores every agent run against a gold standard human submission. Outputs Fidelity Score (0-100%) = `field_match_rate×0.4 + value_accuracy×0.4 + tab_coverage×0.1 + completion_bonus×0.1`. Appends to `data/output/bc_progress.jsonl` for trend tracking. Wired into `run_task.py` — fires after every run. View trend: `python scripts/bc_fidelity.py --progress`. Was: not implemented.
+
+### Infrastructure
+- **Capsule registry** — `components/agent/capsule.py` + `build_capsule.py`. Per-task model routing: agent auto-selects `.pt` file based on goal string and window title. Was: architecture item.
+- **`.gitignore` for traces** — `data/output/traces/forms/`, `forms_aug/`, `live/` excluded. `.dataset_cache.pkl` excluded. Was: housekeeping.
 
 ### Behavioral Fidelity Benchmarks
 Tasks specifically designed to measure whether Intern clones *style and decision-making*, not just mechanical actions.

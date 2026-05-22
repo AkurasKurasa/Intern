@@ -93,21 +93,41 @@ if __name__ == "__main__":
     )
 
     logger.info("Starting — goal=%r  provider=%s  no plugin", GOAL, PROVIDER)
-    results = agent.run(max_steps=MAX_STEPS, task_name="form_filling")
+    results = []
+    try:
+        results = agent.run(max_steps=MAX_STEPS, task_name="form_filling")
+    except KeyboardInterrupt:
+        logger.info("Run interrupted by user.")
+    except Exception as exc:
+        logger.error("Run crashed: %s", exc)
+    finally:
+        logger.info("Run ended — %d steps", len(results))
 
-    logger.info("Done — %d steps", len(results))
-    for r in results:
-        step = r.get("step", "?")
-        act  = r.get("action", {}).get("action_type", "?")
-        val  = r.get("validation", "?")
-        logger.info("  step %02d: %-10s  validation=%s", step, act, val)
+        # ── Evaluation metrics (always runs, even on early stop or crash) ──────
+        sys.path.insert(0, os.path.join(_ROOT, "scripts"))
+        from eval_metrics import evaluate_run
+        evaluate_run(results, goal=GOAL)
 
-    # Extract generalized rules from the completed run
-    if PROVIDER != "none":
-        from intelligence.rule_extractor import RuleExtractor
-        extractor = RuleExtractor(
-            provider   = PROVIDER,
-            api_key    = API_KEY or os.environ.get("GROQ_API_KEY", ""),
-            output_dir = "data/output/rulesets",
-        )
-        extractor.extract(results, goal=GOAL, task_name="form_filling")
+        # ── BC fidelity score vs gold standard ───────────────────────────────
+        try:
+            from bc_fidelity import score_run
+            score_run(results, goal=GOAL)
+        except Exception as _fe:
+            logger.debug("BC fidelity scorer skipped: %s", _fe)
+
+        # ── Per-step log ──────────────────────────────────────────────────────
+        for r in results:
+            step = r.get("step", "?")
+            act  = r.get("action", {}).get("action_type", "?")
+            val  = r.get("validation", "?")
+            logger.info("  step %02d: %-10s  validation=%s", step, act, val)
+
+        # ── Extract generalized rules from the completed run ───────────────────
+        if PROVIDER != "none" and results:
+            from intelligence.rule_extractor import RuleExtractor
+            extractor = RuleExtractor(
+                provider   = PROVIDER,
+                api_key    = API_KEY or os.environ.get("GROQ_API_KEY", ""),
+                output_dir = "data/output/rulesets",
+            )
+            extractor.extract(results, goal=GOAL, task_name="form_filling")

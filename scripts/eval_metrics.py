@@ -419,6 +419,114 @@ def report(session_dir: Path | None, aggregate_all: bool) -> None:
     print(f"\n{'='*70}\n")
 
 
+# ─── per-run evaluator (works on agent.run() results, no trace files needed) ──
+
+def evaluate_run(results: list[dict], goal: str = "") -> dict:
+    """
+    Compute the three core metrics from agent.run() results list.
+    Works on complete AND early-terminated runs.
+
+    Returns a dict with keys: task_completion_rate, action_prediction_accuracy,
+    execution_success_rate, and a formatted summary string.
+    """
+    if not results:
+        return {
+            "task_completion_rate":       0.0,
+            "action_prediction_accuracy": 0.0,
+            "execution_success_rate":     0.0,
+            "summary": "No steps recorded.",
+        }
+
+    total_steps   = len(results)
+    done          = any(r.get("action", {}).get("action_type") == "done" for r in results)
+    fields_filled: set[str] = set()
+    actionable    = 0
+    succeeded     = 0
+    total_clicks  = 0
+    on_target     = 0
+
+    for i, r in enumerate(results):
+        action = r.get("action", {})
+        a_type = action.get("action_type", "noop")
+        state  = r.get("state", {})
+
+        if a_type in ("noop", None, "wait"):
+            continue
+
+        actionable += 1
+
+        # Execution success — did state change vs previous step?
+        if i > 0:
+            prev_state = results[i - 1].get("state", {})
+            focus_changed  = _focused_id(prev_state) != _focused_id(state)
+            before_vals    = _element_values(prev_state)
+            after_vals     = _element_values(state)
+            values_changed = any(after_vals.get(k) != v for k, v in before_vals.items())
+            if focus_changed or values_changed:
+                succeeded += 1
+
+        # Track filled fields (keyboard actions with text)
+        if a_type == "keyboard":
+            text = action.get("text", "").strip()
+            if text:
+                fid = _focused_id(state)
+                for e in state.get("elements", []):
+                    if e.get("element_id") == fid:
+                        label = e.get("label") or e.get("text") or fid or ""
+                        if label:
+                            fields_filled.add(label)
+                        break
+
+        # Action prediction accuracy — clicks on interactive elements
+        if a_type == "click":
+            pos = action.get("click_position")
+            if pos and len(pos) >= 2:
+                total_clicks += 1
+                elements = [e for e in _interactive_elements(state)
+                            if len(e.get("bbox", [])) == 4]
+                if any(_inside_bbox(pos, e["bbox"]) for e in elements):
+                    on_target += 1
+
+    # Task Completion Rate: done signal = 1.0, else fields_filled / estimated total
+    # We estimate 20 fillable fields for the car insurance form (8 tabs × ~2.5 fields avg)
+    ESTIMATED_TOTAL_FIELDS = 20
+    if done:
+        tcr = 1.0
+    else:
+        tcr = min(len(fields_filled) / ESTIMATED_TOTAL_FIELDS, 1.0)
+
+    apa = on_target / total_clicks if total_clicks else 0.0
+    esr = succeeded / actionable   if actionable   else 0.0
+
+    border = "=" * 60
+    summary = (
+        f"\n{border}\n"
+        f"  RUN METRICS\n"
+        f"  Goal: {goal[:55]}\n"
+        f"{border}\n"
+        f"  Task Completion Rate       {tcr*100:>6.1f}%   "
+        f"({'done' if done else f'{len(fields_filled)} fields filled / ~{ESTIMATED_TOTAL_FIELDS} total'})\n"
+        f"  Action Prediction Accuracy {apa*100:>6.1f}%   "
+        f"({on_target} on-target / {total_clicks} clicks)\n"
+        f"  Execution Success Rate     {esr*100:>6.1f}%   "
+        f"({succeeded} state-changing / {actionable} actionable steps)\n"
+        f"  Total steps: {total_steps}  |  Terminated: {'naturally' if done else 'early/max_steps'}\n"
+        f"{border}\n"
+    )
+
+    print(summary)
+
+    return {
+        "task_completion_rate":       tcr,
+        "action_prediction_accuracy": apa,
+        "execution_success_rate":     esr,
+        "fields_filled":              sorted(fields_filled),
+        "total_steps":                total_steps,
+        "completed":                  done,
+        "summary":                    summary,
+    }
+
+
 # ─── entry point ──────────────────────────────────────────────────────────────
 
 def main() -> None:

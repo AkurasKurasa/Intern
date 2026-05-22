@@ -183,7 +183,6 @@ def _compress_session(session_dir: str | Path) -> str:
     """Compress raw trace JSONs from a recording session into readable text."""
     session_path = Path(session_dir)
     trace_files  = sorted(session_path.glob("*.json"))
-    # exclude manifest
     trace_files  = [f for f in trace_files if f.name != "session_manifest.json"]
 
     if not trace_files:
@@ -197,33 +196,71 @@ def _compress_session(session_dir: str | Path) -> str:
         except Exception:
             continue
 
+        action = t.get("action", {})
+        a_type = action.get("action_type", "")
+        if not a_type or a_type == "noop":
+            continue
+
         state  = t.get("state", {})
-        mouse  = t.get("mouse", {})
-        kb     = t.get("keyboard", {})
+        elems  = state.get("elements", [])
+        fid    = state.get("focused_element_id", "")
 
-        tab    = state.get("active_tab", "") or ""
-        app    = state.get("application", "") or ""
-
-        # Derive action type
-        clicked    = mouse.get("clicked", False)
-        typed_text = kb.get("text", "") or "".join(kb.get("keystrokes", []))
-
-        # Find focused element label
-        focused = ""
-        focused_id = state.get("focused_element_id")
-        for elem in state.get("elements", []):
-            if elem.get("element_id") == focused_id:
-                focused = elem.get("label") or elem.get("text") or ""
+        # Active tab — find selected tabitem
+        tab = ""
+        for e in elems:
+            if e.get("type", "").lower() in ("tabitem", "tab") and e.get("selected"):
+                tab = e.get("label") or e.get("text") or ""
                 break
 
-        if clicked:
-            pos = mouse.get("position", [])
-            target = mouse.get("target_label", "") or focused
-            lines.append(f"Step {i:>3}: CLICK  app={app!r}  tab={tab!r}  target={target!r}  pos={pos}")
-        elif typed_text.strip():
-            lines.append(f"Step {i:>3}: TYPE   app={app!r}  tab={tab!r}  field={focused!r}  value={typed_text!r}")
+        # Focused element label
+        focused = ""
+        for e in elems:
+            if e.get("element_id") == fid:
+                focused = e.get("label") or e.get("text") or ""
+                break
 
-    return "\n".join(lines) if lines else "(no meaningful actions in session)"
+        if a_type == "click":
+            pos = action.get("click_position", [])
+            # Try to find element at click position by bbox proximity
+            target = focused
+            if not target:
+                cx, cy = (pos[0], pos[1]) if len(pos) >= 2 else (0, 0)
+                best, best_d = None, 9999
+                for e in elems:
+                    bb = e.get("bbox", {})
+                    ex = bb.get("x", 0) + bb.get("width", 0) / 2
+                    ey = bb.get("y", 0) + bb.get("height", 0) / 2
+                    d = abs(ex - cx) + abs(ey - cy)
+                    if d < best_d:
+                        best_d = d
+                        best = e.get("label") or e.get("text") or ""
+                target = best or ""
+            lines.append(f"Step {i:>4}: CLICK  tab={tab!r}  target={target!r}  pos={pos}")
+
+        elif a_type == "keyboard":
+            text = action.get("text", "") or ""
+            keys = action.get("keystrokes", [])
+            if text.strip():
+                lines.append(f"Step {i:>4}: TYPE   tab={tab!r}  field={focused!r}  value={text!r}")
+            elif keys:
+                readable = [k for k in keys if not k.startswith("Key.shift")]
+                if readable:
+                    lines.append(f"Step {i:>4}: KEY    tab={tab!r}  keys={readable}")
+
+    if not lines:
+        return "(no meaningful actions in session)"
+
+    # Deduplicate consecutive identical lines (held keys, repeated clicks)
+    deduped = [lines[0]]
+    for line in lines[1:]:
+        if line != deduped[-1]:
+            deduped.append(line)
+
+    # Cap at 300 lines to stay within LLM context
+    if len(deduped) > 300:
+        deduped = deduped[:150] + ["... (truncated) ..."] + deduped[-150:]
+
+    return "\n".join(deduped)
 
 
 # ── main class ─────────────────────────────────────────────────────────────────
