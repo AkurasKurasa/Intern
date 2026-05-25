@@ -1,0 +1,76 @@
+{
+  "trace_id": "live_step_0550",
+  "timestamp": "2026-03-21T09:58:36.414488",
+  "duration": 1.062973,
+  "type": "excel",
+  "state": {
+    "application": "Microsoft Excel",
+    "window_title": "",
+    "screen_resolution": [
+      1920,
+      1200
+    ],
+    "focused_element_id": null,
+    "elements": [],
+    "excel_context": {}
+  },
+  "next_state": {
+    "application": "Microsoft Excel",
+    "window_title": "",
+    "screen_resolution": [
+      1920,
+      1200
+    ],
+    "focused_element_id": null,
+    "elements": [],
+    "excel_context": {}
+  },
+  "mouse": {
+    "actions": [
+      {
+        "id": "mouse_action_0288",
+        "position": [
+          435,
+          450
+        ],
+        "type": "click",
+        "timestamp": "2026-03-21T09:58:36.712849"
+      }
+    ]
+  },
+  "keyboard": {
+    "actions": [
+      {
+        "strokes": [
+          {
+            "key": "Key.ctrl_l",
+            "timestamp": "2026-03-21T09:58:36.805405"
+          },
+          {
+            "key": "\u0016",
+            "timestamp": "2026-03-21T09:58:36.901489",
+            "pasted_text": "Delivery Driver"
+          }
+        ]
+      }
+    ]
+  },
+  "clipboard": {
+    "events": [
+      {
+        "event": "paste",
+        "content": "Delivery Driver",
+        "timestamp": "2026-03-21T09:58:36.901508"
+      }
+    ]
+  },
+  "diff": {},
+  "action": {
+    "action_type": "paste",
+    "text": "",
+    "click_position": [
+      435,
+      450
+    ]
+  }
+}

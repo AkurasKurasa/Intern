@@ -1,0 +1,509 @@
+{
+  "trace_id": "live_step_0000",
+  "timestamp": "2026-03-22T20:15:56.848814",
+  "duration": 1.245233,
+  "type": "gui",
+  "state": {
+    "application": "python.exe",
+    "window_title": "Car Insurance — Data Entry Form",
+    "process_id": 33236,
+    "screen_resolution": [
+      1920,
+      1200
+    ],
+    "focused_element_id": null,
+    "source": "uia",
+    "elements": [
+      {
+        "element_id": "elem_0",
+        "type": "windowcontrol",
+        "control_type": "WindowControl",
+        "bbox": [
+          -9,
+          11,
+          1236,
+          1010
+        ],
+        "text": "Car Insurance — Data Entry Form",
+        "value": "",
+        "label": "Car Insurance — Data Entry Form",
+        "automation_id": "",
+        "class_name": "TkTopLevel",
+        "enabled": true,
+        "visible": true,
+        "focused": false,
+        "confidence": 1.0,
+        "source": "uia",
+        "app": "python.exe",
+        "window_title": "Car Insurance — Data Entry Form",
+        "window_role": "active",
+        "pid": 33236,
+        "metadata": {
+          "depth": 0,
+          "ctrl_type": "WindowControl"
+        }
+      },
+      {
+        "element_id": "elem_1",
+        "type": "titlebarcontrol",
+        "control_type": "TitleBarControl",
+        "bbox": [
+          21,
+          15,
+          1226,
+          50
+        ],
+        "text": "Car Insurance — Data Entry Form",
+        "value": "Car Insurance — Data Entry Form",
+        "label": "Car Insurance — Data Entry Form",
+        "automation_id": "",
+        "class_name": "",
+        "enabled": true,
+        "visible": true,
+        "focused": false,
+        "confidence": 1.0,
+        "source": "uia",
+        "app": "python.exe",
+        "window_title": "Car Insurance — Data Entry Form",
+        "window_role": "active",
+        "pid": 33236,
+        "metadata": {
+          "depth": 1,
+          "ctrl_type": "TitleBarControl"
+        }
+      },
+      {
+        "element_id": "elem_2",
+        "type": "menubarcontrol",
+        "control_type": "MenuBarControl",
+        "bbox": [
+          1,
+          21,
+          29,
+          49
+        ],
+        "text": "System",
+        "value": "",
+        "label": "System",
+        "automation_id": "MenuBar",
+        "class_name": "",
+        "enabled": true,
+        "visible": true,
+        "focused": false,
+        "confidence": 1.0,
+        "source": "uia",
+        "app": "python.exe",
+        "window_title": "Car Insurance — Data Entry Form",
+        "window_role": "active",
+        "pid": 33236,
+        "metadata": {
+          "depth": 2,
+          "ctrl_type": "MenuBarControl"
+        }
+      },
+      {
+        "element_id": "elem_3",
+        "type": "menuitemcontrol",
+        "control_type": "MenuItemControl",
+        "bbox": [
+          1,
+          21,
+          29,
+          49
+        ],
+        "text": "System",
+        "value": "",
+        "label": "System",
+        "automation_id": "",
+        "class_name": "",
+        "enabled": true,
+        "visible": true,
+        "focused": false,
+        "confidence": 1.0,
+        "source": "uia",
+        "app": "python.exe",
+        "window_title": "Car Insurance — Data Entry Form",
+        "window_role": "active",
+        "pid": 33236,
+        "metadata": {
+          "depth": 3,
+          "ctrl_type": "MenuItemControl"
+        }
+      },
+      {
+        "element_id": "elem_4",
+        "type": "buttoncontrol",
+        "control_type": "ButtonControl",
+        "bbox": [
+          1048,
+          13,
+          1108,
+          51
+        ],
+        "text": "Minimize",
+        "value": "",
+        "label": "Minimize",
+        "automation_id": "",
+        "class_name": "",
+        "enabled": true,
+        "visible": true,
+        "focused": false,
+        "confidence": 1.0,
+        "source": "uia",
+        "app": "python.exe",
+        "window_title": "Car Insurance — Data Entry Form",
+        "window_role": "active",
+        "pid": 33236,
+        "metadata": {
+          "depth": 2,
+          "ctrl_type": "ButtonControl"
+        }
+      },
+      {
+        "element_id": "elem_5",
+        "type": "buttoncontrol",
+        "control_type": "ButtonControl",
+        "bbox": [
+          1108,
+          13,
+          1167,
+          51
+        ],
+        "text": "Maximize",
+        "value": "",
+        "label": "Maximize",
+        "automation_id": "",
+        "class_name": "",
+        "enabled": true,
+        "visible": true,
+        "focused": false,
+        "confidence": 1.0,
+        "source": "uia",
+        "app": "python.exe",
+        "window_title": "Car Insurance — Data Entry Form",
+        "window_role": "active",
+        "pid": 33236,
+        "metadata": {
+          "depth": 2,
+          "ctrl_type": "ButtonControl"
+        }
+      },
+      {
+        "element_id": "elem_6",
+        "type": "buttoncontrol",
+        "control_type": "ButtonControl",
+        "bbox": [
+          1168,
+          13,
+          1228,
+          51
+        ],
+        "text": "Close",
+        "value": "",
+        "label": "Close",
+        "automation_id": "",
+        "class_name": "",
+        "enabled": true,
+        "visible": true,
+        "focused": false,
+        "confidence": 1.0,
+        "source": "uia",
+        "app": "python.exe",
+        "window_title": "Car Insurance — Data Entry Form",
+        "window_role": "active",
+        "pid": 33236,
+        "metadata": {
+          "depth": 2,
+          "ctrl_type": "ButtonControl"
+        }
+      },
+      {
+        "element_id": "elem_7",
+        "type": "panecontrol",
+        "control_type": "PaneControl",
+        "bbox": [
+          0,
+          0,
+          1920,
+          1200
+        ],
+        "text": "NVIDIA GeForce Overlay",
+        "value": "",
+        "label": "NVIDIA GeForce Overlay",
+        "automation_id": "",
+        "class_name": "CEF-OSC-WIDGET",
+        "enabled": true,
+        "visible": true,
+        "focused": false,
+        "confidence": 1.0,
+        "source": "uia",
+        "app": "NVIDIA Share.exe",
+        "window_title": "NVIDIA GeForce Overlay",
+        "window_role": "background",
+        "pid": 27356,
+        "metadata": {
+          "depth": 0,
+          "ctrl_type": "PaneControl"
+        }
+      }
+    ]
+  },
+  "next_state": {
+    "application": "python.exe",
+    "window_title": "Car Insurance — Data Entry Form",
+    "process_id": 33236,
+    "screen_resolution": [
+      1920,
+      1200
+    ],
+    "focused_element_id": null,
+    "source": "uia",
+    "elements": [
+      {
+        "element_id": "elem_0",
+        "type": "windowcontrol",
+        "control_type": "WindowControl",
+        "bbox": [
+          -9,
+          11,
+          1236,
+          1010
+        ],
+        "text": "Car Insurance — Data Entry Form",
+        "value": "",
+        "label": "Car Insurance — Data Entry Form",
+        "automation_id": "",
+        "class_name": "TkTopLevel",
+        "enabled": true,
+        "visible": true,
+        "focused": false,
+        "confidence": 1.0,
+        "source": "uia",
+        "app": "python.exe",
+        "window_title": "Car Insurance — Data Entry Form",
+        "window_role": "active",
+        "pid": 33236,
+        "metadata": {
+          "depth": 0,
+          "ctrl_type": "WindowControl"
+        }
+      },
+      {
+        "element_id": "elem_1",
+        "type": "titlebarcontrol",
+        "control_type": "TitleBarControl",
+        "bbox": [
+          21,
+          15,
+          1226,
+          50
+        ],
+        "text": "Car Insurance — Data Entry Form",
+        "value": "Car Insurance — Data Entry Form",
+        "label": "Car Insurance — Data Entry Form",
+        "automation_id": "",
+        "class_name": "",
+        "enabled": true,
+        "visible": true,
+        "focused": false,
+        "confidence": 1.0,
+        "source": "uia",
+        "app": "python.exe",
+        "window_title": "Car Insurance — Data Entry Form",
+        "window_role": "active",
+        "pid": 33236,
+        "metadata": {
+          "depth": 1,
+          "ctrl_type": "TitleBarControl"
+        }
+      },
+      {
+        "element_id": "elem_2",
+        "type": "menubarcontrol",
+        "control_type": "MenuBarControl",
+        "bbox": [
+          1,
+          21,
+          29,
+          49
+        ],
+        "text": "System",
+        "value": "",
+        "label": "System",
+        "automation_id": "MenuBar",
+        "class_name": "",
+        "enabled": true,
+        "visible": true,
+        "focused": false,
+        "confidence": 1.0,
+        "source": "uia",
+        "app": "python.exe",
+        "window_title": "Car Insurance — Data Entry Form",
+        "window_role": "active",
+        "pid": 33236,
+        "metadata": {
+          "depth": 2,
+          "ctrl_type": "MenuBarControl"
+        }
+      },
+      {
+        "element_id": "elem_3",
+        "type": "menuitemcontrol",
+        "control_type": "MenuItemControl",
+        "bbox": [
+          1,
+          21,
+          29,
+          49
+        ],
+        "text": "System",
+        "value": "",
+        "label": "System",
+        "automation_id": "",
+        "class_name": "",
+        "enabled": true,
+        "visible": true,
+        "focused": false,
+        "confidence": 1.0,
+        "source": "uia",
+        "app": "python.exe",
+        "window_title": "Car Insurance — Data Entry Form",
+        "window_role": "active",
+        "pid": 33236,
+        "metadata": {
+          "depth": 3,
+          "ctrl_type": "MenuItemControl"
+        }
+      },
+      {
+        "element_id": "elem_4",
+        "type": "buttoncontrol",
+        "control_type": "ButtonControl",
+        "bbox": [
+          1048,
+          13,
+          1108,
+          51
+        ],
+        "text": "Minimize",
+        "value": "",
+        "label": "Minimize",
+        "automation_id": "",
+        "class_name": "",
+        "enabled": true,
+        "visible": true,
+        "focused": false,
+        "confidence": 1.0,
+        "source": "uia",
+        "app": "python.exe",
+        "window_title": "Car Insurance — Data Entry Form",
+        "window_role": "active",
+        "pid": 33236,
+        "metadata": {
+          "depth": 2,
+          "ctrl_type": "ButtonControl"
+        }
+      },
+      {
+        "element_id": "elem_5",
+        "type": "buttoncontrol",
+        "control_type": "ButtonControl",
+        "bbox": [
+          1108,
+          13,
+          1167,
+          51
+        ],
+        "text": "Maximize",
+        "value": "",
+        "label": "Maximize",
+        "automation_id": "",
+        "class_name": "",
+        "enabled": true,
+        "visible": true,
+        "focused": false,
+        "confidence": 1.0,
+        "source": "uia",
+        "app": "python.exe",
+        "window_title": "Car Insurance — Data Entry Form",
+        "window_role": "active",
+        "pid": 33236,
+        "metadata": {
+          "depth": 2,
+          "ctrl_type": "ButtonControl"
+        }
+      },
+      {
+        "element_id": "elem_6",
+        "type": "buttoncontrol",
+        "control_type": "ButtonControl",
+        "bbox": [
+          1168,
+          13,
+          1228,
+          51
+        ],
+        "text": "Close",
+        "value": "",
+        "label": "Close",
+        "automation_id": "",
+        "class_name": "",
+        "enabled": true,
+        "visible": true,
+        "focused": false,
+        "confidence": 1.0,
+        "source": "uia",
+        "app": "python.exe",
+        "window_title": "Car Insurance — Data Entry Form",
+        "window_role": "active",
+        "pid": 33236,
+        "metadata": {
+          "depth": 2,
+          "ctrl_type": "ButtonControl"
+        }
+      },
+      {
+        "element_id": "elem_7",
+        "type": "panecontrol",
+        "control_type": "PaneControl",
+        "bbox": [
+          0,
+          0,
+          1920,
+          1200
+        ],
+        "text": "NVIDIA GeForce Overlay",
+        "value": "",
+        "label": "NVIDIA GeForce Overlay",
+        "automation_id": "",
+        "class_name": "CEF-OSC-WIDGET",
+        "enabled": true,
+        "visible": true,
+        "focused": false,
+        "confidence": 1.0,
+        "source": "uia",
+        "app": "NVIDIA Share.exe",
+        "window_title": "NVIDIA GeForce Overlay",
+        "window_role": "background",
+        "pid": 27356,
+        "metadata": {
+          "depth": 0,
+          "ctrl_type": "PaneControl"
+        }
+      }
+    ]
+  },
+  "mouse": {
+    "actions": []
+  },
+  "keyboard": {
+    "actions": []
+  },
+  "clipboard": {
+    "events": []
+  },
+  "diff": {},
+  "action": {
+    "action_type": "noop"
+  }
+}

@@ -1,0 +1,85 @@
+{
+  "trace_id": "live_step_0385",
+  "timestamp": "2026-03-21T09:55:42.767044",
+  "duration": 1.063906,
+  "type": "excel",
+  "state": {
+    "application": "Microsoft Excel",
+    "window_title": "",
+    "screen_resolution": [
+      1920,
+      1200
+    ],
+    "focused_element_id": null,
+    "elements": [],
+    "excel_context": {}
+  },
+  "next_state": {
+    "application": "Microsoft Excel",
+    "window_title": "",
+    "screen_resolution": [
+      1920,
+      1200
+    ],
+    "focused_element_id": null,
+    "elements": [],
+    "excel_context": {}
+  },
+  "mouse": {
+    "actions": [
+      {
+        "id": "mouse_action_0131",
+        "position": [
+          1231,
+          374
+        ],
+        "type": "click",
+        "timestamp": "2026-03-21T09:55:42.802195"
+      },
+      {
+        "id": "mouse_action_0132",
+        "position": [
+          1328,
+          380
+        ],
+        "type": "click",
+        "timestamp": "2026-03-21T09:55:43.418074"
+      }
+    ]
+  },
+  "keyboard": {
+    "actions": [
+      {
+        "strokes": [
+          {
+            "key": "Key.ctrl_l",
+            "timestamp": "2026-03-21T09:55:42.860885"
+          },
+          {
+            "key": "\u0016",
+            "timestamp": "2026-03-21T09:55:42.945678",
+            "pasted_text": "Salary"
+          }
+        ]
+      }
+    ]
+  },
+  "clipboard": {
+    "events": [
+      {
+        "event": "paste",
+        "content": "Salary",
+        "timestamp": "2026-03-21T09:55:42.945696"
+      }
+    ]
+  },
+  "diff": {},
+  "action": {
+    "action_type": "paste",
+    "text": "",
+    "click_position": [
+      1328,
+      380
+    ]
+  }
+}

@@ -1,0 +1,55 @@
+{
+  "trace_id": "live_step_0409",
+  "timestamp": "2026-03-21T09:56:08.062987",
+  "duration": 1.034817,
+  "type": "excel",
+  "state": {
+    "application": "Microsoft Excel",
+    "window_title": "",
+    "screen_resolution": [
+      1920,
+      1200
+    ],
+    "focused_element_id": null,
+    "elements": [],
+    "excel_context": {}
+  },
+  "next_state": {
+    "application": "Microsoft Excel",
+    "window_title": "",
+    "screen_resolution": [
+      1920,
+      1200
+    ],
+    "focused_element_id": null,
+    "elements": [],
+    "excel_context": {}
+  },
+  "mouse": {
+    "actions": [
+      {
+        "id": "mouse_action_0155",
+        "position": [
+          1500,
+          472
+        ],
+        "type": "drag",
+        "timestamp": "2026-03-21T09:56:09.085902"
+      }
+    ]
+  },
+  "keyboard": {
+    "actions": []
+  },
+  "clipboard": {
+    "events": []
+  },
+  "diff": {},
+  "action": {
+    "action_type": "drag",
+    "click_position": [
+      1500,
+      472
+    ]
+  }
+}

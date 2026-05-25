@@ -1,0 +1,90 @@
+{
+  "trace_id": "live_step_0423",
+  "timestamp": "2026-03-21T09:56:22.769733",
+  "duration": 1.058662,
+  "type": "excel",
+  "state": {
+    "application": "Microsoft Excel",
+    "window_title": "",
+    "screen_resolution": [
+      1920,
+      1200
+    ],
+    "focused_element_id": null,
+    "elements": [],
+    "excel_context": {}
+  },
+  "next_state": {
+    "application": "Microsoft Excel",
+    "window_title": "",
+    "screen_resolution": [
+      1920,
+      1200
+    ],
+    "focused_element_id": null,
+    "elements": [],
+    "excel_context": {}
+  },
+  "mouse": {
+    "actions": []
+  },
+  "keyboard": {
+    "actions": [
+      {
+        "strokes": [
+          {
+            "key": "k",
+            "timestamp": "2026-03-21T09:56:22.775013"
+          },
+          {
+            "key": "Key.backspace",
+            "timestamp": "2026-03-21T09:56:23.040897"
+          },
+          {
+            "key": "Key.backspace",
+            "timestamp": "2026-03-21T09:56:23.157006"
+          },
+          {
+            "key": "Key.backspace",
+            "timestamp": "2026-03-21T09:56:23.249236"
+          },
+          {
+            "key": "n",
+            "timestamp": "2026-03-21T09:56:23.437153"
+          },
+          {
+            "key": "e",
+            "timestamp": "2026-03-21T09:56:23.520766"
+          },
+          {
+            "key": "l",
+            "timestamp": "2026-03-21T09:56:23.661805"
+          },
+          {
+            "key": "l",
+            "timestamp": "2026-03-21T09:56:23.773301"
+          }
+        ]
+      }
+    ]
+  },
+  "clipboard": {
+    "events": []
+  },
+  "diff": {},
+  "action": {
+    "action_type": "keyboard",
+    "text": "knell",
+    "keystrokes": [
+      "k",
+      "Key.backspace",
+      "Key.backspace",
+      "Key.backspace",
+      "n",
+      "e",
+      "l",
+      "l"
+    ],
+    "click_position": null
+  }
+}

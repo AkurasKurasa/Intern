@@ -867,11 +867,11 @@ class WorkflowCanvas(tk.Frame):
             "trigger":  {"trace_type": "excel", "interval": 1.0,
                          "output_dir": "data/output/traces/live"},
             "trainer":  {"trace_dir":  "data/output/traces/live",
-                         "save_path":  "data/models/transformer_bc.pt",
+                         "save_path":  "tasks/form_filling/model.pt",
                          "epochs": 50, "batch_size": 16,
                          "continual": True},
-            "model":    {"model_path": "data/models/transformer_bc.pt"},
-            "executor": {"model_path": "data/models/transformer_bc.pt",
+            "model":    {"model_path": "tasks/form_filling/model.pt"},
+            "executor": {"model_path": "tasks/form_filling/model.pt",
                          "max_steps": 20, "step_delay": 1.0,
                          "trace_type": "gui", "dry_run": False,
                          "goal": "", "provider": "none",
@@ -1627,7 +1627,7 @@ class WorkflowBuilderPanel(tk.Frame):
                 return False, "BCTrainer not importable — check your path."
 
         trace_dir  = config.get("trace_dir",  "data/output/traces/live")
-        save_path  = config.get("save_path",  "data/models/transformer_bc.pt")
+        save_path  = config.get("save_path",  "tasks/form_filling/model.pt")
         epochs     = int(config.get("epochs",     50))
         batch_size = int(config.get("batch_size", 16))
         continual  = bool(config.get("continual", True))
@@ -1690,7 +1690,7 @@ class WorkflowBuilderPanel(tk.Frame):
         # Extract the state dict from the trace (traces have a "state" key wrapping elements)
         last = translated[-1] if isinstance(translated[-1], dict) else {}
         state = last.get("state", last)
-        model_path = config.get("model_path", "data/models/transformer_bc.pt")
+        model_path = config.get("model_path", "tasks/form_filling/model.pt")
         device_str = config.get("device", "auto")
 
         if not os.path.isfile(model_path):
@@ -1722,7 +1722,7 @@ class WorkflowBuilderPanel(tk.Frame):
             except ImportError:
                 return False, "agent not importable — check your path."
 
-        model_path  = config.get("model_path", "data/models/transformer_bc.pt")
+        model_path  = config.get("model_path", "tasks/form_filling/model.pt")
         dry_run     = config.get("dry_run", False)
         max_steps   = int(config.get("max_steps", 20))
         step_delay  = float(config.get("step_delay", 1.0))

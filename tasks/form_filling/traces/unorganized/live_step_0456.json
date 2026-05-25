@@ -1,0 +1,85 @@
+{
+  "trace_id": "live_step_0456",
+  "timestamp": "2026-03-21T09:56:57.387443",
+  "duration": 1.053149,
+  "type": "excel",
+  "state": {
+    "application": "Microsoft Excel",
+    "window_title": "",
+    "screen_resolution": [
+      1920,
+      1200
+    ],
+    "focused_element_id": null,
+    "elements": [],
+    "excel_context": {}
+  },
+  "next_state": {
+    "application": "Microsoft Excel",
+    "window_title": "",
+    "screen_resolution": [
+      1920,
+      1200
+    ],
+    "focused_element_id": null,
+    "elements": [],
+    "excel_context": {}
+  },
+  "mouse": {
+    "actions": [
+      {
+        "id": "mouse_action_0201",
+        "position": [
+          1282,
+          1176
+        ],
+        "type": "click",
+        "timestamp": "2026-03-21T09:56:57.438325"
+      },
+      {
+        "id": "mouse_action_0202",
+        "position": [
+          1113,
+          407
+        ],
+        "type": "click",
+        "timestamp": "2026-03-21T09:56:58.253147"
+      }
+    ]
+  },
+  "keyboard": {
+    "actions": [
+      {
+        "strokes": [
+          {
+            "key": "Key.ctrl_l",
+            "timestamp": "2026-03-21T09:56:58.248869"
+          },
+          {
+            "key": "\u0016",
+            "timestamp": "2026-03-21T09:56:58.341035",
+            "pasted_text": "Atlanta, GA"
+          }
+        ]
+      }
+    ]
+  },
+  "clipboard": {
+    "events": [
+      {
+        "event": "paste",
+        "content": "Atlanta, GA",
+        "timestamp": "2026-03-21T09:56:58.341051"
+      }
+    ]
+  },
+  "diff": {},
+  "action": {
+    "action_type": "paste",
+    "text": "",
+    "click_position": [
+      1113,
+      407
+    ]
+  }
+}

@@ -1,0 +1,75 @@
+{
+  "trace_id": "live_step_0647",
+  "timestamp": "2026-03-21T10:00:18.731229",
+  "duration": 1.063607,
+  "type": "excel",
+  "state": {
+    "application": "Microsoft Excel",
+    "window_title": "",
+    "screen_resolution": [
+      1920,
+      1200
+    ],
+    "focused_element_id": null,
+    "elements": [],
+    "excel_context": {}
+  },
+  "next_state": {
+    "application": "Microsoft Excel",
+    "window_title": "",
+    "screen_resolution": [
+      1920,
+      1200
+    ],
+    "focused_element_id": null,
+    "elements": [],
+    "excel_context": {}
+  },
+  "mouse": {
+    "actions": []
+  },
+  "keyboard": {
+    "actions": [
+      {
+        "strokes": [
+          {
+            "key": "v",
+            "timestamp": "2026-03-21T10:00:18.913563"
+          },
+          {
+            "key": "Key.ctrl_l",
+            "timestamp": "2026-03-21T10:00:18.956337"
+          },
+          {
+            "key": "Key.backspace",
+            "timestamp": "2026-03-21T10:00:19.581334"
+          },
+          {
+            "key": "Key.ctrl_l",
+            "timestamp": "2026-03-21T10:00:19.669185"
+          },
+          {
+            "key": "\u0016",
+            "timestamp": "2026-03-21T10:00:19.722953",
+            "pasted_text": "No"
+          }
+        ]
+      }
+    ]
+  },
+  "clipboard": {
+    "events": [
+      {
+        "event": "paste",
+        "content": "No",
+        "timestamp": "2026-03-21T10:00:19.722968"
+      }
+    ]
+  },
+  "diff": {},
+  "action": {
+    "action_type": "paste",
+    "text": "",
+    "click_position": null
+  }
+}

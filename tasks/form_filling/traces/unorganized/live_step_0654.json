@@ -1,0 +1,76 @@
+{
+  "trace_id": "live_step_0654",
+  "timestamp": "2026-03-21T10:00:26.086992",
+  "duration": 1.063337,
+  "type": "excel",
+  "state": {
+    "application": "Microsoft Excel",
+    "window_title": "",
+    "screen_resolution": [
+      1920,
+      1200
+    ],
+    "focused_element_id": null,
+    "elements": [],
+    "excel_context": {}
+  },
+  "next_state": {
+    "application": "Microsoft Excel",
+    "window_title": "",
+    "screen_resolution": [
+      1920,
+      1200
+    ],
+    "focused_element_id": null,
+    "elements": [],
+    "excel_context": {}
+  },
+  "mouse": {
+    "actions": [
+      {
+        "id": "mouse_action_0389",
+        "position": [
+          1675,
+          469
+        ],
+        "type": "click",
+        "timestamp": "2026-03-21T10:00:26.736965"
+      }
+    ]
+  },
+  "keyboard": {
+    "actions": [
+      {
+        "strokes": [
+          {
+            "key": "Key.ctrl_l",
+            "timestamp": "2026-03-21T10:00:26.776154"
+          },
+          {
+            "key": "\u0016",
+            "timestamp": "2026-03-21T10:00:26.853412",
+            "pasted_text": "Greg Holbrook — (615) 882-4451"
+          }
+        ]
+      }
+    ]
+  },
+  "clipboard": {
+    "events": [
+      {
+        "event": "paste",
+        "content": "Greg Holbrook — (615) 882-4451",
+        "timestamp": "2026-03-21T10:00:26.853428"
+      }
+    ]
+  },
+  "diff": {},
+  "action": {
+    "action_type": "paste",
+    "text": "",
+    "click_position": [
+      1675,
+      469
+    ]
+  }
+}

@@ -1,0 +1,75 @@
+{
+  "trace_id": "live_step_0403",
+  "timestamp": "2026-03-21T09:56:01.785091",
+  "duration": 1.04249,
+  "type": "excel",
+  "state": {
+    "application": "Microsoft Excel",
+    "window_title": "",
+    "screen_resolution": [
+      1920,
+      1200
+    ],
+    "focused_element_id": null,
+    "elements": [],
+    "excel_context": {}
+  },
+  "next_state": {
+    "application": "Microsoft Excel",
+    "window_title": "",
+    "screen_resolution": [
+      1920,
+      1200
+    ],
+    "focused_element_id": null,
+    "elements": [],
+    "excel_context": {}
+  },
+  "mouse": {
+    "actions": [
+      {
+        "id": "mouse_action_0153",
+        "position": [
+          1058,
+          786
+        ],
+        "type": "drag",
+        "timestamp": "2026-03-21T09:56:01.975978"
+      }
+    ]
+  },
+  "keyboard": {
+    "actions": [
+      {
+        "strokes": [
+          {
+            "key": "Key.ctrl_l",
+            "timestamp": "2026-03-21T09:56:01.992930"
+          },
+          {
+            "key": "\u0003",
+            "timestamp": "2026-03-21T09:56:02.165493"
+          }
+        ]
+      }
+    ]
+  },
+  "clipboard": {
+    "events": [
+      {
+        "event": "copy",
+        "content": "Paul Fitzgerald — (901) 440-8812",
+        "timestamp": "2026-03-21T09:56:02.247704"
+      }
+    ]
+  },
+  "diff": {},
+  "action": {
+    "action_type": "paste",
+    "text": "",
+    "click_position": [
+      1058,
+      786
+    ]
+  }
+}

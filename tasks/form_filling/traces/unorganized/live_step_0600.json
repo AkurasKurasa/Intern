@@ -1,0 +1,76 @@
+{
+  "trace_id": "live_step_0600",
+  "timestamp": "2026-03-21T09:59:29.224815",
+  "duration": 1.058509,
+  "type": "excel",
+  "state": {
+    "application": "Microsoft Excel",
+    "window_title": "",
+    "screen_resolution": [
+      1920,
+      1200
+    ],
+    "focused_element_id": null,
+    "elements": [],
+    "excel_context": {}
+  },
+  "next_state": {
+    "application": "Microsoft Excel",
+    "window_title": "",
+    "screen_resolution": [
+      1920,
+      1200
+    ],
+    "focused_element_id": null,
+    "elements": [],
+    "excel_context": {}
+  },
+  "mouse": {
+    "actions": [
+      {
+        "id": "mouse_action_0339",
+        "position": [
+          80,
+          467
+        ],
+        "type": "click",
+        "timestamp": "2026-03-21T09:59:30.003987"
+      }
+    ]
+  },
+  "keyboard": {
+    "actions": [
+      {
+        "strokes": [
+          {
+            "key": "Key.ctrl_l",
+            "timestamp": "2026-03-21T09:59:30.101234"
+          },
+          {
+            "key": "\u0016",
+            "timestamp": "2026-03-21T09:59:30.165152",
+            "pasted_text": "Holbrook"
+          }
+        ]
+      }
+    ]
+  },
+  "clipboard": {
+    "events": [
+      {
+        "event": "paste",
+        "content": "Holbrook",
+        "timestamp": "2026-03-21T09:59:30.165164"
+      }
+    ]
+  },
+  "diff": {},
+  "action": {
+    "action_type": "paste",
+    "text": "",
+    "click_position": [
+      80,
+      467
+    ]
+  }
+}

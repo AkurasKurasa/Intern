@@ -1,0 +1,200 @@
+{
+  "trace_id": "live_step_0307",
+  "timestamp": "2026-03-22T14:23:15.348300",
+  "duration": 1.078408,
+  "type": "gui",
+  "state": {
+    "application": "python.exe",
+    "window_title": "Car Insurance — Data Entry Form",
+    "process_id": 26172,
+    "screen_resolution": [
+      1920,
+      1200
+    ],
+    "focused_element_id": null,
+    "source": "uia",
+    "elements": [
+      {
+        "element_id": "elem_0",
+        "type": "windowcontrol",
+        "control_type": "WindowControl",
+        "bbox": [
+          -9,
+          -9,
+          1929,
+          1149
+        ],
+        "text": "Settings",
+        "value": "",
+        "label": "Settings",
+        "automation_id": "",
+        "class_name": "ApplicationFrameWindow",
+        "enabled": true,
+        "visible": true,
+        "focused": false,
+        "confidence": 1.0,
+        "source": "uia",
+        "app": "ApplicationFrameHost.exe",
+        "window_title": "Settings",
+        "window_role": "background",
+        "pid": 29604,
+        "metadata": {
+          "depth": 0,
+          "ctrl_type": "WindowControl"
+        }
+      },
+      {
+        "element_id": "elem_1",
+        "type": "panecontrol",
+        "control_type": "PaneControl",
+        "bbox": [
+          0,
+          0,
+          1920,
+          1200
+        ],
+        "text": "NVIDIA GeForce Overlay",
+        "value": "",
+        "label": "NVIDIA GeForce Overlay",
+        "automation_id": "",
+        "class_name": "CEF-OSC-WIDGET",
+        "enabled": true,
+        "visible": true,
+        "focused": false,
+        "confidence": 1.0,
+        "source": "uia",
+        "app": "NVIDIA Share.exe",
+        "window_title": "NVIDIA GeForce Overlay",
+        "window_role": "background",
+        "pid": 27356,
+        "metadata": {
+          "depth": 0,
+          "ctrl_type": "PaneControl"
+        }
+      }
+    ]
+  },
+  "next_state": {
+    "application": "python.exe",
+    "window_title": "Car Insurance — Data Entry Form",
+    "process_id": 26172,
+    "screen_resolution": [
+      1920,
+      1200
+    ],
+    "focused_element_id": null,
+    "source": "uia",
+    "elements": [
+      {
+        "element_id": "elem_0",
+        "type": "windowcontrol",
+        "control_type": "WindowControl",
+        "bbox": [
+          -9,
+          -9,
+          1929,
+          1149
+        ],
+        "text": "Settings",
+        "value": "",
+        "label": "Settings",
+        "automation_id": "",
+        "class_name": "ApplicationFrameWindow",
+        "enabled": true,
+        "visible": true,
+        "focused": false,
+        "confidence": 1.0,
+        "source": "uia",
+        "app": "ApplicationFrameHost.exe",
+        "window_title": "Settings",
+        "window_role": "background",
+        "pid": 29604,
+        "metadata": {
+          "depth": 0,
+          "ctrl_type": "WindowControl"
+        }
+      },
+      {
+        "element_id": "elem_1",
+        "type": "panecontrol",
+        "control_type": "PaneControl",
+        "bbox": [
+          0,
+          0,
+          1920,
+          1200
+        ],
+        "text": "NVIDIA GeForce Overlay",
+        "value": "",
+        "label": "NVIDIA GeForce Overlay",
+        "automation_id": "",
+        "class_name": "CEF-OSC-WIDGET",
+        "enabled": true,
+        "visible": true,
+        "focused": false,
+        "confidence": 1.0,
+        "source": "uia",
+        "app": "NVIDIA Share.exe",
+        "window_title": "NVIDIA GeForce Overlay",
+        "window_role": "background",
+        "pid": 27356,
+        "metadata": {
+          "depth": 0,
+          "ctrl_type": "PaneControl"
+        }
+      }
+    ]
+  },
+  "mouse": {
+    "actions": []
+  },
+  "keyboard": {
+    "actions": [
+      {
+        "strokes": [
+          {
+            "key": "Key.shift",
+            "timestamp": "2026-03-22T14:23:15.350103"
+          },
+          {
+            "key": "A",
+            "timestamp": "2026-03-22T14:23:15.573837"
+          },
+          {
+            "key": "c",
+            "timestamp": "2026-03-22T14:23:15.750416"
+          },
+          {
+            "key": "c",
+            "timestamp": "2026-03-22T14:23:15.913569"
+          },
+          {
+            "key": "o",
+            "timestamp": "2026-03-22T14:23:15.998321"
+          },
+          {
+            "key": "r",
+            "timestamp": "2026-03-22T14:23:16.126053"
+          }
+        ]
+      }
+    ]
+  },
+  "clipboard": {
+    "events": []
+  },
+  "diff": {},
+  "action": {
+    "action_type": "keyboard",
+    "text": "Accor",
+    "keystrokes": [
+      "Key.shift",
+      "A",
+      "c",
+      "c",
+      "o",
+      "r"
+    ],
+    "click_position": null
+  }
+}

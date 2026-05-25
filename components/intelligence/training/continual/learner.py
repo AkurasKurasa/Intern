@@ -38,7 +38,7 @@ Flow
 Usage
 -----
   learner = ContinualLearner(
-      model_path = "data/models/transformer_bc.pt",
+      model_path = "tasks/form_filling/model.pt",
       trace_dir  = "data/output/traces/live",
   )
   learner.start()   # begins watching in background
@@ -91,7 +91,7 @@ class ContinualLearner:
 
     def __init__(
         self,
-        model_path:         str   = "data/models/transformer_bc.pt",
+        model_path:         str   = "tasks/form_filling/model.pt",
         trace_dir:          str   = "data/output/traces/live",
         retrain_every:      int   = 20,
         replay_buffer_size: int   = 200,

@@ -15,12 +15,12 @@ Keyboard strokes and text are left untouched — text is deterministic.
 Structural fields (element_id, type, window_role, etc.) are unchanged.
 
 Output mirrors the source session folder structure under a new root:
-  data/output/traces/forms/session_XXXX/  →  data/output/traces/forms_aug/session_XXXX_augN/
+  tasks/form_filling/traces/session_XXXX/  →  tasks/form_filling/traces_aug/session_XXXX_augN/
 
 Usage
 -----
   python scripts/augment_traces.py
-  python scripts/augment_traces.py --source data/output/traces/forms --dest data/output/traces/forms_aug --copies 4
+  python scripts/augment_traces.py --source tasks/form_filling/traces --dest tasks/form_filling/traces_aug --copies 4
 """
 
 from __future__ import annotations
@@ -137,9 +137,9 @@ def augment_session(session_dir: Path, dest_root: Path, copies: int) -> int:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Augment trace sessions")
-    parser.add_argument("--source", default="data/output/traces/forms",
+    parser.add_argument("--source", default="tasks/form_filling/traces",
                         help="Source directory containing session_* folders")
-    parser.add_argument("--dest",   default="data/output/traces/forms_aug",
+    parser.add_argument("--dest",   default="tasks/form_filling/traces_aug",
                         help="Output directory for augmented sessions")
     parser.add_argument("--copies", default=4, type=int,
                         help="Augmented copies per session (default 4 → 5x total data)")

@@ -1,0 +1,84 @@
+{
+  "trace_id": "live_step_0577",
+  "timestamp": "2026-03-21T09:59:05.003958",
+  "duration": 1.062558,
+  "type": "excel",
+  "state": {
+    "application": "Microsoft Excel",
+    "window_title": "",
+    "screen_resolution": [
+      1920,
+      1200
+    ],
+    "focused_element_id": null,
+    "elements": [],
+    "excel_context": {}
+  },
+  "next_state": {
+    "application": "Microsoft Excel",
+    "window_title": "",
+    "screen_resolution": [
+      1920,
+      1200
+    ],
+    "focused_element_id": null,
+    "elements": [],
+    "excel_context": {}
+  },
+  "mouse": {
+    "actions": [
+      {
+        "id": "mouse_action_0315",
+        "position": [
+          1152,
+          425
+        ],
+        "type": "click",
+        "timestamp": "2026-03-21T09:59:05.406286"
+      }
+    ]
+  },
+  "keyboard": {
+    "actions": [
+      {
+        "strokes": [
+          {
+            "key": "\u0003",
+            "timestamp": "2026-03-21T09:59:05.018015"
+          },
+          {
+            "key": "Key.ctrl_l",
+            "timestamp": "2026-03-21T09:59:05.709338"
+          },
+          {
+            "key": "\u0003",
+            "timestamp": "2026-03-21T09:59:05.801128"
+          }
+        ]
+      }
+    ]
+  },
+  "clipboard": {
+    "events": [
+      {
+        "event": "copy",
+        "content": "C. Fitzgerald\r\n",
+        "timestamp": "2026-03-21T09:59:05.099713"
+      },
+      {
+        "event": "copy",
+        "content": "Memphis, TN\r\n",
+        "timestamp": "2026-03-21T09:59:05.882352"
+      }
+    ]
+  },
+  "diff": {},
+  "action": {
+    "action_type": "paste",
+    "text": "",
+    "click_position": [
+      1152,
+      425
+    ]
+  }
+}

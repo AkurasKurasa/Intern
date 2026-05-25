@@ -1,0 +1,74 @@
+{
+  "trace_id": "live_step_0128",
+  "timestamp": "2026-05-21T21:15:42.755752",
+  "duration": 1.509227,
+  "type": "gui",
+  "state": {
+    "application": "Unknown",
+    "window_title": "",
+    "process_id": null,
+    "screen_resolution": [
+      0,
+      0
+    ],
+    "focused_element_id": null,
+    "source": "ocr",
+    "elements": []
+  },
+  "mouse": {
+    "actions": [
+      {
+        "id": "mouse_action_0120",
+        "position": [
+          274,
+          496
+        ],
+        "type": "double_click",
+        "timestamp": "2026-05-21T21:15:42.994211"
+      },
+      {
+        "id": "mouse_action_0121",
+        "position": [
+          1093,
+          790
+        ],
+        "type": "click",
+        "timestamp": "2026-05-21T21:15:44.227294"
+      }
+    ]
+  },
+  "keyboard": {
+    "actions": [
+      {
+        "strokes": [
+          {
+            "key": "Key.ctrl_l",
+            "timestamp": "2026-05-21T21:15:43.119763"
+          },
+          {
+            "key": "\u0003",
+            "timestamp": "2026-05-21T21:15:43.214513"
+          }
+        ]
+      }
+    ]
+  },
+  "clipboard": {
+    "events": [
+      {
+        "event": "copy",
+        "content": "38450",
+        "timestamp": "2026-05-21T21:15:43.295584"
+      }
+    ]
+  },
+  "diff": {},
+  "action": {
+    "action_type": "paste",
+    "text": "",
+    "click_position": [
+      1093,
+      790
+    ]
+  }
+}

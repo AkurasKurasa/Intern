@@ -32,9 +32,9 @@ from pathlib import Path
 from typing import Any
 
 ROOT = Path(__file__).resolve().parent.parent
-TRACES_DIR   = ROOT / "data" / "output" / "traces" / "live"
-SUBMISSIONS_DIR = ROOT / "data" / "output" / "submissions"
-SOURCE_FILE  = ROOT / "data_entry_tasks" / "data_entry_intake.txt"
+TRACES_DIR      = ROOT / "tasks" / "form_filling" / "traces" / "live"
+SUBMISSIONS_DIR = ROOT / "tasks" / "form_filling" / "submissions"
+SOURCE_FILE     = ROOT / "data_entry_tasks" / "data_entry_intake.txt"
 
 # Interactive element types (from UIA observer)
 _INTERACTIVE = {

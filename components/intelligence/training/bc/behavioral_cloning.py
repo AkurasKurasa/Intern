@@ -59,7 +59,7 @@ class BCTrainer:
     def __init__(
         self,
         trace_dir:       str   = "data/output/traces/live",
-        save_path:       str   = "data/models/transformer_bc.pt",
+        save_path:       str   = "tasks/form_filling/model.pt",
         epochs:          int   = 50,
         batch_size:      int   = 16,
         lr:              float = 1e-3,

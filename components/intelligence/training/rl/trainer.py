@@ -30,7 +30,7 @@ Training loop (per episode)
 Usage
 -----
   trainer = RLTrainer(
-      policy_path = "data/models/transformer_bc.pt",
+      policy_path = "tasks/form_filling/model.pt",
       environment = TkinterFormEnvironment(fields, source_data),
       reward_fn   = RewardFunction(target_data),
   )

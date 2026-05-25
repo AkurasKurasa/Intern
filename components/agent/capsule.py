@@ -15,7 +15,7 @@ from typing import List, Optional
 
 REGISTRY_PATH = os.path.join(
     os.path.dirname(os.path.abspath(__file__)),
-    "..", "..", "data", "capsules", "registry.json"
+    "..", "..", "tasks", "registry.json"
 )
 
 
@@ -55,7 +55,7 @@ class CapsuleRegistry:
         self._save()
 
     def route(self, goal: str, window_title: str,
-              fallback: str = "data/models/transformer_bc.pt") -> str:
+              fallback: str = "tasks/form_filling/model.pt") -> str:
         """Return model_path for best matching capsule, or fallback."""
         goal_lower  = goal.lower()
         title_lower = window_title.lower()

@@ -1,0 +1,83 @@
+{
+  "trace_id": "live_step_0457",
+  "timestamp": "2026-03-21T09:56:58.440592",
+  "duration": 1.048145,
+  "type": "excel",
+  "state": {
+    "application": "Microsoft Excel",
+    "window_title": "",
+    "screen_resolution": [
+      1920,
+      1200
+    ],
+    "focused_element_id": null,
+    "elements": [],
+    "excel_context": {}
+  },
+  "next_state": {
+    "application": "Microsoft Excel",
+    "window_title": "",
+    "screen_resolution": [
+      1920,
+      1200
+    ],
+    "focused_element_id": null,
+    "elements": [],
+    "excel_context": {}
+  },
+  "mouse": {
+    "actions": [
+      {
+        "id": "mouse_action_0203",
+        "position": [
+          1221,
+          402
+        ],
+        "type": "click",
+        "timestamp": "2026-03-21T09:56:58.925455"
+      }
+    ]
+  },
+  "keyboard": {
+    "actions": [
+      {
+        "strokes": [
+          {
+            "key": "Key.shift",
+            "timestamp": "2026-03-21T09:56:58.908931"
+          },
+          {
+            "key": "S",
+            "timestamp": "2026-03-21T09:56:58.997662"
+          },
+          {
+            "key": "a",
+            "timestamp": "2026-03-21T09:56:59.169638"
+          },
+          {
+            "key": "l",
+            "timestamp": "2026-03-21T09:56:59.477451"
+          }
+        ]
+      }
+    ]
+  },
+  "clipboard": {
+    "events": []
+  },
+  "diff": {},
+  "action": {
+    "action_type": "keyboard",
+    "text": "Sal",
+    "keystrokes": [
+      "Key.shift",
+      "S",
+      "a",
+      "l"
+    ],
+    "click_position": [
+      1221,
+      402
+    ]
+  }
+}

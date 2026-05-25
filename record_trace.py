@@ -123,7 +123,7 @@ def main():
             extractor = RuleExtractor(
                 provider   = args.provider,
                 api_key    = api_key,
-                output_dir = "data/output/rulesets",
+                output_dir = "tasks/form_filling",
             )
             extractor.correct(
                 session_dir = session_dir,

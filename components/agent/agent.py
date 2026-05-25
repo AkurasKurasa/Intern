@@ -467,7 +467,7 @@ class LLMAgent:
         api_key:       Optional[str]  = None,
         model_id:      Optional[str]  = None,
         lmstudio_url:  str            = "http://localhost:1234/v1",
-        model_path:    str            = "data/models/transformer_bc.pt",
+        model_path:    str            = "tasks/form_filling/model.pt",
         dry_run:       bool           = False,
         max_steps:     int            = 50,
         step_delay:    float          = 1.2,
@@ -587,7 +587,7 @@ class LLMAgent:
         self._system_prompt: str = _SYSTEM_PROMPT
         _spec_path = os.path.join(
             os.path.dirname(os.path.abspath(__file__)),  # components/agent/
-            "..", "..", "data", "output", "rulesets", "form_filling.md",
+            "..", "..", "tasks", "form_filling", "ruleset.md",
         )
         _spec_path = os.path.normpath(_spec_path)
         if os.path.exists(_spec_path):

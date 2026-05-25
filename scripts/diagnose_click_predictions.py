@@ -14,7 +14,7 @@ diagnose_click_predictions.py — answer two questions about the plateau:
 Usage:
     python scripts/diagnose_click_predictions.py \
         --data_dir C:/Users/Ralph/Downloads/fourpointfive-k \
-        --checkpoint data/models/transformer_bc.pt
+        --checkpoint tasks/form_filling/model.pt
 """
 from __future__ import annotations
 
@@ -49,7 +49,7 @@ def elem_signature(elem):
 def main():
     p = argparse.ArgumentParser()
     p.add_argument("--data_dir", default="C:/Users/Ralph/Downloads/fourpointfive-k")
-    p.add_argument("--checkpoint", default="data/models/transformer_bc.pt")
+    p.add_argument("--checkpoint", default="tasks/form_filling/model.pt")
     p.add_argument("--max_elements", type=int, default=128)
     p.add_argument("--hist_len", type=int, default=4)
     p.add_argument("--val_split", type=float, default=0.2)

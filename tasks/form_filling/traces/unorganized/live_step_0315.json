@@ -1,0 +1,105 @@
+{
+  "trace_id": "live_step_0315",
+  "timestamp": "2026-03-21T09:54:28.787933",
+  "duration": 1.064744,
+  "type": "excel",
+  "state": {
+    "application": "Microsoft Excel",
+    "window_title": "",
+    "screen_resolution": [
+      1920,
+      1200
+    ],
+    "focused_element_id": null,
+    "elements": [],
+    "excel_context": {}
+  },
+  "next_state": {
+    "application": "Microsoft Excel",
+    "window_title": "",
+    "screen_resolution": [
+      1920,
+      1200
+    ],
+    "focused_element_id": null,
+    "elements": [],
+    "excel_context": {}
+  },
+  "mouse": {
+    "actions": []
+  },
+  "keyboard": {
+    "actions": [
+      {
+        "strokes": [
+          {
+            "key": "e",
+            "timestamp": "2026-03-21T09:54:28.790878"
+          },
+          {
+            "key": "n",
+            "timestamp": "2026-03-21T09:54:28.885370"
+          },
+          {
+            "key": "e",
+            "timestamp": "2026-03-21T09:54:28.957224"
+          },
+          {
+            "key": "f",
+            "timestamp": "2026-03-21T09:54:29.058719"
+          },
+          {
+            "key": "i",
+            "timestamp": "2026-03-21T09:54:29.109695"
+          },
+          {
+            "key": "t",
+            "timestamp": "2026-03-21T09:54:29.227708"
+          },
+          {
+            "key": "s",
+            "timestamp": "2026-03-21T09:54:29.365016"
+          },
+          {
+            "key": "Key.space",
+            "timestamp": "2026-03-21T09:54:29.444908"
+          },
+          {
+            "key": "Key.shift",
+            "timestamp": "2026-03-21T09:54:29.597453"
+          },
+          {
+            "key": "L",
+            "timestamp": "2026-03-21T09:54:29.733339"
+          },
+          {
+            "key": "e",
+            "timestamp": "2026-03-21T09:54:29.786782"
+          }
+        ]
+      }
+    ]
+  },
+  "clipboard": {
+    "events": []
+  },
+  "diff": {},
+  "action": {
+    "action_type": "keyboard",
+    "text": "enefitsLe",
+    "keystrokes": [
+      "e",
+      "n",
+      "e",
+      "f",
+      "i",
+      "t",
+      "s",
+      "Key.space",
+      "Key.shift",
+      "L",
+      "e"
+    ],
+    "click_position": null
+  }
+}

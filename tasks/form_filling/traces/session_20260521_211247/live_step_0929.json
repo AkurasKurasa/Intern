@@ -1,0 +1,45 @@
+{
+  "trace_id": "live_step_0929",
+  "timestamp": "2026-05-21T21:36:41.185971",
+  "duration": 2.181545,
+  "type": "gui",
+  "state": {
+    "application": "Unknown",
+    "window_title": "",
+    "process_id": null,
+    "screen_resolution": [
+      0,
+      0
+    ],
+    "focused_element_id": null,
+    "source": "ocr",
+    "elements": []
+  },
+  "mouse": {
+    "actions": [
+      {
+        "id": "mouse_action_0935",
+        "position": [
+          1339,
+          1160
+        ],
+        "type": "click",
+        "timestamp": "2026-05-21T21:36:41.465639"
+      }
+    ]
+  },
+  "keyboard": {
+    "actions": []
+  },
+  "clipboard": {
+    "events": []
+  },
+  "diff": {},
+  "action": {
+    "action_type": "click",
+    "click_position": [
+      1339,
+      1160
+    ]
+  }
+}

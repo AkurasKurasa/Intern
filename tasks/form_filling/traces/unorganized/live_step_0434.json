@@ -1,0 +1,76 @@
+{
+  "trace_id": "live_step_0434",
+  "timestamp": "2026-03-21T09:56:34.334337",
+  "duration": 1.045858,
+  "type": "excel",
+  "state": {
+    "application": "Microsoft Excel",
+    "window_title": "",
+    "screen_resolution": [
+      1920,
+      1200
+    ],
+    "focused_element_id": null,
+    "elements": [],
+    "excel_context": {}
+  },
+  "next_state": {
+    "application": "Microsoft Excel",
+    "window_title": "",
+    "screen_resolution": [
+      1920,
+      1200
+    ],
+    "focused_element_id": null,
+    "elements": [],
+    "excel_context": {}
+  },
+  "mouse": {
+    "actions": [
+      {
+        "id": "mouse_action_0176",
+        "position": [
+          425,
+          396
+        ],
+        "type": "click",
+        "timestamp": "2026-03-21T09:56:34.361980"
+      }
+    ]
+  },
+  "keyboard": {
+    "actions": [
+      {
+        "strokes": [
+          {
+            "key": "Key.ctrl_l",
+            "timestamp": "2026-03-21T09:56:34.376901"
+          },
+          {
+            "key": "\u0016",
+            "timestamp": "2026-03-21T09:56:34.462055",
+            "pasted_text": "Regional Account Manager"
+          }
+        ]
+      }
+    ]
+  },
+  "clipboard": {
+    "events": [
+      {
+        "event": "paste",
+        "content": "Regional Account Manager",
+        "timestamp": "2026-03-21T09:56:34.462069"
+      }
+    ]
+  },
+  "diff": {},
+  "action": {
+    "action_type": "paste",
+    "text": "",
+    "click_position": [
+      425,
+      396
+    ]
+  }
+}

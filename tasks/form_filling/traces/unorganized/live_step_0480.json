@@ -1,0 +1,85 @@
+{
+  "trace_id": "live_step_0480",
+  "timestamp": "2026-03-21T09:57:22.622657",
+  "duration": 1.063608,
+  "type": "excel",
+  "state": {
+    "application": "Microsoft Excel",
+    "window_title": "",
+    "screen_resolution": [
+      1920,
+      1200
+    ],
+    "focused_element_id": null,
+    "elements": [],
+    "excel_context": {}
+  },
+  "next_state": {
+    "application": "Microsoft Excel",
+    "window_title": "",
+    "screen_resolution": [
+      1920,
+      1200
+    ],
+    "focused_element_id": null,
+    "elements": [],
+    "excel_context": {}
+  },
+  "mouse": {
+    "actions": []
+  },
+  "keyboard": {
+    "actions": [
+      {
+        "strokes": [
+          {
+            "key": "F",
+            "timestamp": "2026-03-21T09:57:22.670458"
+          },
+          {
+            "key": "i",
+            "timestamp": "2026-03-21T09:57:22.805156"
+          },
+          {
+            "key": "n",
+            "timestamp": "2026-03-21T09:57:22.901451"
+          },
+          {
+            "key": "a",
+            "timestamp": "2026-03-21T09:57:22.981263"
+          },
+          {
+            "key": "n",
+            "timestamp": "2026-03-21T09:57:23.097035"
+          },
+          {
+            "key": "c",
+            "timestamp": "2026-03-21T09:57:23.117348"
+          },
+          {
+            "key": "e",
+            "timestamp": "2026-03-21T09:57:23.189382"
+          }
+        ]
+      }
+    ]
+  },
+  "clipboard": {
+    "events": []
+  },
+  "diff": {},
+  "action": {
+    "action_type": "keyboard",
+    "text": "Finance",
+    "keystrokes": [
+      "F",
+      "i",
+      "n",
+      "a",
+      "n",
+      "c",
+      "e"
+    ],
+    "click_position": null
+  }
+}

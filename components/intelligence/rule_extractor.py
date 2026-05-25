@@ -27,7 +27,7 @@ from typing import Any, Dict, List, Optional
 logger = logging.getLogger(__name__)
 
 # Single persistent task spec — overwritten (not appended) after each session
-PERSISTENT_RULESET_NAME = "form_filling.md"
+PERSISTENT_RULESET_NAME = "ruleset.md"
 
 # ── system prompts ─────────────────────────────────────────────────────────────
 
@@ -286,7 +286,7 @@ class RuleExtractor:
         self,
         provider:   str = "lmstudio",
         api_key:    str = "",
-        output_dir: str = "data/output/rulesets",
+        output_dir: str = "tasks/form_filling",
     ):
         self.provider   = provider
         self.api_key    = api_key

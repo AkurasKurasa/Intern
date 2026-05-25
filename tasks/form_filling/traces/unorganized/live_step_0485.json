@@ -1,0 +1,76 @@
+{
+  "trace_id": "live_step_0485",
+  "timestamp": "2026-03-21T09:57:27.877607",
+  "duration": 1.061409,
+  "type": "excel",
+  "state": {
+    "application": "Microsoft Excel",
+    "window_title": "",
+    "screen_resolution": [
+      1920,
+      1200
+    ],
+    "focused_element_id": null,
+    "elements": [],
+    "excel_context": {}
+  },
+  "next_state": {
+    "application": "Microsoft Excel",
+    "window_title": "",
+    "screen_resolution": [
+      1920,
+      1200
+    ],
+    "focused_element_id": null,
+    "elements": [],
+    "excel_context": {}
+  },
+  "mouse": {
+    "actions": [
+      {
+        "id": "mouse_action_0227",
+        "position": [
+          537,
+          423
+        ],
+        "type": "click",
+        "timestamp": "2026-03-21T09:57:28.306785"
+      }
+    ]
+  },
+  "keyboard": {
+    "actions": [
+      {
+        "strokes": [
+          {
+            "key": "Key.ctrl_l",
+            "timestamp": "2026-03-21T09:57:28.317454"
+          },
+          {
+            "key": "\u0016",
+            "timestamp": "2026-03-21T09:57:28.405438",
+            "pasted_text": "Accounts Payable Specialist"
+          }
+        ]
+      }
+    ]
+  },
+  "clipboard": {
+    "events": [
+      {
+        "event": "paste",
+        "content": "Accounts Payable Specialist",
+        "timestamp": "2026-03-21T09:57:28.405453"
+      }
+    ]
+  },
+  "diff": {},
+  "action": {
+    "action_type": "paste",
+    "text": "",
+    "click_position": [
+      537,
+      423
+    ]
+  }
+}

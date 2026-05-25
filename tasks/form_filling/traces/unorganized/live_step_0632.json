@@ -1,0 +1,75 @@
+{
+  "trace_id": "live_step_0632",
+  "timestamp": "2026-03-21T10:00:02.911755",
+  "duration": 1.052673,
+  "type": "excel",
+  "state": {
+    "application": "Microsoft Excel",
+    "window_title": "",
+    "screen_resolution": [
+      1920,
+      1200
+    ],
+    "focused_element_id": null,
+    "elements": [],
+    "excel_context": {}
+  },
+  "next_state": {
+    "application": "Microsoft Excel",
+    "window_title": "",
+    "screen_resolution": [
+      1920,
+      1200
+    ],
+    "focused_element_id": null,
+    "elements": [],
+    "excel_context": {}
+  },
+  "mouse": {
+    "actions": [
+      {
+        "id": "mouse_action_0370",
+        "position": [
+          993,
+          540
+        ],
+        "type": "double_click",
+        "timestamp": "2026-03-21T10:00:03.416390"
+      }
+    ]
+  },
+  "keyboard": {
+    "actions": [
+      {
+        "strokes": [
+          {
+            "key": "Key.ctrl_l",
+            "timestamp": "2026-03-21T10:00:03.453049"
+          },
+          {
+            "key": "\u0003",
+            "timestamp": "2026-03-21T10:00:03.601257"
+          }
+        ]
+      }
+    ]
+  },
+  "clipboard": {
+    "events": [
+      {
+        "event": "copy",
+        "content": "Remote",
+        "timestamp": "2026-03-21T10:00:03.684157"
+      }
+    ]
+  },
+  "diff": {},
+  "action": {
+    "action_type": "paste",
+    "text": "",
+    "click_position": [
+      993,
+      540
+    ]
+  }
+}

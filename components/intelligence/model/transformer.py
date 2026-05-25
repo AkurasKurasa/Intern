@@ -919,7 +919,7 @@ def train(
     max_elements: int = 128,
     hist_len: int = 4,
     val_split: float = 0.2,
-    save_path: str = "data/models/transformer_bc.pt",
+    save_path: str = "tasks/form_filling/model.pt",
     lambda_click: float = 2.0,
     lambda_key: float = 0.5,
     label_smoothing: float = 0.1,
@@ -1133,7 +1133,7 @@ def _load_model(model_path: str, device: torch.device) -> TransformerAgentNetwor
 def predict(
     state: dict,
     history: Optional[List[Dict[str, Any]]] = None,
-    model_path: str = "data/models/transformer_bc.pt",
+    model_path: str = "tasks/form_filling/model.pt",
     device_str: str = "auto",
     clear_cache: bool = False,
 ) -> Dict[str, Any]:
@@ -1246,7 +1246,7 @@ def _parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="TransformerAgentNetwork — train or predict")
     p.add_argument("--mode",            choices=["train", "predict"], default="train")
     # Shared
-    p.add_argument("--model_path",      default="data/models/transformer_bc.pt")
+    p.add_argument("--model_path",      default="tasks/form_filling/model.pt")
     p.add_argument("--device",          default="auto", dest="device_str")
     # Train args
     p.add_argument("--data_dir",        default="data/output/traces/live")

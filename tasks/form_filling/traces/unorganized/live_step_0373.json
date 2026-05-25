@@ -1,0 +1,75 @@
+{
+  "trace_id": "live_step_0373",
+  "timestamp": "2026-03-21T09:55:30.134032",
+  "duration": 1.050977,
+  "type": "excel",
+  "state": {
+    "application": "Microsoft Excel",
+    "window_title": "",
+    "screen_resolution": [
+      1920,
+      1200
+    ],
+    "focused_element_id": null,
+    "elements": [],
+    "excel_context": {}
+  },
+  "next_state": {
+    "application": "Microsoft Excel",
+    "window_title": "",
+    "screen_resolution": [
+      1920,
+      1200
+    ],
+    "focused_element_id": null,
+    "elements": [],
+    "excel_context": {}
+  },
+  "mouse": {
+    "actions": [
+      {
+        "id": "mouse_action_0115",
+        "position": [
+          1086,
+          754
+        ],
+        "type": "drag",
+        "timestamp": "2026-03-21T09:55:30.848850"
+      }
+    ]
+  },
+  "keyboard": {
+    "actions": [
+      {
+        "strokes": [
+          {
+            "key": "Key.ctrl_l",
+            "timestamp": "2026-03-21T09:55:30.840909"
+          },
+          {
+            "key": "\u0003",
+            "timestamp": "2026-03-21T09:55:30.994212"
+          }
+        ]
+      }
+    ]
+  },
+  "clipboard": {
+    "events": [
+      {
+        "event": "copy",
+        "content": "R. Okonkwo",
+        "timestamp": "2026-03-21T09:55:31.075259"
+      }
+    ]
+  },
+  "diff": {},
+  "action": {
+    "action_type": "paste",
+    "text": "",
+    "click_position": [
+      1086,
+      754
+    ]
+  }
+}

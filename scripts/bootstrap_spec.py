@@ -9,7 +9,7 @@ LLM's best understanding of the task derived from all human demonstrations.
 
 Usage:
     python scripts/bootstrap_spec.py
-    python scripts/bootstrap_spec.py --traces_dir data/output/traces/forms --provider lmstudio
+    python scripts/bootstrap_spec.py --traces_dir tasks/form_filling/traces --provider lmstudio
 """
 
 from __future__ import annotations
@@ -40,10 +40,10 @@ TASK_NAME = "form_filling"
 
 def main():
     parser = argparse.ArgumentParser(description="Bootstrap task spec from existing sessions.")
-    parser.add_argument("--traces_dir", default="data/output/traces/forms")
+    parser.add_argument("--traces_dir", default="tasks/form_filling/traces")
     parser.add_argument("--provider",   default="lmstudio",
                         choices=["lmstudio", "anthropic", "groq"])
-    parser.add_argument("--output_dir", default="data/output/rulesets")
+    parser.add_argument("--output_dir", default="tasks/form_filling")
     parser.add_argument("--min_traces", type=int, default=5,
                         help="Skip sessions with fewer than this many trace files.")
     args = parser.parse_args()

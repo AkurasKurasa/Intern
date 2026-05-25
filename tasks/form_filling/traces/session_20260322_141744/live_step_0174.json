@@ -1,0 +1,193 @@
+{
+  "trace_id": "live_step_0174",
+  "timestamp": "2026-03-22T14:20:52.125514",
+  "duration": 1.08044,
+  "type": "gui",
+  "state": {
+    "application": "Antigravity.exe",
+    "window_title": "Intern - Antigravity - data_entry_intake.txt",
+    "process_id": 22944,
+    "screen_resolution": [
+      1920,
+      1200
+    ],
+    "focused_element_id": null,
+    "source": "uia",
+    "elements": [
+      {
+        "element_id": "elem_0",
+        "type": "windowcontrol",
+        "control_type": "WindowControl",
+        "bbox": [
+          -9,
+          -9,
+          1929,
+          1149
+        ],
+        "text": "Settings",
+        "value": "",
+        "label": "Settings",
+        "automation_id": "",
+        "class_name": "ApplicationFrameWindow",
+        "enabled": true,
+        "visible": true,
+        "focused": false,
+        "confidence": 1.0,
+        "source": "uia",
+        "app": "ApplicationFrameHost.exe",
+        "window_title": "Settings",
+        "window_role": "background",
+        "pid": 29604,
+        "metadata": {
+          "depth": 0,
+          "ctrl_type": "WindowControl"
+        }
+      },
+      {
+        "element_id": "elem_1",
+        "type": "panecontrol",
+        "control_type": "PaneControl",
+        "bbox": [
+          0,
+          0,
+          1920,
+          1200
+        ],
+        "text": "NVIDIA GeForce Overlay",
+        "value": "",
+        "label": "NVIDIA GeForce Overlay",
+        "automation_id": "",
+        "class_name": "CEF-OSC-WIDGET",
+        "enabled": true,
+        "visible": true,
+        "focused": false,
+        "confidence": 1.0,
+        "source": "uia",
+        "app": "NVIDIA Share.exe",
+        "window_title": "NVIDIA GeForce Overlay",
+        "window_role": "background",
+        "pid": 27356,
+        "metadata": {
+          "depth": 0,
+          "ctrl_type": "PaneControl"
+        }
+      }
+    ]
+  },
+  "next_state": {
+    "application": "Antigravity.exe",
+    "window_title": "Intern - Antigravity - data_entry_intake.txt",
+    "process_id": 22944,
+    "screen_resolution": [
+      1920,
+      1200
+    ],
+    "focused_element_id": null,
+    "source": "uia",
+    "elements": [
+      {
+        "element_id": "elem_0",
+        "type": "windowcontrol",
+        "control_type": "WindowControl",
+        "bbox": [
+          -9,
+          -9,
+          1929,
+          1149
+        ],
+        "text": "Settings",
+        "value": "",
+        "label": "Settings",
+        "automation_id": "",
+        "class_name": "ApplicationFrameWindow",
+        "enabled": true,
+        "visible": true,
+        "focused": false,
+        "confidence": 1.0,
+        "source": "uia",
+        "app": "ApplicationFrameHost.exe",
+        "window_title": "Settings",
+        "window_role": "background",
+        "pid": 29604,
+        "metadata": {
+          "depth": 0,
+          "ctrl_type": "WindowControl"
+        }
+      },
+      {
+        "element_id": "elem_1",
+        "type": "panecontrol",
+        "control_type": "PaneControl",
+        "bbox": [
+          0,
+          0,
+          1920,
+          1200
+        ],
+        "text": "NVIDIA GeForce Overlay",
+        "value": "",
+        "label": "NVIDIA GeForce Overlay",
+        "automation_id": "",
+        "class_name": "CEF-OSC-WIDGET",
+        "enabled": true,
+        "visible": true,
+        "focused": false,
+        "confidence": 1.0,
+        "source": "uia",
+        "app": "NVIDIA Share.exe",
+        "window_title": "NVIDIA GeForce Overlay",
+        "window_role": "background",
+        "pid": 27356,
+        "metadata": {
+          "depth": 0,
+          "ctrl_type": "PaneControl"
+        }
+      }
+    ]
+  },
+  "mouse": {
+    "actions": [
+      {
+        "id": "mouse_action_0067",
+        "position": [
+          448,
+          790
+        ],
+        "type": "double_click",
+        "timestamp": "2026-03-22T14:20:52.167918"
+      },
+      {
+        "id": "mouse_action_0068",
+        "position": [
+          619,
+          759
+        ],
+        "type": "click",
+        "timestamp": "2026-03-22T14:20:52.711177"
+      },
+      {
+        "id": "mouse_action_0069",
+        "position": [
+          489,
+          808
+        ],
+        "type": "click",
+        "timestamp": "2026-03-22T14:20:53.190960"
+      }
+    ]
+  },
+  "keyboard": {
+    "actions": []
+  },
+  "clipboard": {
+    "events": []
+  },
+  "diff": {},
+  "action": {
+    "action_type": "click",
+    "click_position": [
+      489,
+      808
+    ]
+  }
+}

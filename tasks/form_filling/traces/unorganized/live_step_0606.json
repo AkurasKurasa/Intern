@@ -1,0 +1,76 @@
+{
+  "trace_id": "live_step_0606",
+  "timestamp": "2026-03-21T09:59:35.526799",
+  "duration": 1.061352,
+  "type": "excel",
+  "state": {
+    "application": "Microsoft Excel",
+    "window_title": "",
+    "screen_resolution": [
+      1920,
+      1200
+    ],
+    "focused_element_id": null,
+    "elements": [],
+    "excel_context": {}
+  },
+  "next_state": {
+    "application": "Microsoft Excel",
+    "window_title": "",
+    "screen_resolution": [
+      1920,
+      1200
+    ],
+    "focused_element_id": null,
+    "elements": [],
+    "excel_context": {}
+  },
+  "mouse": {
+    "actions": [
+      {
+        "id": "mouse_action_0345",
+        "position": [
+          318,
+          469
+        ],
+        "type": "click",
+        "timestamp": "2026-03-21T09:59:36.107007"
+      }
+    ]
+  },
+  "keyboard": {
+    "actions": [
+      {
+        "strokes": [
+          {
+            "key": "Key.ctrl_l",
+            "timestamp": "2026-03-21T09:59:36.151770"
+          },
+          {
+            "key": "\u0016",
+            "timestamp": "2026-03-21T09:59:36.301233",
+            "pasted_text": "Sales"
+          }
+        ]
+      }
+    ]
+  },
+  "clipboard": {
+    "events": [
+      {
+        "event": "paste",
+        "content": "Sales",
+        "timestamp": "2026-03-21T09:59:36.301245"
+      }
+    ]
+  },
+  "diff": {},
+  "action": {
+    "action_type": "paste",
+    "text": "",
+    "click_position": [
+      318,
+      469
+    ]
+  }
+}

@@ -1,0 +1,75 @@
+{
+  "trace_id": "live_step_0610",
+  "timestamp": "2026-03-21T09:59:39.764274",
+  "duration": 1.036966,
+  "type": "excel",
+  "state": {
+    "application": "Microsoft Excel",
+    "window_title": "",
+    "screen_resolution": [
+      1920,
+      1200
+    ],
+    "focused_element_id": null,
+    "elements": [],
+    "excel_context": {}
+  },
+  "next_state": {
+    "application": "Microsoft Excel",
+    "window_title": "",
+    "screen_resolution": [
+      1920,
+      1200
+    ],
+    "focused_element_id": null,
+    "elements": [],
+    "excel_context": {}
+  },
+  "mouse": {
+    "actions": [
+      {
+        "id": "mouse_action_0348",
+        "position": [
+          1148,
+          392
+        ],
+        "type": "drag",
+        "timestamp": "2026-03-21T09:59:40.520583"
+      }
+    ]
+  },
+  "keyboard": {
+    "actions": [
+      {
+        "strokes": [
+          {
+            "key": "Key.ctrl_l",
+            "timestamp": "2026-03-21T09:59:40.513217"
+          },
+          {
+            "key": "\u0003",
+            "timestamp": "2026-03-21T09:59:40.641235"
+          }
+        ]
+      }
+    ]
+  },
+  "clipboard": {
+    "events": [
+      {
+        "event": "copy",
+        "content": "Inside Sales Rep",
+        "timestamp": "2026-03-21T09:59:40.723956"
+      }
+    ]
+  },
+  "diff": {},
+  "action": {
+    "action_type": "paste",
+    "text": "",
+    "click_position": [
+      1148,
+      392
+    ]
+  }
+}

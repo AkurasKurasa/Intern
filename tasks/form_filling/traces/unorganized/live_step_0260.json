@@ -1,0 +1,75 @@
+{
+  "trace_id": "live_step_0260",
+  "timestamp": "2026-03-21T09:53:30.730230",
+  "duration": 1.062862,
+  "type": "excel",
+  "state": {
+    "application": "Microsoft Excel",
+    "window_title": "",
+    "screen_resolution": [
+      1920,
+      1200
+    ],
+    "focused_element_id": null,
+    "elements": [],
+    "excel_context": {}
+  },
+  "next_state": {
+    "application": "Microsoft Excel",
+    "window_title": "",
+    "screen_resolution": [
+      1920,
+      1200
+    ],
+    "focused_element_id": null,
+    "elements": [],
+    "excel_context": {}
+  },
+  "mouse": {
+    "actions": []
+  },
+  "keyboard": {
+    "actions": [
+      {
+        "strokes": [
+          {
+            "key": "t",
+            "timestamp": "2026-03-21T09:53:30.756955"
+          },
+          {
+            "key": "m",
+            "timestamp": "2026-03-21T09:53:30.826638"
+          },
+          {
+            "key": "e",
+            "timestamp": "2026-03-21T09:53:30.941531"
+          },
+          {
+            "key": "n",
+            "timestamp": "2026-03-21T09:53:30.993155"
+          },
+          {
+            "key": "t",
+            "timestamp": "2026-03-21T09:53:31.038982"
+          }
+        ]
+      }
+    ]
+  },
+  "clipboard": {
+    "events": []
+  },
+  "diff": {},
+  "action": {
+    "action_type": "keyboard",
+    "text": "tment",
+    "keystrokes": [
+      "t",
+      "m",
+      "e",
+      "n",
+      "t"
+    ],
+    "click_position": null
+  }
+}

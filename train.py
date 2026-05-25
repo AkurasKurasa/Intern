@@ -14,7 +14,7 @@ Arguments
   --trace_dir   Directory containing trace JSONs / session_* sub-dirs
                 (default: data/output/traces/live)
   --save_path   Where to write the trained checkpoint
-                (default: data/models/transformer_bc.pt)
+                (default: tasks/form_filling/model.pt)
   --epochs      Training epochs (default: 50)
   --batch_size  Mini-batch size (default: 16)
   --lr          Learning rate (default: 1e-3)
@@ -44,7 +44,7 @@ def main():
     )
     parser.add_argument("--trace_dir",  default="data/output/traces/live",
                         help="Trace directory (flat or session_* sub-dirs)")
-    parser.add_argument("--save_path",  default="data/models/transformer_bc.pt",
+    parser.add_argument("--save_path",  default="tasks/form_filling/model.pt",
                         help="Checkpoint output path")
     parser.add_argument("--epochs",     type=int,   default=50)
     parser.add_argument("--batch_size", type=int,   default=16)

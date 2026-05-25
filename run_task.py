@@ -130,6 +130,6 @@ if __name__ == "__main__":
             extractor = RuleExtractor(
                 provider   = PROVIDER,
                 api_key    = API_KEY or os.environ.get("GROQ_API_KEY", ""),
-                output_dir = "data/output/rulesets",
+                output_dir = "tasks/form_filling",
             )
             extractor.extract(results, goal=GOAL, task_name="form_filling")

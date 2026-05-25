@@ -1,0 +1,75 @@
+{
+  "trace_id": "live_step_0378",
+  "timestamp": "2026-03-21T09:55:35.411285",
+  "duration": 1.054676,
+  "type": "excel",
+  "state": {
+    "application": "Microsoft Excel",
+    "window_title": "",
+    "screen_resolution": [
+      1920,
+      1200
+    ],
+    "focused_element_id": null,
+    "elements": [],
+    "excel_context": {}
+  },
+  "next_state": {
+    "application": "Microsoft Excel",
+    "window_title": "",
+    "screen_resolution": [
+      1920,
+      1200
+    ],
+    "focused_element_id": null,
+    "elements": [],
+    "excel_context": {}
+  },
+  "mouse": {
+    "actions": [
+      {
+        "id": "mouse_action_0121",
+        "position": [
+          1100,
+          779
+        ],
+        "type": "drag",
+        "timestamp": "2026-03-21T09:55:36.042199"
+      }
+    ]
+  },
+  "keyboard": {
+    "actions": [
+      {
+        "strokes": [
+          {
+            "key": "Key.ctrl_l",
+            "timestamp": "2026-03-21T09:55:36.041074"
+          },
+          {
+            "key": "\u0003",
+            "timestamp": "2026-03-21T09:55:36.141606"
+          }
+        ]
+      }
+    ]
+  },
+  "clipboard": {
+    "events": [
+      {
+        "event": "copy",
+        "content": "Memphis, TN",
+        "timestamp": "2026-03-21T09:55:36.222510"
+      }
+    ]
+  },
+  "diff": {},
+  "action": {
+    "action_type": "paste",
+    "text": "",
+    "click_position": [
+      1100,
+      779
+    ]
+  }
+}

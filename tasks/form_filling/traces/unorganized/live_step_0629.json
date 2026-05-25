@@ -1,0 +1,85 @@
+{
+  "trace_id": "live_step_0629",
+  "timestamp": "2026-03-21T09:59:59.752543",
+  "duration": 1.061895,
+  "type": "excel",
+  "state": {
+    "application": "Microsoft Excel",
+    "window_title": "",
+    "screen_resolution": [
+      1920,
+      1200
+    ],
+    "focused_element_id": null,
+    "elements": [],
+    "excel_context": {}
+  },
+  "next_state": {
+    "application": "Microsoft Excel",
+    "window_title": "",
+    "screen_resolution": [
+      1920,
+      1200
+    ],
+    "focused_element_id": null,
+    "elements": [],
+    "excel_context": {}
+  },
+  "mouse": {
+    "actions": [
+      {
+        "id": "mouse_action_0366",
+        "position": [
+          1069,
+          467
+        ],
+        "type": "click",
+        "timestamp": "2026-03-21T10:00:00.105995"
+      },
+      {
+        "id": "mouse_action_0367",
+        "position": [
+          1168,
+          543
+        ],
+        "type": "click",
+        "timestamp": "2026-03-21T10:00:00.789437"
+      }
+    ]
+  },
+  "keyboard": {
+    "actions": [
+      {
+        "strokes": [
+          {
+            "key": "Key.ctrl_l",
+            "timestamp": "2026-03-21T10:00:00.121178"
+          },
+          {
+            "key": "\u0016",
+            "timestamp": "2026-03-21T10:00:00.297208",
+            "pasted_text": "L. Vance\r\n"
+          }
+        ]
+      }
+    ]
+  },
+  "clipboard": {
+    "events": [
+      {
+        "event": "paste",
+        "content": "L. Vance\r\n",
+        "timestamp": "2026-03-21T10:00:00.297221"
+      }
+    ]
+  },
+  "diff": {},
+  "action": {
+    "action_type": "paste",
+    "text": "",
+    "click_position": [
+      1168,
+      543
+    ]
+  }
+}

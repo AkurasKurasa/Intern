@@ -1,0 +1,98 @@
+{
+  "trace_id": "live_step_0279",
+  "timestamp": "2026-03-21T09:53:50.803699",
+  "duration": 1.046406,
+  "type": "excel",
+  "state": {
+    "application": "Microsoft Excel",
+    "window_title": "",
+    "screen_resolution": [
+      1920,
+      1200
+    ],
+    "focused_element_id": null,
+    "elements": [],
+    "excel_context": {}
+  },
+  "next_state": {
+    "application": "Microsoft Excel",
+    "window_title": "",
+    "screen_resolution": [
+      1920,
+      1200
+    ],
+    "focused_element_id": null,
+    "elements": [],
+    "excel_context": {}
+  },
+  "mouse": {
+    "actions": [
+      {
+        "id": "mouse_action_0031",
+        "position": [
+          695,
+          350
+        ],
+        "type": "click",
+        "timestamp": "2026-03-21T09:53:50.958472"
+      }
+    ]
+  },
+  "keyboard": {
+    "actions": [
+      {
+        "strokes": [
+          {
+            "key": "Key.shift",
+            "timestamp": "2026-03-21T09:53:50.996754"
+          },
+          {
+            "key": "E",
+            "timestamp": "2026-03-21T09:53:51.138358"
+          },
+          {
+            "key": "n",
+            "timestamp": "2026-03-21T09:53:51.309924"
+          },
+          {
+            "key": "d",
+            "timestamp": "2026-03-21T09:53:51.413324"
+          },
+          {
+            "key": "Key.space",
+            "timestamp": "2026-03-21T09:53:51.649255"
+          },
+          {
+            "key": "Key.shift",
+            "timestamp": "2026-03-21T09:53:51.742910"
+          },
+          {
+            "key": "D",
+            "timestamp": "2026-03-21T09:53:51.781203"
+          }
+        ]
+      }
+    ]
+  },
+  "clipboard": {
+    "events": []
+  },
+  "diff": {},
+  "action": {
+    "action_type": "keyboard",
+    "text": "EndD",
+    "keystrokes": [
+      "Key.shift",
+      "E",
+      "n",
+      "d",
+      "Key.space",
+      "Key.shift",
+      "D"
+    ],
+    "click_position": [
+      695,
+      350
+    ]
+  }
+}

@@ -7,7 +7,7 @@ as a named WorkflowCapsule so the agent loads it automatically.
 Usage
 -----
   python build_capsule.py --name form_filling \
-      --trace_dir data/output/traces/forms \
+      --trace_dir tasks/form_filling/traces \
       --keywords "form,fill,insurance,data entry" \
       --apps "Car Insurance" \
       --description "Fill GUI forms from a data source"

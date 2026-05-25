@@ -75,7 +75,7 @@ def _load_record(data_file: str, record_num: int) -> dict:
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--model_path", default="data/models/transformer_bc.pt")
+    parser.add_argument("--model_path", default="tasks/form_filling/model.pt")
     parser.add_argument("--steps",      type=int,   default=60)
     parser.add_argument("--delay",      type=float, default=1.0)
     parser.add_argument("--countdown",  type=int,   default=5)

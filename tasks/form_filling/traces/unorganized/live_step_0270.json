@@ -1,0 +1,100 @@
+{
+  "trace_id": "live_step_0270",
+  "timestamp": "2026-03-21T09:53:41.303586",
+  "duration": 1.050078,
+  "type": "excel",
+  "state": {
+    "application": "Microsoft Excel",
+    "window_title": "",
+    "screen_resolution": [
+      1920,
+      1200
+    ],
+    "focused_element_id": null,
+    "elements": [],
+    "excel_context": {}
+  },
+  "next_state": {
+    "application": "Microsoft Excel",
+    "window_title": "",
+    "screen_resolution": [
+      1920,
+      1200
+    ],
+    "focused_element_id": null,
+    "elements": [],
+    "excel_context": {}
+  },
+  "mouse": {
+    "actions": []
+  },
+  "keyboard": {
+    "actions": [
+      {
+        "strokes": [
+          {
+            "key": "Key.backspace",
+            "timestamp": "2026-03-21T09:53:41.349037"
+          },
+          {
+            "key": "Key.backspace",
+            "timestamp": "2026-03-21T09:53:41.457356"
+          },
+          {
+            "key": "n",
+            "timestamp": "2026-03-21T09:53:41.645109"
+          },
+          {
+            "key": "t",
+            "timestamp": "2026-03-21T09:53:41.670060"
+          },
+          {
+            "key": "Key.space",
+            "timestamp": "2026-03-21T09:53:41.825378"
+          },
+          {
+            "key": "Key.shift",
+            "timestamp": "2026-03-21T09:53:41.833375"
+          },
+          {
+            "key": "T",
+            "timestamp": "2026-03-21T09:53:41.904960"
+          },
+          {
+            "key": "y",
+            "timestamp": "2026-03-21T09:53:42.077316"
+          },
+          {
+            "key": "p",
+            "timestamp": "2026-03-21T09:53:42.135260"
+          },
+          {
+            "key": "e",
+            "timestamp": "2026-03-21T09:53:42.245258"
+          }
+        ]
+      }
+    ]
+  },
+  "clipboard": {
+    "events": []
+  },
+  "diff": {},
+  "action": {
+    "action_type": "keyboard",
+    "text": "ntType",
+    "keystrokes": [
+      "Key.backspace",
+      "Key.backspace",
+      "n",
+      "t",
+      "Key.space",
+      "Key.shift",
+      "T",
+      "y",
+      "p",
+      "e"
+    ],
+    "click_position": null
+  }
+}

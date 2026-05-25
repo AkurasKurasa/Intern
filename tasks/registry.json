@@ -1,0 +1,22 @@
+{
+  "capsules": [
+    {
+      "name": "form_filling",
+      "description": "Fill GUI forms from a structured data source",
+      "model_path": "tasks/form_filling/model.pt",
+      "trigger_keywords": [
+        "form",
+        "fill",
+        "insurance",
+        "data entry",
+        "intake"
+      ],
+      "trigger_apps": [
+        "Car Insurance",
+        "Data Entry"
+      ],
+      "trace_dir": "tasks/form_filling/traces",
+      "created": "2026-05-17T17:52:45"
+    }
+  ]
+}

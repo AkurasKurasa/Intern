@@ -1,0 +1,103 @@
+{
+  "trace_id": "live_step_0543",
+  "timestamp": "2026-03-21T09:58:29.050629",
+  "duration": 1.045647,
+  "type": "excel",
+  "state": {
+    "application": "Microsoft Excel",
+    "window_title": "",
+    "screen_resolution": [
+      1920,
+      1200
+    ],
+    "focused_element_id": null,
+    "elements": [],
+    "excel_context": {}
+  },
+  "next_state": {
+    "application": "Microsoft Excel",
+    "window_title": "",
+    "screen_resolution": [
+      1920,
+      1200
+    ],
+    "focused_element_id": null,
+    "elements": [],
+    "excel_context": {}
+  },
+  "mouse": {
+    "actions": [
+      {
+        "id": "mouse_action_0281",
+        "position": [
+          307,
+          458
+        ],
+        "type": "click",
+        "timestamp": "2026-03-21T09:58:29.056040"
+      }
+    ]
+  },
+  "keyboard": {
+    "actions": [
+      {
+        "strokes": [
+          {
+            "key": "Key.shift",
+            "timestamp": "2026-03-21T09:58:29.213686"
+          },
+          {
+            "key": "L",
+            "timestamp": "2026-03-21T09:58:29.441496"
+          },
+          {
+            "key": "o",
+            "timestamp": "2026-03-21T09:58:29.649813"
+          },
+          {
+            "key": "g",
+            "timestamp": "2026-03-21T09:58:29.729589"
+          },
+          {
+            "key": "i",
+            "timestamp": "2026-03-21T09:58:29.841411"
+          },
+          {
+            "key": "s",
+            "timestamp": "2026-03-21T09:58:29.913957"
+          },
+          {
+            "key": "t",
+            "timestamp": "2026-03-21T09:58:30.018730"
+          },
+          {
+            "key": "i",
+            "timestamp": "2026-03-21T09:58:30.085080"
+          }
+        ]
+      }
+    ]
+  },
+  "clipboard": {
+    "events": []
+  },
+  "diff": {},
+  "action": {
+    "action_type": "keyboard",
+    "text": "Logisti",
+    "keystrokes": [
+      "Key.shift",
+      "L",
+      "o",
+      "g",
+      "i",
+      "s",
+      "t",
+      "i"
+    ],
+    "click_position": [
+      307,
+      458
+    ]
+  }
+}

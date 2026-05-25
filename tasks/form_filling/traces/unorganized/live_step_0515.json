@@ -1,0 +1,75 @@
+{
+  "trace_id": "live_step_0515",
+  "timestamp": "2026-03-21T09:57:59.532736",
+  "duration": 1.064905,
+  "type": "excel",
+  "state": {
+    "application": "Microsoft Excel",
+    "window_title": "",
+    "screen_resolution": [
+      1920,
+      1200
+    ],
+    "focused_element_id": null,
+    "elements": [],
+    "excel_context": {}
+  },
+  "next_state": {
+    "application": "Microsoft Excel",
+    "window_title": "",
+    "screen_resolution": [
+      1920,
+      1200
+    ],
+    "focused_element_id": null,
+    "elements": [],
+    "excel_context": {}
+  },
+  "mouse": {
+    "actions": []
+  },
+  "keyboard": {
+    "actions": [
+      {
+        "strokes": [
+          {
+            "key": "a",
+            "timestamp": "2026-03-21T09:57:59.545573"
+          },
+          {
+            "key": "l",
+            "timestamp": "2026-03-21T09:57:59.721444"
+          },
+          {
+            "key": "a",
+            "timestamp": "2026-03-21T09:57:59.853099"
+          },
+          {
+            "key": "r",
+            "timestamp": "2026-03-21T09:58:00.168273"
+          },
+          {
+            "key": "y",
+            "timestamp": "2026-03-21T09:58:00.357271"
+          }
+        ]
+      }
+    ]
+  },
+  "clipboard": {
+    "events": []
+  },
+  "diff": {},
+  "action": {
+    "action_type": "keyboard",
+    "text": "alary",
+    "keystrokes": [
+      "a",
+      "l",
+      "a",
+      "r",
+      "y"
+    ],
+    "click_position": null
+  }
+}

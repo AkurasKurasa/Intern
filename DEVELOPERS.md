@@ -212,7 +212,7 @@ The transformer's click accuracy is ~40% after 19 sessions. It needs to see each
 
 - [ ] **Record 30+ total sessions** — Each session = one complete form fill (all 5 records, all 8 tabs). Currently at 19. Target: 50 sessions = ~25,000 traces before expecting reliable click accuracy.
 - [ ] **Run correctional spec after every new session** — `record_trace.py` calls `RuleExtractor.correct()` automatically on stop. Confirm `form_filling.md` updates each time.
-- [ ] **Retrain after every 5 new sessions** — Dataset cache makes init ~5 sec. Full 50-epoch GPU retrain ~20 min. Command: `NO_SENT_TRANSFORMERS=1 python -m components.intelligence.model.transformer --mode train --data_dir data/output/traces/forms --model_path data/models/transformer_form.pt --epochs 50 --d_model 64 --num_layers 2 --max_elements 64 --aug_drop_prob 0.1`
+- [ ] **Retrain after every 5 new sessions** — Dataset cache makes init ~5 sec. Full 50-epoch GPU retrain ~20 min. Command: `NO_SENT_TRANSFORMERS=1 python -m components.intelligence.model.transformer --mode train --data_dir tasks/form_filling/traces --model_path tasks/form_filling/model.pt --epochs 50 --d_model 64 --num_layers 2 --max_elements 64 --aug_drop_prob 0.1`
 - [ ] **Check fidelity after every retrain** — Run agent → `python scripts/bc_fidelity.py --progress`. Fidelity number goes up = improvement confirmed. Target: ≥80%.
 
 ---
@@ -417,7 +417,7 @@ Completed work, preserved for reference. Items here were once in P1/P2/P3 or the
 
 ### Ruleset & Spec System
 - **Correctional ruleset system** — `RuleExtractor.correct(session_dir, goal)` reads existing `form_filling.md` + new session traces → sends both to LLM → overwrites spec with corrected version. Single truth file, not one file per session. Was: P2.
-- **Spec injection into agent** — `LLMAgent.__init__` loads `data/output/rulesets/form_filling.md` at startup and appends to LLM system prompt. Every agent run uses the latest inferred spec. Was: P2.
+- **Spec injection into agent** — `LLMAgent.__init__` loads `tasks/form_filling/ruleset.md` at startup and appends to LLM system prompt. Every agent run uses the latest inferred spec. Was: P2.
 - **Auto-extract on record** — `record_trace.py` calls `RuleExtractor.correct()` automatically when a session ends (≥5 traces). Spec improves with every recording without manual steps. Was: P2.
 - **Bootstrap correctional spec** — `scripts/bootstrap_spec.py` ran `correct()` sequentially across all 19 existing sessions to build the initial `form_filling.md`. Was: Stage 0 blocker.
 
@@ -428,7 +428,7 @@ Completed work, preserved for reference. Items here were once in P1/P2/P3 or the
 
 ### Infrastructure
 - **Capsule registry** — `components/agent/capsule.py` + `build_capsule.py`. Per-task model routing: agent auto-selects `.pt` file based on goal string and window title. Was: architecture item.
-- **`.gitignore` for traces** — `data/output/traces/forms/`, `forms_aug/`, `live/` excluded. `.dataset_cache.pkl` excluded. Was: housekeeping.
+- **`.gitignore` for traces** — `tasks/form_filling/traces/`, `forms_aug/`, `live/` excluded. `.dataset_cache.pkl` excluded. Was: housekeeping.
 
 ### Behavioral Fidelity Benchmarks
 Tasks specifically designed to measure whether Intern clones *style and decision-making*, not just mechanical actions.

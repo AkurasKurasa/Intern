@@ -124,7 +124,7 @@ class Planner:
     def __init__(
         self,
         goal:                 str   = "",
-        model_path:           str   = "data/models/transformer_bc.pt",
+        model_path:           str   = "tasks/form_filling/model.pt",
         provider:             str   = "none",
         api_key:              str   = "",
         lmstudio_url:         str   = "http://localhost:1234",

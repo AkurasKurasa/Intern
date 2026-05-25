@@ -1,0 +1,59 @@
+{
+  "trace_id": "live_step_0593",
+  "timestamp": "2026-03-21T09:59:21.863505",
+  "duration": 1.044987,
+  "type": "excel",
+  "state": {
+    "application": "Microsoft Excel",
+    "window_title": "",
+    "screen_resolution": [
+      1920,
+      1200
+    ],
+    "focused_element_id": null,
+    "elements": [],
+    "excel_context": {}
+  },
+  "next_state": {
+    "application": "Microsoft Excel",
+    "window_title": "",
+    "screen_resolution": [
+      1920,
+      1200
+    ],
+    "focused_element_id": null,
+    "elements": [],
+    "excel_context": {}
+  },
+  "mouse": {
+    "actions": []
+  },
+  "keyboard": {
+    "actions": [
+      {
+        "strokes": [
+          {
+            "key": "\u0016",
+            "timestamp": "2026-03-21T09:59:21.957871",
+            "pasted_text": "Teresa Ruiz — (901) 771-2290"
+          }
+        ]
+      }
+    ]
+  },
+  "clipboard": {
+    "events": [
+      {
+        "event": "paste",
+        "content": "Teresa Ruiz — (901) 771-2290",
+        "timestamp": "2026-03-21T09:59:21.957886"
+      }
+    ]
+  },
+  "diff": {},
+  "action": {
+    "action_type": "paste",
+    "text": "",
+    "click_position": null
+  }
+}
