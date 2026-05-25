@@ -557,19 +557,53 @@ class TrajectoryDataset(Dataset):
         self._preload_tensors()
 
     def _preload_tensors(self) -> None:
-        """Load all unique trace files into RAM as encoded tensors once at init."""
-        unique_files: set = set()
+        """
+        For small datasets (<=5000 files): load all tensors into RAM upfront.
+        For large datasets: use an LRU cache capped at 5000 entries — avoids
+        OOM when augmented traces push total files into the tens of thousands.
+        """
+        unique_files: list = []
         for group in self._grouped_files:
-            unique_files.update(group)
-        self._tensor_cache: dict = {}
-        zero = torch.zeros(self.max_elements, ELEM_FEATURES)
-        print(f"[Dataset] Preloading {len(unique_files)} trace tensors into RAM...", flush=True)
-        for fpath in unique_files:
-            t = _load_trace(fpath)
-            state = t.get("state", {}) if t else {}
-            self._tensor_cache[fpath] = encode_state(state, self.max_elements)
-        print(f"[Dataset] Preload done.", flush=True)
-        self._zero_tensor = zero
+            unique_files.extend(group)
+        unique_files = list(dict.fromkeys(unique_files))  # deduplicate, preserve order
+
+        self._zero_tensor = torch.zeros(self.max_elements, ELEM_FEATURES)
+        _PRELOAD_LIMIT = 5_000
+
+        if len(unique_files) <= _PRELOAD_LIMIT:
+            self._tensor_cache: dict = {}
+            self._lru_cache = None
+            print(f"[Dataset] Preloading {len(unique_files)} trace tensors into RAM...", flush=True)
+            for fpath in unique_files:
+                t = _load_trace(fpath)
+                state = t.get("state", {}) if t else {}
+                self._tensor_cache[fpath] = encode_state(state, self.max_elements)
+            print(f"[Dataset] Preload done.", flush=True)
+        else:
+            # LRU cache: keeps last N tensors in RAM, evicts oldest on overflow.
+            # Trades RAM for disk I/O — each cache miss re-reads one JSON file.
+            from collections import OrderedDict
+            self._tensor_cache = None
+            self._lru_cache: "OrderedDict" = OrderedDict()
+            self._lru_maxsize = _PRELOAD_LIMIT
+            print(f"[Dataset] Large dataset ({len(unique_files)} files) — "
+                  f"using LRU tensor cache (max={_PRELOAD_LIMIT}).", flush=True)
+
+    def _get_tensor(self, fpath: "Path") -> torch.Tensor:
+        """Fetch encoded state tensor, using preload dict or LRU cache."""
+        if self._tensor_cache is not None:
+            return self._tensor_cache.get(fpath, self._zero_tensor)
+        # LRU path
+        if fpath in self._lru_cache:
+            self._lru_cache.move_to_end(fpath)
+            return self._lru_cache[fpath]
+        t = _load_trace(fpath)
+        state = t.get("state", {}) if t else {}
+        tensor = encode_state(state, self.max_elements)
+        self._lru_cache[fpath] = tensor
+        if len(self._lru_cache) > self._lru_maxsize:
+            self._lru_cache.popitem(last=False)
+        return tensor
 
     def __len__(self) -> int:
         return len(self._samples)
@@ -578,9 +612,7 @@ class TrajectoryDataset(Dataset):
         gi, win_start, p_types, p_cont, tgt_type, tgt_click_idx, tgt_key, src_idx = self._samples[idx]
 
         files = self._grouped_files[gi][win_start : win_start + self.hist_len]
-        state_tensors = [
-            self._tensor_cache.get(fpath, self._zero_tensor) for fpath in files
-        ]
+        state_tensors = [self._get_tensor(fpath) for fpath in files]
         while len(state_tensors) < self.hist_len:
             state_tensors.insert(0, self._zero_tensor)
         states = torch.stack(state_tensors)  # (H, T, F)
