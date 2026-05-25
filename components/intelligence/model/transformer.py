@@ -579,7 +579,7 @@ class TrajectoryDataset(Dataset):
         unique_files = list(dict.fromkeys(unique_files))  # deduplicate, preserve order
 
         self._zero_tensor = torch.zeros(self.max_elements, ELEM_FEATURES)
-        _PRELOAD_LIMIT = 5_000
+        _PRELOAD_LIMIT = 50_000
 
         if len(unique_files) <= _PRELOAD_LIMIT:
             self._tensor_cache: dict = {}
