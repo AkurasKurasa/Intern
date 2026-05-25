@@ -57,7 +57,7 @@ def _jitter_bbox(bbox: list, rng: random.Random) -> list:
     return [round(nx1), round(ny1), round(nx2), round(ny2)]
 
 
-def _augment_elements(elements: list, rng: random.Random) -> list:
+def _augment_elements(elements: list, rng: random.Random, shuffle: bool = False) -> list:
     out = []
     for elem in elements:
         e = copy.deepcopy(elem)
@@ -65,12 +65,14 @@ def _augment_elements(elements: list, rng: random.Random) -> list:
         conf = float(e.get("confidence", 1.0))
         e["confidence"] = max(0.0, min(1.0, conf + rng.uniform(-CONF_NOISE, CONF_NOISE)))
         out.append(e)
+    if shuffle:
+        rng.shuffle(out)
     return out
 
 
-def _augment_state(state: dict, rng: random.Random) -> dict:
+def _augment_state(state: dict, rng: random.Random, shuffle: bool = False) -> dict:
     s = copy.deepcopy(state)
-    s["elements"] = _augment_elements(s.get("elements", []), rng)
+    s["elements"] = _augment_elements(s.get("elements", []), rng, shuffle=shuffle)
     return s
 
 
@@ -100,8 +102,11 @@ def _augment_action(action: dict, rng: random.Random) -> dict:
 def augment_trace(trace: dict, seed: int) -> dict:
     rng = random.Random(seed)
     t = copy.deepcopy(trace)
-    t["state"]      = _augment_state(t.get("state", {}), rng)
-    t["next_state"] = _augment_state(t.get("next_state", {}), rng)
+    # Shuffle element order so the model learns element identity, not list position.
+    # click_position labels are pixel-based, so shuffling element list order is safe —
+    # _find_click_elem_idx will resolve the same element at its new index.
+    t["state"]      = _augment_state(t.get("state", {}), rng, shuffle=True)
+    t["next_state"] = _augment_state(t.get("next_state", {}), rng, shuffle=True)
     t["mouse"]      = _augment_mouse(t.get("mouse", {}), rng)
     t["action"]     = _augment_action(t.get("action", {}), rng)
     t["augmented"]  = True

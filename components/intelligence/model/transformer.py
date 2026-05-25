@@ -585,11 +585,30 @@ class TrajectoryDataset(Dataset):
             state_tensors.insert(0, self._zero_tensor)
         states = torch.stack(state_tensors)  # (H, T, F)
 
-        # Element dropout augmentation
+        # Augmentation block — element dropout + order shuffle
         if self.aug_drop_prob > 0.0:
             states = states.clone()
+
+            # Element dropout: randomly zero out UI rows across all history steps
             mask = torch.rand(states.shape[0], states.shape[1]) < self.aug_drop_prob
             states[mask] = 0.0
+
+            # Element order shuffle on the current (last) state only.
+            # Historical states are mean-pooled in the forward pass so their
+            # order doesn't affect the pointer heads — shuffling them is a free
+            # diversity bonus but doesn't change pointer label semantics.
+            # The current state order DOES matter: pointer heads select by index,
+            # so we remap tgt_click_idx / src_idx through the permutation.
+            T = states.shape[1]
+            perm = torch.randperm(T)
+            states[-1] = states[-1][perm]
+            # inv_perm[old_idx] = new_idx (where the element moved to after shuffle)
+            inv_perm = torch.empty(T, dtype=torch.long)
+            inv_perm[perm] = torch.arange(T)
+            if tgt_click_idx >= 0:
+                tgt_click_idx = int(inv_perm[tgt_click_idx].item())
+            if src_idx >= 0:
+                src_idx = int(inv_perm[src_idx].item())
 
         H = self.hist_len
         if H > 1:
@@ -923,7 +942,7 @@ def train(
     lambda_click: float = 2.0,
     lambda_key: float = 0.5,
     label_smoothing: float = 0.1,
-    aug_drop_prob: float = 0.0,
+    aug_drop_prob: float = 0.1,
     seed: int = 42,
     d_model: int = 128,
     nhead: int = 4,
