@@ -632,8 +632,15 @@ class TrajectoryDataset(Dataset):
         if self.aug_drop_prob > 0.0:
             states = states.clone()
 
-            # Element dropout: randomly zero out UI rows across all history steps
+            # Element dropout: randomly zero out UI rows across all history steps.
+            # Protect the click/source label elements in the current (last) state —
+            # if the target gets zeroed its is_real flag goes to 0, the forward pass
+            # masks its logit to -1e9, and CE loss becomes ~1e9, exploding training.
             mask = torch.rand(states.shape[0], states.shape[1]) < self.aug_drop_prob
+            if tgt_click_idx >= 0:
+                mask[-1, tgt_click_idx] = False
+            if src_idx >= 0:
+                mask[-1, src_idx] = False
             states[mask] = 0.0
 
             # Element order shuffle on the current (last) state only.
