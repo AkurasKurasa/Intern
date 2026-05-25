@@ -455,6 +455,10 @@ class TrajectoryDataset(Dataset):
         grouped_src_idx:     List[List[int]] = []
         grouped_click_idx:   List[List[int]] = []
 
+        import gc as _gc
+        total_files = sum(len(g) for g in file_groups)
+        files_done  = 0
+
         for group_files in file_groups:
             valid_files:  List[Path]  = []
             g_actions:    List[Tuple] = []
@@ -464,6 +468,9 @@ class TrajectoryDataset(Dataset):
 
             for fpath in group_files:
                 t = _load_trace(fpath)
+                files_done += 1
+                if files_done % 500 == 0:
+                    print(f"[Dataset] Scanning... {files_done}/{total_files}", flush=True)
                 if t is None:
                     continue
                 state = t.get("state", {})
@@ -475,6 +482,7 @@ class TrajectoryDataset(Dataset):
                 )
                 if active_interactive == 0:
                     skipped += 1
+                    t = None  # explicit release before next iteration
                     continue
                 res  = state.get("screen_resolution", [DEFAULT_W, DEFAULT_H])
                 W    = float(res[0]) or DEFAULT_W
@@ -492,6 +500,9 @@ class TrajectoryDataset(Dataset):
                 g_actions.append(action)
                 g_src_idx.append(src_idx)
                 g_click_idx.append(click_idx)
+                t = None  # release JSON dict immediately — prevents memory accumulation
+
+            _gc.collect()  # force reclaim after each session group
 
             if valid_files:
                 self._grouped_files.append(valid_files)
