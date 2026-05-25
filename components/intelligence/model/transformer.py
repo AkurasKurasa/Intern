@@ -64,8 +64,9 @@ ACTION_NOOP     = 0
 ACTION_CLICK    = 1
 ACTION_KEYBOARD = 2
 
-# bbox(4) + confidence(1) + window_role(1) + is_focused(1) + ctrl_type(1) + text_embedding(384 or 1)
-ELEM_FEATURES = 8 + _EMBED_DIM
+# is_real(1) + bbox(4) + confidence(1) + window_role(1) + is_focused(1) + ctrl_type(1) + text_embedding(384)
+ELEM_FEATURES = 9 + _EMBED_DIM
+_REAL_ELEM_FLAG_IDX = 0  # feature index for the is_real flag
 
 # Numeric encoding for control types — focused/interactive types get distinct values
 _CTRL_TYPE_MAP = {
@@ -121,7 +122,7 @@ def _save_embed_cache(path: str) -> None:
     try:
         with open(path, "wb") as _f:
             pickle.dump(dict(_embed_cache), _f)
-        print(f"[Encoder] Embed cache saved ({len(_embed_cache)} entries) → {path}", flush=True)
+        print(f"[Encoder] Embed cache saved ({len(_embed_cache)} entries) -> {path}", flush=True)
     except Exception as _e:
         print(f"[Encoder] WARNING: could not save embed cache: {_e}", flush=True)
 
@@ -167,14 +168,13 @@ def _prime_embed_cache(texts: List[str]) -> None:
 def _encode_element(elem: dict, W: float, H: float, focused_id=None) -> List[float]:
     x1, y1, x2, y2 = (float(v) for v in elem.get("bbox", [0, 0, 0, 0])[:4])
     conf       = float(elem.get("confidence", 0.0))
-    # window_role: 1.0 = background (data source), 0.0 = active/unknown
     role       = 1.0 if elem.get("window_role") == "background" else 0.0
-    # is_focused: 1.0 if this element is the currently focused input — key signal for action type
     is_focused = 1.0 if (focused_id and elem.get("element_id") == focused_id) else 0.0
-    # ctrl_type: numeric encoding of control type so model distinguishes Edit vs ComboBox etc.
     ctrl_type  = _CTRL_TYPE_MAP.get((elem.get("type") or "").lower(), 0.0)
     text_emb   = _embed_text(elem.get("text", "") or "")
-    return [x1 / W, y1 / H, x2 / W, y2 / H, conf, role, is_focused, ctrl_type] + text_emb
+    # is_real=1.0 at index 0 ensures real elements are never zero-masked even if all
+    # other features happen to be zero (e.g. top-left element with empty text, unknown type)
+    return [1.0, x1 / W, y1 / H, x2 / W, y2 / H, conf, role, is_focused, ctrl_type] + text_emb
 
 
 def encode_state(state: dict, max_elements: int = 128) -> torch.Tensor:
@@ -357,6 +357,7 @@ class TrajectoryDataset(Dataset):
         # windows are later built *within* each group so history never crosses a
         # session boundary (which would stitch together unrelated demonstrations).
         root = Path(data_dir)
+        print(f"[Dataset] Scanning {root} for trace files...", flush=True)
         file_groups: List[List[Path]] = []
         flat_files = sorted(root.glob(glob))
         if flat_files:
@@ -368,6 +369,7 @@ class TrajectoryDataset(Dataset):
                     file_groups.append(session_files)
         if not file_groups:
             raise FileNotFoundError(f"No trace JSONs in {data_dir!r} (including session subfolders)")
+        print(f"[Dataset] Found {sum(len(g) for g in file_groups)} files in {len(file_groups)} session(s).", flush=True)
 
         # ── Dataset init cache ──────────────────────────────────────────────────
         # Reading 10k+ JSONs at init takes 2-10 min. Cache stores filtered file
@@ -380,12 +382,15 @@ class TrajectoryDataset(Dataset):
             if not _cache_path.exists():
                 return False
             cache_mtime = _cache_path.stat().st_mtime
+            # Check session dirs (not individual files) — avoids statting 10k files
+            checked = set()
             for group in file_groups:
-                for fp in group:
-                    if fp.stat().st_mtime > cache_mtime:
+                d = group[0].parent
+                if d not in checked:
+                    checked.add(d)
+                    if d.stat().st_mtime > cache_mtime:
                         return False
-                # also check manifest
-                mp = group[0].parent / "session_manifest.json"
+                mp = d / "session_manifest.json"
                 if mp.exists() and mp.stat().st_mtime > cache_mtime:
                     return False
             return True
@@ -400,6 +405,7 @@ class TrajectoryDataset(Dataset):
                     self._samples           = _cached["samples"]
                     print(f"[Dataset] Loaded from cache: {len(self._samples)} samples "
                           f"from {len(self._grouped_files)} session(s).")
+                    self._preload_tensors()
                     return
             except Exception as _ce:
                 print(f"[Dataset] Cache load failed ({_ce}), rebuilding.")
@@ -407,9 +413,9 @@ class TrajectoryDataset(Dataset):
         # Load raw traces per group — skip traces with no active-window interactive
         # controls (e.g. old Tkinter sessions where UIA saw 0 form elements).
         # Type names must match _CTRL_TYPE_MAP in ui_observer.py:
-        #   "Edit" → "input", "Button" → "button", "ComboBox" → "combobox", etc.
+        #   "Edit" -> "input", "Button" -> "button", "ComboBox" -> "combobox", etc.
         # wxPython controls not in _CTRL_TYPE_MAP fall through as lowercased
-        # ControlTypeName, e.g. "TabItemControl" → "tabitemcontrol".
+        # ControlTypeName, e.g. "TabItemControl" -> "tabitemcontrol".
         _INTERACTIVE = {
             "input",          # Edit / text field  (was "editcontrol" — wrong)
             "combobox",       # ComboBox           (was "comboboxcontrol" — wrong)
@@ -544,9 +550,26 @@ class TrajectoryDataset(Dataset):
                     "grouped_manifests": self._grouped_manifests,
                     "samples":           self._samples,
                 }, _cf, protocol=4)
-            print(f"[Dataset] Cache saved → {_cache_path}")
+            print(f"[Dataset] Cache saved -> {_cache_path}")
         except Exception as _se:
             print(f"[Dataset] Cache save failed ({_se}), continuing without cache.")
+
+        self._preload_tensors()
+
+    def _preload_tensors(self) -> None:
+        """Load all unique trace files into RAM as encoded tensors once at init."""
+        unique_files: set = set()
+        for group in self._grouped_files:
+            unique_files.update(group)
+        self._tensor_cache: dict = {}
+        zero = torch.zeros(self.max_elements, ELEM_FEATURES)
+        print(f"[Dataset] Preloading {len(unique_files)} trace tensors into RAM...", flush=True)
+        for fpath in unique_files:
+            t = _load_trace(fpath)
+            state = t.get("state", {}) if t else {}
+            self._tensor_cache[fpath] = encode_state(state, self.max_elements)
+        print(f"[Dataset] Preload done.", flush=True)
+        self._zero_tensor = zero
 
     def __len__(self) -> int:
         return len(self._samples)
@@ -554,16 +577,12 @@ class TrajectoryDataset(Dataset):
     def __getitem__(self, idx: int):
         gi, win_start, p_types, p_cont, tgt_type, tgt_click_idx, tgt_key, src_idx = self._samples[idx]
 
-        # Lazy state loading — load only the H files for this window
         files = self._grouped_files[gi][win_start : win_start + self.hist_len]
-        state_tensors = []
-        for fpath in files:
-            t = _load_trace(fpath)
-            state = t.get("state", {}) if t else {}
-            state_tensors.append(encode_state(state, self.max_elements))
-        # Pad if window is shorter than hist_len (shouldn't happen but be safe)
+        state_tensors = [
+            self._tensor_cache.get(fpath, self._zero_tensor) for fpath in files
+        ]
         while len(state_tensors) < self.hist_len:
-            state_tensors.insert(0, torch.zeros(self.max_elements, ELEM_FEATURES))
+            state_tensors.insert(0, self._zero_tensor)
         states = torch.stack(state_tensors)  # (H, T, F)
 
         # Element dropout augmentation
@@ -630,7 +649,7 @@ class StateEncoder(nn.Module):
         self.norm = nn.LayerNorm(d_model)
 
     def forward(self, state: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
-        mask = state.abs().sum(-1) > 0                       # (B, T) bool
+        mask = state[..., _REAL_ELEM_FLAG_IDX] > 0.5        # (B, T) bool — index 0 is is_real flag
         elem_emb = self.norm(self.proj(state))               # (B, T, d_model)
         # Zero out padding rows so the pooled sequence token (computed upstream)
         # doesn't mix padding noise into the mean.
@@ -707,10 +726,14 @@ class TransformerAgentNetwork(nn.Module):
         # cross-attended context token and per-element embeddings from the
         # current state. Separate query/key projections let click and source
         # learn different "what am I looking for" signatures.
-        self.click_q = nn.Linear(d_model, d_model)
-        self.click_k = nn.Linear(d_model, d_model)
-        self.src_q   = nn.Linear(d_model, d_model)
-        self.src_k   = nn.Linear(d_model, d_model)
+        self.click_q      = nn.Linear(d_model, d_model)
+        self.click_k      = nn.Linear(d_model, d_model)
+        self.click_q_norm = nn.LayerNorm(d_model)
+        self.click_k_norm = nn.LayerNorm(d_model)
+        self.src_q        = nn.Linear(d_model, d_model)
+        self.src_k        = nn.Linear(d_model, d_model)
+        self.src_q_norm   = nn.LayerNorm(d_model)
+        self.src_k_norm   = nn.LayerNorm(d_model)
 
         for m in self.modules():
             if isinstance(m, nn.Linear):
@@ -773,13 +796,15 @@ class TransformerAgentNetwork(nn.Module):
         # Pointer heads: dot-product between query (from cross-attended ctx)
         # and per-element keys (from the CURRENT state's per-element embeddings).
         scale = self.d_model ** 0.5
-        click_q = self.click_q(ctx)                                   # (B, d)
-        click_k = self.click_k(cur_elem_emb)                          # (B, T, d)
+        # LayerNorm bounds the dot product to O(sqrt(d_model)) — prevents the
+        # bilinear product of two learned projections from diverging during training.
+        click_q = self.click_q_norm(self.click_q(ctx))                # (B, d)
+        click_k = self.click_k_norm(self.click_k(cur_elem_emb))       # (B, T, d)
         click_logits = torch.einsum('bd,btd->bt', click_q, click_k) / scale
         click_logits = click_logits.masked_fill(~cur_elem_mask, -1e9)
 
-        src_q = self.src_q(ctx)                                       # (B, d)
-        src_k = self.src_k(cur_elem_emb)                              # (B, T, d)
+        src_q = self.src_q_norm(self.src_q(ctx))                      # (B, d)
+        src_k = self.src_k_norm(self.src_k(cur_elem_emb))             # (B, T, d)
         src_logits = torch.einsum('bd,btd->bt', src_q, src_k) / scale
         src_logits = src_logits.masked_fill(~cur_elem_mask, -1e9)
 
@@ -856,6 +881,7 @@ def _run_epoch(model, loader, optimizer, device, lambda_click, lambda_key, label
 
             loss = l_type + lambda_click * l_click + lambda_key * l_key + 0.5 * l_src
 
+
             if is_train:
                 optimizer.zero_grad(); loss.backward()
                 nn.utils.clip_grad_norm_(model.parameters(), 1.0)
@@ -888,8 +914,8 @@ def train(
     data_dir: str = "data/output/traces/live",
     epochs: int = 50,
     batch_size: int = 16,
-    lr: float = 1e-3,
-    weight_decay: float = 1e-4,
+    lr: float = 1e-4,
+    weight_decay: float = 1e-2,
     max_elements: int = 128,
     hist_len: int = 4,
     val_split: float = 0.2,
@@ -1032,7 +1058,8 @@ def train(
             print(
                 f"Epoch {epoch:>3}/{epochs}  |  "
                 f"train_loss={train_m['loss']:.4f}  acc={train_m['accuracy']:.3f}  click_acc={train_m['click_acc']:.3f}  |  "
-                f"val_loss={val_m['loss']:.4f}  acc={val_m['accuracy']:.3f}  click_acc={val_m['click_acc']:.3f}"
+                f"val_loss={val_m['loss']:.4f}  acc={val_m['accuracy']:.3f}  click_acc={val_m['click_acc']:.3f}  "
+                f"[type={train_m['l_type']:.3f} click={train_m['l_click']:.3f} key={train_m['l_key']:.4f}]"
             )
 
         save_loss = val_m["loss"] if not math.isnan(val_m["loss"]) else train_m["loss"]

@@ -455,15 +455,10 @@ def evaluate_run(results: list[dict], goal: str = "") -> dict:
 
         actionable += 1
 
-        # Execution success — did state change vs previous step?
-        if i > 0:
-            prev_state = results[i - 1].get("state", {})
-            focus_changed  = _focused_id(prev_state) != _focused_id(state)
-            before_vals    = _element_values(prev_state)
-            after_vals     = _element_values(state)
-            values_changed = any(after_vals.get(k) != v for k, v in before_vals.items())
-            if focus_changed or values_changed:
-                succeeded += 1
+        # Execution success — use validator's own judgement (avoids false positives
+        # from user corrections or dialog pops between steps inflating the count)
+        if r.get("validation") == "ok":
+            succeeded += 1
 
         # Track filled fields (keyboard actions with text)
         if a_type == "keyboard":
@@ -498,7 +493,80 @@ def evaluate_run(results: list[dict], goal: str = "") -> dict:
     apa = on_target / total_clicks if total_clicks else 0.0
     esr = succeeded / actionable   if actionable   else 0.0
 
+    # Value accuracy — compare typed values against source record
+    typed_values: list[tuple[str, str]] = []  # (label, typed_text)
+    for r in results:
+        action = r.get("action", {})
+        if action.get("action_type") != "keyboard":
+            continue
+        text = action.get("text", "").strip()
+        if not text:
+            continue
+        state = r.get("state", {})
+        fid   = _focused_id(state)
+        for e in state.get("elements", []):
+            if e.get("element_id") == fid:
+                label = (e.get("label") or e.get("text") or "").strip()
+                if label:
+                    typed_values.append((label, text))
+                break
+
+    source_record: dict[str, str] = {}
+    try:
+        from data_sources.notepad_source import _parse_records
+        src_text = SOURCE_FILE.read_text(encoding="utf-8", errors="ignore")
+        records  = _parse_records(src_text)
+        if records:
+            # Infer which record was being filled by finding the best-matching record
+            # (most typed values present in that record's values).
+            typed_set = {v.strip().lower() for _, v in typed_values}
+            best_idx, best_hits = 0, -1
+            for idx, rec in enumerate(records):
+                hits = sum(
+                    1 for v in rec.values()
+                    if str(v).strip().lower() in typed_set
+                )
+                if hits > best_hits:
+                    best_hits, best_idx = hits, idx
+            source_record = {k.strip().lower(): str(v).strip()
+                             for k, v in records[best_idx].items()}
+    except Exception:
+        pass
+
+    correct_values = 0
+    wrong_values   = 0
+    value_rows: list[str] = []
+    for label, typed in typed_values:
+        expected = source_record.get(label.lower(), "")
+        if not expected:
+            # fuzzy: check if any source key contains the label words
+            words = label.lower().split()
+            for k, v in source_record.items():
+                if all(w in k for w in words):
+                    expected = v
+                    break
+        if expected:
+            match = typed.strip().lower() == expected.strip().lower()
+            if match:
+                correct_values += 1
+                mark = "✓"
+            else:
+                wrong_values += 1
+                mark = "✗"
+            value_rows.append(f"    {mark}  {label:<30}  typed={typed!r:<25}  expected={expected!r}")
+        else:
+            value_rows.append(f"    ?  {label:<30}  typed={typed!r:<25}  (not in source)")
+
+    val_acc = correct_values / (correct_values + wrong_values) if (correct_values + wrong_values) else 0.0
+
     border = "=" * 60
+    value_section = ""
+    if value_rows:
+        value_section = (
+            f"\n  Value Accuracy ({correct_values} correct / {correct_values+wrong_values} typed):\n"
+            + "\n".join(value_rows) + "\n"
+        )
+
     summary = (
         f"\n{border}\n"
         f"  RUN METRICS\n"
@@ -510,8 +578,11 @@ def evaluate_run(results: list[dict], goal: str = "") -> dict:
         f"({on_target} on-target / {total_clicks} clicks)\n"
         f"  Execution Success Rate     {esr*100:>6.1f}%   "
         f"({succeeded} state-changing / {actionable} actionable steps)\n"
+        f"  Value Accuracy             {val_acc*100:>6.1f}%   "
+        f"({correct_values} correct / {correct_values+wrong_values} typed values)\n"
         f"  Total steps: {total_steps}  |  Terminated: {'naturally' if done else 'early/max_steps'}\n"
         f"{border}\n"
+        f"{value_section}"
     )
 
     print(summary)
@@ -520,6 +591,7 @@ def evaluate_run(results: list[dict], goal: str = "") -> dict:
         "task_completion_rate":       tcr,
         "action_prediction_accuracy": apa,
         "execution_success_rate":     esr,
+        "value_accuracy":             val_acc,
         "fields_filled":              sorted(fields_filled),
         "total_steps":                total_steps,
         "completed":                  done,

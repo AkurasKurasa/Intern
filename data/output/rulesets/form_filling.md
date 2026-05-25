@@ -1,7 +1,7 @@
 # Task Specification — form_filling
 **Goal:** Fill the car insurance form using data from the open text file  
-**Last updated:** 2026-05-22T16:03:27.550681  
-**Sessions processed:** session_20260521_211247
+**Last updated:** 2026-05-23T13:31:55.240114  
+**Sessions processed:** session_20260402_154118
 
 ---
 
@@ -36,8 +36,6 @@ Complete a car insurance form by filling out each field with data from an open t
 ## Confidence
 I am confident that this specification covers the necessary actions based on the given traces and new edge cases. Further testing with more complex scenarios would increase confidence.
 
----
-
-### Additional Notes
+## Additional Notes
 - Ensure that the text file is properly formatted to avoid any parsing errors.
 - If the form has conditional fields (e.g., fields that only appear if certain criteria are met), handle these conditions by checking the data in the text file before filling out those fields.

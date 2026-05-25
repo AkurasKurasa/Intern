@@ -55,7 +55,7 @@ PROVIDER      = "lmstudio"    # anthropic | groq | gemini | lmstudio | none
 API_KEY       = os.environ.get("ANTHROPIC_API_KEY", "")
 GROQ_API_KEY  = os.environ.get("GROQ_API_KEY", "")
 SOURCE_WINDOW = "Notepad"     # title fragment of the data source window
-MAX_STEPS     = 400
+MAX_STEPS     = 50
 STEP_DELAY    = 1.5
 
 # ── run ───────────────────────────────────────────────────────────────────────
@@ -97,9 +97,11 @@ if __name__ == "__main__":
     try:
         results = agent.run(max_steps=MAX_STEPS, task_name="form_filling")
     except KeyboardInterrupt:
-        logger.info("Run interrupted by user.")
+        results = list(agent._results)
+        logger.info("Run interrupted by user at step %d.", len(results))
     except Exception as exc:
-        logger.error("Run crashed: %s", exc)
+        results = list(agent._results)
+        logger.error("Run crashed at step %d: %s", len(results), exc)
     finally:
         logger.info("Run ended — %d steps", len(results))
 

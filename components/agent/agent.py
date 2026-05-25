@@ -134,9 +134,9 @@ Action rules:
 - "wait"   → UI is loading or animating. Use sparingly.
 
 General rules:
-1. Never invent values — only type text you can see in DATA SOURCES.
-2. If a field already has the correct value → hotkey ["tab"] to move on.
-3. If you need a value not in DATA SOURCES → say so in "reason" and skip with tab.
+1. CRITICAL: "text" must be copied VERBATIM from DATA SOURCES. If the exact value is not visible in DATA SOURCES, do NOT type — skip with hotkey ["tab"] instead.
+2. Never complete, guess, reformat, or paraphrase values. Copy the exact string.
+3. If a field already has the correct value → hotkey ["tab"] to move on.
 4. Interact with whatever app is on screen — do not assume it is a form.
 5. Output JSON only. No explanation outside the object.
 """
@@ -299,6 +299,17 @@ def _state_to_text(state: Dict[str, Any], record_num: int = 1, visual_cache: Opt
 def _history_to_text(history: List[Dict[str, Any]]) -> str:
     if not history:
         return "No actions taken yet."
+
+    # Count consecutive no_change failures at the tail
+    consecutive_failures = 0
+    last_failed_target = ""
+    for h in reversed(history):
+        if h.get("validation") == "no_change":
+            consecutive_failures += 1
+            last_failed_target = h.get("target", "")
+        else:
+            break
+
     lines = []
     for i, h in enumerate(history[-3:], 1):
         at     = h.get("action_type", "?")
@@ -312,6 +323,12 @@ def _history_to_text(history: List[Dict[str, Any]]) -> str:
             lines.append(f"  {i}. typed {txt!r}{status}" if txt else f"  {i}. keyboard{status}")
         else:
             lines.append(f"  {i}. {at}{status}")
+
+    if consecutive_failures >= 2:
+        lines.append(
+            f"\n  WARNING: last {consecutive_failures} actions on {last_failed_target!r} "
+            f"all failed with no_change. This target is not responding — try a different action or skip it."
+        )
     return "\n".join(lines)
 
 
@@ -748,9 +765,9 @@ class LLMAgent:
                 continue   # re-observe so auto-handlers run first before LLM gets a chance
 
             # 1b. Stuck guard: if no_change repeats OR too many steps on same tab, advance
-            _stuck = (not _plugin_active
-                      and (_no_change_streak >= _NO_CHANGE_LIMIT
-                           or _steps_on_tab >= _TAB_STEP_LIMIT))
+            # Runs in all modes including pure_transformer — LLM cannot self-recover from loops.
+            _stuck = (_no_change_streak >= _NO_CHANGE_LIMIT
+                      or (not _plugin_active and _steps_on_tab >= _TAB_STEP_LIMIT))
             if _stuck:
                 if _steps_on_tab >= _TAB_STEP_LIMIT:
                     logger.info("Stuck guard: %d steps on tab — forcing advance.", _steps_on_tab)
@@ -1281,12 +1298,11 @@ class LLMAgent:
             t_pred = self._predict(state)
             t_type = t_pred.get("action_type", "no_op")
             t_conf = t_pred.get("confidence", max(t_pred.get("_scores", {}).values(), default=0.0))
-            logger.info("Transformer → %-8s  conf=%.2f", t_type, t_conf)
+            logger.info("[TRANSFORMER] action=%-8s  conf=%.2f", t_type, t_conf)
 
             # Confidence-based routing:
-            #   >= 0.80  → execute directly, skip LLM (transformer is sure)
-            #   0.50–0.80 → LLM validates / may override
-            #   <  0.50  → LLM decides (transformer is uncertain)
+            #   >= 0.995 → execute directly, skip LLM (transformer is sure)
+            #   <  0.995 → LLM consulted; merge decides final action
             _HIGH_CONF   = 0.995
             _MED_CONF    = 0.50
 
@@ -1294,8 +1310,8 @@ class LLMAgent:
             if self._llm_client and t_conf < _HIGH_CONF:
                 llm_action = self._ask_llm(state)
                 action_type = llm_action.get("action_type", "wait")
-                logger.info("LLM[%s] → %s  reason=%r",
-                            self.provider, action_type, llm_action.get("reason", ""))
+                reason = llm_action.get("reason", "")
+                logger.info("[LLM:%s] action=%-8s", self.provider, action_type)
 
                 if action_type == "done":
                     logger.info("LLM: task complete.")
@@ -1306,6 +1322,7 @@ class LLMAgent:
 
                 # ── Merge: LLM decides what, transformer decides where ──────
                 prediction = self._merge(t_pred, t_conf, llm_action, state)
+                print(f"\n  [LLM TOOK OVER]  reason: {reason}\n", flush=True)
 
                 # Stuck-click guard
                 if prediction.get("action_type") == "click":
@@ -1324,8 +1341,12 @@ class LLMAgent:
                 else:
                     _llm_click_pos, _llm_click_count = None, 0
 
-            # 2c. Transformer-only fallback (provider="none")
+            # 2c. Transformer acts alone — high confidence OR no LLM provider
             else:
+                if self._llm_client:
+                    logger.info("[TRANSFORMER] high-conf (%.2f) — acting alone, LLM skipped", t_conf)
+                else:
+                    logger.info("[TRANSFORMER] no LLM provider — acting alone")
                 prediction = t_pred
 
                 if prediction.get("action_type") == "click":
@@ -1542,6 +1563,7 @@ class LLMAgent:
             })
             self._results.append({
                 "step":       step_idx + 1,
+                "state":      state,
                 "action":     prediction,
                 "result":     str(result),
                 "validation": validation.status,
@@ -2828,6 +2850,21 @@ class LLMAgent:
         """
         l_type = llm_action.get("action_type", "wait")
 
+        # If transformer is confident it should click but LLM says type,
+        # trust the transformer — it learned from real demos and knows which
+        # elements are clickable vs typeable (e.g. comboboxes need click).
+        _TRANSFORMER_TYPE_OVERRIDE_THRESHOLD = 0.70
+        if (l_type == "type"
+                and t_pred.get("action_type") == "click"
+                and t_conf >= _TRANSFORMER_TYPE_OVERRIDE_THRESHOLD
+                and t_pred.get("click_position")):
+            pos    = t_pred["click_position"]
+            snapped = self._snap(pos, state)
+            coords  = snapped or pos
+            logger.info("[MERGE] TRANSFORMER overrides LLM type→click  conf=%.2f  @ (%.0f,%.0f)",
+                        t_conf, coords[0], coords[1])
+            return {"action_type": "click", "click_position": coords}
+
         # Hotkey / scroll — pure LLM reasoning, transformer can't help
         if l_type in ("hotkey", "scroll"):
             return self._llm_action_to_prediction(llm_action, state)
@@ -2836,12 +2873,13 @@ class LLMAgent:
         if l_type == "type":
             text = llm_action.get("text", "")
             if not text:
-                # Try transformer's source pointer as backup
                 src_idx = t_pred.get("source_elem_idx", -1)
                 text = self._text_resolver.resolve(state, source_elem_idx=src_idx)
+                if text:
+                    logger.info("[MERGE] type: LLM had no text — TRANSFORMER source resolved %r", text[:40])
             if not text:
-                # No value found — Tab to skip
                 return {"action_type": "keyboard", "key_count": 1, "keystrokes": ["tab"]}
+            logger.info("[MERGE] type: value=%r", text[:40])
             return {"action_type": "keyboard", "key_count": len(text),
                     "keystrokes": list(text), "text": text}
 
@@ -2853,7 +2891,7 @@ class LLMAgent:
             if target:
                 coords = _resolve_target(target, state)
                 if coords is not None:
-                    logger.info("Merge: LLM target %r → (%.0f, %.0f)", target, coords[0], coords[1])
+                    logger.info("[MERGE] LLM wins — click target=%r @ (%.0f, %.0f)", target, coords[0], coords[1])
                     return {"action_type": "click", "click_position": coords}
 
             # Second: transformer click when confident and LLM had no resolvable target
@@ -2864,12 +2902,14 @@ class LLMAgent:
                 pos     = t_pred["click_position"]
                 snapped = self._snap(pos, state)
                 coords  = snapped or pos
-                logger.info("Merge: transformer click @ (%.0f,%.0f)  conf=%.2f  (no LLM target resolved)",
+                logger.info("[MERGE] TRANSFORMER wins — click @ (%.0f,%.0f)  conf=%.2f  (LLM target unresolved)",
                             coords[0], coords[1], t_conf)
                 return {"action_type": "click", "click_position": coords}
+            logger.info("[MERGE] LLM wins (no transformer click) — fallback to LLM position")
             return self._llm_action_to_prediction(llm_action, state)
 
         # Fallback
+        logger.info("[MERGE] LLM wins (hotkey/scroll/fallback)")
         return self._llm_action_to_prediction(llm_action, state)
 
     def _value_for_focused(self, state: Dict[str, Any]) -> str:

@@ -156,6 +156,37 @@ run_agent.py                 Entrypoint
 > When this passes, BC is done and development shifts to the Reinforcement Learning phase.
 
 
+## Live Metrics — Current State
+
+Two test modes: **With LLM** (normal operation) and **Transformer-only** (`PROVIDER="none"`).
+The transformer-only score is the real BC progress indicator — LLM is a crutch, not the goal.
+
+### With LLM (`PROVIDER="lmstudio"`) — 2026-05-24
+
+| Metric | Score | Detail |
+|--------|-------|--------|
+| **Task Completion Rate** | 25% | 5 fields filled / ~20 total |
+| **Action Prediction Accuracy** | 0% | 0 on-target / 0 clicks (LLM typed into comboboxes) |
+| **Execution Success Rate** | 55.6% | 5 ok / 9 actionable steps |
+| **Transformer conf** | 0.74–0.84 | click predictions active (was 0.00 — fixed pointer head explosion) |
+| **Training** | val_loss=6.74  click_acc=19.5% | 50 epochs, fixed bilinear divergence (LayerNorm on pointer heads) |
+
+### Transformer-Only (`PROVIDER="none"`) — 2026-05-23
+
+| Metric | Score | Detail |
+|--------|-------|--------|
+| **Task Completion Rate** | 5% | 1 field filled / ~20 total |
+| **Action Prediction Accuracy** | 100% | 1 on-target / 1 click |
+| **Execution Success Rate** | 5.6–40% | Fills 1 field (Agency Name or Policy Number), then loops on unresolved keyboard — confirmed across 2 runs |
+
+**What the numbers say right now:**
+- LLM fills text fields correctly but fails on all comboboxes (~45% wasted steps).
+- Transformer-only score = true BC baseline. Must improve this over time, not the LLM score.
+- Main gap: combobox handling + tab navigation across all 8 tabs.
+
+**How to track progress:** after each retrain, run both modes and update this table.
+
+
 ## Wish List — Path to Full Behavioral Cloning
 
 What needs to happen, in order, to reach the BC completion criterion (transformer fills all 5 records, all fields, no LLM, ≥80% success rate).

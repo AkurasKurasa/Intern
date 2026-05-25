@@ -228,8 +228,14 @@ def _compress_session(session_dir: str | Path) -> str:
                 best, best_d = None, 9999
                 for e in elems:
                     bb = e.get("bbox", {})
-                    ex = bb.get("x", 0) + bb.get("width", 0) / 2
-                    ey = bb.get("y", 0) + bb.get("height", 0) / 2
+                    if isinstance(bb, list) and len(bb) >= 4:
+                        ex = (bb[0] + bb[2]) / 2
+                        ey = (bb[1] + bb[3]) / 2
+                    elif isinstance(bb, dict):
+                        ex = bb.get("x", 0) + bb.get("width", 0) / 2
+                        ey = bb.get("y", 0) + bb.get("height", 0) / 2
+                    else:
+                        continue
                     d = abs(ex - cx) + abs(ey - cy)
                     if d < best_d:
                         best_d = d
@@ -256,9 +262,9 @@ def _compress_session(session_dir: str | Path) -> str:
         if line != deduped[-1]:
             deduped.append(line)
 
-    # Cap at 300 lines to stay within LLM context
-    if len(deduped) > 300:
-        deduped = deduped[:150] + ["... (truncated) ..."] + deduped[-150:]
+    # Cap at 60 lines — keeps prompt under 4096 tokens for local models
+    if len(deduped) > 60:
+        deduped = deduped[:30] + ["... (truncated) ..."] + deduped[-30:]
 
     return "\n".join(deduped)
 
