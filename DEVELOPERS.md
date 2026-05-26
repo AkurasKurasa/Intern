@@ -57,6 +57,68 @@ The agent re-observes after every action and loops until the plugin signals
 "done" or `max_steps` is reached.
 
 
+## Behavioral Cloning Process
+
+The full loop for teaching Intern a task from human demonstrations.
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│              BEHAVIORAL CLONING PROCESS                     │
+└─────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────┐
+│  TRAINING PIPELINE                                          │
+│                                                             │
+│   STEP 1 — RECORD                                           │
+│     python record_trace.py                                  │
+│     Human demos task in wxForm + Notepad                    │
+│     Output: tasks/form_filling/traces/session_*/            │
+│                      ↓                                      │
+│   STEP 2 — AUGMENT                                          │
+│     python scripts/augment_traces.py \                      │
+│       --source tasks/form_filling/traces \                  │
+│       --dest   tasks/form_filling/traces_aug \              │
+│       --copies 4                                            │
+│     Per session: bbox jitter ±5px, click jitter ±4px,       │
+│     confidence noise ±0.03, element order shuffle           │
+│     Result: 5× data without recording anything new          │
+│                      ↓                                      │
+│   STEP 3 — TRAIN                                            │
+│     python train.py \                                       │
+│       --trace_dir tasks/form_filling/traces_aug \           │
+│       --epochs 50                                           │
+│     Trains TransformerAgentNetwork (131K params, d_model=64)│
+│     Element dropout 10% + order shuffle per batch           │
+│     Output: tasks/form_filling/model.pt                     │
+│                                                             │
+│  Goal: imprint human demo behavior into model.pt            │
+└─────────────────────────────────────────────────────────────┘
+                        ↓
+┌─────────────────────────────────────────────────────────────┐
+│  INFERENCE + EVALUATION                                     │
+│                                                             │
+│   STEP 4 — RUN & EVALUATE AGENT                             │
+│     python run_task.py                                      │
+│     Transformer: picks which element to click/type          │
+│     LLM (LM Studio): supplies text values                   │
+│                                                             │
+│     Auto-runs after completion:                             │
+│       eval_metrics.py   → TCR, field accuracy, value acc   │
+│       bc_fidelity.py    → BC score vs gold standard         │
+│       rule_extractor.py → infers task ruleset from trace    │
+│                                                             │
+│  Goal: measure how well cloned behavior generalizes         │
+└─────────────────────────────────────────────────────────────┘
+                        ↓
+              (poor metrics → record more → repeat)
+```
+
+**Division of responsibility:**
+- **Transformer** — *where* to click / which element to target (learned from demos)
+- **LLM** — *what* to type (text values from source data)
+- **Goal** — LLM is a crutch. BC is complete when transformer works with `PROVIDER="none"`.
+
+
 ## Quick Start
 
 ```bash
@@ -75,20 +137,16 @@ python car_insurance_entry/car_insurance_form_wx.py
 notepad data_entry_tasks/data_entry_intake.txt
 
 # 5. Run the agent
-python run_agent.py
+python run_task.py
 ```
 
-Configure `run_agent.py` knobs at the top:
+Configure `run_task.py` knobs at the top:
 
 | Constant         | Default                  | Notes                                |
 |------------------|--------------------------|--------------------------------------|
 | `PROVIDER`       | `"lmstudio"`             | Switch to `"groq"` / `"anthropic"` for real reasoning. |
-| `MAX_STEPS`      | `150`                    | Hard cap per record.                 |
-| `RECORD_START`   | `1`                      | First record to fill (1-based).      |
-| `RECORD_END`     | `1`                      | Inclusive. Set higher to loop.       |
-| `SOURCE_WINDOW`  | `"data_entry_intake"`    | Title fragment of the source window. |
-| `USE_VLM`        | `True`                   | Enable VLM (live `scan_tab` per tab).|
-| `USE_VLM_PRESCAN`| `False`                  | Walk full document upfront. Heavy on rate limits.|
+| `MAX_STEPS`      | `50`                     | Hard cap per run.                    |
+| `SOURCE_WINDOW`  | `"Notepad"`              | Title fragment of the source window. |
 
 
 ## Repository Layout
@@ -97,22 +155,46 @@ Configure `run_agent.py` knobs at the top:
 components/
   agent/
     agent.py                 LLMAgent — main loop, provider abstraction
+    capsule.py               Per-task model routing (goal → .pt file)
     task_plugins/            Task-specific plugins (form-fill, etc.)
       base_plugin.py         TaskPlugin ABC
       form_filler_plugin.py  Auto-fill / auto-skip / tab-advance / scan
   data_sources/
     base.py                  DataSource ABC
     notepad_source.py        Win32 WM_GETTEXT + parse_records helpers
+  intelligence/
+    model/
+      transformer.py         TransformerAgentNetwork — BC policy model
+    rule_extractor.py        LLM-based task spec generator / corrector
+    training/
+      bc/                    Behavioral cloning trainer
+      rl/                    RL trainer (future)
+      continual/             Continual learner
   observers/
     vlm/
       vision_observer/       VLM screenshot → key/value extraction
       visual_data_reader/    pre_scan + scan_tab + rescan_after_scroll
-  trace_translator/          Action-trace → text trace
-car_insurance_entry/         The wxPython target form (test fixture)
-data_entry_tasks/             Source intake .txt files
-data/output/                 Submission JSONs + run traces
-scripts/                     Smoke tests + dev utilities
-run_agent.py                 Entrypoint
+  workflow_builder/          Workflow construction utilities
+tasks/
+  registry.json              Global capsule registry (goal → model path)
+  form_filling/
+    model.pt                 Trained BC checkpoint
+    ruleset.md               Inferred task spec (auto-updated each session)
+    traces/                  Raw human demo sessions (session_*/)
+    traces_aug/              Augmented copies (session_*_augN/)
+    submissions/             Agent output JSONs
+car_insurance_entry/         wxPython target form (test fixture)
+data_entry_tasks/            Source intake .txt files
+scripts/
+  augment_traces.py          Dataset augmentation (5× data from existing traces)
+  eval_metrics.py            TCR / field accuracy / value accuracy metrics
+  bc_fidelity.py             BC fidelity score vs gold standard
+  bootstrap_spec.py          One-shot spec bootstrap from all sessions
+  diagnose_click_predictions.py  Debug click head predictions
+run_task.py                  Agent entrypoint (pure transformer + LLM)
+record_trace.py              Human demo recorder
+train.py                     BC training entrypoint
+build_capsule.py             Package model + metadata into capsule
 ```
 
 
@@ -121,8 +203,19 @@ run_agent.py                 Entrypoint
 ### Agent
 - **`components/agent/agent.py`** — `LLMAgent` orchestration loop, multi-provider
   LLM support (Anthropic / Groq / Gemini / LM Studio).
+- **`components/agent/capsule.py`** — Routes goal string + window title to the
+  correct `.pt` checkpoint via `tasks/registry.json`.
 - **`components/agent/task_plugins/`** — Task plugins. The plugin owns task
   logic; the agent owns the observe → decide → act loop.
+
+### Transformer (BC Policy)
+- **`components/intelligence/model/transformer.py`** — `TransformerAgentNetwork`.
+  Causal transformer trained via behavioral cloning. Predicts: action type
+  (click/keyboard/noop), which element to click (pointer head), which source
+  element contains the value to type (source pointer head).
+- Input: UI element list (bbox + type + text embedding) across H history steps.
+- Output: action type logits + per-element click logits + per-element source logits.
+- **LayerNorm on pointer heads** — prevents bilinear Q×K divergence (fixed 197M loss bug).
 
 ### Observers
 - **UI Automation Observer** — Walks the UIA tree, returns `{element_id, type,
@@ -142,9 +235,12 @@ run_agent.py                 Entrypoint
 - pyautogui mouse/keyboard. All actions go through this — no OS-level
   shortcuts that humans can't do.
 
-### Trace Translator
-- Converts an action trace into natural-language steps for downstream
-  consumption (training data, replay, debugging).
+### Rule Extractor
+- **`components/intelligence/rule_extractor.py`** — Two modes:
+  - `extract()` — derives rules from completed agent run trace (timestamped log).
+  - `correct()` — reads existing spec + new human demo → LLM produces corrected
+    spec → overwrites `tasks/form_filling/ruleset.md`. Called automatically
+    after every recording session.
 
 
 ## Current Goal
@@ -211,8 +307,8 @@ These are blocking every downstream improvement.
 The transformer's click accuracy is ~40% after 19 sessions. It needs to see each field ~50+ times before positions become reliable.
 
 - [ ] **Record 30+ total sessions** — Each session = one complete form fill (all 5 records, all 8 tabs). Currently at 19. Target: 50 sessions = ~25,000 traces before expecting reliable click accuracy.
-- [ ] **Run correctional spec after every new session** — `record_trace.py` calls `RuleExtractor.correct()` automatically on stop. Confirm `form_filling.md` updates each time.
-- [ ] **Retrain after every 5 new sessions** — Dataset cache makes init ~5 sec. Full 50-epoch GPU retrain ~20 min. Command: `NO_SENT_TRANSFORMERS=1 python -m components.intelligence.model.transformer --mode train --data_dir tasks/form_filling/traces --model_path tasks/form_filling/model.pt --epochs 50 --d_model 64 --num_layers 2 --max_elements 64 --aug_drop_prob 0.1`
+- [ ] **Run correctional spec after every new session** — `record_trace.py` calls `RuleExtractor.correct()` automatically on stop. Confirm `ruleset.md` updates each time.
+- [ ] **Retrain after every 5 new sessions** — Dataset cache makes init ~5 sec. Full 50-epoch GPU retrain. Command: `python train.py --trace_dir tasks/form_filling/traces_aug --epochs 50`
 - [ ] **Check fidelity after every retrain** — Run agent → `python scripts/bc_fidelity.py --progress`. Fidelity number goes up = improvement confirmed. Target: ≥80%.
 
 ---
@@ -221,9 +317,9 @@ The transformer's click accuracy is ~40% after 19 sessions. It needs to see each
 
 More data alone won't close the gap if the model is too small and undertrained.
 
-- [ ] **Scale model to `d_model=128, num_layers=4`** — Current 164k-param model will underfit at 50 sessions. Bump once dataset exceeds 30 sessions.
+- [ ] **Scale model to `d_model=128, num_layers=4`** — Current 131k-param model will underfit at 50 sessions. Bump once dataset exceeds 30 sessions.
 - [ ] **Train to 100 epochs** — val_loss was still trending down at epoch 21 (best checkpoint). Extend budget. Early stopping already saves best checkpoint so extra epochs cost nothing if loss plateaus.
-- [ ] **Click accuracy target: ≥75%** — Current: ~40%. Each 10-session retrain cycle should move this up. If click_acc stalls below 60% after 40 sessions, revisit click loss weight (currently `lambda_click=2.0` — try 3.0).
+- [ ] **Click accuracy target: ≥75%** — Current: ~19.5%. Each 10-session retrain cycle should move this up. If click_acc stalls below 60% after 40 sessions, revisit click loss weight (currently `lambda_click=2.0` — try 3.0).
 
 ---
 
@@ -233,7 +329,7 @@ LLM currently does all reasoning. Transformer needs to take over progressively.
 
 - [ ] **`PROVIDER="none"` smoke test** — Disable LLM entirely. Run agent on the form. Record: how many fields does the transformer fill correctly? Which tabs does it navigate correctly? This is the BC baseline.
 - [ ] **Lower `_HIGH_CONF` threshold** — Currently 0.995 (LLM always decides). Once transformer click_acc ≥ 75%, lower to 0.90 so transformer handles confident clicks, LLM handles ambiguous cases.
-- [ ] **Automate correction → retrain trigger** — After each new session, if `form_filling.md` changed, auto-queue a retrain. Removes manual intervention from the loop.
+- [ ] **Automate correction → retrain trigger** — After each new session, if `ruleset.md` changed, auto-queue a retrain. Removes manual intervention from the loop.
 
 ---
 
@@ -265,15 +361,18 @@ Priority order — top = most blocking right now.
 - [x] **Train longer** *(→ Finished Tasks)* — Default epochs 20 → 50, GPU training on RTX 4050.
 - [x] **GPU training** *(→ Finished Tasks)* — CUDA PyTorch 2.6.0+cu124 installed.
 - [x] **Dataset init cache** *(→ Finished Tasks)* — `.dataset_cache.pkl` cuts retrain init from 10 min to ~1 sec.
-- [x] **Bootstrap correctional spec** *(→ Finished Tasks)* — `scripts/bootstrap_spec.py` ran `correct()` across all 19 sessions.
+- [x] **Element order shuffle** *(→ Finished Tasks)* — `__getitem__` shuffles last state's element order each batch; pointer labels remapped through inverse permutation. Prevents position memorization.
+- [x] **Element dropout label protection** *(→ Finished Tasks)* — Click/source target elements exempt from dropout; zeroed target → masked logit → ~1e9 CE loss bug fixed.
 - [ ] **Fix _compress_session()** — Trace compressor produces near-empty output because JSON structure doesn't match expected fields. LLM gets no specific data → spec stays generic. Must fix before next bootstrap.
 - [ ] **Fix LLM checkbox clicking** — Inferred from spec, not hardcoded. Needs `_compress_session()` fixed first so traces surface checkbox behavior patterns.
-- [ ] **Record more training traces** — 19 sessions. Target 50. Click_acc ~40%, needs ~75% for reliable fills. See Stage 1.
+- [ ] **Record more training traces** — 19 sessions. Target 50. Click_acc ~19.5%, needs ~75% for reliable fills. See Stage 1.
 
 ### 🟡 P2 — Important (do after P1)
 
 - [x] **Correctional ruleset system** *(→ Finished Tasks)* — `RuleExtractor.correct()` + `record_trace.py` auto-calls on session end.
-- [x] **Spec injection into agent** *(→ Finished Tasks)* — `LLMAgent.__init__` loads `form_filling.md` into LLM system prompt.
+- [x] **Spec injection into agent** *(→ Finished Tasks)* — `LLMAgent.__init__` loads `tasks/form_filling/ruleset.md` into LLM system prompt.
+- [x] **Data augmentation** *(→ Finished Tasks)* — `scripts/augment_traces.py` creates ×4 copies per session with bbox jitter, click jitter, confidence noise, element order shuffle.
+- [ ] **Train on augmented data** — Run full 50 epochs on `tasks/form_filling/traces_aug` (52k traces, 5× original). Expected to improve click_acc significantly.
 - [ ] **Increase model capacity** — Bump to `d_model=128, num_layers=4` after 30+ sessions.
 - [ ] **PROVIDER="none" smoke test** — Run agent with LLM disabled. Measures pure transformer capability. See Stage 3.
 - [ ] **Automate correction → retrain loop** — After each session, if spec changed, queue retrain. See Stage 3.
@@ -407,28 +506,35 @@ Completed work, preserved for reference. Items here were once in P1/P2/P3 or the
 - **Boost click loss weight** — `lambda_click` raised 1.0 → 2.0. Extra gradient pressure on click head. Was: P1 Blocking.
 - **Train longer** — Default epochs 20 → 50. val_loss still trending at epoch 21 so budget increased. Best checkpoint auto-saved. Was: P1 Blocking.
 - **Dataset init cache** — `TrajectoryDataset.__init__` saves filtered file paths + action metadata to `.dataset_cache.pkl`. Invalidated when any session file is newer than cache. Cuts retrain init from 10 min to ~1 sec on second+ run. Was: P1 Blocking.
-- **Lazy loading** — State tensors built on demand in `__getitem__`, not at init. Fixes OOM crash on 11k-trace datasets. Was: implicit P1 blocker (MemoryError).
+- **Lazy loading / LRU cache** — State tensors built on demand in `__getitem__` via LRU cache (50k cap). Fixes OOM crash on large augmented datasets. Was: implicit P1 blocker.
 - **NO_SENT_TRANSFORMERS bypass** — Sentence-transformers caused segfault (exit 139) with torch 2.6.0. Env var skips loading entirely. Was: implicit P1 blocker.
 - **Balanced sampler** — Per-class sampling so click/keyboard classes train equally despite imbalance. Fixed index bug after lazy-load tuple reorder. Was: P2.
-- **Data augmentation** — `scripts/augment_traces.py` creates ×4 copies per session with bbox jitter ±5px, click jitter ±4px, confidence noise ±0.03. Was: P2.
+- **Data augmentation** — `scripts/augment_traces.py` creates ×4 copies per session with bbox jitter ±5px, click jitter ±4px, confidence noise ±0.03, element order shuffle. Was: P2.
+- **Element order shuffle** — `__getitem__` shuffles last state's element order each batch; tgt_click_idx and src_idx remapped through inverse permutation. Prevents model memorizing list positions. Was: P1.
+- **Element dropout label protection** — Click/source target elements protected from aug_drop in the current state. Fixes ~1e9 CE loss caused by masked target logits. Was: P1 Blocking.
+- **LayerNorm on pointer heads** — Bilinear Q×K divergence fixed. click_q_norm, click_k_norm, src_q_norm, src_k_norm added. Resolved 197M training loss. Was: P1 Blocking.
+- **Tasks/ reorganization** — model.pt, ruleset.md, traces, submissions moved to `tasks/form_filling/`. Global registry at `tasks/registry.json`. All path references updated. Was: housekeeping.
 
 ### Agent & Merge Logic
-- **Fix LLM click position** — `_merge()` now calls `_resolve_target()` on the LLM's named target first. Uses element bbox center directly. Transformer click coords only used as fallback when LLM target doesn't resolve. Confirmed working: logs show "LLM target 'E-Signature Obtained' → (1357, 670)". Was: P1 Blocking.
+- **Fix LLM click position** — `_merge()` now calls `_resolve_target()` on the LLM's named target first. Uses element bbox center directly. Transformer click coords only used as fallback when LLM target doesn't resolve. Was: P1 Blocking.
+- **Stuck guard fixed** — Removed `not _plugin_active` gate so stuck guard fires in pure_transformer mode. Prevents infinite click loops on unresponsive elements. Was: P1 Blocking.
+- **Transformer type override** — When transformer conf ≥ 0.70 and LLM says type but transformer says click, transformer wins on action type. Prevents LLM typing into comboboxes. Was: P1 Blocking.
 
 ### Ruleset & Spec System
-- **Correctional ruleset system** — `RuleExtractor.correct(session_dir, goal)` reads existing `form_filling.md` + new session traces → sends both to LLM → overwrites spec with corrected version. Single truth file, not one file per session. Was: P2.
+- **Correctional ruleset system** — `RuleExtractor.correct(session_dir, goal)` reads existing `ruleset.md` + new session traces → sends both to LLM → overwrites spec with corrected version. Single truth file, not one file per session. Was: P2.
 - **Spec injection into agent** — `LLMAgent.__init__` loads `tasks/form_filling/ruleset.md` at startup and appends to LLM system prompt. Every agent run uses the latest inferred spec. Was: P2.
 - **Auto-extract on record** — `record_trace.py` calls `RuleExtractor.correct()` automatically when a session ends (≥5 traces). Spec improves with every recording without manual steps. Was: P2.
-- **Bootstrap correctional spec** — `scripts/bootstrap_spec.py` ran `correct()` sequentially across all 19 existing sessions to build the initial `form_filling.md`. Was: Stage 0 blocker.
+- **Bootstrap correctional spec** — `scripts/bootstrap_spec.py` ran `correct()` sequentially across all 19 existing sessions to build the initial `ruleset.md`. Was: Stage 0 blocker.
 
 ### Evaluation
 - **Per-run evaluation metrics** — `evaluate_run(results)` in `scripts/eval_metrics.py` computes Task Completion Rate, Action Prediction Accuracy, and Execution Success Rate from in-memory agent results. Wired into `run_task.py` via `try/finally` — fires on every run including crashes, early stops, and Ctrl+C. Was: not implemented.
-- **`_compress_session()` fixed** — Trace compressor now reads actual JSON structure (`action.action_type`, `action.text`, `action.click_position`, active tab from selected tabitem elements, focused field by `element_id`, click target by bbox proximity). Was: producing near-empty output. Was: P1 blocker for bootstrap quality.
+- **`_compress_session()` fixed** — Trace compressor now reads actual JSON structure. Was: producing near-empty output. Was: P1 blocker for bootstrap quality.
 - **BC fidelity scorer** — `scripts/bc_fidelity.py` scores every agent run against a gold standard human submission. Outputs Fidelity Score (0-100%) = `field_match_rate×0.4 + value_accuracy×0.4 + tab_coverage×0.1 + completion_bonus×0.1`. Appends to `data/output/bc_progress.jsonl` for trend tracking. Wired into `run_task.py` — fires after every run. View trend: `python scripts/bc_fidelity.py --progress`. Was: not implemented.
+- **Value accuracy metric** — `evaluate_run()` now infers which source record the agent was filling by best-match scoring of typed values, then computes per-field correct/incorrect breakdown. Was: not implemented.
 
 ### Infrastructure
 - **Capsule registry** — `components/agent/capsule.py` + `build_capsule.py`. Per-task model routing: agent auto-selects `.pt` file based on goal string and window title. Was: architecture item.
-- **`.gitignore` for traces** — `tasks/form_filling/traces/`, `forms_aug/`, `live/` excluded. `.dataset_cache.pkl` excluded. Was: housekeeping.
+- **`.gitignore` for traces** — `tasks/form_filling/traces/`, `traces_aug/`, excluded. `.dataset_cache.pkl` excluded. Was: housekeeping.
 
 ### Behavioral Fidelity Benchmarks
 Tasks specifically designed to measure whether Intern clones *style and decision-making*, not just mechanical actions.
