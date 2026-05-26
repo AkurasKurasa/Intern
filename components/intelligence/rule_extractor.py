@@ -353,6 +353,12 @@ class RuleExtractor:
         new_traces    = _compress_session(session_dir)
         n_files       = len(list(session_dir.glob("*.json")))
 
+        # Truncate existing spec to ~800 chars so it fits within local model
+        # context alongside the new traces and system prompt (~3200 chars total).
+        _SPEC_CHAR_LIMIT = 800
+        if existing_spec and len(existing_spec) > _SPEC_CHAR_LIMIT:
+            existing_spec = existing_spec[:_SPEC_CHAR_LIMIT] + "\n... (truncated)"
+
         prompt = (
             f"STATED GOAL: {goal}\n\n"
             f"=== EXISTING SPEC ===\n"
