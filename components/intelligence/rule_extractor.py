@@ -262,9 +262,9 @@ def _compress_session(session_dir: str | Path) -> str:
         if line != deduped[-1]:
             deduped.append(line)
 
-    # Cap at 60 lines — keeps prompt under 4096 tokens for local models
-    if len(deduped) > 60:
-        deduped = deduped[:30] + ["... (truncated) ..."] + deduped[-30:]
+    # Cap at 20 lines — keeps prompt under 4096 tokens for local models (4096 ctx)
+    if len(deduped) > 20:
+        deduped = deduped[:10] + ["... (truncated) ..."] + deduped[-10:]
 
     return "\n".join(deduped)
 
