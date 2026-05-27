@@ -24,6 +24,7 @@ try:
 except Exception:
     pass
 
+import json
 import logging
 import sys
 
@@ -55,7 +56,7 @@ PROVIDER      = "lmstudio"    # anthropic | groq | gemini | lmstudio | none
 API_KEY       = os.environ.get("ANTHROPIC_API_KEY", "")
 GROQ_API_KEY  = os.environ.get("GROQ_API_KEY", "")
 SOURCE_WINDOW = "Notepad"     # title fragment of the data source window
-MAX_STEPS     = 50
+MAX_STEPS     = 200
 STEP_DELAY    = 1.5
 
 # ── run ───────────────────────────────────────────────────────────────────────
@@ -64,7 +65,8 @@ if __name__ == "__main__":
     from agent.agent import LLMAgent
     from observers.vlm.visual_data_reader.visual_data_reader import VisualDataReader
 
-    if PROVIDER not in ("lmstudio", "none") and not API_KEY:
+    _active_key = API_KEY if PROVIDER == "anthropic" else GROQ_API_KEY if PROVIDER == "groq" else API_KEY
+    if PROVIDER not in ("lmstudio", "none") and not _active_key:
         logger.error("API key not set for provider %r. Add to .env", PROVIDER)
         sys.exit(1)
 
@@ -82,9 +84,9 @@ if __name__ == "__main__":
     agent = LLMAgent(
         goal             = GOAL,
         provider         = PROVIDER,
-        api_key          = API_KEY,
+        api_key          = _active_key,
         task_plugin      = None,
-        pure_transformer = True,
+        pure_transformer = False,
         visual_reader    = visual_reader,
         visual_cache     = visual_cache,
         source_window    = SOURCE_WINDOW,
@@ -108,7 +110,22 @@ if __name__ == "__main__":
         # ── Evaluation metrics (always runs, even on early stop or crash) ──────
         sys.path.insert(0, os.path.join(_ROOT, "scripts"))
         from eval_metrics import evaluate_run
-        evaluate_run(results, goal=GOAL)
+        _metrics = evaluate_run(results, goal=GOAL, heuristic_steps=agent._heuristic_steps)
+
+        # ── Persist metrics to JSONL for trend tracking ───────────────────────
+        try:
+            import datetime as _dt
+            _metrics_path = os.path.join(_ROOT, "data", "output", "run_metrics.jsonl")
+            _metrics_row  = {
+                "timestamp": _dt.datetime.now().isoformat(),
+                "goal":      GOAL,
+                "provider":  PROVIDER,
+                **{k: v for k, v in _metrics.items() if k != "summary"},
+            }
+            with open(_metrics_path, "a", encoding="utf-8") as _mf:
+                _mf.write(json.dumps(_metrics_row) + "\n")
+        except Exception as _me:
+            logger.debug("Metrics persist failed: %s", _me)
 
         # ── BC fidelity score vs gold standard ───────────────────────────────
         try:

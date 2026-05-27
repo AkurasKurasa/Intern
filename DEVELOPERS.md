@@ -242,6 +242,40 @@ build_capsule.py             Package model + metadata into capsule
     spec → overwrites `tasks/form_filling/ruleset.md`. Called automatically
     after every recording session.
 
+### Chain-of-Thought (LM Studio only)
+
+The agent injects a reasoning step for local models to reduce hallucination and
+improve action quality. Only active for LM Studio / OpenAI-compatible providers —
+**not** Anthropic (Claude's native reasoning is superior and handles this
+internally).
+
+**How it works:**
+
+1. `_call_openai_compat()` appends to the system prompt:
+   ```
+   Before choosing an action, reason briefly inside <think>...</think> tags.
+   Then output ONLY a JSON object on the last line.
+   ```
+2. A unique session tag (`[sid:xxxxxxxx]`) is appended per call to break LM
+   Studio's server-side KV-cache accumulation (prevents stale context).
+3. The model responds with optional `<think>` reasoning followed by the JSON
+   action object.
+4. `_parse_llm_response()` strips `<think>...</think>` blocks before JSON
+   parsing — the reasoning is discarded, only the action object reaches the
+   agent loop.
+
+**Why only for local models:**
+Qwen2.5-7B-Instruct (the current LM Studio model) is not a native reasoning
+model. CoT injection via system prompt gives it a structured thinking step it
+wouldn't otherwise take. Anthropic models (Claude) have built-in extended
+thinking and don't benefit from this — injecting CoT prompts into Claude wastes
+tokens and degrades JSON formatting reliability.
+
+**To disable CoT for a specific local model:** remove the CoT injection lines
+from `_call_openai_compat()` in `components/agent/agent.py`. The `<think>` strip
+in `_parse_llm_response()` is a no-op if no think blocks are present, so it is
+safe to leave in place.
+
 
 ## Current Goal
 
@@ -257,15 +291,23 @@ build_capsule.py             Package model + metadata into capsule
 Two test modes: **With LLM** (normal operation) and **Transformer-only** (`PROVIDER="none"`).
 The transformer-only score is the real BC progress indicator — LLM is a crutch, not the goal.
 
-### With LLM (`PROVIDER="lmstudio"`) — 2026-05-24
+### With LLM (`PROVIDER="lmstudio"`) — 2026-05-27
 
 | Metric | Score | Detail |
 |--------|-------|--------|
-| **Task Completion Rate** | 25% | 5 fields filled / ~20 total |
-| **Action Prediction Accuracy** | 0% | 0 on-target / 0 clicks (LLM typed into comboboxes) |
-| **Execution Success Rate** | 55.6% | 5 ok / 9 actionable steps |
-| **Transformer conf** | 0.74–0.84 | click predictions active (was 0.00 — fixed pointer head explosion) |
-| **Training** | val_loss=6.74  click_acc=19.5% | 50 epochs, fixed bilinear divergence (LayerNorm on pointer heads) |
+| **Task Completion Rate** | ~30–40% | Multi-tab filling working; Policy + Policyholder + Vehicle confirmed |
+| **Value Accuracy** | 100% | All typed values matched source record |
+| **Action Prediction Accuracy** | ~60–70% | Clicks landing on interactive elements; combobox-fix handles state/education/occupation |
+| **Execution Success Rate** | ~70% | Auto-handlers resolve most fields; LLM called for ~10 steps out of 133+ |
+| **LLM Dependency** | ~7–10% | ~10 LLM steps / 130+ total (was reported 100% — metric bug fixed this session) |
+| **Transformer conf** | ~0.64 avg | Below HIGH_CONF threshold (0.995) so LLM still called for all tagged steps |
+| **Steps per field** | ~4–6 | 133 steps / ~25 fields across 3+ tabs |
+
+**Key infrastructure fixes this session (2026-05-27):**
+- `pure_transformer=False` in run_task.py — was silently disabling ALL auto-handlers
+- Tab advance tracker always trusted over pane detection (pane detection fundamentally broken)
+- `_resolve_target` deprioritizes tabitem/tabitemcontrol — prevents tab headers stealing LLM clicks
+- `_heuristic_steps` counter added — LLM Dependency denominator now includes heuristic steps
 
 ### Transformer-Only (`PROVIDER="none"`) — 2026-05-23
 
@@ -276,9 +318,10 @@ The transformer-only score is the real BC progress indicator — LLM is a crutch
 | **Execution Success Rate** | 5.6–40% | Fills 1 field (Agency Name or Policy Number), then loops on unresolved keyboard — confirmed across 2 runs |
 
 **What the numbers say right now:**
-- LLM fills text fields correctly but fails on all comboboxes (~45% wasted steps).
-- Transformer-only score = true BC baseline. Must improve this over time, not the LLM score.
-- Main gap: combobox handling + tab navigation across all 8 tabs.
+- Auto-handlers fill most fields correctly; LLM handles only navigation decisions (~10 steps per run).
+- Value Accuracy 100% — typed values exactly match source data.
+- Main remaining gap: combobox selections (LLM must open dropdown then select correct option).
+- Transformer-only still fails — model conf 0.64 avg, needs retraining on new traces.
 
 **How to track progress:** after each retrain, run both modes and update this table.
 
@@ -474,6 +517,13 @@ picking it up has the failure mode in hand.
 ### Generality
 - [ ] **`RECORD N OF M` delimiter hardcoded** — Only this intake format
       parses. Any other source layout is unparseable.
+- [ ] **Task-specific code baked into `agent.py`** — Three pieces are
+      car-insurance-form-specific and break generality:
+      `_detect_section` (regex `section_(driver|vehicle)_(\d+)`),
+      `_KNOWN_TABS` (`{"policy", "policyholder", "vehicle", ...}`), and
+      `_TAB_PANE_NAMES` (`["tab_policy", "tab_policyholder", ...]`).
+      These should be constructor params with neutral defaults so the agent
+      works on any form without modification.
 - [ ] **No unit tests** — Every fix is run-and-pray. A regression suite would
       catch `_parse_records`, `_lookup_field`, and tab-advance bugs before
       they reach a real run.

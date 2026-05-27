@@ -584,12 +584,17 @@ class TrajectoryDataset(Dataset):
         if len(unique_files) <= _PRELOAD_LIMIT:
             self._tensor_cache: dict = {}
             self._lru_cache = None
-            print(f"[Dataset] Preloading {len(unique_files)} trace tensors into RAM...", flush=True)
-            for fpath in unique_files:
+            total = len(unique_files)
+            print(f"[Dataset] Preloading {total} trace tensors into RAM...", flush=True)
+            for i, fpath in enumerate(unique_files):
                 t = _load_trace(fpath)
                 state = t.get("state", {}) if t else {}
                 self._tensor_cache[fpath] = encode_state(state, self.max_elements)
-            print(f"[Dataset] Preload done.", flush=True)
+                if (i + 1) % 1000 == 0 or (i + 1) == total:
+                    pct = (i + 1) / total * 100
+                    bar = "#" * int(pct / 5) + "-" * (20 - int(pct / 5))
+                    print(f"\r  [{bar}] {i+1}/{total} ({pct:.0f}%)", end="", flush=True)
+            print(f"\n[Dataset] Preload done.", flush=True)
         else:
             # LRU cache: keeps last N tensors in RAM, evicts oldest on overflow.
             # Trades RAM for disk I/O — each cache miss re-reads one JSON file.

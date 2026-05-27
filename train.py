@@ -27,8 +27,11 @@ Arguments
 from __future__ import annotations
 
 import argparse
+import faulthandler
 import os
 import sys
+
+faulthandler.enable()  # print C-level traceback on segfault/SIGABRT
 
 # ── resolve paths so imports work from the project root ────────────────────────
 _ROOT = os.path.dirname(os.path.abspath(__file__))
@@ -105,7 +108,12 @@ def main():
     print(f"  device     : {args.device}")
     print(f"{'='*60}\n")
 
-    trainer.train()
+    try:
+        trainer.train()
+    except Exception as _e:
+        import traceback
+        traceback.print_exc()
+        sys.exit(1)
 
     print(f"\n  Checkpoint saved -> {save_path}")
 

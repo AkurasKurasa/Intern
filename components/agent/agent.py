@@ -139,6 +139,12 @@ General rules:
 3. If a field already has the correct value → hotkey ["tab"] to move on.
 4. Interact with whatever app is on screen — do not assume it is a form.
 5. Output JSON only. No explanation outside the object.
+6. ALWAYS act on the CURRENTLY FOCUSED FIELD first. Do not click other fields to skip ahead.
+7. Fill fields in order — top to bottom, left to right. Never jump over a field.
+8. UNKNOWN VALUE RULE: If you do not see the value for the focused field in DATA SOURCES, do NOT guess, invent, or reuse a value from another field. Output exactly: {"action_type": "hotkey", "keys": ["tab"], "reason": "value not found in data sources — skipping"}
+9. UNCERTAINTY RULE: If you are unsure what action to take next, skip with tab rather than guess. A skipped field is recoverable. A wrong value is not.
+10. All required data is already provided in DATA SOURCES. Do not click buttons or controls that would fetch, import, or load additional data — doing so will open dialogs that derail the task.
+11. DIALOG ESCAPE: If an unexpected dialog or popup appears that you did not intend to open, press Escape immediately: {"action_type": "hotkey", "keys": ["escape"], "reason": "dismissing unexpected dialog"}
 """
 
 
@@ -151,7 +157,7 @@ General rules:
 from data_sources.notepad_source import _parse_records  # noqa: F401
 
 
-def _state_to_text(state: Dict[str, Any], record_num: int = 1, visual_cache: Optional[Dict[str, str]] = None) -> str:
+def _state_to_text(state: Dict[str, Any], record_num: int = 1, visual_cache: Optional[Dict[str, str]] = None, filled_labels: Optional[set] = None) -> str:
     lines: List[str] = []
     lines.append(f"Active window: {state.get('application','?')} — {state.get('window_title','')!r}")
 
@@ -231,32 +237,55 @@ def _state_to_text(state: Dict[str, Any], record_num: int = 1, visual_cache: Opt
     all_types = sorted({e.get("type", "?") for e in form_elems})
 
 
+    _filled = filled_labels or set()
+    _filled_lower = {s.lower() for s in _filled}
+
     lines.append("SCREEN (use EXACT strings as 'target' when clicking):")
-    for e in labels[:30]:
+    for e in labels[:15]:
         focused = " [FOCUSED]" if e.get("focused") else ""
         txt = (e.get('text') or '').strip()
         if len(txt) > 200:
-            continue  # skip source-data blobs misclassified as labels
+            continue
         lines.append(f"  \"{txt}\"{focused}")
 
-    lines.append(f"\nINTERACTIVE ELEMENTS ({len(interactive)} elements):")
-    for e in interactive[:30]:
-        focused = " [FOCUSED]" if e.get("focused") else ""
+    # Only show unfilled interactive elements (+ always show focused element)
+    _focused_id_st = state.get("focused_element_id")
+    _shown = 0
+    lines.append(f"\nINTERACTIVE ELEMENTS (showing unfilled):")
+    for e in interactive:
+        if _shown >= 15:
+            break
         val   = (e.get("value") or "").strip()
         text  = (e.get("text") or "").strip()
-        # Skip elements with huge values — these are source-data edit controls
-        # (e.g. Notepad's full file content), not form fields.
         if len(val) > 300 or len(text) > 300:
             continue
         label = text or val or "(empty)"
+        # Skip already-filled non-focused elements to save tokens
+        if (label.lower() in _filled_lower
+                and e.get("element_id") != _focused_id_st
+                and e.get("type") not in ("tabitem", "tabitemcontrol", "buttoncontrol")):
+            continue
+        focused = " [FOCUSED]" if e.get("focused") else ""
         lines.append(f"  [{e.get('type','?')}] \"{label}\"{focused}"
                      + (f"  current value: {val!r}" if val else ""))
+        _shown += 1
 
     if visual_cache:
-        # Visual cache is populated — use it directly (avoids reading 80k+ token Notepad blobs)
-        lines.append(f"\nDATA SOURCES (Record {record_num}):")
+        # Only show unfilled fields — already-filled ones waste tokens
+        # Always include the focused field's entry even if it's past the cap
+        _focused_field_name = ""
+        if focused_el:
+            _focused_field_name = (focused_el.get("label") or focused_el.get("text") or "").strip().lower()
+        lines.append(f"\nDATA SOURCES (Record {record_num}, unfilled fields):")
+        _shown_ds = 0
         for field, value in visual_cache.items():
+            _is_focused_field = field.lower() == _focused_field_name
+            if _shown_ds >= 20 and not _is_focused_field:
+                continue
+            if field.lower() in _filled_lower and not _is_focused_field:
+                continue
             lines.append(f"  {field} : {value}")
+            _shown_ds += 1
     elif data_elems:
         # Collect all background text blobs
         bg_blobs = []
@@ -333,8 +362,11 @@ def _history_to_text(history: List[Dict[str, Any]]) -> str:
 
 
 def _parse_llm_response(raw: str) -> Dict[str, Any]:
-    """Strip markdown fences and parse JSON from any LLM response."""
+    """Strip markdown fences, thinking blocks, and parse JSON from any LLM response."""
+    import re as _re
     raw = raw.strip()
+    # Strip <think>...</think> blocks emitted by reasoning models (QwQ, DeepSeek-R1, etc.)
+    raw = _re.sub(r"<think>.*?</think>", "", raw, flags=_re.DOTALL).strip()
     if raw.startswith("```"):
         parts = raw.split("```")
         raw = parts[1] if len(parts) > 1 else raw
@@ -374,26 +406,31 @@ def _resolve_target(target: str, state: Dict[str, Any]) -> Optional[List[float]]
         "comboboxcontrol", "listitemcontrol", "tabitemcontrol", "listcontrol",
         "hyperlinkcontrol", "splitbuttoncontrol",
     }
+    # Tab navigation controls are deprioritized — they share names with form sections
+    # (e.g. "Policy" tab header vs "Policy Number" field).  Only fall back to them
+    # when nothing else matches, so LLM clicks like "click Policy" land on inputs first.
+    _TAB_TYPES = {"tabitem", "tabitemcontrol"}
+    _INTERACTIVE_NONTAB = _INTERACTIVE - _TAB_TYPES
 
     def _center(e: Dict) -> List[float]:
         b = e.get("bbox", [0, 0, 0, 0])
         return [(b[0] + b[2]) / 2, (b[1] + b[3]) / 2]
 
-    # 1. Exact match on interactive element text
+    # 1. Exact match on non-tab interactive element text
     for e in active_elems:
-        if e.get("type") in _INTERACTIVE:
+        if e.get("type") in _INTERACTIVE_NONTAB:
             txt = (e.get("text") or e.get("label") or e.get("value") or "").lower()
             if txt == tl:
                 return _center(e)
 
-    # 2. Exact match on label element → return nearest interactive element
+    # 2. Exact match on label element → return nearest non-tab interactive element
     for e in active_elems:
         txt = (e.get("text") or e.get("label") or "").lower()
         if txt == tl:
             cx, cy = _center(e)
             best, best_dist = None, float("inf")
             for other in active_elems:
-                if other.get("type") not in _INTERACTIVE:
+                if other.get("type") not in _INTERACTIVE_NONTAB:
                     continue
                 ox, oy = _center(other)
                 dist = ((ox - cx) ** 2 + (oy - cy) ** 2) ** 0.5
@@ -403,21 +440,21 @@ def _resolve_target(target: str, state: Dict[str, Any]) -> Optional[List[float]]
             if best and best_dist < 300:
                 return _center(best)
 
-    # 3. Partial match on interactive element text
+    # 3. Partial match on non-tab interactive element text
     for e in active_elems:
-        if e.get("type") in _INTERACTIVE:
+        if e.get("type") in _INTERACTIVE_NONTAB:
             txt = (e.get("text") or e.get("label") or e.get("value") or "").lower()
             if tl in txt or txt in tl:
                 return _center(e)
 
-    # 4. Partial match on label → nearest interactive
+    # 4. Partial match on label → nearest non-tab interactive
     for e in active_elems:
         txt = (e.get("text") or e.get("label") or "").lower()
         if tl in txt or txt in tl:
             cx, cy = _center(e)
             best, best_dist = None, float("inf")
             for other in active_elems:
-                if other.get("type") not in _INTERACTIVE:
+                if other.get("type") not in _INTERACTIVE_NONTAB:
                     continue
                 ox, oy = _center(other)
                 dist = ((ox - cx) ** 2 + (oy - cy) ** 2) ** 0.5
@@ -429,9 +466,16 @@ def _resolve_target(target: str, state: Dict[str, Any]) -> Optional[List[float]]
 
     # 5. Match by current element value (LLM sometimes uses the value as target)
     for e in active_elems:
-        if e.get("type") in _INTERACTIVE:
+        if e.get("type") in _INTERACTIVE_NONTAB:
             val = (e.get("value") or "").lower().strip()
             if val and val == tl:
+                return _center(e)
+
+    # 6. Last resort: repeat passes 1+3 including tab items (explicit tab switching)
+    for e in active_elems:
+        if e.get("type") in _TAB_TYPES:
+            txt = (e.get("text") or e.get("label") or e.get("value") or "").lower()
+            if txt == tl or tl in txt or txt in tl:
                 return _center(e)
 
     return None
@@ -497,6 +541,23 @@ class LLMAgent:
         except Exception:
             pass
         self.model_path = model_path
+        # Resolve relative model path against repo root so CWD doesn't matter
+        if not os.path.isabs(self.model_path):
+            _agent_dir = os.path.dirname(os.path.abspath(__file__))
+            _repo_root = os.path.normpath(os.path.join(_agent_dir, "..", ".."))
+            _abs_mp    = os.path.normpath(os.path.join(_repo_root, self.model_path))
+            if os.path.exists(_abs_mp):
+                self.model_path = _abs_mp
+        # Fail fast — a missing capsule means every step silently runs as pure LLM with no spatial
+        # grounding. Surface this at startup so it's never confused with a real run.
+        if provider != "none" and not os.path.exists(self.model_path):
+            raise FileNotFoundError(
+                f"\n\n{'!'*60}\n"
+                f"  CAPSULE NOT FOUND: {self.model_path}\n"
+                f"  Train the model first:  python -m components.intelligence.model.transformer "
+                f"--mode train --data_dir data/output/traces/live\n"
+                f"{'!'*60}\n"
+            )
         self.dry_run    = dry_run
         self.max_steps  = max_steps
         self.step_delay = step_delay
@@ -536,10 +597,12 @@ class LLMAgent:
         self._visual_cache: Dict[str, str]  = visual_cache or {}   # Gemini pre-scan data
         self._visual_reader: Optional[Any]  = visual_reader        # VisualDataReader instance
         self._source_window: str            = source_window        # Notepad/source window title
-        self._history:  List[Dict[str, Any]] = []
-        self._results:  List[Dict[str, Any]] = []
+        self._history:        List[Dict[str, Any]] = []
+        self._results:        List[Dict[str, Any]] = []
+        self._heuristic_steps: int                 = 0
         self._checked_fields: set           = set()   # checkboxes already clicked this run
         self._filled_this_tab: set          = set()   # edit fields filled on current tab (prevents re-fill on cycling)
+        self._nochange_click_pos: set       = set()   # (rx,ry) click positions that gave no_change this tab
         self._current_tab_idx: int          = 0       # tracks which tab we're on
         self._guidance: str = ""
         self._task_name: str = ""   # set via run(task_name=...)
@@ -585,11 +648,10 @@ class LLMAgent:
 
         # ── Load persistent task spec → inject into system prompt ─────────────
         self._system_prompt: str = _SYSTEM_PROMPT
-        _spec_path = os.path.join(
-            os.path.dirname(os.path.abspath(__file__)),  # components/agent/
-            "..", "..", "tasks", "form_filling", "ruleset.md",
-        )
-        _spec_path = os.path.normpath(_spec_path)
+        _mp = self.model_path
+        if not os.path.isabs(_mp):
+            _mp = os.path.join(os.getcwd(), _mp)
+        _spec_path = os.path.normpath(os.path.join(os.path.dirname(_mp), "ruleset.md"))
         if os.path.exists(_spec_path):
             try:
                 _spec = open(_spec_path, encoding="utf-8").read().strip()
@@ -687,6 +749,7 @@ class LLMAgent:
         _no_change_streak: int            = 0
         _NO_CHANGE_LIMIT:  int            = 4   # advance tab after this many consecutive no_change
         _last_focused_id:  Optional[str]  = None  # track focus changes to reset streak
+        _open_combobox_label: str         = ""  # label of combobox whose dropdown is currently open
         _tab_just_switched: bool          = True   # True on first step to focus first empty field
         _last_auto_step:   int            = -1  # step_idx of last step where an auto-handler fired
         _DROUGHT_LIMIT:    int            = 10  # scroll form after this many non-fill steps in a row
@@ -697,9 +760,16 @@ class LLMAgent:
         _pane_escape_last_field: str      = ""  # last field pane-escape tried to click
         _pane_escape_streak:     int      = 0   # consecutive tries on the same field without escaping
         _confirmed_blank_fields: set      = set()  # fields where peek found no value → treat as blank
+        _heuristic_steps:        int      = 0      # steps decided by auto-handlers (not LLM/transformer)
 
         _record_cache_loaded     = False
         _tc_advance_verified     = False   # True once the full top→bottom scan passes before advance/submit
+        _prev_elem_count:    int = 0       # element count from previous step — spike = unexpected dialog
+
+        # Repeat-action detector — fingerprint last N actions; identical streak → Tab out
+        from collections import deque as _deque
+        _action_history: _deque = _deque(maxlen=6)
+        _REPEAT_LIMIT: int = 3
 
         for step_idx in range(n):
           try:
@@ -707,7 +777,18 @@ class LLMAgent:
             state      = self._observe()
             llm_action: Dict[str, Any] = {}
             _steps_on_tab += 1
-            logger.info("── Step %d/%d  (%d elements) ──", step_idx + 1, n, len(state.get("elements", [])))
+            _cur_elem_count = len(state.get("elements", []))
+            logger.info("── Step %d/%d  (%d elements) ──", step_idx + 1, n, _cur_elem_count)
+
+            # Dialog guard: large element-count spike → unexpected dialog opened → Escape
+            if _prev_elem_count > 0 and _cur_elem_count - _prev_elem_count > 100:
+                logger.warning("Element count spiked %d→%d — unexpected dialog detected, pressing Escape.",
+                               _prev_elem_count, _cur_elem_count)
+                self._executor.execute({"action_type": "hotkey", "keys": ["escape"]})
+                time.sleep(self.step_delay)
+                _prev_elem_count = 0
+                continue
+            _prev_elem_count = _cur_elem_count
 
             # Load record cache on first step
             if not _record_cache_loaded:
@@ -736,9 +817,36 @@ class LLMAgent:
             # form-specific auto-handlers and fall through to transformer/LLM only.
             _plugin_active = (self._task_plugin is not None) or self._pure_transformer
 
-            # In pure_transformer mode, still run VLM tab scan on tab switches
-            if self._pure_transformer and _tab_just_switched and self._visual_reader:
-                self._scan_tab_visual(state)
+            # In pure_transformer mode: scroll to top + click first field on tab switch
+            # (same as the non-plugin handler below, but without auto-fill logic)
+            if self._pure_transformer and _tab_just_switched:
+                _tab_just_switched  = False
+                _steps_on_tab       = 0
+                _tab_scroll_count   = 0
+                _no_change_streak   = 0
+                _last_auto_step     = step_idx
+                if self._visual_reader:
+                    self._scan_tab_visual(state)
+                self._scroll_form_to_top(state)
+                time.sleep(0.6)
+                state = self._observe()
+                # Click the topmost-left interactive field (by bbox Y then X).
+                # Excludes tab-strip elements (tabitemcontrol) which sit at the top
+                # of the window but are not form fields.
+                _candidates = sorted(
+                    [e for e in state.get("elements", [])
+                     if e.get("type") in ("editcontrol", "comboboxcontrol", "checkboxcontrol")
+                     and e.get("window_role") != "background"
+                     and e.get("bbox") and e.get("enabled", True)],
+                    key=lambda e: (e["bbox"][1], e["bbox"][0])
+                )
+                if _candidates:
+                    _fe = _candidates[0]
+                    _fx1, _fy1, _fx2, _fy2 = _fe["bbox"]
+                    self._executor.execute({"action_type": "click",
+                                            "click_position": [(_fx1+_fx2)/2, (_fy1+_fy2)/2]})
+                    time.sleep(self.step_delay * 0.5)
+                continue
 
             # 1a. After a tab switch: scroll to top, re-observe, then click first empty field
             if not _plugin_active and _tab_just_switched:
@@ -750,6 +858,7 @@ class LLMAgent:
                 _pane_escape_last_field = ""
                 _pane_escape_streak     = 0
                 self._filled_this_tab.clear()     # new tab — reset filled-field tracking
+                self._nochange_click_pos.clear()  # new tab — reset failed-click blacklist
                 _confirmed_blank_fields.clear()   # new tab — reset peek-confirmed-blank set
                 _tc_advance_verified = False      # new tab — reset full-scan gate
                 # Visual scan: bring Notepad to foreground, scroll to this tab's section,
@@ -778,10 +887,14 @@ class LLMAgent:
                     _foc_id = state.get("focused_element_id")
                     _foc_el = next((e for e in state.get("elements", [])
                                     if e.get("element_id") == _foc_id), None)
-                    _foc_nm = ((_foc_el.get("label") or _foc_el.get("text") or "?")
-                               if _foc_el else "?")
+                    _foc_nm_bare = ((_foc_el.get("label") or _foc_el.get("text") or "?")
+                                    if _foc_el else "?")
+                    _foc_nm_sec  = self._detect_section(state, _foc_el) if _foc_el else ""
+                    _foc_nm      = f"{_foc_nm_sec} {_foc_nm_bare}" if _foc_nm_sec else _foc_nm_bare
                     logger.info("Stuck guard: no_change x%d on %r — Tab past field.",
                                 _no_change_streak, _foc_nm)
+                    if _foc_nm_bare and _foc_nm_bare != "?":
+                        self._filled_this_tab.add(_foc_nm)
                     self._executor.execute({"action_type": "keyboard",
                                             "key_count": 1, "keystrokes": ["tab"]})
                     _no_change_streak = 0
@@ -817,6 +930,10 @@ class LLMAgent:
                             or _e.get("type") not in ("editcontrol", "comboboxcontrol")
                             or not _e.get("enabled", True)):
                         continue
+                    # Inactive tab panels have negative screen coordinates in wxPython.
+                    # Skip off-screen elements — they belong to other tabs, not this one.
+                    if _e.get("bbox") and _e["bbox"][1] < 0:
+                        continue
                     _fn = (_e.get("label") or _e.get("text") or "").strip()
                     _sec = self._detect_section(_st, _e)
                     _fk  = (f"{_sec} {_fn}" if _sec else _fn).lower()
@@ -824,6 +941,16 @@ class LLMAgent:
                         continue
                     if _fk in _cb_lower or _fn.lower() in _cb_lower:
                         continue  # peeked and confirmed blank — skip
+                    # Skip fields in a section that has no data at all (e.g. Driver 3 when
+                    # record has only 2 drivers).  Without this check _lookup_field falls
+                    # back to the bare key and returns the wrong value (e.g. Policyholder's
+                    # First Name instead of Driver 3 First Name), making the section appear
+                    # pending even though it doesn't exist.
+                    if _sec and self._cached_record:
+                        _sec_lower = _sec.lower()
+                        if not any(rk.lower().startswith(_sec_lower + " ")
+                                   for rk in self._cached_record):
+                            continue  # section absent from record — not pending
                     _known = self._lookup_field(_fn, section=_sec)
                     _val   = (_e.get("value") or "").strip()
                     if _known:
@@ -844,18 +971,17 @@ class LLMAgent:
                             or _chk.get("type") != "checkboxcontrol"
                             or not _chk.get("enabled", True)):
                         continue
+                    if _chk.get("bbox") and _chk["bbox"][1] < 0:
+                        continue
                     _nm = (_chk.get("label") or _chk.get("text") or "").strip()
                     if _nm in self._checked_fields:
                         continue
                     if _nm.lower() in _cb_lower:
                         continue  # confirmed blank after peek
                     _exp = self._lookup_field(_nm)
-                    if _exp:
-                        if _exp.lower().strip().startswith("yes"):
-                            return True
-                    else:
-                        # Unknown checkbox — treat as pending so peek gets a chance to run
+                    if _exp and _exp.lower().strip().startswith("yes"):
                         return True
+                    # Unknown checkbox: no data → not blocking tab advance
                 return False
 
             if not _plugin_active and self._filled_this_tab and not _tc_has_pending(state):
@@ -980,31 +1106,71 @@ class LLMAgent:
                     self._scroll_form_down(state)
                     time.sleep(self.step_delay * 0.5)
                     _pane_escape_streak = 0  # reset after scroll so we try click once fresh
-                    continue
+                    _heuristic_steps += 1; continue
                 if self._focus_first_empty_field(state, min_y=_pane_y):
                     time.sleep(self.step_delay * 0.5)
-                    continue
+                    _heuristic_steps += 1; continue
                 # No unhandled field found in this pane — fall through so the
                 # universal tab-complete check (above) or LLM handles next steps.
 
             # 1c. Button-focus escape: if focus landed on a button but there are still
             # pending fields, seek the first unfilled field directly instead of waiting
             # for the LLM to figure out what to do (avoids 10-step wait-loop).
-            if (not _plugin_active and _focused_el and _focused_el.get("type") == "buttoncontrol"
+            if (not _plugin_active and _focused_el
+                    and _focused_el.get("type") in {
+                        "button", "buttoncontrol", "splitbutton", "splitbuttoncontrol",
+                        "hyperlinkcontrol", "link",
+                        "tabitem", "tabitemcontrol"}
                     and _tc_has_pending(state)):
                 _btn_lbl = (_focused_el.get("label") or _focused_el.get("text") or "").strip()
-                logger.info("Button-focus escape: focus on button %r but fields still pending "
+                logger.info("Button-focus escape: focus on non-input %r but fields still pending "
                             "— seeking first unfilled field.", _btn_lbl)
                 if self._focus_first_empty_field(state):
                     _no_change_streak = 0
                     time.sleep(self.step_delay * 0.5)
-                    continue
-                # No empty field visible — scroll down to reveal hidden fields
+                    _heuristic_steps += 1; continue
+                # No empty edit/combobox visible — try unchecked checkboxes directly
+                _chk_pending = [
+                    e for e in state.get("elements", [])
+                    if e.get("type") == "checkboxcontrol"
+                    and e.get("window_role") != "background"
+                    and e.get("enabled", True)
+                    and (e.get("label") or e.get("text") or "").strip() not in self._checked_fields
+                ]
+                _chk_acted = False
+                for _chk_e in _chk_pending:
+                    _chk_nm = (_chk_e.get("label") or _chk_e.get("text") or "").strip()
+                    _exp_v  = self._lookup_field(_chk_nm)
+                    if _exp_v and _exp_v.lower().strip().startswith("yes"):
+                        _bbox = _chk_e.get("bbox")
+                        if _bbox:
+                            try:
+                                import win32gui as _wgb; import win32api as _wab
+                                _cx2 = (_bbox[0] + _bbox[2]) / 2
+                                _cy2 = (_bbox[1] + _bbox[3]) / 2
+                                _hw2 = _wgb.WindowFromPoint((int(_cx2), int(_cy2)))
+                                if _hw2:
+                                    _wab.SendMessage(_hw2, 0x00F1, 1, 0)
+                                    logger.info("Button-escape: checked checkbox %r via BM_SETCHECK.", _chk_nm)
+                                    self._checked_fields.add(_chk_nm)
+                                    self._filled_this_tab.add(_chk_nm)
+                                    _chk_acted = True
+                            except Exception as _bce:
+                                logger.warning("Button-escape checkbox BM_SETCHECK failed: %s", _bce)
+                if _chk_acted:
+                    time.sleep(self.step_delay * 0.5)
+                    _heuristic_steps += 1; continue
+                # Scroll down to reveal hidden fields
                 if self._scroll_form_down(state):
                     _tab_scroll_count += 1
                     _last_auto_step    = step_idx
                     time.sleep(self.step_delay * 0.5)
-                    continue
+                    _heuristic_steps += 1; continue
+                # All seeks exhausted — force Tab past the button, never give it to LLM
+                logger.info("Button-escape: all seeks failed — forcing Tab past %r.", _btn_lbl)
+                self._executor.execute({"action_type": "keyboard", "key_count": 1, "keystrokes": ["tab"]})
+                time.sleep(self.step_delay * 0.5)
+                _heuristic_steps += 1; continue
 
             # 2. Auto-skip: if focused field already has the correct value, Tab past it
             if not _plugin_active and self._llm_client and self._auto_skip(state):
@@ -1016,7 +1182,7 @@ class LLMAgent:
                 # Resetting on auto-skip would mask LLM back-cycling (clicking already-filled
                 # fields), preventing the drought guard from firing and scrolling down.
                 time.sleep(self.step_delay)
-                continue
+                _heuristic_steps += 1; continue
 
             # 2a. Auto-fill: if focused field is empty (or has wrong leftover value), type correct value
             auto_text = (self._auto_fill(state) if not _plugin_active else None)
@@ -1049,7 +1215,7 @@ class LLMAgent:
                             _no_change_streak = 0
                             _last_auto_step   = step_idx
                             time.sleep(self.step_delay)
-                            continue
+                            _heuristic_steps += 1; continue
             # 2a-dup: duplicate UIA label — field is empty but label already in _filled_this_tab.
             # Peek Notepad for the next uncached field after that label and fill it.
             if not auto_text:
@@ -1073,6 +1239,7 @@ class LLMAgent:
                             self._visual_cache[_nk]  = _nv
                             logger.info("Dup-label fill: actual field=%r  value=%r  (UIA label=%r)",
                                         _nk, _nv, _fn_dup)
+                            self._ensure_form_foreground(state)
                             self._executor.execute({"action_type": "keyboard",
                                                     "key_count": 1, "keystrokes": ["ctrl+a"]})
                             self._executor.execute({
@@ -1088,7 +1255,7 @@ class LLMAgent:
                             _steps_on_tab     = 0
                             _last_auto_step   = step_idx
                             time.sleep(self.step_delay)
-                            continue
+                            _heuristic_steps += 1; continue
                         else:
                             logger.info("Dup-label: no next field found — treating as blank, Tab.")
                             _confirmed_blank_fields.add(_fn_dup_low + "#dup")
@@ -1097,11 +1264,12 @@ class LLMAgent:
                             _no_change_streak = 0
                             _last_auto_step   = step_idx
                             time.sleep(self.step_delay)
-                            continue
+                            _heuristic_steps += 1; continue
 
             if auto_text:
                 field_name_log, text_val, needs_clear = auto_text
                 self._peek_notepad(state, field_name_log)
+                self._ensure_form_foreground(state)
                 if needs_clear:
                     logger.info("Auto-fill (overwrite): '%s' → %r", field_name_log, text_val[:40])
                     self._executor.execute({"action_type": "keyboard", "key_count": 1, "keystrokes": ["ctrl+a"]})
@@ -1120,7 +1288,7 @@ class LLMAgent:
                 _last_auto_step   = step_idx
                 self._filled_this_tab.add(field_name_log)
                 time.sleep(self.step_delay)
-                continue
+                _heuristic_steps += 1; continue
 
             # 2a2. Auto-check: if focused checkbox should be checked per background data, click it
             auto_chk = (self._auto_check(state) if not _plugin_active else None)
@@ -1174,7 +1342,7 @@ class LLMAgent:
                     _steps_on_tab   = 0
                     _last_auto_step = step_idx
                 time.sleep(self.step_delay)
-                continue
+                _heuristic_steps += 1; continue
 
             # 2a3. Peek for unknown focused checkbox (not in cache → peek, then re-check)
             _fid_chk = state.get("focused_element_id")
@@ -1207,7 +1375,7 @@ class LLMAgent:
                         _no_change_streak = 0
                         _last_auto_step   = step_idx
                         time.sleep(self.step_delay)
-                        continue
+                        _heuristic_steps += 1; continue
                     else:
                         # Peek found nothing — mark confirmed blank, tab past
                         logger.info("Auto-check: '%s' not found after peek — treating as blank, Tab.", _fn_chk)
@@ -1216,7 +1384,7 @@ class LLMAgent:
                         _no_change_streak = 0
                         _last_auto_step   = step_idx
                         time.sleep(self.step_delay)
-                        continue
+                        _heuristic_steps += 1; continue
 
             # 2b. Auto-fix combobox: if focused combobox has WRONG value, select correct option
             fix = (self._combobox_needs_fix(state) if not _plugin_active else None)
@@ -1245,7 +1413,7 @@ class LLMAgent:
                         _steps_on_tab   = 0
                         _last_auto_step = step_idx
                         time.sleep(self.step_delay)
-                        continue
+                        _heuristic_steps += 1; continue
                     else:
                         logger.warning("Combobox-fix: listitem %r not found in open list", expected_val)
                 else:
@@ -1263,7 +1431,7 @@ class LLMAgent:
                         _steps_on_tab   = 0
                         _last_auto_step = step_idx
                         time.sleep(self.step_delay)
-                        continue
+                        _heuristic_steps += 1; continue
                         
             _drought = step_idx - _last_auto_step
             if not _plugin_active and _drought >= _DROUGHT_LIMIT:
@@ -1277,7 +1445,7 @@ class LLMAgent:
                         state = self._observe()          # re-observe so we see newly revealed fields
                         self._focus_first_empty_field(state, after_scroll=True)  # skip already-filled
                         time.sleep(0.3)
-                        continue   # re-observe with scrolled form + focused field
+                        _heuristic_steps += 1; continue   # re-observe with scrolled form + focused field
                 else:
                     # All scroll attempts exhausted — all visible fields are done on this tab.
                     # Proactively advance to the next tab instead of waiting for the stuck guard.
@@ -1307,6 +1475,7 @@ class LLMAgent:
             _MED_CONF    = 0.50
 
             # 2b. LLM only consulted when transformer is uncertain
+            _decision_maker = "transformer"  # tracks who made the final call this step
             if self._llm_client and t_conf < _HIGH_CONF:
                 llm_action = self._ask_llm(state)
                 action_type = llm_action.get("action_type", "wait")
@@ -1322,6 +1491,7 @@ class LLMAgent:
 
                 # ── Merge: LLM decides what, transformer decides where ──────
                 prediction = self._merge(t_pred, t_conf, llm_action, state)
+                _decision_maker = "llm"
                 print(f"\n  [LLM TOOK OVER]  reason: {reason}\n", flush=True)
 
                 # Stuck-click guard
@@ -1378,15 +1548,46 @@ class LLMAgent:
             # 3. Execute — guard against typing into non-edit elements or clicking submit early
             _fid = state.get("focused_element_id")
             _fel = next((e for e in state.get("elements", []) if e.get("element_id") == _fid), None)
-            _flabel = ((_fel.get("label") or _fel.get("text") or "?").strip() if _fel else "unknown")
+            _flabel     = ((_fel.get("label") or _fel.get("text") or "?").strip() if _fel else "unknown")
+            _flabel_sec = self._detect_section(state, _fel) if _fel else ""
+            _flabel_full = f"{_flabel_sec} {_flabel}" if _flabel_sec else _flabel
 
             if prediction.get("action_type") == "keyboard" and prediction.get("text"):
-                logger.info("Type target: focused=[%s] %r", _fel.get("type","?") if _fel else "?", _flabel)
+                logger.info("Type target: focused=[%s] %r", _fel.get("type","?") if _fel else "?", _flabel_full)
+                # If focused field already has the correct value → Tab instead of re-typing
+                if _fel and _fel.get("type") in ("editcontrol", "input"):
+                    _cur_val = (_fel.get("value") or "").strip()
+                    _new_val = prediction["text"].strip()
+                    if _cur_val and _cur_val == _new_val:
+                        logger.info("Re-type guard: %r already has %r — Tab instead.", _flabel_full, _cur_val[:40])
+                        self._filled_this_tab.add(_flabel_full)
+                        _no_change_streak += 1
+                        prediction = {"action_type": "keyboard", "key_count": 1, "keystrokes": ["tab"]}
                 # If the focused element is NOT an editable text field, typing will do nothing
                 # (or corrupt a pane/tab/button). Replace with Tab to advance focus instead.
-                if _fel and _fel.get("type") not in ("editcontrol", "input"):
-                    logger.warning("LLM type into non-edit [%s] %r — pressing Tab instead.",
-                                   _fel.get("type","?"), _flabel[:40])
+                if _fel and _fel.get("type") not in ("editcontrol", "input", "comboboxcontrol"):
+                    if _fel.get("type") == "checkboxcontrol":
+                        # LLM typed a truthy value (e.g. "YES (check)") into a checkbox — check it
+                        _chk_text = prediction.get("text", "").lower().strip()
+                        _should_chk = _chk_text not in ("", "no", "false", "0", "unchecked")
+                        if _should_chk and _flabel not in self._checked_fields:
+                            _chk_bbox = _fel.get("bbox")
+                            if _chk_bbox:
+                                try:
+                                    import win32gui as _wgc; import win32api as _wac
+                                    _cx = (_chk_bbox[0] + _chk_bbox[2]) / 2
+                                    _cy = (_chk_bbox[1] + _chk_bbox[3]) / 2
+                                    _hw = _wgc.WindowFromPoint((int(_cx), int(_cy)))
+                                    if _hw:
+                                        _wac.SendMessage(_hw, 0x00F1, 1, 0)  # BM_SETCHECK, BST_CHECKED
+                                        logger.info("Checkbox %r checked via BM_SETCHECK (type intercept).", _flabel_full)
+                                        self._checked_fields.add(_flabel_full)
+                                        self._filled_this_tab.add(_flabel_full)
+                                except Exception as _cbe:
+                                    logger.warning("Checkbox BM_SETCHECK failed: %s", _cbe)
+                    else:
+                        logger.warning("LLM type into non-edit [%s] %r — pressing Tab instead.",
+                                       _fel.get("type","?"), _flabel[:40])
                     prediction = {"action_type": "keyboard", "key_count": 1, "keystrokes": ["tab"]}
 
             if prediction.get("action_type") == "click":
@@ -1402,23 +1603,31 @@ class LLMAgent:
                     None
                 )
                 if _chk_at_cp:
-                    _chk_label = (_chk_at_cp.get("label") or _chk_at_cp.get("text") or "").strip()
-                    if _chk_label in self._checked_fields:
-                        # Use BM_GETCHECK (same as auto-check) — UIA toggle_state is often empty
-                        # for wxPython checkboxes so we can't rely on element attributes.
-                        _is_checked = False
-                        try:
-                            import win32gui as _wg2; import win32api as _wa2
-                            _cx2 = (_chk_at_cp["bbox"][0] + _chk_at_cp["bbox"][2]) / 2
-                            _cy2 = (_chk_at_cp["bbox"][1] + _chk_at_cp["bbox"][3]) / 2
-                            _hwnd2 = _wg2.WindowFromPoint((int(_cx2), int(_cy2)))
-                            if _hwnd2:
-                                _is_checked = (_wa2.SendMessage(_hwnd2, 0x00F0, 0, 0) == 1)
-                        except Exception:
-                            pass
-                        if _is_checked:
-                            logger.warning("Blocking LLM re-click on checked checkbox %r — Tab instead.", _chk_label)
-                            prediction = {"action_type": "keyboard", "key_count": 1, "keystrokes": ["tab"]}
+                    _chk_label_bare = (_chk_at_cp.get("label") or _chk_at_cp.get("text") or "").strip()
+                    _chk_sec   = self._detect_section(state, _chk_at_cp)
+                    _chk_label = f"{_chk_sec} {_chk_label_bare}" if _chk_sec else _chk_label_bare
+                    _chk_cx = (_chk_at_cp["bbox"][0] + _chk_at_cp["bbox"][2]) / 2
+                    _chk_cy = (_chk_at_cp["bbox"][1] + _chk_at_cp["bbox"][3]) / 2
+                    # Use Win32 BM_SETCHECK — pyautogui clicks don't toggle wx checkboxes
+                    try:
+                        import win32gui as _wg2; import win32api as _wa2
+                        BM_GETCHECK = 0x00F0; BM_SETCHECK = 0x00F1; BST_CHECKED = 1
+                        _hwnd2 = _wg2.WindowFromPoint((int(_chk_cx), int(_chk_cy)))
+                        if _hwnd2:
+                            _already = (_wa2.SendMessage(_hwnd2, BM_GETCHECK, 0, 0) == BST_CHECKED)
+                            if _chk_label in self._checked_fields or _already:
+                                logger.warning("Checkbox %r already checked — Tab instead.", _chk_label)
+                                prediction = {"action_type": "keyboard", "key_count": 1, "keystrokes": ["tab"]}
+                            else:
+                                _wa2.SendMessage(_hwnd2, BM_SETCHECK, BST_CHECKED, 0)
+                                logger.info("Checkbox %r checked via Win32 BM_SETCHECK.", _chk_label)
+                                self._checked_fields.add(_chk_label)
+                                self._filled_this_tab.add(_chk_label)
+                                _no_change_streak = 0
+                                _last_auto_step   = step_idx
+                                prediction = {"action_type": "keyboard", "key_count": 1, "keystrokes": ["tab"]}
+                    except Exception as _ce:
+                        logger.warning("BM_SETCHECK failed for %r: %s", _chk_label, _ce)
 
                 _SUBMIT_KW = {"submit", "save", "ok", "accept", "done", "finish", "new"}
                 # NOTE: do NOT filter by window_role here — Submit/Submit & New buttons live
@@ -1477,6 +1686,84 @@ class LLMAgent:
                     # Tab advance failed (already on last tab) — fall through to execute
                     prediction = {"action_type": "no_op"}
 
+            # Combobox: type-into-combobox → open dropdown + click matching listitem
+            if (prediction.get("action_type") == "keyboard"
+                    and prediction.get("text")
+                    and _fel and _fel.get("type") == "comboboxcontrol"
+                    and _fel.get("bbox")):
+                _combo_value = prediction["text"]
+                _bx1, _by1, _bx2, _by2 = _fel["bbox"]
+                _ccx, _ccy = (_bx1 + _bx2) / 2, (_by1 + _by2) / 2
+                logger.info("Combobox: clicking to open dropdown for %r → %r", _flabel, _combo_value)
+                self._executor.execute({"action_type": "click", "click_position": [_ccx, _ccy]})
+                time.sleep(0.4)
+                _combo_state = self._observe()
+                _listitems = [e for e in _combo_state.get("elements", [])
+                              if e.get("type") == "listitemcontrol"
+                              and e.get("window_role") != "background"
+                              and e.get("bbox")]
+                _match = next(
+                    (e for e in _listitems
+                     if (e.get("text") or e.get("label") or "").strip().lower()
+                        == _combo_value.strip().lower()),
+                    None,
+                )
+                if _match:
+                    _lx1, _ly1, _lx2, _ly2 = _match["bbox"]
+                    self._executor.execute({"action_type": "click",
+                                            "click_position": [(_lx1+_lx2)/2, (_ly1+_ly2)/2]})
+                    logger.info("Combobox: selected %r", _combo_value)
+                    _no_change_streak = 0
+                    _last_auto_step   = step_idx
+                    # Tab past to advance focus — without this, LLM re-opens the same combobox
+                    time.sleep(0.25)
+                    self._executor.execute({"action_type": "keyboard", "key_count": 1,
+                                            "keystrokes": ["tab"]})
+                    # Mark in action history so repeat-guard catches any re-attempt
+                    _action_history.append(("combobox_done", _flabel_full))
+                    self._filled_this_tab.add(_flabel_full)
+                else:
+                    logger.warning("Combobox: %r not in dropdown — pressing Escape", _combo_value)
+                    self._executor.execute({"action_type": "keyboard", "key_count": 1,
+                                            "keystrokes": ["escape"]})
+                    _action_history.append(("combobox_fail", _flabel))
+                time.sleep(self.step_delay * 0.5)
+                continue
+
+            # Repeat-action guard: fingerprint this prediction; if last N identical → Tab
+            _atype = prediction.get("action_type", "no_op")
+            if _atype == "keyboard":
+                _fp = ("keyboard", (prediction.get("text") or "".join(prediction.get("keystrokes", [])))[:40])
+            elif _atype == "click":
+                _cp2 = prediction.get("click_position", [0, 0])
+                _fp  = ("click", round(_cp2[0] / 20) * 20, round(_cp2[1] / 20) * 20)
+            else:
+                _fp = (_atype,)
+            _action_history.append(_fp)
+            if (len(_action_history) >= _REPEAT_LIMIT
+                    and len(set(_action_history)) == 1):
+                logger.warning("Repeat-action guard: same action %dx in a row — forcing Tab.", _REPEAT_LIMIT)
+                _action_history.clear()
+                _no_change_streak = 0
+                self._executor.execute({"action_type": "keyboard", "key_count": 1, "keystrokes": ["tab"]})
+                time.sleep(self.step_delay * 0.5)
+                continue
+
+            if prediction.get("action_type") == "keyboard":
+                self._ensure_form_foreground(state)
+                # Clear existing field value before typing to prevent append corruption
+                # (e.g. "Maria" + "James" → "MariaJames").  Skip for nav-only actions.
+                _pred_text = prediction.get("text", "")
+                _pred_keys = prediction.get("keystrokes", [])
+                _nav_keys  = {"tab", "return", "enter", "escape", "Key.tab",
+                               "Key.return", "Key.enter", "Key.escape"}
+                _is_nav_only = not _pred_text and all(k in _nav_keys for k in _pred_keys)
+                if not _is_nav_only and _focused_el:
+                    _foc_val = (_focused_el.get("value") or "").strip()
+                    if _foc_val:
+                        logger.info("Pre-type clear: field has %r — ctrl+a.", _foc_val[:40])
+                        self._executor.execute({"action_type": "keyboard",
+                                                "key_count": 1, "keystrokes": ["ctrl+a"]})
             result = self._executor.execute(prediction)
             logger.info("%s", result)
 
@@ -1525,13 +1812,36 @@ class LLMAgent:
             _cur_focused_id = state.get("focused_element_id")
             if validation.status == "no_change":
                 if _cur_focused_id and _cur_focused_id != _last_focused_id:
-                    # Focus moved to a new element — not truly stuck, reset streak
                     _no_change_streak = 0
                 else:
                     _no_change_streak += 1
+                # Blacklist click position so transformer won't override LLM type there again
+                if prediction.get("action_type") == "click":
+                    _fcp = prediction.get("click_position", [])
+                    if len(_fcp) >= 2:
+                        self._nochange_click_pos.add((round(_fcp[0] / 10) * 10, round(_fcp[1] / 10) * 10))
             else:
                 _no_change_streak = 0
             _last_focused_id = _cur_focused_id
+
+            # Combobox open/close tracking — mark field filled when dropdown closes
+            _n_before = len(state.get("elements", []))
+            _n_after  = len(state_after.get("elements", []))
+            _delta    = _n_after - _n_before
+            if _delta > 2:
+                # Dropdown opened — record which combobox is open
+                _foc_id_cb = state.get("focused_element_id")
+                _foc_cb = next((e for e in state.get("elements", [])
+                                if e.get("element_id") == _foc_id_cb), None)
+                if _foc_cb and _foc_cb.get("type") in ("comboboxcontrol", "combobox"):
+                    _ocb_bare = (_foc_cb.get("label") or _foc_cb.get("text") or "").strip()
+                    _ocb_sec  = self._detect_section(state, _foc_cb)
+                    _open_combobox_label = f"{_ocb_sec} {_ocb_bare}" if _ocb_sec else _ocb_bare
+            elif _delta < -2 and _open_combobox_label and validation.status == "ok":
+                # Dropdown closed after a successful action — mark combobox as filled
+                logger.info("Combobox-close tracking: marking %r as filled.", _open_combobox_label)
+                self._filled_this_tab.add(_open_combobox_label)
+                _open_combobox_label = ""
 
             # Notify plugin of validation result so it can update its own streak tracking
             if self._task_plugin is not None:
@@ -1562,13 +1872,15 @@ class LLMAgent:
                 "validation":  validation.status,
             })
             self._results.append({
-                "step":       step_idx + 1,
-                "state":      state,
-                "action":     prediction,
-                "result":     str(result),
-                "validation": validation.status,
-                "guidance":   self._guidance,
-                "elements":   len(state.get("elements", [])),
+                "step":         step_idx + 1,
+                "state":        state,
+                "action":       prediction,
+                "result":       str(result),
+                "validation":   validation.status,
+                "guidance":     self._guidance,
+                "elements":     len(state.get("elements", [])),
+                "decision_by":  _decision_maker,
+                "t_conf":       t_conf,
             })
 
             if not result.success:
@@ -1584,7 +1896,9 @@ class LLMAgent:
             print(f"\n=== STEP {step_idx+1} CRASHED ===\n{_tb_str}", flush=True)
             break
 
-        logger.info("LLMAgent finished — %d step(s).", len(self._results))
+        self._heuristic_steps = _heuristic_steps
+        logger.info("LLMAgent finished — %d step(s)  (%d heuristic).", len(self._results), _heuristic_steps)
+        self._export_run_traces(self._results, task_name)
         return list(self._results)
 
     @property
@@ -1594,6 +1908,80 @@ class LLMAgent:
     @property
     def history(self) -> List[Dict[str, Any]]:
         return list(self._history)
+
+    def _export_run_traces(self, results: List[Dict[str, Any]], task_name: str) -> None:
+        """
+        Convert completed run results to trace JSONs and write to disk.
+
+        Only exports steps where the agent's action had a real effect (validation != no_change
+        and action_type != no_op) — bad steps teach bad behavior.
+
+        Output: data/output/traces/agent_runs/session_{timestamp}/live_step_{idx:04d}.json
+        Compatible with TrajectoryDataset — ContinualLearner picks these up automatically.
+        """
+        good = [
+            r for r in results
+            if r.get("validation") != "no_change"
+            and r.get("action", {}).get("action_type", "no_op") not in ("no_op", "noop", "wait", None)
+        ]
+        if len(good) < 3:
+            logger.info("Trace export: only %d usable steps — skipping (run too short/failed).", len(good))
+            return
+
+        import datetime as _dt, json as _json
+        session_ts  = _dt.datetime.now().strftime("%Y%m%d_%H%M%S")
+        session_tag = task_name or "run"
+        out_dir     = os.path.join(_ROOT, "data", "output", "traces", "agent_runs",
+                                   f"session_{session_ts}_{session_tag}")
+        os.makedirs(out_dir, exist_ok=True)
+
+        written = 0
+        for i, r in enumerate(good):
+            state  = r.get("state", {})
+            action = r.get("action", {})
+            a_type = action.get("action_type", "no_op")
+
+            res = state.get("screen_resolution", [1920, 1080])
+            W   = float(res[0]) or 1920.0
+
+            if a_type == "click":
+                pos = action.get("click_position") or [0.0, 0.0]
+                mouse_actions = [{"position": [float(pos[0]), float(pos[1])],
+                                  "type": "click",
+                                  "timestamp": r.get("state", {}).get("timestamp", "")}]
+                kb_actions = []
+            elif a_type == "keyboard":
+                mouse_actions = []
+                text = action.get("text", "") or ""
+                key_count = action.get("key_count", 0)
+                if text:
+                    strokes = [{"pasted_text": text, "key": ""}]
+                else:
+                    strokes = [{"key": "tab", "pasted_text": ""}] * max(1, key_count)
+                kb_actions = [{"strokes": strokes}]
+            else:
+                continue  # skip anything else (scroll, done markers, etc.)
+
+            trace = {
+                "trace_id":  f"live_step_{i:04d}",
+                "timestamp": session_ts,
+                "duration":  1.5,
+                "type":      session_tag,
+                "state":     state,
+                "mouse":     {"actions": mouse_actions},
+                "keyboard":  {"actions": kb_actions},
+                "diff":      {},
+                "action":    a_type,
+            }
+            out_path = os.path.join(out_dir, f"live_step_{i:04d}.json")
+            try:
+                with open(out_path, "w", encoding="utf-8") as _f:
+                    _json.dump(trace, _f, ensure_ascii=False)
+                written += 1
+            except Exception as _e:
+                logger.debug("Trace export: failed writing step %d: %s", i, _e)
+
+        logger.info("Trace export: %d step(s) → %s", written, out_dir)
 
     # ── Auto-skip helper ─────────────────────────────────────────────────────
 
@@ -2170,6 +2558,8 @@ class LLMAgent:
                       "leave blank — liability only", "leave blank — owned outright"}
         rec = self._cached_record
 
+        import re as _re
+
         def _get(key: str) -> str:
             kl = key.lower()
             v = rec.get(key) or next((rv for rk, rv in rec.items() if rk.lower() == kl), "")
@@ -2177,11 +2567,26 @@ class LLMAgent:
                 return ""
             return v
 
+        def _get_fuzzy(key: str) -> str:
+            """Strip punctuation/spaces and match any record key that contains all words."""
+            kl_words = set(_re.sub(r"[^a-z0-9 ]", " ", key.lower()).split())
+            if not kl_words:
+                return ""
+            for rk, rv in rec.items():
+                rk_words = set(_re.sub(r"[^a-z0-9 ]", " ", rk.lower()).split())
+                if kl_words <= rk_words or rk_words <= kl_words:
+                    if rv and rv.lower().strip("()") not in _skip_vals:
+                        return rv
+            return ""
+
         if section:
             val = _get(f"{section} {field_name}")
             if val:
                 return val
-        return _get(field_name)
+        val = _get(field_name)
+        if not val:
+            val = _get_fuzzy(field_name)
+        return val
 
     def _auto_fill(self, state: Dict[str, Any]) -> Optional[tuple]:
         """
@@ -2502,6 +2907,39 @@ class LLMAgent:
             logger.warning("OCR scan failed: %s", exc)
             return []
 
+    def _ensure_form_foreground(self, state: Dict[str, Any]) -> None:
+        """
+        Bring the form window to the foreground before sending keyboard events.
+        pyautogui sends keystrokes to the OS foreground window — if Notepad or
+        the terminal grabbed focus, keystrokes land there instead of the form.
+        Uses the hwnd of the first active (non-background) element in state.
+        """
+        try:
+            import win32gui
+            elements = state.get("elements", [])
+            active_el = next((e for e in elements
+                              if e.get("window_role") != "background"
+                              and e.get("bbox")), None)
+            if not active_el:
+                return
+            bbox = active_el["bbox"]
+            cx, cy = int((bbox[0] + bbox[2]) / 2), int((bbox[1] + bbox[3]) / 2)
+            hwnd = win32gui.WindowFromPoint((cx, cy))
+            if not hwnd:
+                return
+            # Walk up to the top-level window
+            parent = win32gui.GetParent(hwnd)
+            while parent:
+                hwnd   = parent
+                parent = win32gui.GetParent(hwnd)
+            fg = win32gui.GetForegroundWindow()
+            if fg == hwnd:
+                return  # already foreground — nothing to do
+            win32gui.SetForegroundWindow(hwnd)
+            import time as _t; _t.sleep(0.05)
+        except Exception:
+            pass
+
     def _scroll_form_to_top(self, state: Dict[str, Any]) -> None:
         """
         Scroll the active form window back to the top so that _focus_first_empty_field
@@ -2758,57 +3196,41 @@ class LLMAgent:
             if not tabs:
                 return False
 
-        # Detect the actual active tab by checking which panel pane has
-        # on-screen children (positive BoundingRectangle).  wx moves inactive
-        # tab panels to negative screen coordinates, so only the active panel's
-        # children have left >= 0 and top >= 0.  This is the same principle
-        # used in _uia_focus_first_field and is more reliable than IsSelected
-        # for wx controls.
-        _TAB_PANE_MAP = {
-            "Policy":       "tab_policy",
-            "Policyholder": "tab_policyholder",
-            "Vehicle":      "tab_vehicle",
-            "Coverage":     "tab_coverage",
-            "Drivers":      "tab_drivers",
-            "History":      "tab_history",
-            "Claims":       "tab_claims",
-            "Payment":      "tab_payment",
-        }
+        # Detect the active tab by finding which tab's elements have positive
+        # screen coordinates.  wx moves inactive tab panels to negative coords,
+        # so any tab whose children have bbox[1] >= 0 is the active one.
+        # No hardcoded tab names — works for any tabbed form.
         _active_idx = self._current_tab_idx  # fallback
-        try:
-            import win32gui as _w32g2
-            import uiautomation as _uia2
-            _fg2 = _w32g2.GetForegroundWindow()
-            _root2 = _uia2.ControlFromHandle(_fg2)
-            for _tii, _tab_el in enumerate(tabs):
-                _tname = (_tab_el.get("text") or _tab_el.get("label") or "").strip()
-                _pname = _TAB_PANE_MAP.get(_tname)
-                if not _pname:
-                    continue
-                _pane = _root2.PaneControl(searchDepth=6, Name=_pname)
-                if not _pane.Exists(maxSearchSeconds=0.05):
-                    continue
-                _found = False
-                for _ch in _pane.GetChildren():
-                    try:
-                        _r = _ch.BoundingRectangle
-                        if _r.left >= 0 and _r.top >= 0 and _r.width > 0:
-                            _active_idx = _tii
-                            _found = True
-                            break
-                    except Exception:
-                        pass
-                if _found:
-                    break
-        except Exception:
-            pass
-        # Sanity check: pane detection jumping more than one tab ahead of the tracked
-        # index is almost certainly BoundingRectangle noise from an inactive pane.
-        # Fall back to the tracked index so we always advance exactly one tab at a time.
-        if _active_idx > self._current_tab_idx + 1:
+        _all_elems  = state.get("elements", [])
+        for _tii, _tab_el in enumerate(tabs):
+            _tbbox = _tab_el.get("bbox")
+            if not _tbbox:
+                continue
+            _tab_cx = (_tbbox[0] + _tbbox[2]) / 2
+            _tab_cy = (_tbbox[1] + _tbbox[3]) / 2
+            # Check if any interactive element is spatially "below" this tab header
+            # and has a positive y — meaning it belongs to an on-screen panel.
+            _panel_elems = [
+                e for e in _all_elems
+                if e.get("window_role") != "background"
+                and e.get("bbox")
+                and e["bbox"][1] >= 0
+                and e["bbox"][1] > _tab_cy   # below the tab strip
+                and e.get("type") in (
+                    "editcontrol", "comboboxcontrol", "checkboxcontrol",
+                    "buttoncontrol", "button", "panecontrol",
+                )
+            ]
+            if _panel_elems:
+                _active_idx = _tii
+                break
+        # Sanity check: pane detection must stay within one step of the tracked index.
+        # Jumping ahead OR falling behind the tracker is BoundingRectangle noise from
+        # inactive panels that briefly have positive coordinates.  Trust the tracker.
+        if _active_idx != self._current_tab_idx:
             logger.warning(
-                "_try_advance_tab: pane detection jumped tabs (idx=%d > tracked+1=%d) — using fallback.",
-                _active_idx, self._current_tab_idx + 1)
+                "_try_advance_tab: pane detection drifted (detected=%d, tracked=%d) — using tracker.",
+                _active_idx, self._current_tab_idx)
             _active_idx = self._current_tab_idx
 
         logger.info("_try_advance_tab: active tab detected as idx=%d (fallback=%d)",
@@ -2853,17 +3275,35 @@ class LLMAgent:
         # If transformer is confident it should click but LLM says type,
         # trust the transformer — it learned from real demos and knows which
         # elements are clickable vs typeable (e.g. comboboxes need click).
-        _TRANSFORMER_TYPE_OVERRIDE_THRESHOLD = 0.70
+        # Exception: if transformer's click lands on a tab element, do NOT override —
+        # the LLM is still trying to fill fields on the current tab.
+        _TRANSFORMER_TYPE_OVERRIDE_THRESHOLD = 0.92
         if (l_type == "type"
                 and t_pred.get("action_type") == "click"
                 and t_conf >= _TRANSFORMER_TYPE_OVERRIDE_THRESHOLD
                 and t_pred.get("click_position")):
-            pos    = t_pred["click_position"]
-            snapped = self._snap(pos, state)
-            coords  = snapped or pos
-            logger.info("[MERGE] TRANSFORMER overrides LLM type→click  conf=%.2f  @ (%.0f,%.0f)",
-                        t_conf, coords[0], coords[1])
-            return {"action_type": "click", "click_position": coords}
+            pos = t_pred["click_position"]
+            _tab_elems = [e for e in state.get("elements", [])
+                          if e.get("type") in ("tabitem", "tabitemcontrol")
+                          and e.get("window_role") != "background"
+                          and e.get("bbox")]
+            _hits_tab = any(
+                e["bbox"][0] <= pos[0] <= e["bbox"][2] and e["bbox"][1] <= pos[1] <= e["bbox"][3]
+                for e in _tab_elems
+            )
+            _pos_key = (round(pos[0] / 10) * 10, round(pos[1] / 10) * 10)
+            _pos_blacklisted = _pos_key in self._nochange_click_pos
+            if _hits_tab:
+                logger.info("[MERGE] TRANSFORMER wants tab advance but LLM says type — deferring to LLM")
+            elif _pos_blacklisted:
+                logger.info("[MERGE] TRANSFORMER click @ (%.0f,%.0f) blacklisted (prev no_change) — LLM types",
+                            pos[0], pos[1])
+            else:
+                snapped = self._snap(pos, state)
+                coords  = snapped or pos
+                logger.info("[MERGE] TRANSFORMER overrides LLM type→click  conf=%.2f  @ (%.0f,%.0f)",
+                            t_conf, coords[0], coords[1])
+                return {"action_type": "click", "click_position": coords}
 
         # Hotkey / scroll — pure LLM reasoning, transformer can't help
         if l_type in ("hotkey", "scroll"):
@@ -2946,7 +3386,16 @@ class LLMAgent:
     # ── LLM dispatch ─────────────────────────────────────────────────────────
 
     def _ask_llm(self, state: Dict[str, Any]) -> Dict[str, Any]:
-        screen_text = _state_to_text(state, record_num=self._record_num, visual_cache=self._visual_cache or None)
+        # Prefer _cached_record (Win32 Notepad read, fully parsed) over visual_cache
+        # (which is empty when VLM pre-scan is disabled). This prevents the LLM from
+        # reading a truncated UIA text blob and hallucinating field values.
+        _vc_for_llm = self._cached_record if self._cached_record else (self._visual_cache or None)
+        screen_text = _state_to_text(
+            state,
+            record_num=self._record_num,
+            visual_cache=_vc_for_llm,
+            filled_labels=self._filled_this_tab,
+        )
         logger.debug("LLM screen context:\n%s", screen_text)
 
         # Build focused-field banner — put it FIRST so the LLM sees it immediately
@@ -2960,9 +3409,27 @@ class LLMAgent:
                 _fn = (focused_el.get("label") or focused_el.get("text") or "?").strip()[:200]
                 _fv = (focused_el.get("value") or "").strip()[:200]
                 _ft = focused_el.get("type", "?")
+                # Look up the expected value for this field from the cached record
+                _expected = self._lookup_field(_fn) if _fn != "?" else ""
+                # Cache miss — force a live re-read of Notepad then retry
+                if not _expected and _fn != "?":
+                    self._refresh_record_cache(state)
+                    _expected = self._lookup_field(_fn)
+                # Still nothing — direct peek for this specific field
+                if not _expected and _fn != "?":
+                    self._peek_notepad(state, _fn)
+                    _expected = self._lookup_field(_fn)
+                logger.info("LLM focused-field lookup: field=%r  expected=%r  cache_size=%d",
+                            _fn, _expected[:40] if _expected else "", len(self._cached_record))
+                _expect_hint = (
+                    f"\n  → EXPECTED VALUE FROM DATA SOURCES: {_expected!r}"
+                    f"\n  → Use EXACTLY this string as 'text'. Do NOT modify or invent."
+                    if _expected else ""
+                )
                 focused_banner = (
                     f"⚠ CURRENTLY FOCUSED FIELD: [{_ft}] \"{_fn}\""
                     + (f" — current value: {_fv!r}" if _fv else " — EMPTY")
+                    + _expect_hint
                     + "\nYou MUST act on THIS field only. Do NOT click other fields.\n\n"
                 )
 
@@ -3084,10 +3551,15 @@ class LLMAgent:
         """Handles both Groq and LM Studio — both use the OpenAI client format."""
         import uuid
         # Unique tag per call breaks LM Studio's server-side KV-cache accumulation
-        system_msg = self._system_prompt + f"\n[sid:{uuid.uuid4().hex[:12]}]"
+        system_msg = (
+            self._system_prompt
+            + "\n\nBefore choosing an action, reason briefly inside <think>...</think> tags."
+            + " Then output ONLY a JSON object on the last line."
+            + f"\n[sid:{uuid.uuid4().hex[:12]}]"
+        )
         resp = self._llm_client.chat.completions.create(
             model=self._llm_model,
-            max_tokens=1024,
+            max_tokens=2048,
             messages=[
                 {"role": "system", "content": system_msg},
                 {"role": "user",   "content": user_msg},
@@ -3144,5 +3616,5 @@ class LLMAgent:
                 device_str=self.device_str,
             )
         except Exception as exc:
-            logger.warning("Transformer error: %s — no_op.", exc)
-            return {"action_type": "no_op"}
+            logger.error("Transformer predict failed: %s", exc)
+            raise

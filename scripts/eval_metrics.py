@@ -421,7 +421,7 @@ def report(session_dir: Path | None, aggregate_all: bool) -> None:
 
 # ─── per-run evaluator (works on agent.run() results, no trace files needed) ──
 
-def evaluate_run(results: list[dict], goal: str = "") -> dict:
+def evaluate_run(results: list[dict], goal: str = "", heuristic_steps: int = 0) -> dict:
     """
     Compute the three core metrics from agent.run() results list.
     Works on complete AND early-terminated runs.
@@ -442,6 +442,7 @@ def evaluate_run(results: list[dict], goal: str = "") -> dict:
     fields_filled: set[str] = set()
     actionable    = 0
     succeeded     = 0
+    no_change     = 0
     total_clicks  = 0
     on_target     = 0
 
@@ -455,10 +456,11 @@ def evaluate_run(results: list[dict], goal: str = "") -> dict:
 
         actionable += 1
 
-        # Execution success — use validator's own judgement (avoids false positives
-        # from user corrections or dialog pops between steps inflating the count)
-        if r.get("validation") == "ok":
+        val = r.get("validation", "")
+        if val == "ok":
             succeeded += 1
+        elif val == "no_change":
+            no_change += 1
 
         # Track filled fields (keyboard actions with text)
         if a_type == "keyboard":
@@ -482,9 +484,16 @@ def evaluate_run(results: list[dict], goal: str = "") -> dict:
                 if any(_inside_bbox(pos, e["bbox"]) for e in elements):
                     on_target += 1
 
-    # Task Completion Rate: done signal = 1.0, else fields_filled / estimated total
-    # We estimate 20 fillable fields for the car insurance form (8 tabs × ~2.5 fields avg)
-    ESTIMATED_TOTAL_FIELDS = 20
+    # Count actual fillable fields from source record
+    try:
+        from data_sources.notepad_source import _parse_records as _pr
+        _src = SOURCE_FILE.read_text(encoding="utf-8", errors="ignore")
+        _recs = _pr(_src)
+        ESTIMATED_TOTAL_FIELDS = len(_recs[min(_recs)]) if _recs else 50
+    except Exception:
+        ESTIMATED_TOTAL_FIELDS = 50
+
+    # Task Completion Rate: done signal = 1.0, else fields_filled / actual total
     if done:
         tcr = 1.0
     else:
@@ -520,14 +529,14 @@ def evaluate_run(results: list[dict], goal: str = "") -> dict:
             # Infer which record was being filled by finding the best-matching record
             # (most typed values present in that record's values).
             typed_set = {v.strip().lower() for _, v in typed_values}
-            best_idx, best_hits = 0, -1
-            for idx, rec in enumerate(records):
+            best_idx, best_hits = min(records), -1
+            for rec_num, rec in records.items():
                 hits = sum(
                     1 for v in rec.values()
                     if str(v).strip().lower() in typed_set
                 )
                 if hits > best_hits:
-                    best_hits, best_idx = hits, idx
+                    best_hits, best_idx = hits, rec_num
             source_record = {k.strip().lower(): str(v).strip()
                              for k, v in records[best_idx].items()}
     except Exception:
@@ -559,6 +568,17 @@ def evaluate_run(results: list[dict], goal: str = "") -> dict:
 
     val_acc = correct_values / (correct_values + wrong_values) if (correct_values + wrong_values) else 0.0
 
+    # LLM Dependency — exact, using per-step decision_by tag logged by agent
+    llm_steps         = sum(1 for r in results if r.get("decision_by") == "llm")
+    transformer_steps = sum(1 for r in results if r.get("decision_by") == "transformer")
+    tagged_steps      = llm_steps + transformer_steps + heuristic_steps
+    llm_dep         = llm_steps         / tagged_steps if tagged_steps else None
+    transformer_dep = transformer_steps / tagged_steps if tagged_steps else None
+    avg_conf = (
+        sum(r["t_conf"] for r in results if "t_conf" in r) /
+        sum(1 for r in results if "t_conf" in r)
+    ) if any("t_conf" in r for r in results) else None
+
     border = "=" * 60
     value_section = ""
     if value_rows:
@@ -567,19 +587,36 @@ def evaluate_run(results: list[dict], goal: str = "") -> dict:
             + "\n".join(value_rows) + "\n"
         )
 
+    wasted_rate   = no_change / actionable if actionable else 0.0
+    steps_per_field = total_steps / len(fields_filled) if fields_filled else float("inf")
+
+    _dep_str  = (f"{llm_dep*100:.1f}%"         if llm_dep         is not None else "n/a")
+    _tdep_str = (f"{transformer_dep*100:.1f}%" if transformer_dep is not None else "n/a")
+    _conf_str = (f"{avg_conf:.3f}"             if avg_conf        is not None else "n/a")
+    _spf_str  = f"{steps_per_field:.1f}" if steps_per_field != float("inf") else "∞"
     summary = (
         f"\n{border}\n"
         f"  RUN METRICS\n"
         f"  Goal: {goal[:55]}\n"
         f"{border}\n"
         f"  Task Completion Rate       {tcr*100:>6.1f}%   "
-        f"({'done' if done else f'{len(fields_filled)} fields filled / ~{ESTIMATED_TOTAL_FIELDS} total'})\n"
+        f"({'done' if done else f'{len(fields_filled)} fields filled / {ESTIMATED_TOTAL_FIELDS} total'})\n"
+        f"  Wasted Step Rate           {wasted_rate*100:>6.1f}%   "
+        f"({no_change} no_change / {actionable} actionable)  ← loops; target <20%\n"
+        f"  Steps per Field            {_spf_str:>6}     "
+        f"({total_steps} steps / {len(fields_filled)} fields)  ← efficiency; target <5\n"
         f"  Action Prediction Accuracy {apa*100:>6.1f}%   "
         f"({on_target} on-target / {total_clicks} clicks)\n"
         f"  Execution Success Rate     {esr*100:>6.1f}%   "
         f"({succeeded} state-changing / {actionable} actionable steps)\n"
         f"  Value Accuracy             {val_acc*100:>6.1f}%   "
         f"({correct_values} correct / {correct_values+wrong_values} typed values)\n"
+        f"  LLM Dependency             {_dep_str:>7}   "
+        f"({llm_steps} LLM / {tagged_steps} total)  ← target <5%\n"
+        f"  Transformer Dependency     {_tdep_str:>7}   "
+        f"({transformer_steps} transformer / {tagged_steps} total)  ← target >95%\n"
+        f"  Heuristic Steps            {heuristic_steps:>7}   "
+        f"(auto-handlers)  avg transformer conf={_conf_str}\n"
         f"  Total steps: {total_steps}  |  Terminated: {'naturally' if done else 'early/max_steps'}\n"
         f"{border}\n"
         f"{value_section}"
@@ -592,6 +629,12 @@ def evaluate_run(results: list[dict], goal: str = "") -> dict:
         "action_prediction_accuracy": apa,
         "execution_success_rate":     esr,
         "value_accuracy":             val_acc,
+        "llm_dependency":             llm_dep,
+        "transformer_dependency":     transformer_dep,
+        "avg_transformer_conf":       avg_conf,
+        "llm_steps":                  llm_steps,
+        "transformer_steps":          transformer_steps,
+        "heuristic_steps":            heuristic_steps,
         "fields_filled":              sorted(fields_filled),
         "total_steps":                total_steps,
         "completed":                  done,

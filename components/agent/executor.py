@@ -147,7 +147,7 @@ class ActionExecutor:
                 try:
                     import pyperclip
                     pyperclip.copy(text)
-                    time.sleep(0.05)
+                    time.sleep(0.15)
                     pyautogui.hotkey("ctrl", "v")
                     time.sleep(self.post_click_delay)
                 except Exception:
