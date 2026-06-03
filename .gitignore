@@ -48,6 +48,11 @@ test_data/
 data/output/traces/
 tasks/form_filling/traces_aug/
 
+# Recorded demos — thousands of per-step JSON files, generated training data
+data/demos/
+data/output/submissions/
+data/output/transformer_training_log.jsonl
+
 # Run outputs (generated, not source)
 data/output/rulesets/
 data/output/bc_progress.jsonl

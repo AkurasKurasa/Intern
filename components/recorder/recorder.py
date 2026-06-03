@@ -877,8 +877,1165 @@ def _fmt_state(state: Dict[str, Any]) -> Dict[str, Any]:
     return out
 
 
+def _notepad_uia_text() -> tuple:
+    """Return (full_text, selected_text) from Notepad via UIA TextPattern."""
+    try:
+        import uiautomation as _auto
+        root = _auto.GetRootControl()
+        np_ctrl = None
+        for child in root.GetChildren():
+            name = (child.Name or "").lower()
+            if "notepad" in name or ".txt" in name:
+                np_ctrl = child
+                break
+        if not np_ctrl:
+            return ("", "")
+        # Win11 Notepad uses DocumentControl; classic uses EditControl
+        doc = None
+        for ctrl_type in (_auto.ControlType.DocumentControl,
+                          _auto.ControlType.EditControl):
+            try:
+                doc = np_ctrl.Control(ControlType=ctrl_type, searchDepth=8)
+                if doc.Exists(0):
+                    break
+                doc = None
+            except Exception:
+                doc = None
+        if not doc:
+            return ("", "")
+        try:
+            tp = doc.GetPattern(_auto.PatternId.TextPattern)
+            full_range = tp.DocumentRange
+            full_text  = full_range.GetText(-1)
+            sels = tp.GetSelection()
+            sel_text = sels[0].GetText(-1) if sels else ""
+            return (full_text, sel_text)
+        except Exception:
+            return ("", "")
+    except Exception:
+        return ("", "")
+
+
+def _get_notepad_line_at(x: int, y: int) -> str:
+    """Return visible Notepad lines near click position."""
+    return _get_notepad_visible_lines(2)
+
+
+def _get_notepad_selection() -> str:
+    """Return currently selected text in Notepad via UIA TextPattern."""
+    try:
+        _, sel = _notepad_uia_text()
+        return sel.strip()[:80] if sel else ""
+    except Exception:
+        return ""
+
+
+def _is_separator(line: str) -> bool:
+    """True if line is purely decorative (separators, box-drawing, etc.)."""
+    if not line:
+        return True
+    import unicodedata
+    clean = line.strip()
+    if not clean:
+        return True
+    unique_cats = {unicodedata.category(c) for c in clean}
+    # Po = punctuation other, Pd = dash, So = symbol other (box drawing), Sm = math symbol
+    if unique_cats <= {"Po", "Pd", "So", "Sm", "Zs", "Cc", "Cf"}:
+        return True
+    # all same character repeated
+    if len(set(clean)) <= 2 and len(clean) > 3:
+        return True
+    # contains a colon = likely a field line like "First Name: John"
+    return False
+
+
+def _timeout_call(fn, timeout_sec: float = 1.0, default=""):
+    """Run fn() in a daemon thread; return its result or `default` if it hangs.
+    Guards against UWP-Notepad UIA calls that can block indefinitely."""
+    import threading as _t
+    result = [default]
+    def _run():
+        try:
+            import ctypes
+            ctypes.windll.ole32.CoInitializeEx(None, 0x2)
+        except Exception:
+            pass
+        try:
+            result[0] = fn()
+        except Exception:
+            pass
+    th = _t.Thread(target=_run, daemon=True)
+    th.start()
+    th.join(timeout_sec)
+    return result[0]
+
+
+def _get_notepad_visible_lines(max_lines: int = 30) -> str:
+    """Return all currently visible lines in Notepad using UIA GetVisibleRanges."""
+    try:
+        import uiautomation as _auto
+        root = _auto.GetRootControl()
+        np_ctrl = None
+        for child in root.GetChildren():
+            name = (child.Name or "").lower()
+            if "notepad" in name or ".txt" in name:
+                np_ctrl = child
+                break
+        if not np_ctrl:
+            return ""
+
+        doc = None
+        for ctrl_type in (_auto.ControlType.DocumentControl,
+                          _auto.ControlType.EditControl):
+            try:
+                candidate = np_ctrl.Control(ControlType=ctrl_type, searchDepth=8)
+                if candidate.Exists(0):
+                    doc = candidate
+                    break
+            except Exception:
+                pass
+        if not doc:
+            return ""
+
+        tp = doc.GetPattern(_auto.PatternId.TextPattern)
+
+        # GetVisibleRanges returns only what's actually on screen
+        try:
+            ranges = tp.GetVisibleRanges()
+            if ranges:
+                visible_text = "".join(r.GetText(-1) for r in ranges)
+            else:
+                visible_text = tp.DocumentRange.GetText(-1)
+        except Exception:
+            visible_text = tp.DocumentRange.GetText(-1)
+
+        lines = []
+        for line in visible_text.splitlines():
+            line = line.strip()
+            if line and not _is_separator(line):
+                lines.append(line)
+            if len(lines) >= max_lines:
+                break
+        return "\n".join(lines)
+    except Exception:
+        return ""
+
+
+def _first_meaningful_line(elems) -> str:
+    # Try UIA first (works on Win11 Notepad)
+    result = _get_notepad_visible_lines(3)
+    if result:
+        return result
+    # fallback: scan element text
+    for e in elems:
+        t = (e.get("value") or e.get("text") or "").strip()
+        if not t:
+            continue
+        for line in t.splitlines():
+            line = line.strip()
+            if line and not _is_separator(line) and len(line) > 3 and ":" in line:
+                return line[:60]
+    return ""
+
+
+def _semantic_desc(action_type, click_pos, text, keystrokes, state,
+                   hotkey="", scroll_dy=0.0, drag_src=None, drag_dst=None,
+                   notepad_line="", notepad_select="", clipboard=""):
+    """Return a human-readable description of an action for console output."""
+    elems  = state.get("elements", []) if state else []
+    app    = (state.get("application") or "?").replace(".exe", "")
+
+    # Active tab label
+    tab_lbl = ""
+    for e in elems:
+        if e.get("type") in ("tabitem", "tabitemcontrol") and e.get("window_role") == "active":
+            t = (e.get("text") or e.get("label") or "").strip()
+            if t and len(t) < 30:
+                tab_lbl = t
+                break
+
+    tab_part = f" [{tab_lbl}]" if tab_lbl else ""
+
+    def _elem_at(px, py, role=None):
+        best, best_area = None, float("inf")
+        for e in elems:
+            if role and e.get("window_role") != role:
+                continue
+            b = e.get("bbox", [])
+            if len(b) < 4:
+                continue
+            x1, y1, x2, y2 = b
+            if x1 <= px <= x2 and y1 <= py <= y2:
+                area = (x2 - x1) * (y2 - y1)
+                if area < best_area:
+                    best_area = area
+                    best = e
+        # fallback: search all roles if active-only found nothing
+        if best is None and role == "active":
+            return _elem_at(px, py, role=None)
+        return best
+
+    def _lbl(e):
+        return ((e.get("label") or e.get("text") or "").strip()[:30] or e.get("type", "?")) if e else "?"
+
+    if action_type == "click" and click_pos:
+        e = _elem_at(*click_pos, role="active")
+        etype = e.get("type", "") if e else "?"
+        lbl = _lbl(e)
+        # notepad pane click — show line at cursor (pre-computed)
+        if etype in ("panecontrol", "textcontrol", "documentcontrol", "document"):
+            ctx = f"  →  {notepad_line!r}" if notepad_line and not _is_separator(notepad_line) else ""
+            return f"click       [{app}] [cursor position]{ctx}"
+        # combobox OPEN click — value is still the pre-selection default at this
+        # instant, so don't show it (misleading). The actual pick is the next
+        # listitem click, which shows the chosen option correctly.
+        if etype in ("combobox", "comboboxcontrol"):
+            return f"click       [{app}]{tab_part} [{lbl}] (combobox — opening)"
+        # dropdown item pick — this is where the real selection shows
+        if etype in ("listitem", "listitemcontrol"):
+            return f"select      [{app}]{tab_part} [{lbl}]"
+        return f"click       [{app}]{tab_part} [{lbl}] ({etype})"
+
+    if action_type == "double_click" and click_pos:
+        e = _elem_at(*click_pos, role="active")
+        etype = e.get("type", "") if e else "?"
+        # notepad double-click = word selection (from subprocess-attached state)
+        if etype in ("panecontrol", "textcontrol", "documentcontrol", "document"):
+            sel = (state.get("_np_selection") or "").strip() if state else ""
+            ctx = f"  →  {sel!r}" if sel and not _is_separator(sel) else ""
+            return f"double-click [{app}] [word select]{ctx}"
+        return f"double-click [{app}]{tab_part} [{_lbl(e)}]"
+
+    if action_type == "drag" and drag_src and drag_dst:
+        src_e = _elem_at(*drag_src, role="active")
+        etype = src_e.get("type", "") if src_e else ""
+        if etype in ("textcontrol", "panecontrol", "documentcontrol", "document"):
+            sel = (state.get("_np_selection") or "").strip() if state else ""
+            ctx = f"  →  {sel!r}" if sel and not _is_separator(sel) else "  (next Ctrl+C shows exact value)"
+            return f"drag        [{app}] [text selection]{ctx}"
+        dst_e = _elem_at(*drag_dst)
+        return f"drag        [{app}]{tab_part} [{_lbl(src_e)}] → [{_lbl(dst_e)}]"
+
+    if action_type == "scroll":
+        direction = "↓ down" if scroll_dy < 0 else "↑ up"
+        ticks = abs(int(scroll_dy))
+        ctx = ""
+        if "notepad" in app.lower():
+            visible = (state.get("_np_visible") or "") if state else ""
+            ctx = f"\n{visible}" if visible else ""
+        else:
+            # show visible form fields with values
+            parts = []
+            for e in elems:
+                if e.get("window_role") != "active":
+                    continue
+                if e.get("type") not in ("input", "combobox", "editcontrol", "comboboxcontrol"):
+                    continue
+                lbl = (e.get("label") or e.get("text") or "").strip()
+                val = (e.get("value") or "").strip()
+                if not lbl:
+                    continue
+                parts.append(f"{lbl}: {val!r}" if val else lbl)
+                if len(parts) >= 4:
+                    break
+            ctx = f"  →  {' | '.join(parts)}" if parts else ""
+        return f"scroll      [{app}] {direction} {ticks} tick(s){ctx}"
+
+    if action_type == "hotkey":
+        extra = ""
+        if clipboard:
+            if hotkey == "ctrl+c":
+                extra = f"  →  {clipboard[:40]!r}"
+            elif hotkey == "ctrl+v":
+                extra = f"  pasting {clipboard[:40]!r}"
+        return f"hotkey      [{app}]{tab_part} [{hotkey}]{extra}"
+
+    if action_type == "keyboard":
+        val = (text or " ".join(keystrokes))[:40]
+        focused = next((e for e in elems
+                        if e.get("window_role") == "active" and e.get("focused")), None)
+        field = _lbl(focused)
+        return f"type        [{app}]{tab_part} [{field}]  →  {val!r}"
+
+    return action_type
+
+
+# =============================================================================
+# SNAPSHOT SUBPROCESS — runs UIA in a separate process so the ~280ms snapshot
+# never holds the main process GIL (which would block pynput's input hook and
+# make Windows drop events). Continuously snapshots, pushes latest state via a
+# multiprocessing Queue. Main process just reads the latest — zero UIA on the
+# main GIL, so input recording stays instant and lossless.
+# =============================================================================
+
+def _snapshot_proc(req_q, res_q, stop_flag, bg_apps):
+    """Child-process: ON-DEMAND snapshots. Waits for a request token, takes ONE
+    UIA snapshot, returns the slimmed state. ZERO snapshots between requests, so
+    the form is never flooded with UIA queries while the user is interacting."""
+    import sys as _sys, os as _os, time as _time
+    import queue as _q
+    _here = _os.path.dirname(_os.path.abspath(__file__))
+    _comp = _os.path.dirname(_here)
+    _root = _os.path.dirname(_comp)
+    for _p in (_root, _comp):
+        if _p not in _sys.path:
+            _sys.path.insert(0, _p)
+    try:
+        from observers.ui_observer import UIAutomationObserver as _Obs
+    except Exception:
+        try:
+            from components.observers.ui_observer import UIAutomationObserver as _Obs
+        except Exception:
+            return
+    try:
+        obs = _Obs(background_apps=set(bg_apps)) if bg_apps else _Obs()
+    except TypeError:
+        obs = _Obs()
+    # Keep only the element fields the transformer + recorder actually use.
+    # Drops metadata/automation_id/class_name/enabled/visible/pid/control_type/
+    # source — the structural bulk that made each state ~138KB. Shrinks state to
+    # ~15-20KB → IPC unpickle + per-step json save stay <2ms → main GIL free.
+    _KEEP = ("element_id", "type", "label", "text", "value", "bbox",
+             "window_role", "window_title", "app", "focused", "confidence")
+
+    def _slim(state):
+        slim_elems = []
+        for e in state.get("elements", []):
+            ne = {k: e[k] for k in _KEEP if k in e}
+            # label is display-only → cap hard (was the 149KB bloat: Notepad
+            # elements stuff the whole document into label)
+            lb = ne.get("label")
+            if lb and len(lb) > 200:
+                ne["label"] = lb[:200]
+            v = ne.get("value")
+            if v and len(v) > 6000:
+                ne["value"] = v[:6000]
+            t = ne.get("text")
+            if t and len(t) > 6000:
+                ne["text"] = t[:6000]
+            slim_elems.append(ne)
+        state["elements"] = slim_elems
+        return state
+
+    while not stop_flag.value:
+        try:
+            req = req_q.get(timeout=0.3)   # block until a snapshot is requested
+        except _q.Empty:
+            continue
+        action_type = req if isinstance(req, str) else ""
+        try:
+            state = _slim(obs.snapshot())
+        except Exception:
+            state = {}
+        # Attach Notepad context HERE (subprocess = off main GIL) so the console
+        # can show highlighted/copied text without lagging the user's input.
+        try:
+            if action_type in ("drag", "double_click"):
+                state["_np_selection"] = _get_notepad_selection()
+            elif action_type == "scroll":
+                state["_np_visible"] = _get_notepad_visible_lines(20)
+        except Exception:
+            pass
+        try:
+            res_q.put(state)
+        except Exception:
+            pass
+
+
+# =============================================================================
+# DEMO RECORDER  (action-triggered BC data collection)
+# =============================================================================
+
+class DemoRecorder:
+    """
+    Action-triggered recorder for Behavioral Cloning demo collection.
+
+    Unlike ScreenObserver (time-based frame capture), DemoRecorder fires on
+    every human mouse click or keyboard group and immediately snapshots UI
+    state before and after the action.  Each (state, action, next_state) triple
+    is one BC training step — no time-window ambiguity, no empty frames.
+
+    Controls (hotkeys while the form is focused):
+        F9  — toggle recording on / off
+        F10 — save session and quit
+
+    Output: data/demos/human/session_<timestamp>/live_step_NNNN.json
+    Format: identical to ScreenObserver + _export_run_traces output —
+            train.py reads it without any changes.
+
+    Usage:
+        recorder = DemoRecorder()
+        recorder.run()          # blocks until F10
+    """
+
+    _FLUSH_KEYS = {"Key.tab", "Key.enter", "Key.esc", "Key.escape",
+                   "tab", "enter", "return", "escape", "esc"}
+    _CAPTURE_DELAY = 0.30   # seconds to wait after action before snapshotting
+
+    def __init__(self, output_dir: str = "data/demos/human", trace_type: str = "form_filling"):
+        if not _PYNPUT_AVAILABLE:
+            raise ImportError("pynput is required. Install with: pip install pynput")
+        if not _UIA_OBSERVER_AVAILABLE:
+            raise ImportError("UIAutomationObserver not found in components/observers/.")
+
+        from datetime import datetime as _dt
+        _session_ts   = _dt.now().strftime("%Y%m%d_%H%M%S")
+        _intern_dir   = _INTERN_DIR
+        self.output_dir = os.path.join(_intern_dir, output_dir, f"session_{_session_ts}")
+        self.trace_type = trace_type
+
+        # Option A: only walk the foreground form + Notepad source window.
+        # ~10x faster snapshots than walking every visible window.
+        try:
+            self._observer = _UIAObserver(background_apps={"notepad", ".txt"})
+        except TypeError:
+            self._observer = _UIAObserver()  # older signature fallback
+        self._steps: list = []
+        self._lock   = threading.Lock()
+
+        self._recording      = False
+        self._pending_text   = ""
+        self._pending_keys: list = []
+        self._pending_hotkey: str = ""
+        self._pre_key_state: dict | None = None
+        self._quit_event     = threading.Event()
+        # drag detection
+        self._mouse_down_pos: list | None = None
+        self._mouse_down_time: float = 0.0
+        self._last_click_time: float = 0.0
+        self._last_click_pos: list | None = None
+        # ctrl key state
+        self._ctrl_held: bool = False
+        # scroll debounce
+        self._scroll_accum: float = 0.0
+        self._scroll_pos: list = [0, 0]
+        self._scroll_timer = None
+        self._last_state: dict = {}
+        self._cached_state: dict = {}   # legacy, unused
+        self._state_lock = threading.Lock()
+        import queue as _queue
+        self._action_queue = _queue.Queue()
+
+        # ── snapshot subprocess: ON-DEMAND UIA, off the main GIL ─────────────
+        # No continuous snapshotting → form is never flooded → no input lag.
+        self._snap_proc = None
+        self._use_subprocess = True
+        try:
+            import multiprocessing as _mp
+            self._req_q   = _mp.Queue(maxsize=4)
+            self._res_q   = _mp.Queue(maxsize=4)
+            self._mp_stop = _mp.Value("b", False)
+            self._snap_proc = _mp.Process(
+                target=_snapshot_proc,
+                args=(self._req_q, self._res_q, self._mp_stop, ["notepad", ".txt"]),
+                daemon=True,
+            )
+            self._snap_proc.start()
+            print("  [recorder] MODE: on-demand subprocess snapshots")
+        except Exception as _e:
+            self._use_subprocess = False
+            print(f"  [recorder] subprocess unavailable ({_e}); in-process fallback")
+
+        self._worker_thread = threading.Thread(target=self._worker, daemon=True)
+        self._worker_thread.start()
+
+    def _request_snapshot(self, action_type: str = "", timeout: float = 2.0) -> dict:
+        """Ask the subprocess for ONE fresh snapshot (+ Notepad context for the
+        given action_type). Blocks the worker (not the input listener)."""
+        if not self._use_subprocess:
+            try:
+                return self._observer.snapshot()
+            except Exception:
+                return {}
+        try:
+            try:
+                while not self._res_q.empty():
+                    self._res_q.get_nowait()
+            except Exception:
+                pass
+            self._req_q.put(action_type or 1)
+            return self._res_q.get(timeout=timeout) or {}
+        except Exception:
+            return {}
+
+    # ── public ─────────────────────────────────────────────────────────────────
+
+    def run(self, auto_start: bool = True):
+        """Block until F10 is pressed or stop() is called."""
+        print("\n" + "=" * 60)
+        print("  DEMO RECORDER  (BC data collection)")
+        print("  F10 — save session and quit")
+        print("=" * 60)
+        print("\nRecording started. Fill the form, then press F10 or click Stop.\n")
+
+        self._quit_event = threading.Event()
+        if auto_start:
+            self._recording = True
+
+        def _make_mouse():
+            # NO on_move — drag is detected from press/release positions. A move
+            # callback fires hundreds of times during a highlight-drag and each
+            # guard call adds GIL load → lag while highlighting. Omit it entirely.
+            return _pynput_mouse.Listener(
+                on_click=self._guard(self._on_click),
+                on_scroll=self._guard(self._on_scroll),
+            )
+
+        def _make_keyboard():
+            return _pynput_keyboard.Listener(
+                on_press=self._guard(self._on_key_press),
+                on_release=self._guard(self._on_key_release))
+
+        listeners = {"m": _make_mouse(), "k": _make_keyboard()}
+        listeners["m"].start()
+        listeners["k"].start()
+
+        # Watchdog: pynput listener threads can die upstream of our guards
+        # (e.g. NotImplementedError in pynput's own key conversion). Restart any
+        # dead listener so recording never permanently stops mid-session.
+        def _watchdog():
+            while not self._quit_event.is_set():
+                time.sleep(0.5)
+                try:
+                    if not listeners["m"].is_alive():
+                        print("  [watchdog] mouse listener died — restarting")
+                        listeners["m"] = _make_mouse(); listeners["m"].start()
+                    if not listeners["k"].is_alive():
+                        print("  [watchdog] keyboard listener died — restarting")
+                        listeners["k"] = _make_keyboard(); listeners["k"].start()
+                except Exception:
+                    pass
+        threading.Thread(target=_watchdog, daemon=True).start()
+
+        try:
+            self._quit_event.wait()
+        except Exception:
+            pass
+        finally:
+            self._recording = False
+            try: listeners["m"].stop()
+            except Exception: pass
+            try: listeners["k"].stop()
+            except Exception: pass
+            # PROCESS (don't discard) remaining queued actions so nothing is lost.
+            import queue as _q
+            print(f"\n  Flushing {self._action_queue.qsize()} pending action(s)…")
+            deadline = time.time() + 15.0
+            while time.time() < deadline:
+                try:
+                    event = self._action_queue.get_nowait()
+                except _q.Empty:
+                    break
+                try:
+                    self._process_event(event)
+                except Exception:
+                    self._log_crash("drain._process_event")
+            self._flush_pending(self._capture())
+            if self._steps:
+                out = self._save()
+                print(f"\n  [SAVED] {len(self._steps)} steps → {out}")
+            # stop the snapshot subprocess
+            try:
+                if self._snap_proc is not None:
+                    self._mp_stop.value = True
+                    self._snap_proc.join(timeout=2.0)
+                    if self._snap_proc.is_alive():
+                        self._snap_proc.terminate()
+            except Exception:
+                pass
+
+    def save(self) -> str:
+        return self._save()
+
+    # ── replay ───────────────────────────────────────────────────────────────
+    def replay(self, source_session: str, count: int = 1,
+               submit_between: bool = True, progress=None) -> int:
+        """Re-execute the actions of a recorded session on the LIVE form, capturing
+        fresh state each step → saves as NEW session(s). Hands-free data generation.
+        Hit Submit & New between runs (submit_between) → each replay fills a
+        DIFFERENT record → same navigation, real state variety.
+
+        source_session : path to a saved session folder (live_step_*.json)
+        count          : how many replay sessions to produce
+        progress       : optional callback(msg) for UI updates
+        Returns total steps written.
+        """
+        import pyautogui, glob as _glob
+        pyautogui.FAILSAFE = False
+        src = source_session
+        if not os.path.isabs(src):
+            src = os.path.join(_INTERN_DIR, src)
+        step_files = sorted(_glob.glob(os.path.join(src, "live_step_*.json")))
+        if not step_files:
+            if progress: progress(f"No steps in {src}")
+            return 0
+
+        # parse the source actions once
+        actions = []
+        for f in step_files:
+            try:
+                t = json.load(open(f, encoding="utf-8"))
+            except Exception:
+                continue
+            m = t.get("mouse", {}).get("actions", [])
+            k = t.get("keyboard", {}).get("actions", [])
+            if m:
+                a = m[0]
+                actions.append({"kind": a.get("type", "click"),
+                                "pos": a.get("position", [0, 0]),
+                                "dst": a.get("dst_position"),
+                                "dy":  a.get("dy", 0)})
+            elif k:
+                g = k[0]
+                hk = g.get("hotkey", "")
+                if hk:
+                    actions.append({"kind": "hotkey", "hotkey": hk})
+                else:
+                    txt = "".join(s.get("pasted_text") or s.get("key", "")
+                                  for s in g.get("strokes", []))
+                    actions.append({"kind": "type", "text": txt})
+
+        def _foreground_form():
+            # Bring the wx form window to the front so replayed clicks land on
+            # its fields (not the recorder window / panel background).
+            try:
+                import win32gui
+                target = [0]
+                def _cb(h, _):
+                    if not win32gui.IsWindowVisible(h):
+                        return
+                    t = (win32gui.GetWindowText(h) or "").lower()
+                    if "insurance" in t or "data entry" in t or "car" in t:
+                        target[0] = h
+                win32gui.EnumWindows(_cb, None)
+                if target[0]:
+                    win32gui.SetForegroundWindow(target[0])
+                    time.sleep(0.4)
+            except Exception:
+                pass
+
+        total = 0
+        from datetime import datetime as _dt
+        for run_i in range(count):
+            self._steps = []
+            ts = _dt.now().strftime("%Y%m%d_%H%M%S_%f")
+            self.output_dir = os.path.join(_INTERN_DIR, "data", "demos", "human",
+                                           f"session_replay_{ts}")
+            if progress: progress(f"Replay {run_i+1}/{count} → {os.path.basename(self.output_dir)}")
+            _foreground_form()   # focus the form before each replay pass
+            for ai, act in enumerate(actions):
+                pre = self._request_snapshot()
+                if progress:
+                    _p = act.get("pos") or act.get("text") or act.get("hotkey") or ""
+                    progress(f"  [{ai+1}/{len(actions)}] {act['kind']} {_p}")
+                try:
+                    if act["kind"] in ("click", "double_click"):
+                        x, y = act["pos"]
+                        pyautogui.moveTo(x, y, duration=0.08)
+                        if act["kind"] == "double_click":
+                            pyautogui.doubleClick(x, y)
+                        else:
+                            pyautogui.click(x, y)
+                    elif act["kind"] == "drag" and act.get("dst"):
+                        x, y = act["pos"]; dx, dy = act["dst"]
+                        pyautogui.moveTo(x, y, duration=0.08)
+                        pyautogui.dragTo(dx, dy, duration=0.2, button="left")
+                    elif act["kind"] == "scroll":
+                        x, y = act["pos"]
+                        pyautogui.scroll(int(act.get("dy", 0)) or -3, x=int(x), y=int(y))
+                    elif act["kind"] == "type":
+                        if act.get("text"):
+                            pyautogui.typewrite(act["text"], interval=0.02)
+                    elif act["kind"] == "hotkey":
+                        hk = act["hotkey"]
+                        keys = hk.split("+")
+                        pyautogui.hotkey(*keys) if len(keys) > 1 else pyautogui.press(hk)
+                except Exception as _re:
+                    if progress: progress(f"  step {ai} exec error: {_re}")
+                time.sleep(0.3)
+                post = self._request_snapshot()
+                # build the new step directly (same format as live capture)
+                _ev = {"action_type": {"click":"click","double_click":"double_click",
+                                       "drag":"drag","scroll":"scroll","type":"keyboard",
+                                       "hotkey":"hotkey"}.get(act["kind"], "click")}
+                self._append_step(
+                    state_before=pre, state_after=post,
+                    action_type=_ev["action_type"],
+                    click_pos=act.get("pos") if act["kind"] in ("click","double_click") else None,
+                    text=act.get("text",""),
+                    hotkey=act.get("hotkey",""),
+                    scroll_pos=act.get("pos") if act["kind"]=="scroll" else None,
+                    scroll_dy=act.get("dy",0),
+                    drag_src=act.get("pos") if act["kind"]=="drag" else None,
+                    drag_dst=act.get("dst") if act["kind"]=="drag" else None,
+                )
+            out = self._save()
+            total += len(self._steps)
+            if progress: progress(f"  saved {len(self._steps)} steps → {out}")
+            if submit_between and run_i < count - 1:
+                # click Submit & New to advance to a fresh record
+                try:
+                    st = self._request_snapshot()
+                    btn = next((e for e in st.get("elements", [])
+                                if e.get("type") in ("buttoncontrol","button")
+                                and "new" in (e.get("text") or e.get("label") or "").lower()
+                                and e.get("bbox")), None)
+                    if btn:
+                        b = btn["bbox"]; cx,cy=(b[0]+b[2])/2,(b[1]+b[3])/2
+                        pyautogui.click(cx, cy); time.sleep(0.6)
+                except Exception:
+                    pass
+        return total
+
+    # ── pynput callbacks ───────────────────────────────────────────────────────
+
+    def _on_hotkey(self, key):
+        k = self._key_name(key)
+        if k in ("Key.f9", "f9"):
+            self._recording = not self._recording
+            state_str = "RECORDING" if self._recording else "PAUSED"
+            with self._lock:
+                count = len(self._steps)
+            print(f"\n  [{state_str}]  {count} steps so far\n")
+        elif k in ("Key.f10", "f10"):
+            self._recording = False
+            print("\n  Saving and quitting …")
+            self._flush_pending(self._capture())
+            out = self._save()
+            print(f"\n  {len(self._steps)} steps saved → {out}")
+            print(f"\n  Train:  python train.py --trace_dir data/demos/human --epochs 50\n")
+            return False  # stop listener
+
+    def _on_move(self, x, y, *args):
+        pass  # used implicitly for drag detection via _mouse_down_pos
+
+    def _on_scroll(self, x, y, dx, dy, *args):
+        if not self._recording:
+            return
+        delta = float(dy) if dy != 0 else float(dx)
+        if delta == 0:
+            return
+        self._flush_text_to_queue()
+        self._scroll_accum += delta
+        self._scroll_pos = [x, y]
+        if self._scroll_timer:
+            self._scroll_timer.cancel()
+        self._scroll_timer = threading.Timer(0.4, self._flush_scroll)
+        self._scroll_timer.start()
+
+    def _flush_scroll(self):
+        accum = self._scroll_accum
+        pos   = self._scroll_pos
+        self._scroll_accum = 0.0
+        if accum == 0:
+            return
+        self._action_queue.put({
+            "action_type": "scroll",
+            "scroll_pos":  pos,
+            "scroll_dy":   accum,
+        })
+
+    def _on_click(self, x, y, button, pressed, *args):
+        if not self._recording:
+            return
+        if button != _pynput_mouse.Button.left:
+            return
+
+        # LISTENER IS PURE EVENT-QUEUEING — never reads UIA/state (that would
+        # hold the GIL and lag input). Worker snapshots on-demand and filters.
+        if pressed:
+            self._mouse_down_pos  = [x, y]
+            self._mouse_down_time = time.time()
+            return
+
+        if self._mouse_down_pos is None:
+            return
+
+        # commit any typed text before this mouse action (preserve order)
+        self._flush_text_to_queue()
+
+        dx = abs(x - self._mouse_down_pos[0])
+        dy = abs(y - self._mouse_down_pos[1])
+        now = time.time()
+
+        # drag: moved far enough that it can't be click jitter. 8px was too low —
+        # normal clicks have minor hand movement and were misclassified as drags
+        # (231 fake drags polluted the click demos). 40px = real drag/selection.
+        if dx > 40 or dy > 40:
+            src = list(self._mouse_down_pos)
+            self._mouse_down_pos  = None
+            self._last_click_time = 0.0
+            self._action_queue.put({"action_type": "drag",
+                                    "drag_src": src, "drag_dst": [x, y]})
+            return
+
+        # double-click: second click within 400ms at same spot
+        if (self._last_click_pos
+                and abs(x - self._last_click_pos[0]) < 10
+                and abs(y - self._last_click_pos[1]) < 10
+                and (now - self._last_click_time) < 0.4):
+            self._mouse_down_pos  = None
+            self._last_click_time = 0.0
+            self._last_click_pos  = None
+            self._action_queue.put({"action_type": "double_click", "click_pos": [x, y]})
+            return
+
+        # single click
+        self._mouse_down_pos  = None
+        self._last_click_time = now
+        self._last_click_pos  = [x, y]
+        self._action_queue.put({"action_type": "click", "click_pos": [x, y]})
+
+    def _on_key_press(self, key, *args):
+        k = self._key_name(key)
+        if k == "f9":
+            self._recording = not self._recording
+            state_str = "RECORDING" if self._recording else "PAUSED"
+            with self._lock:
+                count = len(self._steps)
+            print(f"\n  [{state_str}]  {count} steps so far\n")
+            return
+        if k == "f10":
+            self._recording = False
+            print("\n  Saving and quitting …")
+            self._flush_pending(self._capture())
+            out = self._save()
+            print(f"\n  {len(self._steps)} steps saved → {out}")
+            print(f"\n  Train:  python train.py --trace_dir data/demos/human --epochs 50\n")
+            self._quit_event.set()
+            return
+        # Ignore function keys (F1-F12) entirely — never form values. F8 is the
+        # GUI replay hotkey; without this it leaks into recorded text as "f8 f8…".
+        if len(k) in (2, 3) and k[0] in ("f", "F") and k[1:].isdigit():
+            return
+        if not self._recording:
+            return
+
+        # track ctrl state
+        if k in ("ctrl_l", "ctrl_r", "Key.ctrl_l", "Key.ctrl_r", "ctrl"):
+            self._ctrl_held = True
+            return
+
+        # detect hotkeys: ctrl+letter, tab, enter, escape, arrows
+        # control chars: \x01=a \x03=c \x06=f \x16=v \x18=x \x19=y \x1a=z
+        _CTRL_CHARS = {'\x01':'a','\x02':'b','\x03':'c','\x04':'d','\x05':'e',
+                       '\x06':'f','\x16':'v','\x18':'x','\x19':'y','\x1a':'z'}
+        hotkey = None
+        if self._ctrl_held or (len(k) == 1 and k in _CTRL_CHARS):
+            letter = _CTRL_CHARS.get(k, k.lower() if len(k) == 1 else "")
+            if letter in ("a", "c", "v", "x", "z", "y"):
+                hotkey = f"ctrl+{letter}"
+            elif k in ("tab", "Key.tab"):
+                hotkey = "ctrl+tab"
+        elif k in ("tab", "Key.tab"):
+            hotkey = "tab"
+        elif k in ("enter", "return", "Key.enter", "Key.return"):
+            hotkey = "enter"
+        elif k in ("escape", "esc", "Key.esc", "Key.escape"):
+            hotkey = "escape"
+        elif k in ("backspace", "Key.backspace"):
+            hotkey = "backspace"
+        elif k in ("delete", "Key.delete"):
+            hotkey = "delete"
+        elif k in ("home", "Key.home"):
+            hotkey = "home"
+        elif k in ("end", "Key.end"):
+            hotkey = "end"
+        elif k in ("page_up", "Key.page_up"):
+            hotkey = "page_up"
+        elif k in ("page_down", "Key.page_down"):
+            hotkey = "page_down"
+        elif k in ("up", "Key.up"):
+            hotkey = "arrow_up"
+        elif k in ("down", "Key.down"):
+            hotkey = "arrow_down"
+        elif k in ("left", "Key.left"):
+            hotkey = "arrow_left"
+        elif k in ("right", "Key.right"):
+            hotkey = "arrow_right"
+
+        if hotkey:
+            # flush pending text first (worker assigns states)
+            if self._pending_text or self._pending_keys:
+                self._action_queue.put({
+                    "action_type": "keyboard",
+                    "text":        self._pending_text,
+                    "keystrokes":  list(self._pending_keys),
+                })
+                self._pending_text  = ""
+                self._pending_keys  = []
+            self._action_queue.put({"action_type": "hotkey", "hotkey": hotkey})
+            return
+
+        # regular character — accumulate, no state read
+        try:
+            ch = key.char
+            if ch and ch.isprintable() and not self._ctrl_held:
+                self._pending_text += ch
+        except AttributeError:
+            self._pending_keys.append(k)
+
+    def _on_key_release(self, key, *args):
+        k = self._key_name(key)
+        if k in ("ctrl_l", "ctrl_r", "Key.ctrl_l", "Key.ctrl_r", "ctrl"):
+            self._ctrl_held = False
+
+    # ── internal ───────────────────────────────────────────────────────────────
+
+    _NOISE_APPS = {"windowsterminal", "code", "devenv", "cursor",
+                   "firefox", "chrome", "msedge", "iexplore", "opera", "brave"}
+
+    def _is_noise_app(self, state: dict) -> bool:
+        app = (state.get("application") or "").lower().replace(".exe", "")
+        return any(n in app for n in self._NOISE_APPS)
+
+    @staticmethod
+    def _init_com():
+        """Initialize COM for the current thread — required for UIA calls.
+        Each thread that touches uiautomation must call this or it crashes."""
+        try:
+            import ctypes
+            ctypes.windll.ole32.CoInitializeEx(None, 0x2)  # COINIT_APARTMENTTHREADED
+        except Exception:
+            pass
+
+    def _log_crash(self, where: str):
+        """Append a full traceback to the crash log so silent listener-thread
+        deaths become visible."""
+        import traceback, datetime as _dt
+        try:
+            path = os.path.join(_INTERN_DIR, "data", "output", "recorder_crash.log")
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            with open(path, "a", encoding="utf-8") as f:
+                f.write(f"\n[{_dt.datetime.now().isoformat()}] {where}\n")
+                f.write(traceback.format_exc())
+            print(f"  [CRASH in {where}] {traceback.format_exc().splitlines()[-1]}")
+        except Exception:
+            pass
+
+    def _guard(self, fn):
+        """Wrap a pynput callback so an exception is logged instead of silently
+        killing the listener thread."""
+        def _wrapped(*args, **kwargs):
+            try:
+                return fn(*args, **kwargs)
+            except Exception:
+                self._log_crash(fn.__name__)
+                return True   # keep listener alive
+        return _wrapped
+
+    def _bg_capture(self):
+        """Continuously refresh cached UI state in background.
+        snapshot() self-initializes COM via UIAutomationInitializerInThread —
+        do NOT call _init_com here or it conflicts and snapshot returns empty."""
+        while not self._quit_event.is_set():
+            t0 = time.time()
+            try:
+                state = self._observer.snapshot()
+                if state.get("elements"):
+                    self._cached_state = state   # atomic ref swap, no lock needed
+            except Exception:
+                pass
+            # The UIA walk holds the GIL the whole time, starving the input
+            # listeners. Sleep 3x the snapshot duration so the GIL is free ~75%
+            # of the time and clicks/keys stay responsive.
+            elapsed = time.time() - t0
+            time.sleep(max(0.3, elapsed * 3))
+
+    def _worker(self):
+        """Process queued actions. UIA snapshots come from the subprocess via
+        _last_state (no UIA on this process's GIL → input never lags/drops).
+        In fallback mode (no subprocess) snapshots happen here in-process."""
+        import queue as _queue
+        # initial baseline snapshot (on-demand)
+        self._last_state = self._request_snapshot() or {}
+        while not self._quit_event.is_set():
+            try:
+                event = self._action_queue.get(timeout=0.5)
+            except _queue.Empty:
+                continue
+            try:
+                self._process_event(event)
+            except Exception:
+                self._log_crash("worker._process_event")
+
+    def _process_event(self, event: dict):
+        """pre = snapshot before this action (= prior action's post); take ONE
+        fresh on-demand snapshot for post; it becomes the next action's pre.
+        UIA fires only here — a few times per demo, never continuously."""
+        action_type = event["action_type"]
+        pre = self._last_state or {}
+
+        # Coalesce during bursts: if more actions are already queued, DON'T pay
+        # the ~200ms snapshot — reuse last state and drain fast. Snapshot only
+        # when caught up (queue empty), so the worker keeps pace with the user
+        # and the console stops firing in delayed bursts.
+        backlog = self._action_queue.qsize()
+        if backlog > 0:
+            time.sleep(0.02)
+            post = self._last_state or pre
+        else:
+            time.sleep(0.12)
+            post = self._request_snapshot(action_type)
+            if not post.get("elements"):
+                post = pre
+            self._last_state = post
+
+        # filter noise-app actions (terminal/browser) using fresh post-state
+        if self._is_noise_app(post) and self._is_noise_app(pre):
+            return
+        # drop bare Notepad single clicks (cursor-positioning noise)
+        if action_type == "click" and "notepad" in (post.get("application") or "").lower():
+            return
+
+        clipboard = ""
+        if action_type == "hotkey" and event.get("hotkey") in ("ctrl+c", "ctrl+v"):
+            try:
+                import pyperclip as _pc
+                clipboard = _pc.paste() or ""
+            except Exception:
+                pass
+
+        self._append_step(
+            state_before    = pre,
+            state_after     = post,
+            action_type     = action_type,
+            click_pos       = event.get("click_pos"),
+            text            = event.get("text", ""),
+            keystrokes      = event.get("keystrokes", []),
+            hotkey          = event.get("hotkey", ""),
+            scroll_pos      = event.get("scroll_pos"),
+            scroll_dy       = event.get("scroll_dy", 0.0),
+            drag_src        = event.get("drag_src"),
+            drag_dst        = event.get("drag_dst"),
+            clipboard       = clipboard,
+        )
+
+    def _capture(self) -> dict:
+        """Return last worker snapshot (used by F10 flush path)."""
+        return getattr(self, "_last_state", None) or {}
+
+    def _flush_text_to_queue(self):
+        """Queue accumulated typed text as a keyboard event (no state read)."""
+        if self._pending_text or self._pending_keys:
+            self._action_queue.put({
+                "action_type": "keyboard",
+                "text":        self._pending_text,
+                "keystrokes":  list(self._pending_keys),
+            })
+            self._pending_text = ""
+            self._pending_keys = []
+
+    def _flush_pending(self, *args, **kwargs):
+        self._flush_text_to_queue()
+
+    def _append_step(
+        self,
+        state_before:   dict,
+        state_after:    dict,
+        action_type:    str,
+        click_pos:      list | None = None,
+        text:           str         = "",
+        keystrokes:     list        = [],
+        hotkey:         str         = "",
+        scroll_pos:     list | None = None,
+        scroll_dy:      float       = 0.0,
+        drag_src:       list | None = None,
+        drag_dst:       list | None = None,
+        notepad_line:   str         = "",
+        notepad_select: str         = "",
+        clipboard:      str         = "",
+    ):
+        ts = datetime.now().isoformat()
+        if action_type == "click" and click_pos:
+            mouse_entry = {"actions": [{"position": [float(click_pos[0]), float(click_pos[1])],
+                                        "type": "click", "timestamp": ts}]}
+            kb_entry = {"actions": []}
+        elif action_type == "double_click" and click_pos:
+            mouse_entry = {"actions": [{"position": [float(click_pos[0]), float(click_pos[1])],
+                                        "type": "double_click", "timestamp": ts}]}
+            kb_entry = {"actions": []}
+        elif action_type == "drag" and drag_src and drag_dst:
+            mouse_entry = {"actions": [{"position": [float(drag_src[0]), float(drag_src[1])],
+                                        "dst_position": [float(drag_dst[0]), float(drag_dst[1])],
+                                        "type": "drag", "timestamp": ts}]}
+            kb_entry = {"actions": []}
+        elif action_type == "scroll" and scroll_pos:
+            mouse_entry = {"actions": [{"position": [float(scroll_pos[0]), float(scroll_pos[1])],
+                                        "type": "scroll", "dy": float(scroll_dy), "timestamp": ts}]}
+            kb_entry = {"actions": []}
+        elif action_type == "hotkey" and hotkey:
+            mouse_entry = {"actions": []}
+            kb_entry = {"actions": [{"hotkey": hotkey, "strokes": [{"key": hotkey, "pasted_text": ""}]}]}
+        elif action_type == "keyboard":
+            mouse_entry = {"actions": []}
+            if text:
+                strokes = [{"pasted_text": text, "key": ""}]
+            else:
+                strokes = [{"key": k, "pasted_text": ""} for k in keystrokes]
+            kb_entry = {"actions": [{"strokes": strokes}]}
+        else:
+            return
+
+        with self._lock:
+            idx = len(self._steps)
+            step = {
+                "trace_id":   f"live_step_{idx:04d}",
+                "timestamp":  datetime.now().isoformat(),
+                "duration":   1.0,
+                "type":       self.trace_type,
+                "state":      _fmt_state(state_before),
+                "mouse":      mouse_entry,
+                "keyboard":   kb_entry,
+                "next_state": _fmt_state(state_after),
+            }
+            self._steps.append(step)
+            desc = _semantic_desc(action_type, click_pos, text, keystrokes, state_after,
+                                  hotkey=hotkey, scroll_dy=scroll_dy,
+                                  drag_src=drag_src, drag_dst=drag_dst,
+                                  notepad_line=notepad_line,
+                                  notepad_select=notepad_select,
+                                  clipboard=clipboard)
+            warn = " [!empty state]" if not state_after.get("elements") else ""
+            print(f"  [{idx:04d}] {desc}{warn}")
+
+        # write this step to disk immediately — never lose data on crash/kill
+        try:
+            os.makedirs(self.output_dir, exist_ok=True)
+            path = os.path.join(self.output_dir, f"live_step_{idx:04d}.json")
+            with open(path, "w", encoding="utf-8") as f:
+                json.dump(step, f, indent=2, ensure_ascii=False)
+        except Exception:
+            self._log_crash("incremental_save")
+
+    def _save(self) -> str:
+        os.makedirs(self.output_dir, exist_ok=True)
+        with self._lock:
+            steps = list(self._steps)
+        if not steps:
+            print("  No steps recorded — nothing saved.")
+            return self.output_dir
+        for i, step in enumerate(steps):
+            path = os.path.join(self.output_dir, f"live_step_{i:04d}.json")
+            with open(path, "w", encoding="utf-8") as f:
+                json.dump(step, f, indent=2, ensure_ascii=False)
+        return self.output_dir
+
+    @staticmethod
+    def _key_name(key) -> str:
+        try:
+            if key.char:
+                return key.char
+        except AttributeError:
+            pass
+        try:
+            return key.name  # "f9", "f10", "tab", "enter", etc.
+        except AttributeError:
+            return str(key)
+
+
 # =============================================================================
 # EXPORTS
 # =============================================================================
 
-__all__ = ["ScreenObserver", "MouseInput", "KeyboardInput", "ClipboardMonitor"]
+__all__ = ["ScreenObserver", "MouseInput", "KeyboardInput", "ClipboardMonitor", "DemoRecorder"]

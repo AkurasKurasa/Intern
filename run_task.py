@@ -61,9 +61,16 @@ STEP_DELAY    = 1.5
 
 # ── run ───────────────────────────────────────────────────────────────────────
 if __name__ == "__main__":
+    import argparse
     import time
     from agent.agent import LLMAgent
     from observers.vlm.visual_data_reader.visual_data_reader import VisualDataReader
+
+    _parser = argparse.ArgumentParser()
+    _parser.add_argument("--start_tab", type=int, default=0,
+                         help="Tab index to start from (0=Policy … 4=Drivers). "
+                              "Manually click that tab in the form before running.")
+    _args = _parser.parse_args()
 
     _active_key = API_KEY if PROVIDER == "anthropic" else GROQ_API_KEY if PROVIDER == "groq" else API_KEY
     if PROVIDER not in ("lmstudio", "none") and not _active_key:
@@ -87,12 +94,16 @@ if __name__ == "__main__":
         api_key          = _active_key,
         task_plugin      = None,
         pure_transformer = False,
+        disable_auto_handlers = True,   # kill legacy heuristics — transformer(WHERE)+LLM(WHAT) merge drives
         visual_reader    = visual_reader,
         visual_cache     = visual_cache,
         source_window    = SOURCE_WINDOW,
         max_steps        = MAX_STEPS,
         step_delay       = STEP_DELAY,
+        start_tab_idx    = _args.start_tab,
     )
+    if _args.start_tab:
+        logger.info("Drill mode: starting at tab index %d — manually click that tab first.", _args.start_tab)
 
     logger.info("Starting — goal=%r  provider=%s  no plugin", GOAL, PROVIDER)
     results = []

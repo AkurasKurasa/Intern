@@ -34,7 +34,9 @@ for _p in (_ROOT, _COMP_DIR):
 # ── optional dependency: pyautogui ────────────────────────────────────────────
 try:
     import pyautogui
-    pyautogui.FAILSAFE = True
+    # We guard invalid coords ourselves (skip (0,0)/corner). Disable the
+    # built-in fail-safe so a single bad prediction doesn't abort the whole run.
+    pyautogui.FAILSAFE = False
     pyautogui.PAUSE    = 0.05
     _PYAUTOGUI_AVAILABLE = True
 except ImportError:
@@ -105,6 +107,11 @@ class ActionExecutor:
             if action_type == "click":
                 pos  = prediction.get("click_position", [0, 0])
                 x, y = int(round(pos[0])), int(round(pos[1]))
+                # Skip invalid coords — the transformer pointed at a padding/empty
+                # element (zero bbox → (0,0)). Don't move the mouse to the corner.
+                if x <= 1 and y <= 1:
+                    logger.warning("CLICK skipped — invalid (0,0) target (bad element prediction)")
+                    return ExecutionResult("click", None, 0, [], ts, self.dry_run, False, "invalid_coords")
                 self._click(x, y)
                 return ExecutionResult("click", (x, y), 0, [], ts, self.dry_run, True, "")
 
@@ -170,17 +177,30 @@ class ActionExecutor:
 
     def _scroll(self, x: int, y: int, direction: str, clicks: int) -> None:
         amount = -clicks if direction == "down" else clicks
+        # Guard against (0,0)/corner coords — moving there trips pyautogui's
+        # fail-safe and aborts the run. Scroll at the current cursor position
+        # (or screen center) instead of an invalid predicted point.
+        if x <= 1 and y <= 1:
+            try:
+                x, y = pyautogui.position()
+            except Exception:
+                w, h = pyautogui.size()
+                x, y = w // 2, h // 2
         logger.info("SCROLL  @ (%d, %d)  dir=%s  clicks=%d%s",
                     x, y, direction, clicks, "  [DRY-RUN]" if self.dry_run else "")
         if self.dry_run:
             return
-        pyautogui.moveTo(x, y, duration=0.15)
-        pyautogui.scroll(amount, x=x, y=y)
+        try:
+            pyautogui.scroll(amount, x=x, y=y)
+        except pyautogui.FailSafeException:
+            pyautogui.scroll(amount)  # scroll at current pos, no move
         time.sleep(self.post_click_delay)
 
     def _press_key(self, key: str) -> None:
         if key.startswith("Key."):
             pyautogui.press(key.split("Key.", 1)[1])
+        elif "+" in key:
+            pyautogui.hotkey(*key.split("+"))
         elif len(key) == 1:
             pyautogui.typewrite(key, interval=0.0)
         else:

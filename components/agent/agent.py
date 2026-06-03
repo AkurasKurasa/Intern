@@ -524,6 +524,8 @@ class LLMAgent:
         source_window:     str            = "",     # title fragment of source data window
         task_plugin:       Optional[Any]  = None,   # TaskPlugin for task-specific logic
         pure_transformer:  bool           = False,  # skip all hardcoded handlers; transformer+LLM only
+        disable_auto_handlers: bool       = False,  # skip legacy heuristics but KEEP LLM+transformer merge
+        start_tab_idx:     int            = 0,      # start agent at this tab index (drill testing)
     ):
         self.goal       = goal
         self.provider   = provider.lower().strip()
@@ -587,10 +589,17 @@ class LLMAgent:
 
         self._executor          = ActionExecutor(dry_run=dry_run)
         self._text_resolver     = _TextResolver()
-        self._observer          = UIAutomationObserver(
-            max_elements_per_window=300,
-            max_total_elements=700,
-        )
+        # MUST match the recorder's observer config exactly, or inference states
+        # are out-of-distribution vs training and the transformer predicts
+        # garbage. Recorder uses background_apps={notepad,.txt} + default limits.
+        try:
+            self._observer      = UIAutomationObserver(
+                background_apps={"notepad", ".txt"},
+            )
+        except TypeError:
+            self._observer      = UIAutomationObserver(
+                max_elements_per_window=300, max_total_elements=700,
+            )
         self._validator         = StateValidator()
         self._correction        = CorrectionHandler()
         self._record_num: int               = record_num
@@ -603,13 +612,14 @@ class LLMAgent:
         self._checked_fields: set           = set()   # checkboxes already clicked this run
         self._filled_this_tab: set          = set()   # edit fields filled on current tab (prevents re-fill on cycling)
         self._nochange_click_pos: set       = set()   # (rx,ry) click positions that gave no_change this tab
-        self._current_tab_idx: int          = 0       # tracks which tab we're on
+        self._current_tab_idx: int          = start_tab_idx  # tracks which tab we're on
         self._guidance: str = ""
         self._task_name: str = ""   # set via run(task_name=...)
         self._cached_record: Dict[str, str] = {}     # full parsed record from Notepad (bypasses 2000-char UIA cap)
         self._ocr_cache: Dict[str, Any] = {}        # instance-level OCR cache (clears per record)
 
         self._pure_transformer: bool = pure_transformer
+        self._no_autohandlers:  bool = disable_auto_handlers
 
         # ── Task plugin (optional — encapsulates task-specific logic) ───────────
         self._task_plugin: Optional[Any] = task_plugin
@@ -815,7 +825,7 @@ class LLMAgent:
 
             # When a plugin is active OR pure-transformer mode, skip all legacy
             # form-specific auto-handlers and fall through to transformer/LLM only.
-            _plugin_active = (self._task_plugin is not None) or self._pure_transformer
+            _plugin_active = (self._task_plugin is not None) or self._pure_transformer or self._no_autohandlers
 
             # In pure_transformer mode: scroll to top + click first field on tab switch
             # (same as the non-plugin handler below, but without auto-fill logic)
@@ -873,10 +883,12 @@ class LLMAgent:
                 time.sleep(self.step_delay)
                 continue   # re-observe so auto-handlers run first before LLM gets a chance
 
-            # 1b. Stuck guard: if no_change repeats OR too many steps on same tab, advance
-            # Runs in all modes including pure_transformer — LLM cannot self-recover from loops.
-            _stuck = (_no_change_streak >= _NO_CHANGE_LIMIT
-                      or (not _plugin_active and _steps_on_tab >= _TAB_STEP_LIMIT))
+            # 1b. Stuck guard: if no_change repeats OR too many steps on same tab, advance.
+            # DISABLED when disable_auto_handlers — we want to see the pure
+            # transformer with no rescue (honest navigation test).
+            _stuck = ((not self._no_autohandlers)
+                      and (_no_change_streak >= _NO_CHANGE_LIMIT
+                           or (not _plugin_active and _steps_on_tab >= _TAB_STEP_LIMIT)))
             if _stuck:
                 if _steps_on_tab >= _TAB_STEP_LIMIT:
                     logger.info("Stuck guard: %d steps on tab — forcing advance.", _steps_on_tab)
@@ -948,9 +960,12 @@ class LLMAgent:
                     # pending even though it doesn't exist.
                     if _sec and self._cached_record:
                         _sec_lower = _sec.lower()
-                        if not any(rk.lower().startswith(_sec_lower + " ")
-                                   for rk in self._cached_record):
-                            continue  # section absent from record — not pending
+                        _fn_key_tc = _sec_lower + " first name"
+                        _fn_val_tc = next((rv for rk, rv in self._cached_record.items()
+                                           if rk.lower() == _fn_key_tc), "")
+                        _skip_pl_tc = {"(none)", "none", "(leave blank)", "n/a"}
+                        if not (_fn_val_tc and _fn_val_tc.lower().strip("()") not in _skip_pl_tc):
+                            continue  # section has no real person — not pending
                     _known = self._lookup_field(_fn, section=_sec)
                     _val   = (_e.get("value") or "").strip()
                     if _known:
@@ -1075,6 +1090,36 @@ class LLMAgent:
             if not _plugin_active and _focused_el and _focused_el.get("type") == "panecontrol":
                 _pane_label = (_focused_el.get("label") or _focused_el.get("text") or "?")[:40]
                 _pane_y     = _focused_el["bbox"][1] if _focused_el.get("bbox") else 0
+                # If this pane is a section_ with no data in the record (e.g. Driver 3 when
+                # record has only 2 drivers), don't escape into it — advance tab instead.
+                # Read the section directly from the pane's own label rather than calling
+                # _detect_section (which finds panes ABOVE the element, not the element itself).
+                import re as _pre
+                _pane_raw = (_focused_el.get("label") or _focused_el.get("text") or "").lower()
+                _pm = _pre.match(r"section_(driver|vehicle)_(\d+)$", _pane_raw)
+                _pane_sec = f"{_pm.group(1).title()} {_pm.group(2)}" if _pm else ""
+                if _pane_sec and self._cached_record:
+                    _ps_lower = _pane_sec.lower()
+                    # A section exists only if its First Name field has a real value.
+                    # Boolean fields like "SR-22 Required: No" are present for every
+                    # section and must not be used as presence indicators.
+                    _fn_key   = _ps_lower + " first name"
+                    _fn_val   = next((rv for rk, rv in self._cached_record.items()
+                                      if rk.lower() == _fn_key), "")
+                    _skip_pl  = {"(none)", "none", "(leave blank)", "n/a"}
+                    _sec_has_real = bool(_fn_val and _fn_val.lower().strip("()") not in _skip_pl)
+                    if not _sec_has_real:
+                        logger.info("Pane-escape: section %r has no real data — advancing tab.", _pane_sec)
+                        if self._try_advance_tab(state):
+                            _no_change_streak  = 0
+                            _tab_just_switched = True
+                            _tab_scroll_count  = 0
+                            _last_auto_step    = step_idx
+                            self._filled_this_tab.clear()
+                            _confirmed_blank_fields.clear()
+                            self._refresh_record_cache(state)
+                            time.sleep(self.step_delay)
+                        _heuristic_steps += 1; continue
                 logger.info("Focus on pane %r — clicking first empty field to escape.", _pane_label)
                 # Peek at which field we'd click before actually clicking it.
                 # If we've clicked the same field 3+ times with no escape (loop!), scroll down first.
@@ -1107,9 +1152,14 @@ class LLMAgent:
                     time.sleep(self.step_delay * 0.5)
                     _pane_escape_streak = 0  # reset after scroll so we try click once fresh
                     _heuristic_steps += 1; continue
-                if self._focus_first_empty_field(state, min_y=_pane_y):
-                    time.sleep(self.step_delay * 0.5)
-                    _heuristic_steps += 1; continue
+                # Press Tab instead of UIA SetFocus — the form's own tab order
+                # reliably lands on the first field inside the section pane.
+                # UIA SetFocus can bounce back to the previous section when the
+                # target field hasn't been scrolled into the form's active region.
+                self._executor.execute({"action_type": "keyboard",
+                                        "key_count": 1, "keystrokes": ["tab"]})
+                time.sleep(self.step_delay * 0.5)
+                _heuristic_steps += 1; continue
                 # No unhandled field found in this pane — fall through so the
                 # universal tab-complete check (above) or LLM handles next steps.
 
@@ -1172,6 +1222,26 @@ class LLMAgent:
                 time.sleep(self.step_delay * 0.5)
                 _heuristic_steps += 1; continue
 
+            # 1z. Already-handled guard: focus bounced back to a field we already filled.
+            #     Tab past without calling LLM — prevents LLM from overwriting correct values.
+            if not _plugin_active:
+                _fid_ah = state.get("focused_element_id")
+                _fe_ah  = next((e for e in state.get("elements", [])
+                                if e.get("element_id") == _fid_ah), None)
+                if _fe_ah and _fe_ah.get("type") in ("editcontrol", "comboboxcontrol"):
+                    _fn_ah  = (_fe_ah.get("label") or _fe_ah.get("text") or "").strip()
+                    _sec_ah = self._detect_section(state, _fe_ah)
+                    _fk_ah  = f"{_sec_ah} {_fn_ah}" if _sec_ah else _fn_ah
+                    if _fk_ah in self._filled_this_tab:
+                        _foc_val_ah = (_fe_ah.get("value") or "").strip()
+                        _exp_ah     = self._lookup_field(_fn_ah, section=_sec_ah)
+                        if not _exp_ah or _foc_val_ah.lower() == _exp_ah.lower():
+                            logger.info("Already-handled guard: %r already filled (%r) — Tab.",
+                                        _fk_ah, _foc_val_ah[:30])
+                            self._executor.execute({"action_type": "keyboard",
+                                                    "key_count": 1, "keystrokes": ["tab"]})
+                            _heuristic_steps += 1; continue
+
             # 2. Auto-skip: if focused field already has the correct value, Tab past it
             if not _plugin_active and self._llm_client and self._auto_skip(state):
                 logger.info("Auto-skip: focused field already has correct value — Tab.")
@@ -1186,8 +1256,10 @@ class LLMAgent:
 
             # 2a. Auto-fill: if focused field is empty (or has wrong leftover value), type correct value
             auto_text = (self._auto_fill(state) if not _plugin_active else None)
-            # 2a-peek: focused empty editcontrol with no cached value — peek Notepad to populate cache
-            if not auto_text:
+            # 2a-peek: focused empty editcontrol with no cached value — peek Notepad to populate cache.
+            # Gated off when disable_auto_handlers — these are task guards (Notepad
+            # peek + dup-label fill) that fill fields without the transformer.
+            if not auto_text and not self._no_autohandlers:
                 _fid_p = state.get("focused_element_id")
                 _fe_p  = next((e for e in state.get("elements", [])
                                if e.get("element_id") == _fid_p), None)
@@ -1218,7 +1290,7 @@ class LLMAgent:
                             _heuristic_steps += 1; continue
             # 2a-dup: duplicate UIA label — field is empty but label already in _filled_this_tab.
             # Peek Notepad for the next uncached field after that label and fill it.
-            if not auto_text:
+            if not auto_text and not self._no_autohandlers:
                 _fid_dup = state.get("focused_element_id")
                 _fe_dup  = next((e for e in state.get("elements", [])
                                  if e.get("element_id") == _fid_dup), None)
@@ -1468,15 +1540,81 @@ class LLMAgent:
             t_conf = t_pred.get("confidence", max(t_pred.get("_scores", {}).values(), default=0.0))
             logger.info("[TRANSFORMER] action=%-8s  conf=%.2f", t_type, t_conf)
 
-            # Confidence-based routing:
-            #   >= 0.995 → execute directly, skip LLM (transformer is sure)
-            #   <  0.995 → LLM consulted; merge decides final action
-            _HIGH_CONF   = 0.995
+            # Routing: the transformer's ACTION-TYPE head collapses (always one
+            # class), so we never let it act alone on action choice. The LLM
+            # always decides WHAT (action + value); the transformer supplies
+            # WHERE (click position) via _merge. Transformer's strength is
+            # positioning (click_acc ~0.76), not action selection.
+            _HIGH_CONF   = 1.01   # effectively: never skip the LLM
             _MED_CONF    = 0.50
 
-            # 2b. LLM only consulted when transformer is uncertain
-            _decision_maker = "transformer"  # tracks who made the final call this step
-            if self._llm_client and t_conf < _HIGH_CONF:
+            _decision_maker = "transformer"
+
+            # ── OPTION 2: transformer-navigation + LLM value-oracle ──────────
+            # Transformer's PROVEN strength is WHICH field (pointer, click_acc
+            # ~0.76); its action-type head is unreliable, so we don't use it.
+            # Rule:
+            #   - If a fillable field is focused & empty → LLM supplies its value
+            #     (one call, the "understanding"), then type it.
+            #   - Otherwise → click the transformer's pointer target (navigate to
+            #     the next field). The transformer DRIVES navigation.
+            if self._no_autohandlers:
+                _fid2 = state.get("focused_element_id")
+                _fe2  = next((e for e in state.get("elements", [])
+                              if e.get("element_id") == _fid2), None)
+                _fillable = bool(_fe2 and _fe2.get("type") in
+                                 ("editcontrol", "input", "comboboxcontrol", "combobox"))
+                _empty    = bool(_fe2 and not (_fe2.get("value") or "").strip())
+
+                if _fillable and _empty and self._llm_client:
+                    # LLM value-oracle for the focused field
+                    llm_action = self._ask_llm(state)
+                    if llm_action.get("action_type") == "done":
+                        logger.info("LLM: task complete."); break
+                    prediction = self._merge(t_pred, t_conf, llm_action, state)
+                    _decision_maker = "llm"
+                    logger.info("[OPT2] LLM value for '%s' → %r",
+                                (_fe2.get("label") or _fe2.get("text") or "?")[:30],
+                                prediction.get("text", "")[:40])
+                else:
+                    # Transformer pointer navigates to the next field
+                    _decision_maker = "transformer"
+                    _pos2 = t_pred.get("click_position")
+                    if _pos2 and (_pos2[0] > 1 or _pos2[1] > 1):
+                        _snap2 = self._snap(_pos2, state) or _pos2
+                        # VISITED-ADVANCE: assume each clicked field is handled. If
+                        # the (collapsed) pointer repeats a visited field, jump to
+                        # the next UNVISITED fillable field so the run covers the
+                        # whole form instead of looping on one spot.
+                        _vis = getattr(self, "_visited_pos", None)
+                        if _vis is None:
+                            _vis = self._visited_pos = set()
+                        _vk = (round(_snap2[0] / 15) * 15, round(_snap2[1] / 15) * 15)
+                        if _vk in _vis:
+                            _cands = sorted(
+                                [e for e in state.get("elements", [])
+                                 if e.get("window_role") != "background"
+                                 and e.get("type") in ("editcontrol", "input",
+                                                       "comboboxcontrol", "combobox")
+                                 and e.get("bbox")],
+                                key=lambda e: (e["bbox"][1], e["bbox"][0]))
+                            for _e in _cands:
+                                _b = _e["bbox"]
+                                _cx, _cy = (_b[0] + _b[2]) / 2, (_b[1] + _b[3]) / 2
+                                _ck = (round(_cx / 15) * 15, round(_cy / 15) * 15)
+                                if _ck not in _vis:
+                                    _snap2 = [_cx, _cy]; _vk = _ck
+                                    logger.info("[VISITED-ADVANCE] pointer repeated — next unvisited field @ (%.0f,%.0f)", _cx, _cy)
+                                    break
+                        _vis.add(_vk)
+                        prediction = {"action_type": "click", "click_position": _snap2}
+                        logger.info("[OPT2] TRANSFORMER navigates → click @ (%.0f,%.0f)  ptr_conf=%.2f",
+                                    _snap2[0], _snap2[1], t_pred.get("_click_conf", 0.0))
+                    else:
+                        prediction = {"action_type": "keyboard", "key_count": 1, "keystrokes": ["tab"]}
+                        logger.info("[OPT2] pointer invalid — Tab fallback")
+
+            elif self._llm_client and t_conf < _HIGH_CONF:
                 llm_action = self._ask_llm(state)
                 action_type = llm_action.get("action_type", "wait")
                 reason = llm_action.get("reason", "")
@@ -1519,6 +1657,22 @@ class LLMAgent:
                     logger.info("[TRANSFORMER] no LLM provider — acting alone")
                 prediction = t_pred
 
+                # Anti-scroll-loop: if scroll keeps producing no_change, the model
+                # is stuck over-predicting scroll (overfit on small data). Swap to
+                # its next-best non-scroll action so it progresses.
+                if (prediction.get("action_type") == "scroll"
+                        and getattr(self, "_scroll_nochange", 0) >= 2):
+                    _alt = sorted(
+                        ((p, a) for a, p in t_pred.get("_scores", {}).items() if a != "scroll"),
+                        reverse=True,
+                    )
+                    if _alt:
+                        prediction = dict(prediction)
+                        prediction["action_type"] = _alt[0][1]
+                        logger.warning("Scroll-loop (%dx no_change) — switching to next-best: %s (%.2f)",
+                                       self._scroll_nochange, _alt[0][1], _alt[0][0])
+                    self._scroll_nochange = 0
+
                 if prediction.get("action_type") == "click":
                     snapped = self._snap(prediction.get("click_position", [0, 0]), state)
                     if snapped:
@@ -1531,6 +1685,38 @@ class LLMAgent:
                     else:
                         _stuck_pos, _stuck_count = snap_tuple, 1
 
+                    # VISITED-ADVANCE protocol (transformer-only runs): after a
+                    # field is clicked, assume it's handled. If the (collapsed)
+                    # pointer targets an already-visited field, advance to the
+                    # next UNVISITED fillable field by position order — lets the
+                    # run cover the form instead of looping on one spot.
+                    if not self._llm_client:
+                        _vis = getattr(self, "_visited_pos", None)
+                        if _vis is None:
+                            _vis = self._visited_pos = set()
+                        _key = (round(snap_tuple[0] / 15) * 15, round(snap_tuple[1] / 15) * 15)
+                        if _key in _vis:
+                            _cands = sorted(
+                                [e for e in state.get("elements", [])
+                                 if e.get("window_role") != "background"
+                                 and e.get("type") in ("editcontrol", "input",
+                                                       "comboboxcontrol", "combobox")
+                                 and e.get("bbox")],
+                                key=lambda e: (e["bbox"][1], e["bbox"][0]))
+                            for _e in _cands:
+                                _b = _e["bbox"]
+                                _cx, _cy = (_b[0] + _b[2]) / 2, (_b[1] + _b[3]) / 2
+                                _ck = (round(_cx / 15) * 15, round(_cy / 15) * 15)
+                                if _ck not in _vis:
+                                    prediction = {"action_type": "click",
+                                                  "click_position": [_cx, _cy]}
+                                    snap_tuple = (int(_cx), int(_cy))
+                                    _key = _ck
+                                    logger.info("[VISITED-ADVANCE] pointer repeated — next unvisited field @ (%.0f,%.0f)", _cx, _cy)
+                                    break
+                        _vis.add(_key)
+                        _stuck_count = 0   # visited-advance handles progression
+
                     if _stuck_count >= _STUCK_LIMIT:
                         logger.warning("Loop detected @ %s %dx — forcing keyboard.", snap_tuple, _stuck_count)
                         prediction   = {"action_type": "keyboard", "key_count": 1, "keystrokes": []}
@@ -1538,6 +1724,11 @@ class LLMAgent:
                 else:
                     _stuck_pos, _stuck_count = None, 0
 
+                # TextResolver turns the transformer's source_elem_idx (which
+                # Notepad element to read) into actual typed text. Required in
+                # pure mode too — without it the model can navigate but never
+                # types Notepad values (the "doesn't know how to get from the
+                # Notepad" symptom).
                 if prediction.get("action_type") == "keyboard":
                     src_idx = prediction.get("source_elem_idx", -1)
                     text = self._text_resolver.resolve(state, source_elem_idx=src_idx)
@@ -1552,7 +1743,8 @@ class LLMAgent:
             _flabel_sec = self._detect_section(state, _fel) if _fel else ""
             _flabel_full = f"{_flabel_sec} {_flabel}" if _flabel_sec else _flabel
 
-            if prediction.get("action_type") == "keyboard" and prediction.get("text"):
+            if (not self._pure_transformer
+                    and prediction.get("action_type") == "keyboard" and prediction.get("text")):
                 logger.info("Type target: focused=[%s] %r", _fel.get("type","?") if _fel else "?", _flabel_full)
                 # If focused field already has the correct value → Tab instead of re-typing
                 if _fel and _fel.get("type") in ("editcontrol", "input"):
@@ -1643,7 +1835,7 @@ class LLMAgent:
                      and e["bbox"][1] <= _cp[1] <= e["bbox"][3]),
                     None
                 )
-                if _btn_at_cp:
+                if _btn_at_cp and not self._no_autohandlers:
                     _btn_name = (_btn_at_cp.get("text") or _btn_at_cp.get("label") or "button")
                     logger.warning("Blocking premature click on button %r — advancing tab instead.", _btn_name)
                     if self._try_advance_tab(state):
@@ -1687,7 +1879,8 @@ class LLMAgent:
                     prediction = {"action_type": "no_op"}
 
             # Combobox: type-into-combobox → open dropdown + click matching listitem
-            if (prediction.get("action_type") == "keyboard"
+            if (not self._pure_transformer
+                    and prediction.get("action_type") == "keyboard"
                     and prediction.get("text")
                     and _fel and _fel.get("type") == "comboboxcontrol"
                     and _fel.get("bbox")):
@@ -1731,6 +1924,8 @@ class LLMAgent:
                 continue
 
             # Repeat-action guard: fingerprint this prediction; if last N identical → Tab
+            if self._pure_transformer:
+                _action_history.clear()  # don't accumulate in pure-transformer mode
             _atype = prediction.get("action_type", "no_op")
             if _atype == "keyboard":
                 _fp = ("keyboard", (prediction.get("text") or "".join(prediction.get("keystrokes", [])))[:40])
@@ -1791,9 +1986,11 @@ class LLMAgent:
                             self._task_plugin.notify_tab_click(_ti_idx, state)
                         break
 
-            # After a successful type, automatically press Tab to advance the field.
-            # This prevents the LLM from getting stuck re-typing the same field.
-            if (self._llm_client
+            # Auto-Tab DISABLED — it was a navigation crutch (heuristic advancing
+            # fields instead of the transformer clicking the next field). With it
+            # off, the transformer MUST navigate (click next field) itself, so we
+            # measure honestly whether it learned navigation.
+            if (False and self._llm_client
                     and prediction.get("action_type") == "keyboard"
                     and prediction.get("text")):
                 tab_pred = {"action_type": "keyboard", "key_count": 1, "keystrokes": ["tab"]}
@@ -1810,6 +2007,11 @@ class LLMAgent:
                 break
 
             _cur_focused_id = state.get("focused_element_id")
+            # Track scroll-specific no-change so we can break scroll loops
+            if validation.status == "no_change" and prediction.get("action_type") == "scroll":
+                self._scroll_nochange = getattr(self, "_scroll_nochange", 0) + 1
+            else:
+                self._scroll_nochange = 0
             if validation.status == "no_change":
                 if _cur_focused_id and _cur_focused_id != _last_focused_id:
                     _no_change_streak = 0
@@ -1884,8 +2086,17 @@ class LLMAgent:
             })
 
             if not result.success:
-                logger.error("Execution failed — halting: %s", result.error)
-                break
+                # Skip-and-continue: one failed action shouldn't kill the whole
+                # run. Count consecutive failures and only abort if stuck.
+                logger.warning("Execution failed — skipping: %s", result.error)
+                _exec_fail_streak = getattr(self, "_exec_fail_streak", 0) + 1
+                self._exec_fail_streak = _exec_fail_streak
+                if _exec_fail_streak >= 8:
+                    logger.error("8 consecutive execution failures — halting.")
+                    break
+                time.sleep(self.step_delay)
+                continue
+            self._exec_fail_streak = 0
 
             time.sleep(self.step_delay)
 
@@ -3326,25 +3537,26 @@ class LLMAgent:
         # Click — prefer LLM's named target (resolved to element bbox center),
         # fall back to transformer coords only when no resolvable label is available.
         if l_type == "click":
-            # First: resolve LLM's named target from the live UIA element tree
+            # LLM decided it's a click (WHEN to move). Transformer decides WHICH
+            # field (WHERE) — its navigation pointer is always exposed now and is
+            # its real strength (click_acc ~0.76). Prefer it; fall back to LLM's
+            # named target only if the transformer pointer is invalid.
+            _click_conf = t_pred.get("_click_conf", 0.0)
+            _t_pos      = t_pred.get("click_position")
+            if _t_pos and (_t_pos[0] > 1 or _t_pos[1] > 1) and _click_conf >= 0.30:
+                snapped = self._snap(_t_pos, state)
+                coords  = snapped or _t_pos
+                logger.info("[MERGE] TRANSFORMER navigates — click @ (%.0f,%.0f)  ptr_conf=%.2f",
+                            coords[0], coords[1], _click_conf)
+                return {"action_type": "click", "click_position": coords}
+
             target = llm_action.get("target", "")
             if target:
                 coords = _resolve_target(target, state)
                 if coords is not None:
-                    logger.info("[MERGE] LLM wins — click target=%r @ (%.0f, %.0f)", target, coords[0], coords[1])
+                    logger.info("[MERGE] LLM target (transformer ptr weak) — click=%r @ (%.0f,%.0f)",
+                                target, coords[0], coords[1])
                     return {"action_type": "click", "click_position": coords}
-
-            # Second: transformer click when confident and LLM had no resolvable target
-            _TRANSFORMER_CLICK_THRESHOLD = 0.55
-            if (t_pred.get("action_type") == "click"
-                    and t_conf >= _TRANSFORMER_CLICK_THRESHOLD
-                    and t_pred.get("click_position")):
-                pos     = t_pred["click_position"]
-                snapped = self._snap(pos, state)
-                coords  = snapped or pos
-                logger.info("[MERGE] TRANSFORMER wins — click @ (%.0f,%.0f)  conf=%.2f  (LLM target unresolved)",
-                            coords[0], coords[1], t_conf)
-                return {"action_type": "click", "click_position": coords}
             logger.info("[MERGE] LLM wins (no transformer click) — fallback to LLM position")
             return self._llm_action_to_prediction(llm_action, state)
 
@@ -3406,19 +3618,21 @@ class LLMAgent:
                 (e for e in state.get("elements", []) if e.get("element_id") == focused_id), None
             )
             if focused_el:
-                _fn = (focused_el.get("label") or focused_el.get("text") or "?").strip()[:200]
-                _fv = (focused_el.get("value") or "").strip()[:200]
-                _ft = focused_el.get("type", "?")
-                # Look up the expected value for this field from the cached record
-                _expected = self._lookup_field(_fn) if _fn != "?" else ""
+                _fn  = (focused_el.get("label") or focused_el.get("text") or "?").strip()[:200]
+                _fv  = (focused_el.get("value") or "").strip()[:200]
+                _ft  = focused_el.get("type", "?")
+                _fsec = self._detect_section(state, focused_el)
+                # Look up the expected value — section-qualified so Driver 3 First Name
+                # returns "Tyler" not the policyholder's "James".
+                _expected = self._lookup_field(_fn, section=_fsec) if _fn != "?" else ""
                 # Cache miss — force a live re-read of Notepad then retry
                 if not _expected and _fn != "?":
                     self._refresh_record_cache(state)
-                    _expected = self._lookup_field(_fn)
+                    _expected = self._lookup_field(_fn, section=_fsec)
                 # Still nothing — direct peek for this specific field
                 if not _expected and _fn != "?":
                     self._peek_notepad(state, _fn)
-                    _expected = self._lookup_field(_fn)
+                    _expected = self._lookup_field(_fn, section=_fsec)
                 logger.info("LLM focused-field lookup: field=%r  expected=%r  cache_size=%d",
                             _fn, _expected[:40] if _expected else "", len(self._cached_record))
                 _expect_hint = (
@@ -3603,6 +3817,27 @@ class LLMAgent:
             logger.warning("Observer error: %s", exc)
         return {"elements": [], "screen_resolution": [1920, 1080]}
 
+    @staticmethod
+    def _slim_for_model(state: Dict[str, Any]) -> Dict[str, Any]:
+        """Match the recorder's slim EXACTLY so the transformer sees the same
+        element shape it trained on (else inputs are out-of-distribution)."""
+        _KEEP = ("element_id", "type", "label", "text", "value", "bbox",
+                 "window_role", "window_title", "app", "focused", "confidence")
+        out = dict(state)
+        slim = []
+        for e in state.get("elements", []):
+            ne = {k: e[k] for k in _KEEP if k in e}
+            lb = ne.get("label")
+            if lb and len(lb) > 200:
+                ne["label"] = lb[:200]
+            for fld in ("value", "text"):
+                v = ne.get(fld)
+                if v and len(v) > 6000:
+                    ne[fld] = v[:6000]
+            slim.append(ne)
+        out["elements"] = slim
+        return out
+
     def _predict(self, state: Dict[str, Any]) -> Dict[str, Any]:
         try:
             try:
@@ -3610,7 +3845,7 @@ class LLMAgent:
             except ImportError:
                 from intelligence.model.transformer import predict
             return predict(
-                state=state,
+                state=self._slim_for_model(state),
                 history=self._history[-3:],
                 model_path=self.model_path,
                 device_str=self.device_str,

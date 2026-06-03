@@ -41,7 +41,7 @@ if os.path.exists(_env_path):
                 _k, _v = _line.split("=", 1)
                 os.environ.setdefault(_k.strip(), _v.strip())
 
-from recorder.recorder import ScreenObserver
+from recorder.recorder import ScreenObserver, DemoRecorder
 
 
 def parse_args():
@@ -86,11 +86,22 @@ def parse_args():
         "--no-extract", action="store_true",
         help="Skip rule extraction after recording."
     )
+    parser.add_argument(
+        "--demo", action="store_true",
+        help="BC demo mode: action-triggered UIA capture (F9=toggle, F10=save+quit). "
+             "Output goes to data/demos/human/. Use for training data collection."
+    )
     return parser.parse_args()
 
 
 def main():
     args = parse_args()
+
+    # ── BC demo mode ──────────────────────────────────────────────────────────
+    if args.demo:
+        recorder = DemoRecorder(output_dir="data/demos/human", trace_type="form_filling")
+        recorder.run()
+        return
 
     observer = ScreenObserver(
         output_dir=args.output,

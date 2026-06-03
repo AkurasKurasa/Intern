@@ -63,13 +63,36 @@ _loaded_embed_caches: set = set()          # tracks which pkl files were loaded 
 ACTION_NOOP     = 0
 ACTION_CLICK    = 1
 ACTION_KEYBOARD = 2
+ACTION_HOTKEY   = 3
+ACTION_SCROLL   = 4
+ACTION_DCLICK   = 5
+ACTION_DRAG     = 6
+NUM_ACTIONS     = 7
+
+# Hotkey vocabulary — each gets a unique index for the hotkey_head classifier
+HOTKEYS = [
+    "tab", "shift+tab", "enter", "escape", "backspace", "delete",
+    "ctrl+a", "ctrl+c", "ctrl+v", "ctrl+x", "ctrl+z", "ctrl+y",
+    "ctrl+tab", "ctrl+shift+tab",
+    "home", "end", "page_up", "page_down",
+    "arrow_up", "arrow_down", "arrow_left", "arrow_right",
+    "f1", "f2", "f3", "f4", "f5", "f6",
+]
+NUM_HOTKEYS = len(HOTKEYS)
+_HOTKEY_IDX = {h: i for i, h in enumerate(HOTKEYS)}
 
 # is_real(1) + bbox(4) + confidence(1) + window_role(1) + is_focused(1) + ctrl_type(1) + text_embedding(384)
 ELEM_FEATURES = 9 + _EMBED_DIM
 _REAL_ELEM_FLAG_IDX = 0  # feature index for the is_real flag
 
 # Numeric encoding for control types — focused/interactive types get distinct values
+# New-style names (from UIAutomationObserver) take priority; legacy wx names kept as fallback.
 _CTRL_TYPE_MAP = {
+    # new-style UIA names (ui_observer.py _CTRL_TYPE_MAP output)
+    "input": 0.1, "combobox": 0.2, "checkbox": 0.3,
+    "button": 0.4, "label": 0.5, "window": 0.6,
+    "document": 0.7, "list": 0.8, "tabitem": 0.9,
+    # legacy wx fallback names
     "editcontrol": 0.1, "comboboxcontrol": 0.2, "checkboxcontrol": 0.3,
     "buttoncontrol": 0.4, "textcontrol": 0.5, "windowcontrol": 0.6,
     "documentcontrol": 0.7, "listcontrol": 0.8,
@@ -191,14 +214,23 @@ def encode_state(state: dict, max_elements: int = 128) -> torch.Tensor:
 def _decode_actions(
     mouse: dict, keyboard: dict, W: float, H: float
 ) -> Tuple[int, float, float, float, str]:
-    """Return (action_type, cx_norm, cy_norm, key_norm, typed_text)."""
+    """Return (action_type, cx_norm, cy_norm, aux_norm, hotkey_or_text).
+
+    aux_norm meaning per action type:
+      click/dclick/drag : key_count norm (unused, 0.0)
+      keyboard          : key_count norm
+      hotkey            : hotkey index norm (idx / NUM_HOTKEYS)
+      scroll            : scroll_dy norm (clamped -1..1, positive=down)
+    """
     mouse_actions   = mouse.get("actions", [])
     keyboard_groups = keyboard.get("actions", [])
-    key_count  = sum(len(g.get("strokes", [])) for g in keyboard_groups)
-    # Prefer pasted_text (full clipboard paste) over raw key characters.
-    # Skip control characters (Ctrl+V = \x16, Ctrl+C = \x03, etc.)
-    parts = []
+
+    # ── collect typed text and hotkey ──────────────────────────────────────────
+    parts, hotkey_name = [], None
     for g in keyboard_groups:
+        hk = g.get("hotkey", "")
+        if hk:
+            hotkey_name = hk.lower()
         for s in g.get("strokes", []):
             pt = s.get("pasted_text", "")
             if pt:
@@ -208,12 +240,43 @@ def _decode_actions(
                 if len(k) == 1 and k.isprintable():
                     parts.append(k)
     typed_text = "".join(parts)
-    clicks = [a for a in mouse_actions if a.get("type") in ("click", "double_click")]
+    key_count  = sum(len(g.get("strokes", [])) for g in keyboard_groups)
+
+    # ── scroll ────────────────────────────────────────────────────────────────
+    scrolls = [a for a in mouse_actions if a.get("type") == "scroll"]
+    if scrolls:
+        dy = float(scrolls[0].get("dy", 0))
+        pos = scrolls[0].get("position", [0, 0])
+        norm_dy = max(-1.0, min(1.0, dy / 10.0))
+        return ACTION_SCROLL, float(pos[0]) / W, float(pos[1]) / H, norm_dy, ""
+
+    # ── drag ──────────────────────────────────────────────────────────────────
+    drags = [a for a in mouse_actions if a.get("type") == "drag"]
+    if drags:
+        src = drags[0].get("position", [0, 0])
+        return ACTION_DRAG, float(src[0]) / W, float(src[1]) / H, 0.0, ""
+
+    # ── double click ──────────────────────────────────────────────────────────
+    dclicks = [a for a in mouse_actions if a.get("type") == "double_click"]
+    if dclicks:
+        pos = dclicks[0].get("position", [0, 0])
+        return ACTION_DCLICK, float(pos[0]) / W, float(pos[1]) / H, 0.0, ""
+
+    # ── left click ────────────────────────────────────────────────────────────
+    clicks = [a for a in mouse_actions if a.get("type") == "click"]
     if clicks:
         pos = clicks[0].get("position", [0, 0])
-        return ACTION_CLICK, float(pos[0]) / W, float(pos[1]) / H, min(key_count / 100.0, 1.0), ""
+        return ACTION_CLICK, float(pos[0]) / W, float(pos[1]) / H, 0.0, ""
+
+    # ── hotkey ────────────────────────────────────────────────────────────────
+    if hotkey_name and hotkey_name in _HOTKEY_IDX:
+        idx_norm = _HOTKEY_IDX[hotkey_name] / max(NUM_HOTKEYS - 1, 1)
+        return ACTION_HOTKEY, 0.0, 0.0, idx_norm, hotkey_name
+
+    # ── regular keyboard ──────────────────────────────────────────────────────
     if key_count > 0:
         return ACTION_KEYBOARD, 0.0, 0.0, min(key_count / 100.0, 1.0), typed_text
+
     return ACTION_NOOP, 0.0, 0.0, 0.0, ""
 
 
@@ -685,8 +748,11 @@ class TrajectoryDataset(Dataset):
 
     def class_counts(self) -> dict:
         from collections import Counter
-        names = {0: "no_op", 1: "click", 2: "keyboard"}
-        return {names[k]: v for k, v in Counter(s[4] for s in self._samples).items()}
+        names = {ACTION_NOOP: "no_op", ACTION_CLICK: "click", ACTION_KEYBOARD: "keyboard",
+                 ACTION_HOTKEY: "hotkey", ACTION_SCROLL: "scroll",
+                 ACTION_DCLICK: "double_click", ACTION_DRAG: "drag"}
+        return {names.get(k, f"action_{k}"): v
+                for k, v in Counter(s[4] for s in self._samples).items()}
 
     def __repr__(self) -> str:
         return (
@@ -764,7 +830,7 @@ class TransformerAgentNetwork(nn.Module):
         num_layers:      int   = 4,
         dim_feedforward: int   = 256,
         dropout:         float = 0.1,
-        num_actions:     int   = 3,
+        num_actions:     int   = NUM_ACTIONS,
         hist_len:        int   = 4,
     ):
         super().__init__()
@@ -772,6 +838,11 @@ class TransformerAgentNetwork(nn.Module):
         self.max_elements = max_elements
         self.hist_len    = hist_len
         self.num_actions = num_actions
+        # Past-action dropout — moderate. 0.8 killed causal confusion but also
+        # erased the history the pointer needs to learn the USER'S ORDER
+        # ("after field A, click field B"). 0.3 keeps enough sequence signal to
+        # clone the order while still reducing action-type collapse.
+        self.action_dropout = 0.3
 
         self.state_enc  = StateEncoder(elem_features, d_model)
         self.action_enc = ActionEncoder(num_actions, d_model)
@@ -794,16 +865,21 @@ class TransformerAgentNetwork(nn.Module):
             embed_dim=d_model, num_heads=nhead, dropout=dropout, batch_first=True,
         )
         self.cross_norm = nn.LayerNorm(d_model)
-        self.type_head = nn.Linear(d_model, num_actions)
-        self.key_head  = nn.Linear(d_model, 1)
-        # Pointer heads: dot-product attention between a query derived from the
-        # cross-attended context token and per-element embeddings from the
-        # current state. Separate query/key projections let click and source
-        # learn different "what am I looking for" signatures.
+        self.type_head   = nn.Linear(d_model, num_actions)
+        self.key_head    = nn.Linear(d_model, 1)
+        self.hotkey_head = nn.Linear(d_model, NUM_HOTKEYS)   # which hotkey
+        self.scroll_head = nn.Linear(d_model, 1)              # scroll amount/direction
+        # Pointer heads — shared for click, double_click, drag_src
         self.click_q      = nn.Linear(d_model, d_model)
         self.click_k      = nn.Linear(d_model, d_model)
         self.click_q_norm = nn.LayerNorm(d_model)
         self.click_k_norm = nn.LayerNorm(d_model)
+        # Drag destination pointer (separate from src)
+        self.drag_dst_q      = nn.Linear(d_model, d_model)
+        self.drag_dst_k      = nn.Linear(d_model, d_model)
+        self.drag_dst_q_norm = nn.LayerNorm(d_model)
+        self.drag_dst_k_norm = nn.LayerNorm(d_model)
+        # Source element pointer (keyboard text lookup)
         self.src_q        = nn.Linear(d_model, d_model)
         self.src_k        = nn.Linear(d_model, d_model)
         self.src_q_norm   = nn.LayerNorm(d_model)
@@ -840,7 +916,12 @@ class TransformerAgentNetwork(nn.Module):
         tokens  = torch.zeros(B, seq_len, self.d_model, device=states.device)
         tokens[:, 0::2] = s
         if H > 1:
-            tokens[:, 1::2] = self.action_enc(past_types, past_cont)
+            act_tokens = self.action_enc(past_types, past_cont)
+            if self.training and self.action_dropout > 0:
+                # zero whole action tokens at random → model must use state
+                keep = (torch.rand(B, H - 1, 1, device=states.device) >= self.action_dropout).float()
+                act_tokens = act_tokens * keep
+            tokens[:, 1::2] = act_tokens
 
         # Positional encoding
         pos    = torch.arange(seq_len, device=states.device).unsqueeze(0)
@@ -1096,31 +1177,33 @@ def train(
         if verbose:
             print("[train] class weights: none (uniform)")
     else:
-        if class_weight_mode == "inverse":
-            raw = [
-                _total / max(_cc.get("no_op",    _total), 1),
-                _total / max(_cc.get("click",    1), 1),
-                _total / max(_cc.get("keyboard", 1), 1),
-            ]
-        elif class_weight_mode == "sqrt_inverse":
-            raw = [
-                (_total / max(_cc.get("no_op",    _total), 1)) ** 0.5,
-                (_total / max(_cc.get("click",    1), 1)) ** 0.5,
-                (_total / max(_cc.get("keyboard", 1), 1)) ** 0.5,
-            ]
-        else:
-            raise ValueError(f"Unknown class_weight_mode: {class_weight_mode!r}")
+        # General over ALL action classes by index (was hardcoded to 3). Inverse-
+        # frequency weights punish collapsing onto one class — fixes the observed
+        # action-head collapse (always-scroll, then always-hotkey).
+        _name_by_idx = {
+            ACTION_NOOP: "no_op", ACTION_CLICK: "click", ACTION_KEYBOARD: "keyboard",
+            ACTION_HOTKEY: "hotkey", ACTION_SCROLL: "scroll",
+            ACTION_DCLICK: "double_click", ACTION_DRAG: "drag",
+        }
+        raw = []
+        for i in range(NUM_ACTIONS):
+            cnt = max(_cc.get(_name_by_idx.get(i, ""), 0), 1)
+            w = _total / cnt
+            raw.append(w ** 0.5 if class_weight_mode == "sqrt_inverse" else w)
         _class_weights = torch.tensor(raw, dtype=torch.float32, device=device)
         _class_weights = _class_weights / _class_weights.sum() * len(_class_weights)
         if verbose:
-            print(f"[train] class weights ({class_weight_mode}): "
-                  f"no_op={_class_weights[0]:.3f}  click={_class_weights[1]:.3f}  keyboard={_class_weights[2]:.3f}")
+            _wstr = "  ".join(f"{_name_by_idx.get(i,i)}={_class_weights[i]:.2f}"
+                              for i in range(NUM_ACTIONS))
+            print(f"[train] class weights ({class_weight_mode}): {_wstr}")
 
     optimizer = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=weight_decay)
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=epochs, eta_min=lr / 100)
 
-    best_val_loss = math.inf
-    save_path_p   = Path(save_path)
+    best_val_loss      = math.inf
+    best_val_acc       = 0.0
+    best_val_click_acc = 0.0
+    save_path_p        = Path(save_path)
     save_path_p.parent.mkdir(parents=True, exist_ok=True)
 
     for epoch in range(1, epochs + 1):
@@ -1136,13 +1219,22 @@ def train(
                 f"[type={train_m['l_type']:.3f} click={train_m['l_click']:.3f} key={train_m['l_key']:.4f}]"
             )
 
-        save_loss = val_m["loss"] if not math.isnan(val_m["loss"]) else train_m["loss"]
-        if save_loss < best_val_loss:
-            best_val_loss = save_loss
+        # Checkpoint on best COMBINED acc (action-type + click targeting) — the
+        # metrics we actually deploy on. Saving best val_LOSS picked an early,
+        # underfit, scroll-biased model even though val_acc kept climbing.
+        save_loss   = val_m["loss"] if not math.isnan(val_m["loss"]) else train_m["loss"]
+        _val_score  = val_m["accuracy"] + val_m["click_acc"]
+        _best_score = best_val_acc + best_val_click_acc
+        if _val_score > _best_score:
+            best_val_loss      = save_loss
+            best_val_acc       = val_m["accuracy"]
+            best_val_click_acc = val_m["click_acc"]
             torch.save({
                 "epoch": epoch,
                 "model_state_dict": model.state_dict(),
                 "val_loss": best_val_loss,
+                "val_acc": best_val_acc,
+                "val_click_acc": best_val_click_acc,
                 "hyperparams": {
                     "elem_features": ELEM_FEATURES, "max_elements": max_elements,
                     "d_model": d_model, "nhead": nhead, "num_layers": num_layers,
@@ -1151,10 +1243,30 @@ def train(
                 },
             }, save_path_p)
             if verbose:
-                print(f"           -> Saved checkpoint (val_loss={best_val_loss:.4f})")
+                print(f"           -> Saved checkpoint (val_acc={best_val_acc:.3f}  click_acc={best_val_click_acc:.3f})")
 
     if verbose:
-        print(f"[train] Done.  Best val_loss={best_val_loss:.4f} -> {save_path_p}")
+        print(f"[train] Done.  Best val_loss={best_val_loss:.4f}  val_acc={best_val_acc:.3f}  click_acc={best_val_click_acc:.3f} -> {save_path_p}")
+
+    # Persist training metrics for trend tracking across runs
+    try:
+        import json as _json, datetime as _dt
+        _log_path = Path(save_path_p).parents[2] / "data" / "output" / "transformer_training_log.jsonl"
+        _log_path.parent.mkdir(parents=True, exist_ok=True)
+        _row = {
+            "timestamp":         _dt.datetime.now().isoformat(),
+            "trace_dir":         str(data_dir),
+            "n_train":           len(train_loader.dataset),
+            "n_val":             len(val_loader.dataset),
+            "epochs":            epochs,
+            "best_val_loss":     round(best_val_loss, 4),
+            "best_val_acc":      round(best_val_acc, 4),
+            "best_val_click_acc":round(best_val_click_acc, 4),
+        }
+        with open(_log_path, "a", encoding="utf-8") as _lf:
+            _lf.write(_json.dumps(_row) + "\n")
+    except Exception:
+        pass
 
     if save_path_p.exists():
         ckpt = torch.load(save_path_p, map_location=device, weights_only=True)
@@ -1183,8 +1295,10 @@ def train(
 # ═══════════════════════════════════════════════════════════
 
 _model_cache: Dict[str, TransformerAgentNetwork] = {}
-_ACTION_LABELS = {0: "no_op", 1: "click", 2: "keyboard"}
-_ACTION_IDS    = {"no_op": 0, "click": 1, "keyboard": 2}
+_ACTION_LABELS = {ACTION_NOOP: "no_op", ACTION_CLICK: "click", ACTION_KEYBOARD: "keyboard",
+                  ACTION_HOTKEY: "hotkey", ACTION_SCROLL: "scroll",
+                  ACTION_DCLICK: "double_click", ACTION_DRAG: "drag"}
+_ACTION_IDS    = {v: k for k, v in _ACTION_LABELS.items()}
 
 
 def _load_model(model_path: str, device: torch.device) -> TransformerAgentNetwork:
@@ -1286,26 +1400,28 @@ def predict(
         "confidence":  round(max(probs), 4),
         "_scores": {_ACTION_LABELS.get(i, str(i)): round(p, 3) for i, p in enumerate(probs)},
     }
-    if idx == ACTION_CLICK:
-        click_idx  = int(out.click_elem[0].argmax(-1).item())
-        click_conf = F.softmax(out.click_elem[0], dim=-1).max().item()
-        result["click_elem_idx"] = click_idx
-        result["_click_conf"]    = round(click_conf, 3)
-        # Resolve pointer -> pixel click position by looking up the bbox
-        # in the *current* state (same slice the encoder saw).
-        elems = state.get("elements", [])[:max_elements]
-        if 0 <= click_idx < len(elems):
-            bbox = elems[click_idx].get("bbox", [0, 0, 0, 0])
-            if len(bbox) >= 4:
-                cx_px = (float(bbox[0]) + float(bbox[2])) / 2.0
-                cy_px = (float(bbox[1]) + float(bbox[3])) / 2.0
-                result["click_position"] = [round(cx_px, 1), round(cy_px, 1)]
-            else:
-                result["click_position"] = [0.0, 0.0]
+
+    # ALWAYS expose the click pointer (which field) — this is the transformer's
+    # navigation signal and it's good (click_acc ~0.76). Decoupled from the
+    # action-type head (which collapses), so the merge can use the transformer's
+    # "which field" even when the action-type head misfires.
+    click_idx  = int(out.click_elem[0].argmax(-1).item())
+    click_conf = F.softmax(out.click_elem[0], dim=-1).max().item()
+    result["click_elem_idx"] = click_idx
+    result["_click_conf"]    = round(click_conf, 3)
+    elems = state.get("elements", [])[:max_elements]
+    if 0 <= click_idx < len(elems):
+        bbox = elems[click_idx].get("bbox", [0, 0, 0, 0])
+        if len(bbox) >= 4:
+            cx_px = (float(bbox[0]) + float(bbox[2])) / 2.0
+            cy_px = (float(bbox[1]) + float(bbox[3])) / 2.0
+            result["click_position"] = [round(cx_px, 1), round(cy_px, 1)]
         else:
-            # Pointer landed on a padding slot — no valid element to click.
             result["click_position"] = [0.0, 0.0]
-    elif idx == ACTION_KEYBOARD:
+    else:
+        result["click_position"] = [0.0, 0.0]
+
+    if idx == ACTION_KEYBOARD:
         result["key_count"]       = max(1, round(out.key_count[0, 0].item() * 100))
         result["source_elem_idx"] = int(out.source_elem[0].argmax(-1).item())
         result["_source_conf"]    = round(F.softmax(out.source_elem[0], dim=-1).max().item(), 3)

@@ -141,11 +141,19 @@ class UIAutomationObserver:
         max_elements_per_window: int = 150,
         max_total_elements: int = 400,
         min_size: int = 4,
+        background_apps: Optional[set] = None,
     ):
         self.max_depth               = max_depth
         self.max_elements_per_window = max_elements_per_window
         self.max_total_elements      = max_total_elements
         self.min_size                = min_size
+        # When set, only the foreground window + windows whose app name contains
+        # one of these substrings are walked. Massively faster than walking every
+        # visible window. e.g. {"notepad"} → foreground form + Notepad source only.
+        self.background_apps         = background_apps
+        # Per-window element cache: a window is only mutated while it's the
+        # foreground, so background windows can be reused from their last walk.
+        self._win_cache: Dict[int, List[Dict[str, Any]]] = {}
 
     @property
     def available(self) -> bool:
@@ -203,6 +211,21 @@ class UIAutomationObserver:
         # Enumerate all visible non-minimised windows
         visible_windows = _get_visible_windows(fg_hwnd)
 
+        # Option A scope: keep only foreground + whitelisted background apps.
+        # Skips walking every other window — the main snapshot speedup.
+        if self.background_apps is not None:
+            _kept = []
+            for w in visible_windows:
+                wh, wt, wa = w[0], w[1], w[2]
+                if wh == fg_hwnd:
+                    _kept.append(w)
+                    continue
+                al = (wa or "").lower()
+                tl = (wt or "").lower()
+                if any(b in al or b in tl for b in self.background_apps):
+                    _kept.append(w)
+            visible_windows = _kept
+
         all_elements: List[Dict[str, Any]] = []
         windows_meta: List[Dict[str, Any]] = []
 
@@ -212,8 +235,23 @@ class UIAutomationObserver:
 
             is_active = (hwnd == fg_hwnd)
             role      = "active" if is_active else "background"
-            win_elems: List[Dict[str, Any]] = []
 
+            # WINDOW CACHE: a window only changes while it's foreground. Walk the
+            # active window fresh; reuse the cached tree for background windows
+            # (their last foreground state is still valid). Halves UIA cost and
+            # keeps the form responsive when the user is working in Notepad.
+            if not is_active and hwnd in self._win_cache:
+                cached = [dict(e) for e in self._win_cache[hwnd]]
+                for e in cached:
+                    e["window_role"] = "background"
+                    e["focused"] = False
+                windows_meta.append({"hwnd": hwnd, "title": title, "app": app,
+                                     "pid": pid, "role": role,
+                                     "element_count": len(cached)})
+                all_elements.extend(cached)
+                continue
+
+            win_elems: List[Dict[str, Any]] = []
             try:
                 ctrl = _uia.ControlFromHandle(hwnd)
                 if ctrl:
@@ -228,6 +266,10 @@ class UIAutomationObserver:
                     )
             except Exception:
                 pass
+
+            # cache the freshly-walked tree by window for reuse while backgrounded
+            if win_elems:
+                self._win_cache[hwnd] = [dict(e) for e in win_elems]
 
             # Skip windows that yielded no meaningful elements
             if not win_elems:

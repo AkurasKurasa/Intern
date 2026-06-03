@@ -118,6 +118,16 @@ The full loop for teaching Intern a task from human demonstrations.
 - **LLM** — *what* to type (text values from source data)
 - **Goal** — LLM is a crutch. BC is complete when transformer works with `PROVIDER="none"`.
 
+### Testing Variations
+
+To validate that BC generalizes beyond rote memorization, record demos in multiple fill orders and confirm the agent handles all of them:
+
+- **Forward** — fill fields top-to-bottom, tab 1 → tab 8 in order (baseline)
+- **Backward** — fill fields bottom-to-top, tab 8 → tab 1
+- **Middle-first** — start from a mid-form tab (e.g. Vehicle or Coverage), then wrap around
+
+A successful BC clone handles all three. If the agent only works forward, it memorized sequence rather than learned field-level affordances. Run `python scripts/show_progress.py` after each variation to compare T-Dep% and Fields% across runs.
+
 
 ## Quick Start
 
