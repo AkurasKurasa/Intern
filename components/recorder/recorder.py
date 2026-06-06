@@ -1470,6 +1470,29 @@ class DemoRecorder:
             if progress: progress(f"No steps in {src}")
             return 0
 
+        def _elem_at(state, pos, role="active"):
+            # Smallest element containing pos. Filter to the ACTIVE window's
+            # elements first (skips background panes that overlap the same
+            # coords — same logic the recorder uses to label the click), then
+            # fall back to all roles if nothing matched.
+            if not state or not pos:
+                return None
+            px, py = pos
+            best, best_area = None, 1e18
+            for e in state.get("elements", []):
+                if role and e.get("window_role") != role:
+                    continue
+                b = e.get("bbox")
+                if not b or len(b) != 4:
+                    continue
+                if b[0] <= px <= b[2] and b[1] <= py <= b[3]:
+                    area = (b[2] - b[0]) * (b[3] - b[1])
+                    if area < best_area:
+                        best, best_area = e, area
+            if best is None and role == "active":
+                return _elem_at(state, pos, role=None)
+            return best
+
         # parse the source actions once
         actions = []
         for f in step_files:
@@ -1481,10 +1504,17 @@ class DemoRecorder:
             k = t.get("keyboard", {}).get("actions", [])
             if m:
                 a = m[0]
+                pos = a.get("position", [0, 0])
+                # identify the clicked field from the post-click state (matches
+                # the recorder's own label), fall back to the pre-click state
+                tgt = _elem_at(t.get("next_state", {}), pos) or _elem_at(t.get("state", {}), pos)
                 actions.append({"kind": a.get("type", "click"),
-                                "pos": a.get("position", [0, 0]),
+                                "pos": pos,
                                 "dst": a.get("dst_position"),
-                                "dy":  a.get("dy", 0)})
+                                "dy":  a.get("dy", 0),
+                                "lbl": (tgt or {}).get("label") or (tgt or {}).get("text") or "",
+                                "etype": (tgt or {}).get("type") or "",
+                                "win": (tgt or {}).get("window_title") or ""})
             elif k:
                 g = k[0]
                 hk = g.get("hotkey", "")
@@ -1494,6 +1524,23 @@ class DemoRecorder:
                     txt = "".join(s.get("pasted_text") or s.get("key", "")
                                   for s in g.get("strokes", []))
                     actions.append({"kind": "type", "text": txt})
+
+        # JUNK FILTER: the form is the window the user clicked most. Any click
+        # whose target landed on a DIFFERENT window (e.g. the recorder GUI, the
+        # terminal) is a stray click — drop it. General: no app names hardcoded.
+        from collections import Counter as _Counter
+        _wins = _Counter(a["win"] for a in actions
+                         if a["kind"] in ("click", "double_click") and a.get("win"))
+        form_win = _wins.most_common(1)[0][0] if _wins else ""
+        if form_win:
+            _before = len(actions)
+            actions = [a for a in actions
+                       if a["kind"] not in ("click", "double_click")
+                       or not a.get("win") or a["win"] == form_win]
+            _dropped = _before - len(actions)
+            if _dropped and progress:
+                progress(f"  filtered {_dropped} stray click(s) off form window "
+                         f"({form_win!r})")
 
         def _foreground_form():
             # Bring the wx form window to the front so replayed clicks land on
@@ -1525,9 +1572,27 @@ class DemoRecorder:
             _foreground_form()   # focus the form before each replay pass
             for ai, act in enumerate(actions):
                 pre = self._request_snapshot()
+                # SEMANTIC REPLAY: re-find the recorded field by its identity
+                # (label + type) in the CURRENT UI and click its live center.
+                # Pixel-independent — survives the form moving / scrolling.
+                # Recorded coords are only the fallback when no match is found.
+                resolved = ""
+                if act["kind"] in ("click", "double_click") and act.get("lbl"):
+                    lbl, et = act["lbl"], act.get("etype", "")
+                    match = next((e for e in pre.get("elements", [])
+                                  if ((e.get("label") or e.get("text") or "").strip() == lbl)
+                                  and (not et or e.get("type") == et)
+                                  and e.get("window_role") == "active"
+                                  and e.get("bbox") and len(e["bbox"]) == 4), None)
+                    if match:
+                        b = match["bbox"]
+                        act = dict(act, pos=[(b[0]+b[2])/2.0, (b[1]+b[3])/2.0])
+                        resolved = f" → {lbl}"
+                    else:
+                        resolved = f" → (raw coords; '{lbl}' not found)"
                 if progress:
-                    _p = act.get("pos") or act.get("text") or act.get("hotkey") or ""
-                    progress(f"  [{ai+1}/{len(actions)}] {act['kind']} {_p}")
+                    _tag = act.get("lbl") or act.get("text") or act.get("hotkey") or act.get("pos")
+                    progress(f"  [{ai+1}/{len(actions)}] {act['kind']} {_tag}{resolved}")
                 try:
                     if act["kind"] in ("click", "double_click"):
                         x, y = act["pos"]
@@ -1870,8 +1935,14 @@ class DemoRecorder:
         # the ~200ms snapshot — reuse last state and drain fast. Snapshot only
         # when caught up (queue empty), so the worker keeps pace with the user
         # and the console stops firing in delayed bursts.
+        # EXCEPTION: clicks ALWAYS get a fresh snapshot. A click moves keyboard
+        # focus; coalescing it reuses a stale state where the focused field never
+        # updates — which destroys the focus signal the navigation model needs
+        # (focus was stuck on one field for 11 consecutive clicks). Clicks are
+        # infrequent vs scroll/move bursts, so this won't reintroduce burst lag.
         backlog = self._action_queue.qsize()
-        if backlog > 0:
+        _is_click = action_type in ("click", "double_click")
+        if backlog > 0 and not _is_click:
             time.sleep(0.02)
             post = self._last_state or pre
         else:
@@ -1884,9 +1955,28 @@ class DemoRecorder:
         # filter noise-app actions (terminal/browser) using fresh post-state
         if self._is_noise_app(post) and self._is_noise_app(pre):
             return
+        # drop clicks on the recorder's OWN GUI window (Start/Stop/Replay buttons)
+        # — these are control clicks, never part of the demo. Without this they
+        # land as "[cursor position]" junk steps at the end of every recording.
+        if action_type in ("click", "double_click"):
+            _wt = (post.get("window_title") or "") + " " + (pre.get("window_title") or "")
+            if "bc recorder" in _wt.lower() or "intern" in _wt.lower():
+                return
         # drop bare Notepad single clicks (cursor-positioning noise)
         if action_type == "click" and "notepad" in (post.get("application") or "").lower():
             return
+        # DROPDOWN-SELECTION filter: if a combobox dropdown was OPEN when this
+        # click happened (list items present in the pre-state), the click is a
+        # value-selection, not navigation. Its position lands on the option,
+        # which visually sits OVER a lower field — so it would be mis-recorded as
+        # a click on that field (phantom "Expiration Date" between Type and Term).
+        # The combobox-OPEN click is kept (pre has no list items); only the
+        # selection click that follows is dropped. Value-picking is the LLM's job.
+        if action_type in ("click", "double_click"):
+            _n_li = sum(1 for e in (pre.get("elements") or [])
+                        if "listitem" in (e.get("type") or "").lower())
+            if _n_li > 0:
+                return
 
         clipboard = ""
         if action_type == "hotkey" and event.get("hotkey") in ("ctrl+c", "ctrl+v"):

@@ -9,6 +9,13 @@ import tkinter as tk
 from tkinter import filedialog
 from datetime import datetime
 
+# Windows consoles default to cp1252 → printing Unicode (→, …) crashes. Force UTF-8.
+for _stream in (sys.stdout, sys.stderr):
+    try:
+        _stream.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+
 _APP_DIR = os.path.dirname(os.path.abspath(__file__))
 _ROOT    = os.path.dirname(_APP_DIR)
 _COMP    = os.path.join(_ROOT, "components")
@@ -74,7 +81,7 @@ class DemoPanel(tk.Frame):
         self._running = False
         self._frames  = 0
         self._sessions= 0
-        self._out_dir = tk.StringVar(value=os.path.join(_ROOT, "data", "demos", "policy_clicks"))
+        self._out_dir = tk.StringVar(value=os.path.join(_ROOT, "data", "demos", "bottom-top-nav"))
         self._replay_n = 5          # default replay count for the F8 hotkey
         self._build()
         self._start_hotkeys()
@@ -92,6 +99,7 @@ class DemoPanel(tk.Frame):
 
     def _replay_hotkey(self):
         # Triggered from the pynput listener thread — find newest session and go.
+        self.after(0, lambda: self._log("F8 pressed.", "dim"))
         if self._running:
             self.after(0, lambda: self._log(
                 "F8 ignored — STOP recording first, then press F8.", "dim"))
@@ -182,6 +190,7 @@ class DemoPanel(tk.Frame):
         self._frames  = 0
         self._start_btn.config(state="disabled")
         self._stop_btn.config(state="normal")
+        self._replay_btn.config(state="disabled")   # can't replay mid-recording
         self._dot_lbl.config(text="●  Recording", fg=GREEN)
         self._status_bar.config(text="Recording — fill the form, then click Stop & Save", fg=GREEN, bg=CARD2)
         self._log("Demo recorder started.", "ok")
@@ -202,63 +211,86 @@ class DemoPanel(tk.Frame):
 
     def _replay(self):
         if self._running:
+            self._log("Replay blocked — STOP recording first.", "err")
             return
-        src = filedialog.askdirectory(
-            title="Pick a recorded session folder to replay",
-            initialdir=self._out_dir.get())
-        if not src:
+        import glob as _glob
+        base = self._out_dir.get()
+        cands = [d for d in _glob.glob(os.path.join(base, "*")) if os.path.isdir(d)]
+        if not cands:
+            self._log(f"No sessions to duplicate in {base}", "dim")
             return
+        src = max(cands, key=os.path.getmtime)   # newest = what you just recorded
         from tkinter import simpledialog
-        n = simpledialog.askinteger("Replay", "How many replay sessions?",
-                                    initialvalue=5, minvalue=1, maxvalue=50)
+        n = simpledialog.askinteger("Replay ×N",
+                                    f"Duplicate '{os.path.basename(src)}' how many times?",
+                                    initialvalue=10, minvalue=1, maxvalue=500)
         if not n:
             return
         self._do_replay(src, n)
 
     def _do_replay(self, src, n):
+        # COPY/PASTE the recorded session N times — pure file duplication, no
+        # mouse, no live form. Each copy is a new session folder of identical
+        # traces, so training sees the session repeated N times.
         if self._running:
+            print("  [replay] BLOCKED — still recording. Click STOP first.", flush=True)
             return
-        self._running = True
-        self._replay_btn.config(state="disabled")
-        self._start_btn.config(state="disabled")
-        self._dot_lbl.config(text="●  Replaying", fg=ACCENT)
-        self._status_bar.config(text=f"Replaying ×{n} — DON'T touch mouse/keyboard", fg=ACCENT, bg=CARD2)
-        self._log(f"Replay started: {n}× from {os.path.basename(src)}", "ok")
-
-        rec = DemoRecorder(output_dir="data/demos/human", trace_type="form_filling")
-
-        def _prog(msg):
-            self.after(0, lambda m=msg: self._log(m, "dim"))
-
-        def _run():
+        import shutil, glob as _glob
+        from datetime import datetime as _dt
+        out_base = os.path.join(_ROOT, "data", "demos", "human")
+        os.makedirs(out_base, exist_ok=True)
+        step_files = sorted(_glob.glob(os.path.join(src, "live_step_*.json")))
+        if not step_files:
+            self._log(f"No steps in {os.path.basename(src)} to copy.", "err")
+            print(f"  [replay] no steps in {src}", flush=True)
+            return
+        print(f"\n  [replay] copying '{os.path.basename(src)}' "
+              f"({len(step_files)} steps) x{n} ...", flush=True)
+        # print the actual step sequence being replicated
+        import json as _json
+        try:
+            from recorder.recorder import _semantic_desc as _sd
+        except Exception:
+            _sd = None
+        print("  [replay] --- steps being replicated ---", flush=True)
+        for si, sf in enumerate(step_files):
             try:
-                # Countdown so the user can click the FORM to focus it — otherwise
-                # the recorder window keeps focus and clicks land on the panel
-                # background ("cursor position"), not the fields.
-                import time as _t
-                for _c in (4, 3, 2, 1):
-                    _prog(f"  CLICK THE FORM NOW — replay in {_c}…")
-                    _t.sleep(1)
-                total = rec.replay(src, count=n, submit_between=True, progress=_prog)
-                self.after(0, lambda: self._on_replay_done(total))
+                t = _json.load(open(sf, encoding="utf-8"))
+                m = t.get("mouse", {}).get("actions", [])
+                k = t.get("keyboard", {}).get("actions", [])
+                if _sd:
+                    at = "click" if m else ("keyboard" if k else "?")
+                    cp = m[0].get("position") if m else None
+                    txt = "".join(s.get("pasted_text") or s.get("key", "")
+                                  for s in (k[0].get("strokes", []) if k else []))
+                    hk = k[0].get("hotkey", "") if k else ""
+                    desc = _sd(at, cp, txt, [], t.get("next_state", {}), hotkey=hk)
+                else:
+                    desc = (m[0].get("type") if m else "kbd")
+                print(f"  [replay]   [{si:04d}] {desc}", flush=True)
+            except Exception as _e:
+                print(f"  [replay]   [{si:04d}] <parse error: {_e}>", flush=True)
+        print("  [replay] -----------------------------------", flush=True)
+        made = 0
+        for i in range(n):
+            ts = _dt.now().strftime("%Y%m%d_%H%M%S_%f")
+            dst = os.path.join(out_base, f"session_copy_{ts}_{i:03d}")
+            try:
+                shutil.copytree(src, dst)
+                made += 1
+                print(f"  [replay] [{i+1:>3}/{n}] -> {os.path.basename(dst)}", flush=True)
             except Exception as exc:
-                _m = str(exc)
-                self.after(0, lambda m=_m: self._on_error(m))
-            finally:
-                try:
-                    rec._mp_stop.value = True
-                except Exception:
-                    pass
-
-        threading.Thread(target=_run, daemon=True).start()
-
-    def _on_replay_done(self, total):
-        self._running = False
-        self._dot_lbl.config(text="●  Idle", fg=DIM)
-        self._status_bar.config(text=f"Replay done — {total} steps generated", fg=ACCENT, bg=CARD2)
-        self._replay_btn.config(state="normal")
-        self._start_btn.config(state="normal")
-        self._log(f"Replay complete — {total} steps.", "ok")
+                self._log(f"Copy {i+1} failed: {exc}", "err")
+                print(f"  [replay] copy {i+1} FAILED: {exc}", flush=True)
+        self._sessions += made
+        self._session_lbl.config(text=str(self._sessions), fg=GREEN)
+        self._status_bar.config(
+            text=f"Copied ×{made} → data/demos/human ({len(step_files)} steps each)",
+            fg=ACCENT, bg=CARD2)
+        self._log(f"Replay = {made} copies of '{os.path.basename(src)}' "
+                  f"({len(step_files)} steps each) → data/demos/human", "ok")
+        print(f"  [replay] DONE — {made} copies x {len(step_files)} steps "
+              f"-> data/demos/human\n", flush=True)
 
     def _stop(self):
         if hasattr(self, "_recorder") and self._running:
@@ -283,7 +315,8 @@ class DemoPanel(tk.Frame):
             text=f"Saved — {steps} frames · {self._sessions} session(s) total", fg=ACCENT, bg=CARD2)
         self._start_btn.config(state="normal")
         self._stop_btn.config(state="disabled")
-        self._log(f"Session saved — {steps} frames.", "ok")
+        self._replay_btn.config(state="normal")   # now safe to replay
+        self._log(f"Session saved — {steps} frames. Now click Replay ×N to repeat it.", "ok")
 
     def _on_error(self, msg):
         self._running = False
@@ -291,6 +324,7 @@ class DemoPanel(tk.Frame):
         self._status_bar.config(text=f"Error: {msg}", fg=RED, bg=CARD2)
         self._start_btn.config(state="normal")
         self._stop_btn.config(state="disabled")
+        self._replay_btn.config(state="normal")
         self._log(f"Error: {msg}", "err")
 
 

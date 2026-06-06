@@ -1562,20 +1562,26 @@ class LLMAgent:
                 _fid2 = state.get("focused_element_id")
                 _fe2  = next((e for e in state.get("elements", [])
                               if e.get("element_id") == _fid2), None)
-                _fillable = bool(_fe2 and _fe2.get("type") in
-                                 ("editcontrol", "input", "comboboxcontrol", "combobox"))
-                _empty    = bool(_fe2 and not (_fe2.get("value") or "").strip())
 
-                if _fillable and _empty and self._llm_client:
-                    # LLM value-oracle for the focused field
+                # The TRANSFORMER decides WHAT: click (navigate) vs type (fill).
+                # Its action-type head is now ~80% (was a coin-flip) after the
+                # action-space collapse, so it DRIVES the decision — no hardcoded
+                # "fillable & empty" rule. When it says type, the LLM supplies the
+                # value for the focused field (WHAT-value = LLM).
+                _t_is_type = str(t_type).lower() in ("keyboard", "type")
+
+                if _t_is_type and self._llm_client:
+                    # transformer chose to FILL → LLM supplies the value (the WHAT).
+                    # LLM owns value-filling per the architecture.
                     llm_action = self._ask_llm(state)
                     if llm_action.get("action_type") == "done":
                         logger.info("LLM: task complete."); break
                     prediction = self._merge(t_pred, t_conf, llm_action, state)
                     _decision_maker = "llm"
-                    logger.info("[OPT2] LLM value for '%s' → %r",
-                                (_fe2.get("label") or _fe2.get("text") or "?")[:30],
-                                prediction.get("text", "")[:40])
+                    _flabel = ((_fe2.get("label") or _fe2.get("text") or "?")[:30]
+                               if _fe2 else "(no focus)")
+                    logger.info("[OPT2] TRANSFORMER chose TYPE → LLM value for '%s' → %r",
+                                _flabel, prediction.get("text", "")[:40])
                 else:
                     # Transformer pointer navigates to the next field
                     _decision_maker = "transformer"
@@ -1586,27 +1592,32 @@ class LLMAgent:
                         # the (collapsed) pointer repeats a visited field, jump to
                         # the next UNVISITED fillable field so the run covers the
                         # whole form instead of looping on one spot.
-                        _vis = getattr(self, "_visited_pos", None)
-                        if _vis is None:
-                            _vis = self._visited_pos = set()
-                        _vk = (round(_snap2[0] / 15) * 15, round(_snap2[1] / 15) * 15)
-                        if _vk in _vis:
-                            _cands = sorted(
-                                [e for e in state.get("elements", [])
-                                 if e.get("window_role") != "background"
-                                 and e.get("type") in ("editcontrol", "input",
-                                                       "comboboxcontrol", "combobox")
-                                 and e.get("bbox")],
-                                key=lambda e: (e["bbox"][1], e["bbox"][0]))
-                            for _e in _cands:
-                                _b = _e["bbox"]
-                                _cx, _cy = (_b[0] + _b[2]) / 2, (_b[1] + _b[3]) / 2
-                                _ck = (round(_cx / 15) * 15, round(_cy / 15) * 15)
-                                if _ck not in _vis:
-                                    _snap2 = [_cx, _cy]; _vk = _ck
-                                    logger.info("[VISITED-ADVANCE] pointer repeated — next unvisited field @ (%.0f,%.0f)", _cx, _cy)
-                                    break
-                        _vis.add(_vk)
+                        # VISITED-ADVANCE is a crutch for a collapsed pointer. With
+                        # the model's own is_visited feature it FIGHTS the model
+                        # (yanks correct repeats to other fields), so it's gated OFF
+                        # in pure mode — let the transformer's pointer stand.
+                        if not self._no_autohandlers:
+                            _vis = getattr(self, "_visited_pos", None)
+                            if _vis is None:
+                                _vis = self._visited_pos = set()
+                            _vk = (round(_snap2[0] / 15) * 15, round(_snap2[1] / 15) * 15)
+                            if _vk in _vis:
+                                _cands = sorted(
+                                    [e for e in state.get("elements", [])
+                                     if e.get("window_role") != "background"
+                                     and e.get("type") in ("editcontrol", "input",
+                                                           "comboboxcontrol", "combobox")
+                                     and e.get("bbox")],
+                                    key=lambda e: (e["bbox"][1], e["bbox"][0]))
+                                for _e in _cands:
+                                    _b = _e["bbox"]
+                                    _cx, _cy = (_b[0] + _b[2]) / 2, (_b[1] + _b[3]) / 2
+                                    _ck = (round(_cx / 15) * 15, round(_cy / 15) * 15)
+                                    if _ck not in _vis:
+                                        _snap2 = [_cx, _cy]; _vk = _ck
+                                        logger.info("[VISITED-ADVANCE] pointer repeated — next unvisited field @ (%.0f,%.0f)", _cx, _cy)
+                                        break
+                            _vis.add(_vk)
                         prediction = {"action_type": "click", "click_position": _snap2}
                         logger.info("[OPT2] TRANSFORMER navigates → click @ (%.0f,%.0f)  ptr_conf=%.2f",
                                     _snap2[0], _snap2[1], t_pred.get("_click_conf", 0.0))
@@ -1690,7 +1701,9 @@ class LLMAgent:
                     # pointer targets an already-visited field, advance to the
                     # next UNVISITED fillable field by position order — lets the
                     # run cover the form instead of looping on one spot.
-                    if not self._llm_client:
+                    # Gated OFF in pure mode — the model's is_visited feature
+                    # handles progression; this crutch fights it.
+                    if not self._llm_client and not self._no_autohandlers:
                         _vis = getattr(self, "_visited_pos", None)
                         if _vis is None:
                             _vis = self._visited_pos = set()
@@ -1751,6 +1764,11 @@ class LLMAgent:
                     _cur_val = (_fel.get("value") or "").strip()
                     _new_val = prediction["text"].strip()
                     if _cur_val and _cur_val == _new_val:
+                        # Field already holds the right value — don't re-type. Tab to
+                        # release focus and let the TRANSFORMER decide the next move.
+                        # (No hardcoded "go to empty field" / "click Submit" crutch —
+                        # the end-game is the model's job; gaps there are a data
+                        # problem to fix with demos, not agent navigation.)
                         logger.info("Re-type guard: %r already has %r — Tab instead.", _flabel_full, _cur_val[:40])
                         self._filled_this_tab.add(_flabel_full)
                         _no_change_streak += 1
@@ -1889,12 +1907,19 @@ class LLMAgent:
                 _ccx, _ccy = (_bx1 + _bx2) / 2, (_by1 + _by2) / 2
                 logger.info("Combobox: clicking to open dropdown for %r → %r", _flabel, _combo_value)
                 self._executor.execute({"action_type": "click", "click_position": [_ccx, _ccy]})
-                time.sleep(0.4)
-                _combo_state = self._observe()
-                _listitems = [e for e in _combo_state.get("elements", [])
-                              if e.get("type") == "listitemcontrol"
-                              and e.get("window_role") != "background"
-                              and e.get("bbox")]
+                # The dropdown can take a moment to render. Poll a few times before
+                # giving up — otherwise we Escape on an empty observe and waste a
+                # whole open→escape→reopen cycle (the #1 combobox time-sink).
+                _listitems = []
+                for _try in range(4):
+                    time.sleep(0.35)
+                    _combo_state = self._observe()
+                    _listitems = [e for e in _combo_state.get("elements", [])
+                                  if e.get("type") == "listitemcontrol"
+                                  and e.get("window_role") != "background"
+                                  and e.get("bbox")]
+                    if _listitems:
+                        break
                 _match = next(
                     (e for e in _listitems
                      if (e.get("text") or e.get("label") or "").strip().lower()
@@ -3543,7 +3568,11 @@ class LLMAgent:
             # named target only if the transformer pointer is invalid.
             _click_conf = t_pred.get("_click_conf", 0.0)
             _t_pos      = t_pred.get("click_position")
-            if _t_pos and (_t_pos[0] > 1 or _t_pos[1] > 1) and _click_conf >= 0.30:
+            # In pure mode the transformer ALWAYS owns WHERE (LLM only supplies
+            # values). Drop the confidence gate so the LLM can't hijack the click
+            # target when the pointer is merely low-confidence.
+            _conf_gate = 0.0 if self._no_autohandlers else 0.30
+            if _t_pos and (_t_pos[0] > 1 or _t_pos[1] > 1) and _click_conf >= _conf_gate:
                 snapped = self._snap(_t_pos, state)
                 coords  = snapped or _t_pos
                 logger.info("[MERGE] TRANSFORMER navigates — click @ (%.0f,%.0f)  ptr_conf=%.2f",

@@ -81,8 +81,13 @@ HOTKEYS = [
 NUM_HOTKEYS = len(HOTKEYS)
 _HOTKEY_IDX = {h: i for i, h in enumerate(HOTKEYS)}
 
-# is_real(1) + bbox(4) + confidence(1) + window_role(1) + is_focused(1) + ctrl_type(1) + text_embedding(384)
-ELEM_FEATURES = 9 + _EMBED_DIM
+# is_real(1) + bbox(4) + confidence(1) + window_role(1) + is_focused(1) + ctrl_type(1)
+#   + is_filled(1) + text_embedding(384)
+# is_filled is PERCEPTION (does this field currently hold a value), read straight
+# from the observed element — NOT a hand-tracked progress signal. Without it the
+# model only saw field labels and was blind to which fields were already done,
+# so it looped / re-entered filled fields.
+ELEM_FEATURES = 10 + _EMBED_DIM
 _REAL_ELEM_FLAG_IDX = 0  # feature index for the is_real flag
 
 # Numeric encoding for control types — focused/interactive types get distinct values
@@ -188,16 +193,28 @@ def _prime_embed_cache(texts: List[str]) -> None:
         _save_embed_cache(_EMBED_CACHE_PATH)
 
 
+def _elem_label(elem: dict) -> str:
+    """Stable identity for a UI element across frames."""
+    return ((elem.get("label") or elem.get("text") or "").strip())
+
+
 def _encode_element(elem: dict, W: float, H: float, focused_id=None) -> List[float]:
     x1, y1, x2, y2 = (float(v) for v in elem.get("bbox", [0, 0, 0, 0])[:4])
     conf       = float(elem.get("confidence", 0.0))
     role       = 1.0 if elem.get("window_role") == "background" else 0.0
     is_focused = 1.0 if (focused_id and elem.get("element_id") == focused_id) else 0.0
     ctrl_type  = _CTRL_TYPE_MAP.get((elem.get("type") or "").lower(), 0.0)
-    text_emb   = _embed_text(elem.get("text", "") or "")
+    # PERCEIVED fill-state: does this field currently hold a value? Read from the
+    # element itself. Lets the model tell a done field from an empty one.
+    _val       = (elem.get("value") or "").strip()
+    is_filled  = 1.0 if _val else 0.0
+    # embed label + current value so a filled field is semantically distinct from
+    # the same field empty (was embedding only the label → filled == empty).
+    text_emb   = _embed_text(((elem.get("text") or "") + " " + _val).strip())
     # is_real=1.0 at index 0 ensures real elements are never zero-masked even if all
     # other features happen to be zero (e.g. top-left element with empty text, unknown type)
-    return [1.0, x1 / W, y1 / H, x2 / W, y2 / H, conf, role, is_focused, ctrl_type] + text_emb
+    return [1.0, x1 / W, y1 / H, x2 / W, y2 / H, conf, role, is_focused, ctrl_type,
+            is_filled] + text_emb
 
 
 def encode_state(state: dict, max_elements: int = 128) -> torch.Tensor:
@@ -205,7 +222,8 @@ def encode_state(state: dict, max_elements: int = 128) -> torch.Tensor:
     res        = state.get("screen_resolution", [DEFAULT_W, DEFAULT_H])
     W, H       = float(res[0]) or DEFAULT_W, float(res[1]) or DEFAULT_H
     focused_id = state.get("focused_element_id")
-    rows = [_encode_element(e, W, H, focused_id) for e in state.get("elements", [])[:max_elements]]
+    rows = [_encode_element(e, W, H, focused_id)
+            for e in state.get("elements", [])[:max_elements]]
     while len(rows) < max_elements:
         rows.append([0.0] * ELEM_FEATURES)
     return torch.tensor(rows, dtype=torch.float32)
@@ -250,17 +268,20 @@ def _decode_actions(
         norm_dy = max(-1.0, min(1.0, dy / 10.0))
         return ACTION_SCROLL, float(pos[0]) / W, float(pos[1]) / H, norm_dy, ""
 
-    # ── drag ──────────────────────────────────────────────────────────────────
+    # ── drag / double-click → CLICK ───────────────────────────────────────────
+    # ACTION-SPACE COLLAPSE: the transformer only needs to decide NAVIGATE(click)
+    # vs FILL(type). drag/double_click on this task are misclassified clicks or
+    # text-highlight noise → fold into CLICK. Keeps the action-type head from
+    # collapsing onto junk classes it can never predict reliably.
     drags = [a for a in mouse_actions if a.get("type") == "drag"]
     if drags:
         src = drags[0].get("position", [0, 0])
-        return ACTION_DRAG, float(src[0]) / W, float(src[1]) / H, 0.0, ""
+        return ACTION_CLICK, float(src[0]) / W, float(src[1]) / H, 0.0, ""
 
-    # ── double click ──────────────────────────────────────────────────────────
     dclicks = [a for a in mouse_actions if a.get("type") == "double_click"]
     if dclicks:
         pos = dclicks[0].get("position", [0, 0])
-        return ACTION_DCLICK, float(pos[0]) / W, float(pos[1]) / H, 0.0, ""
+        return ACTION_CLICK, float(pos[0]) / W, float(pos[1]) / H, 0.0, ""
 
     # ── left click ────────────────────────────────────────────────────────────
     clicks = [a for a in mouse_actions if a.get("type") == "click"]
@@ -268,10 +289,12 @@ def _decode_actions(
         pos = clicks[0].get("position", [0, 0])
         return ACTION_CLICK, float(pos[0]) / W, float(pos[1]) / H, 0.0, ""
 
-    # ── hotkey ────────────────────────────────────────────────────────────────
-    if hotkey_name and hotkey_name in _HOTKEY_IDX:
-        idx_norm = _HOTKEY_IDX[hotkey_name] / max(NUM_HOTKEYS - 1, 1)
-        return ACTION_HOTKEY, 0.0, 0.0, idx_norm, hotkey_name
+    # ── hotkey → KEYBOARD ─────────────────────────────────────────────────────
+    # backspace/enter etc. recorded during value entry are part of TYPING (the
+    # LLM produces the clean value at runtime, no corrections needed) → fold into
+    # the KEYBOARD/type class instead of a separate hotkey class.
+    if hotkey_name:
+        return ACTION_KEYBOARD, 0.0, 0.0, min(max(key_count, 1) / 100.0, 1.0), typed_text
 
     # ── regular keyboard ──────────────────────────────────────────────────────
     if key_count > 0:
@@ -439,7 +462,9 @@ class TrajectoryDataset(Dataset):
         # paths + action metadata; invalidated when any session is newer than cache.
         import pickle as _pickle
         _cache_path = root / ".dataset_cache.pkl"
-        _cache_key  = (max_elements, hist_len, aug_drop_prob)
+        # ELEM_FEATURES in the key → a change in the feature layout invalidates
+        # any stale cache built with a different one.
+        _cache_key  = (max_elements, hist_len, aug_drop_prob, ELEM_FEATURES, "v3_filled")
 
         def _cache_valid() -> bool:
             if not _cache_path.exists():
@@ -838,11 +863,11 @@ class TransformerAgentNetwork(nn.Module):
         self.max_elements = max_elements
         self.hist_len    = hist_len
         self.num_actions = num_actions
-        # Past-action dropout — moderate. 0.8 killed causal confusion but also
-        # erased the history the pointer needs to learn the USER'S ORDER
-        # ("after field A, click field B"). 0.3 keeps enough sequence signal to
-        # clone the order while still reducing action-type collapse.
-        self.action_dropout = 0.3
+        # Past-action dropout. For CLONING A FIXED ORDER, history ("after field A,
+        # click field B") is the primary signal — dropout suppresses exactly what
+        # we want. 0.8 killed it, 0.3 still muffled it. 0.1 keeps the sequence
+        # signal strong (slight dropout to avoid pure copy-the-last-token).
+        self.action_dropout = 0.1
 
         self.state_enc  = StateEncoder(elem_features, d_model)
         self.action_enc = ActionEncoder(num_actions, d_model)
@@ -1361,7 +1386,8 @@ def predict(
     ctx_tensors = [encode_state(item["state"], max_elements) for item in ctx]
     while len(ctx_tensors) < H - 1:
         ctx_tensors.insert(0, torch.zeros(max_elements, ELEM_FEATURES))
-    all_states = torch.stack(ctx_tensors + [encode_state(state, max_elements)])  # (H, T, 6)
+    all_states = torch.stack(
+        ctx_tensors + [encode_state(state, max_elements)])  # (H, T, F)
 
     # Build action tensors
     p_types_list, p_cont_list = [], []
