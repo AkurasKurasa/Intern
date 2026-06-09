@@ -152,9 +152,9 @@ General rules:
 #  State / history → text helpers
 # ══════════════════════════════════════════════════════════════════════════════
 
-# Canonical record parser lives in data_sources.notepad_source.
+# Canonical record parser + default data source live in data_sources.notepad_source.
 # This re-export keeps existing call sites working.
-from data_sources.notepad_source import _parse_records  # noqa: F401
+from data_sources.notepad_source import _parse_records, NotepadDataSource  # noqa: F401
 
 
 def _state_to_text(state: Dict[str, Any], record_num: int = 1, visual_cache: Optional[Dict[str, str]] = None, filled_labels: Optional[set] = None) -> str:
@@ -528,6 +528,7 @@ class LLMAgent:
         start_tab_idx:     int            = 0,      # start agent at this tab index (drill testing)
         scope:             Optional[Any]  = None,   # ScopeConfig — app-specific tabs/sections/records
         observer:          Optional[Any]  = None,   # perception adapter (snapshot()→schema); default=UIA
+        data_source:       Optional[Any]  = None,   # DataSource for field values; default=Notepad
     ):
         # Per-application config (tabs, sections, record delimiter). Default =
         # fully generic: no tabs, no sections, no assumptions. Each scope passes
@@ -623,6 +624,11 @@ class LLMAgent:
         self._visual_cache: Dict[str, str]  = visual_cache or {}   # Gemini pre-scan data
         self._visual_reader: Optional[Any]  = visual_reader        # VisualDataReader instance
         self._source_window: str            = source_window        # Notepad/source window title
+        # Data source = where field VALUES come from. Injectable adapter (the seam):
+        # NotepadDataSource now; Excel/web/email plug into the same slot. The agent
+        # reads source-specific I/O (read_full_text/peek) only through self._source.
+        self._source: Any = data_source if data_source is not None \
+            else NotepadDataSource(source_window)
         self._history:        List[Dict[str, Any]] = []
         self._results:        List[Dict[str, Any]] = []
         self._heuristic_steps: int                 = 0
@@ -2315,70 +2321,12 @@ class LLMAgent:
 
     def _read_notepad_full_text(self, state: Dict[str, Any]) -> str:
         """
-        Read the full text from an open Notepad window via Win32 WM_GETTEXT.
-        Returns empty string if Notepad is not found or unavailable.
-        Bypasses the 2000-char UIA cap so the complete file is readable.
+        Read the full source text via the injected data source. Source-specific
+        I/O (Win32 WM_GETTEXT for Notepad, COM for Excel, …) lives in the adapter,
+        not here — this is just the agent's call into the seam.
         """
         try:
-            import win32gui, win32api
-            WM_GETTEXTLENGTH = 0x000E
-            WM_GETTEXT       = 0x000D
-            _EDIT_CLASSES    = {"Edit", "RichEditD2DPT", "RichEdit20W", "RICHEDIT50W", "RICHEDIT60W"}
-            _TERMINAL_HINTS  = {"powershell", "terminal", "command prompt", "cmd.exe"}
-
-            elements = state.get("elements", [])
-            bg_window_title = ""
-            for e in elements:
-                if e.get("window_role") != "background":
-                    continue
-                wt = (e.get("window_title") or "").strip()
-                if ".txt" in wt or "notepad" in wt.lower():
-                    bg_window_title = wt
-                    break
-
-            np_hwnd = None
-            if bg_window_title:
-                np_hwnd = win32gui.FindWindow(None, bg_window_title)
-                if not np_hwnd:
-                    np_hwnd = win32gui.FindWindow(None, bg_window_title + " - Notepad")
-            if not np_hwnd:
-                def _find_np(hwnd, _):
-                    nonlocal np_hwnd
-                    if np_hwnd: return
-                    if not win32gui.IsWindowVisible(hwnd): return
-                    title = win32gui.GetWindowText(hwnd)
-                    cls   = win32gui.GetClassName(hwnd)
-                    if cls == "Notepad" or ".txt" in title or "notepad" in title.lower():
-                        np_hwnd = hwnd
-                win32gui.EnumWindows(_find_np, None)
-            if not np_hwnd:
-                return ""
-
-            edit_hwnd = None
-            def _find_edit(hwnd, _):
-                nonlocal edit_hwnd
-                if edit_hwnd: return
-                try:
-                    if win32gui.GetClassName(hwnd) in _EDIT_CLASSES:
-                        edit_hwnd = hwnd
-                except Exception:
-                    pass
-            win32gui.EnumChildWindows(np_hwnd, _find_edit, None)
-            if not edit_hwnd:
-                child = win32gui.GetWindow(np_hwnd, 5)
-                while child and not edit_hwnd:
-                    win32gui.EnumChildWindows(child, _find_edit, None)
-                    child = win32gui.GetWindow(child, 2)
-            if not edit_hwnd:
-                return ""
-
-            length = win32api.SendMessage(edit_hwnd, WM_GETTEXTLENGTH, 0, 0)
-            if length <= 0:
-                return ""
-            import ctypes
-            buf = ctypes.create_unicode_buffer(length + 2)
-            ctypes.windll.user32.SendMessageW(edit_hwnd, WM_GETTEXT, length + 1, buf)
-            return buf.value
+            return self._source.read_full_text(state) or ""
         except Exception:
             return ""
 
