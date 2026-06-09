@@ -29,14 +29,27 @@ from __future__ import annotations
 
 from typing import Any, Dict, List
 
-# Normalized control-type vocabulary the agent understands. An adapter that emits
-# a type outside this set (e.g. Excel's "cell") must map it to one of these, or
-# the agent's element filters will silently drop it.
+# Normalized control-type vocabulary. An adapter that emits a type outside this
+# set (e.g. Excel's raw "cell") must map it to one of these, or the agent's
+# element filters silently drop it. This is the standard UIA ControlType set:
+# ACTIONABLE types the agent acts on (edit/combobox/checkbox/…) plus the PASSIVE
+# container/decoration types a real accessibility tree always includes
+# (window/title/group/image/…) which the agent harmlessly ignores. Both belong
+# here so a conforming tree passes clean; a foreign dialect (cell) still fails.
 CONTROL_TYPES = {
+    # actionable
     "editcontrol", "comboboxcontrol", "checkboxcontrol", "radiobuttoncontrol",
-    "buttoncontrol", "tabitemcontrol", "panecontrol", "listcontrol",
+    "buttoncontrol", "splitbuttoncontrol", "tabitemcontrol", "listcontrol",
     "listitemcontrol", "hyperlinkcontrol", "menubarcontrol", "menuitemcontrol",
-    "textcontrol", "documentcontrol", "customcontrol",
+    "menucontrol", "treecontrol", "treeitemcontrol", "spinnercontrol",
+    "slidercontrol", "tabcontrol",
+    # passive containers / decoration (ignored, but legit in any UIA tree)
+    "windowcontrol", "panecontrol", "groupcontrol", "titlebarcontrol",
+    "textcontrol", "documentcontrol", "imagecontrol", "separatorcontrol",
+    "statusbarcontrol", "toolbarcontrol", "scrollbarcontrol", "headercontrol",
+    "headeritemcontrol", "tablecontrol", "datagridcontrol", "dataitemcontrol",
+    "tooltipcontrol", "progressbarcontrol", "calendarcontrol", "thumbcontrol",
+    "customcontrol",
 }
 
 _STATE_REQUIRED   = ("elements", "screen_resolution")

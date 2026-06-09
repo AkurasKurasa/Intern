@@ -81,6 +81,16 @@ def test_missing_required_type_is_error():
     assert any("required key" in e and "type" in e for e in _errors(validate_state(state)))
 
 
+def test_uia_container_types_dont_false_alarm():
+    # windowcontrol et al. are legit UIA containers the agent ignores — they must
+    # NOT raise ERROR (regression: live run flagged 'windowcontrol' 2026-06-09).
+    for t in ("windowcontrol", "titlebarcontrol", "groupcontrol", "imagecontrol"):
+        state = {"elements": [{"type": t, "label": "", "value": "",
+                               "window_role": "active", "bbox": [0, 0, 10, 10]}],
+                 "screen_resolution": [1, 1], "source": "uia"}
+        assert _errors(validate_state(state)) == [], f"{t} false-alarmed"
+
+
 def test_vocab_covers_agent_filter_types():
     # the types agent.py filters on must all be in the contract
     for t in ("editcontrol", "comboboxcontrol", "checkboxcontrol",
