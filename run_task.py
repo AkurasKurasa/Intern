@@ -88,6 +88,8 @@ if __name__ == "__main__":
         time.sleep(1)
     print("  GO!                 ")
 
+    from agent.scope import INSURANCE_SCOPE   # app-specific tabs/sections/records
+
     agent = LLMAgent(
         goal             = GOAL,
         provider         = PROVIDER,
@@ -101,6 +103,7 @@ if __name__ == "__main__":
         max_steps        = MAX_STEPS,
         step_delay       = STEP_DELAY,
         start_tab_idx    = _args.start_tab,
+        scope            = INSURANCE_SCOPE,   # the only place insurance-specifics live
     )
     if _args.start_tab:
         logger.info("Drill mode: starting at tab index %d — manually click that tab first.", _args.start_tab)

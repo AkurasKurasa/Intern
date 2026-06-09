@@ -526,7 +526,16 @@ class LLMAgent:
         pure_transformer:  bool           = False,  # skip all hardcoded handlers; transformer+LLM only
         disable_auto_handlers: bool       = False,  # skip legacy heuristics but KEEP LLM+transformer merge
         start_tab_idx:     int            = 0,      # start agent at this tab index (drill testing)
+        scope:             Optional[Any]  = None,   # ScopeConfig — app-specific tabs/sections/records
     ):
+        # Per-application config (tabs, sections, record delimiter). Default =
+        # fully generic: no tabs, no sections, no assumptions. Each scope passes
+        # its own; the agent code stays application-blind.
+        try:
+            from agent.scope import ScopeConfig
+        except ImportError:
+            from components.agent.scope import ScopeConfig
+        self._scope = scope if scope is not None else ScopeConfig()
         self.goal       = goal
         self.provider   = provider.lower().strip()
         # Capsule routing: if a registered capsule matches goal/window, use its model
@@ -2470,15 +2479,15 @@ class LLMAgent:
             return
 
         # Resolve current tab name from _current_tab_idx + state tab elements
-        _KNOWN_TABS = {"policy", "policyholder", "vehicle", "coverage",
-                       "drivers", "history", "claims", "payment"}
+        _KNOWN_TABS = self._scope.tab_names   # scope-provided; empty → no tab filter
         elements = state.get("elements", [])
         tabs = [
             e for e in elements
             if e.get("type") in ("tabitem", "tabitemcontrol")
             and e.get("window_role") != "background"
             and e.get("bbox")
-            and (e.get("text") or e.get("label") or "").strip().lower() in _KNOWN_TABS
+            and (not _KNOWN_TABS
+                 or (e.get("text") or e.get("label") or "").strip().lower() in _KNOWN_TABS)
         ]
         if not tabs or self._current_tab_idx >= len(tabs):
             return
@@ -2743,17 +2752,22 @@ class LLMAgent:
 
     def _detect_section(self, state: Dict[str, Any], focused_el: Dict) -> str:
         """
-        Return the Driver/Vehicle section name (e.g. 'Driver 2', 'Driver 3')
-        that the focused element belongs to, or '' if none.
+        Return the repeated-section name (e.g. 'Driver 2') the focused element
+        belongs to, or '' if none / the scope has no sections.
 
-        Uses bounding-box position: the section is the last section-pane whose
-        top edge is at or above the focused field's vertical centre.  Section
-        panes are wx.Panel elements with names like 'section_driver_2' that
-        appear in the UIA tree as panecontrols.
+        Generic mechanism: the section is the lowest section-pane whose top edge
+        is at/above the focused field's vertical centre. The pane prefix, the
+        name pattern, and the display format all come from the injected
+        ScopeConfig — so a non-sectioned app (default scope, pattern=None) gets
+        '' for free, and no app-specific names live here.
         """
         import re as _re
+        _pat = getattr(self._scope, "section_pattern", None)
+        if not _pat:                         # scope has no sections → no-op
+            return ""
         if not focused_el or not focused_el.get("bbox"):
             return ""
+        _prefix = getattr(self._scope, "section_prefix", "section_")
         fx1, fy1, fx2, fy2 = focused_el["bbox"]
         fy_center = (fy1 + fy2) / 2
 
@@ -2762,7 +2776,7 @@ class LLMAgent:
              if e.get("type") == "panecontrol"
              and e.get("window_role") != "background"
              and e.get("bbox")
-             and (e.get("label") or e.get("text") or "").startswith("section_")],
+             and (e.get("label") or e.get("text") or "").startswith(_prefix)],
             key=lambda e: e["bbox"][1]
         )
 
@@ -2775,10 +2789,9 @@ class LLMAgent:
 
         if not current_label:
             return ""
-        # Convert "section_driver_2" → "Driver 2", "section_vehicle_1" → "Vehicle 1"
-        m = _re.match(r"section_(driver|vehicle)_(\d+)$", current_label.lower())
+        m = _re.match(_pat, current_label.lower())
         if m:
-            return f"{m.group(1).title()} {m.group(2)}"
+            return self._scope.section_format(*m.groups())
         return ""
 
     def _lookup_field(self, field_name: str, section: str = "") -> str:
@@ -3255,10 +3268,7 @@ class LLMAgent:
             # (negative BoundingRectangle), while the active panel's direct children
             # remain at positive screen coordinates.  Find the first pane whose
             # direct children have positive coords — that pane is the active tab.
-            _TAB_PANE_NAMES = [
-                "tab_policy", "tab_policyholder", "tab_vehicle", "tab_coverage",
-                "tab_drivers", "tab_history", "tab_claims", "tab_payment",
-            ]
+            _TAB_PANE_NAMES = self._scope.tab_pane_names   # scope-provided; [] → none
             _search_root = root   # fallback: search entire tree
             for _pname in _TAB_PANE_NAMES:
                 _pane = root.PaneControl(searchDepth=6, Name=_pname)

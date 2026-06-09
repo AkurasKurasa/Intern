@@ -66,13 +66,20 @@ def _find_field_line(lines, field_name: str) -> Optional[Tuple[int, str]]:
 
 
 # Shared record parser (same logic as agent.py _parse_records).
-def _parse_records(raw_text: str) -> dict:
+# Default record-header pattern (one capture group = the record number). The
+# car-insurance intake uses 'RECORD N OF M' between '===' rules. Overridable so
+# other sources/scopes can supply their own delimiter (see ScopeConfig /
+# DataSource generalization) without editing this function.
+_DEFAULT_RECORD_RE = r"={3,}[\s\S]*?RECORD\s+(\d+)\s+OF\s+\d+[\s\S]*?={3,}"
+
+
+def _parse_records(raw_text: str, record_re: str = _DEFAULT_RECORD_RE) -> dict:
     """
     Parse a multi-record intake text into {record_num: {field: value}}.
-    Expects records delimited by lines containing 'RECORD N OF M'.
-    Returns {} if no record headers are found.
+    `record_re` splits records and captures the record number (default =
+    'RECORD N OF M'). Returns {} if no record headers are found.
     """
-    parts = re.split(r"={3,}[\s\S]*?RECORD\s+(\d+)\s+OF\s+\d+[\s\S]*?={3,}", raw_text)
+    parts = re.split(record_re, raw_text)
     if len(parts) <= 1:
         return {}
     records = {}
