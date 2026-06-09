@@ -527,6 +527,7 @@ class LLMAgent:
         disable_auto_handlers: bool       = False,  # skip legacy heuristics but KEEP LLM+transformer merge
         start_tab_idx:     int            = 0,      # start agent at this tab index (drill testing)
         scope:             Optional[Any]  = None,   # ScopeConfig — app-specific tabs/sections/records
+        observer:          Optional[Any]  = None,   # perception adapter (snapshot()→schema); default=UIA
     ):
         # Per-application config (tabs, sections, record delimiter). Default =
         # fully generic: no tabs, no sections, no assumptions. Each scope passes
@@ -598,17 +599,24 @@ class LLMAgent:
 
         self._executor          = ActionExecutor(dry_run=dry_run)
         self._text_resolver     = _TextResolver()
-        # MUST match the recorder's observer config exactly, or inference states
-        # are out-of-distribution vs training and the transformer predicts
-        # garbage. Recorder uses background_apps={notepad,.txt} + default limits.
-        try:
-            self._observer      = UIAutomationObserver(
-                background_apps={"notepad", ".txt"},
-            )
-        except TypeError:
-            self._observer      = UIAutomationObserver(
-                max_elements_per_window=300, max_total_elements=700,
-            )
+        # Perception is an injectable adapter (the seam). Any observer whose
+        # snapshot() conforms to observers/schema.py plugs in here — UIA now,
+        # Excel/web later — with zero agent changes. Default = UIA.
+        # NOTE: the observer config MUST match the recorder's, or inference states
+        # are out-of-distribution vs training and the transformer predicts garbage
+        # (recorder uses background_apps={notepad,.txt} + default limits).
+        if observer is not None:
+            self._observer = observer
+        else:
+            try:
+                self._observer  = UIAutomationObserver(
+                    background_apps={"notepad", ".txt"},
+                )
+            except TypeError:
+                self._observer  = UIAutomationObserver(
+                    max_elements_per_window=300, max_total_elements=700,
+                )
+        self._schema_checked = False   # validate the adapter once, on first observe
         self._validator         = StateValidator()
         self._correction        = CorrectionHandler()
         self._record_num: int               = record_num
@@ -3832,6 +3840,18 @@ class LLMAgent:
     def _observe(self) -> Dict[str, Any]:
         try:
             state = self._observer.snapshot()
+            # Validate the perception adapter ONCE against the schema contract.
+            # Fail LOUD (log) instead of the agent silently seeing a blank screen
+            # because an adapter speaks a different dialect (e.g. Excel type=cell).
+            if not self._schema_checked:
+                self._schema_checked = True
+                try:
+                    from components.observers.schema import validate_state
+                except ImportError:
+                    from observers.schema import validate_state
+                for _issue in validate_state(state):
+                    _lvl = logger.error if _issue.startswith("ERROR") else logger.warning
+                    _lvl("Perception schema: %s", _issue)
             if state and state.get("elements") is not None:
                 # EXPERIMENTAL: OCR background-window overlay.
                 # Only fires when use_ocr=True AND UIA background data is thin

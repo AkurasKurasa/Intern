@@ -22,17 +22,18 @@ This document is for developers working on Intern itself.
 1. [Current Status](#current-status)
 2. [How It Works](#how-it-works)
 3. [Behavioral Cloning Process](#behavioral-cloning-process)
-4. [Roadblocks Ahead](#roadblocks-ahead) — **the Big Three + Fundamental**
-5. [Roadmaps to a General Agent](#roadmaps-to-a-general-agent)
-6. [Quick Start](#quick-start)
-7. [Repository Layout](#repository-layout)
-8. [Components](#components)
-9. [Current Goal](#current-goal)
-10. [Wish List — Path to Full BC](#wish-list--path-to-full-behavioral-cloning)
-11. [Task List](#task-list)
-12. [Known Issues](#known-issues)
-13. [Non-System Work](#non-system-work)
-14. [Finished Tasks](#finished-tasks)
+4. [Solved Problems](#solved-problems) — **what's behind us**
+5. [Roadblocks Ahead](#roadblocks-ahead) — **the Big Three + Fundamental**
+6. [Roadmaps to a General Agent](#roadmaps-to-a-general-agent)
+7. [Quick Start](#quick-start)
+8. [Repository Layout](#repository-layout)
+9. [Components](#components)
+10. [Current Goal](#current-goal)
+11. [Wish List — Path to Full BC](#wish-list--path-to-full-behavioral-cloning)
+12. [Task List](#task-list)
+13. [Known Issues](#known-issues)
+14. [Non-System Work](#non-system-work)
+15. [Finished Tasks](#finished-tasks)
 
 ---
 
@@ -195,6 +196,49 @@ A clone that handles a *different* demonstrated order proves field-level learnin
 not sequence memorization. `scripts/test_clone.py` reports exact% + the offset
 distribution (0 = exact, +1 = next-down, −1 = next-up) so you can see the
 *direction* it learned.
+
+---
+
+## Solved Problems
+
+What's *behind* us — the mirror of the roadblocks ahead. Each was a real blocker;
+each is now closed with a verification that guards against regression.
+
+### Behavioral cloning — the core thesis
+- **The transformer clones the demonstrated order, not a bias.** Top-down→74% /
+  bottom-up→93% exact on each order's own data. Same architecture, opposite
+  orders → genuine cloning. *(Proof: offset-distribution analysis, `test_clone.py`.)*
+- **WHERE/WHAT division works.** Transformer drives element + click/type; LLM
+  supplies the value. Live: 100% value accuracy when on the right field.
+- **Learned the finish.** Clicks Submit on its own via tail-oversampling — no
+  hardcoded end-game rule.
+
+### Perception / data quality
+- **Looping from fill-blindness.** Model re-entered filled fields because state
+  embedded only labels, never values. Fixed with the `is_filled` feature + folding
+  value into the embedding → click_acc 0.95→1.00.
+- **Action-type collapse.** Junk classes (backspace/drag) wrecked the action head.
+  Collapsed action-space to {click, type} → action-type 29/51% → 80/80%.
+- **Combobox phantom fields.** Clicks while a dropdown was open landed on the field
+  beneath it → recorded a phantom order. Fixed at record time (drop selection-clicks).
+
+### Generalization foundation *(Tier 1 — in progress, two closed)*
+- **✅ Form-specific hardcodes killed → injected `ScopeConfig`.** `_detect_section`,
+  `_KNOWN_TABS`, `_TAB_PANE_NAMES`, the `RECORD N OF M` delimiter — all moved out of
+  agent.py into a per-scope config with generic defaults. The agent is now
+  **application-blind**; a new scope passes its own config with zero agent edits.
+  *(Guard: `tests/test_detect_section.py` — 8/8, locks behavior + proves the default
+  scope is a no-op. Live-verified: form fills + submits unchanged.)*
+- **✅ Perception adapter seam.** The observer is now **injectable** (UIA / Excel /
+  web plug into one slot), and a canonical element schema (`observers/schema.py`)
+  defines the one language every adapter must speak. The agent **validates the
+  adapter on first observe and fails LOUD** — no more silent blank-screen when an
+  adapter emits a different dialect (e.g. Excel `type=cell` / value-under-`text`).
+  *(Guard: `tests/test_perception_schema.py` — 8/8, conforming passes clean, Excel's
+  raw dialect is flagged with actionable errors.)*
+
+> Still open in Tier 1: generalize the data-source layer, and the scope
+> abstraction (declare a scope in one place). See [Task List](#task-list).
 
 ---
 
@@ -526,15 +570,14 @@ it later (with 3 scopes' coupling) is the trap. Refactor while it's small.
 > real source of dissatisfaction. Fix the engine on one scope, then #2/#3 drop in.
 
 ### 🔴 Tier 1 — Foundation: scope-agnostic pipeline *(do now, on one scope)*
-- [ ] **Kill form-specific hardcodes → scope config** — `_detect_section`,
-      `_KNOWN_TABS`, `_TAB_PANE_NAMES`, `RECORD N OF M`. Constructor/scope params
-      with neutral defaults. *(Also serves multi-tab — these ARE the tab logic.)*
-      **← start here: cheapest, most concrete, gates everything.**
-- [ ] **Formalize the perception adapter seam** — one interface; UIA + Excel as
-      drop-in adapters (Excel already emits the schema). Agent consumes it
-      identically regardless of source.
+- [x] **Kill form-specific hardcodes → scope config** — `_detect_section`,
+      `_KNOWN_TABS`, `_TAB_PANE_NAMES`, `RECORD N OF M` → injected `ScopeConfig`
+      (`components/agent/scope.py`). Agent application-blind. ✅ tested + live-verified.
+- [x] **Formalize the perception adapter seam** — observer injectable; canonical
+      element contract (`observers/schema.py`) + loud validation on first observe.
+      UIA/Excel/web plug into one slot. ✅ tested (`test_perception_schema.py`).
 - [ ] **Generalize the data-source layer** — `DataSource` ABC not coupled to
-      Notepad / RECORD format; each scope plugs in its own source.
+      Notepad / RECORD format; each scope plugs in its own source. **← next.**
 - [ ] **Scope abstraction** — declare a scope (goal + adapter + source + model +
       metric) in ONE place, not scattered in `run_task.py`. (Finish capsules.)
 
