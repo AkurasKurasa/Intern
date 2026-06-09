@@ -7,8 +7,55 @@ the way you would: by looking at the screen, moving the mouse, and pressing
 keys. No file-system shortcuts, no app-specific scripting — only what a human
 operator could do.
 
+**The vision:** a general agent that learns a task *from a user's
+demonstrations* — how *they* solve it — builds a workflow from those learned
+actions, and executes it. The car-insurance form is the current **vertical
+slice** that proves the loop end to end; everything else generalizes outward
+from it.
+
 This document is for developers working on Intern itself.
 
+---
+
+## Table of Contents
+
+1. [Current Status](#current-status)
+2. [How It Works](#how-it-works)
+3. [Behavioral Cloning Process](#behavioral-cloning-process)
+4. [Roadblocks Ahead](#roadblocks-ahead) — **the Big Three + Fundamental**
+5. [Roadmaps to a General Agent](#roadmaps-to-a-general-agent)
+6. [Quick Start](#quick-start)
+7. [Repository Layout](#repository-layout)
+8. [Components](#components)
+9. [Current Goal](#current-goal)
+10. [Wish List — Path to Full BC](#wish-list--path-to-full-behavioral-cloning)
+11. [Task List](#task-list)
+12. [Known Issues](#known-issues)
+13. [Non-System Work](#non-system-work)
+14. [Finished Tasks](#finished-tasks)
+
+---
+
+## Current Status
+
+**The core loop works end-to-end on the vertical slice.** Proven this far:
+
+- **Navigation cloning confirmed** — the transformer reproduces the user's
+  demonstrated field order. Trained on top-down → navigates top-down (74% exact);
+  trained on bottom-up → navigates bottom-up (93% exact). Same architecture,
+  opposite orders, each learned its own → **not hardcoded, genuinely cloning.**
+- **End-to-end fill + submit** — live, transformer-driven: fills every field in
+  the learned order (100% value accuracy via LLM), **clicks Submit on its own**
+  (learned via tail-oversampling, not a hardcoded rule), advances to the next
+  record.
+- **Division holds:** transformer = WHERE (which element) + WHAT (click vs type);
+  LLM = the value.
+
+**Honest gaps remaining on the slice:** cold-start (first click from a blank
+screen), multi-record reliability, combobox retry timing, and the fundamental
+limits below. See [Roadblocks](#roadblocks-ahead).
+
+---
 
 ## How It Works
 
@@ -56,6 +103,13 @@ This document is for developers working on Intern itself.
 The agent re-observes after every action and loops until the plugin signals
 "done" or `max_steps` is reached.
 
+**Perception is an adapter.** Today it's the UIA tree (accurate on native
+controls). The downstream pipeline consumes a semantic element list
+(`bbox, role, name, value, states, …`), so the perception source is swappable —
+UIA now, a vision/VLM adapter later — without touching the learning layer. See
+[Roadblock #1](#1-perception-uia--vision).
+
+---
 
 ## Behavioral Cloning Process
 
@@ -63,33 +117,29 @@ The full loop for teaching Intern a task from human demonstrations.
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│              BEHAVIORAL CLONING PROCESS                     │
-└─────────────────────────────────────────────────────────────┘
-
-┌─────────────────────────────────────────────────────────────┐
 │  TRAINING PIPELINE                                          │
 │                                                             │
 │   STEP 1 — RECORD                                           │
-│     python record_trace.py                                  │
-│     Human demos task in wxForm + Notepad                    │
-│     Output: tasks/form_filling/traces/session_*/            │
+│     python app/main.py   (GUI recorder)  or record_trace.py │
+│     Human demos the task (target form + Notepad source)     │
 │                      ↓                                      │
-│   STEP 2 — AUGMENT                                          │
-│     python scripts/augment_traces.py \                      │
-│       --source tasks/form_filling/traces \                  │
-│       --dest   tasks/form_filling/traces_aug \              │
-│       --copies 4                                            │
-│     Per session: bbox jitter ±5px, click jitter ±4px,       │
-│     confidence noise ±0.03, element order shuffle           │
-│     Result: 5× data without recording anything new          │
+│   STEP 2 — CLEAN                                            │
+│     python scripts/clean_demos.py <src> <dst>              │
+│     Drops dropdown-SELECTION clicks (value-picks that land   │
+│     on the field under an open dropdown), off-form-window    │
+│     junk, pane clicks, consecutive dupes.                    │
+│                      ↓                                      │
+│   STEP 2b — (optional) OVERSAMPLE THE FINISH                │
+│     python scripts/oversample_tails.py <clean> <dst>       │
+│     Copies each cycle's tail (… → Submit) K× so the rare    │
+│     "form complete → Submit" transition is well-represented │
+│     → model LEARNS to submit (no hardcoded completion rule). │
 │                      ↓                                      │
 │   STEP 3 — TRAIN                                            │
-│     python train.py \                                       │
-│       --trace_dir tasks/form_filling/traces_aug \           │
-│       --epochs 50                                           │
-│     Trains TransformerAgentNetwork (131K params, d_model=64)│
-│     Element dropout 10% + order shuffle per batch           │
-│     Output: tasks/form_filling/model.pt                     │
+│     python train.py --trace_dir <dir> --epochs 80 \         │
+│       --d_model 128 --num_layers 4 --dim_feedforward 256    │
+│     Trains TransformerAgentNetwork. Best checkpoint on       │
+│     (val_acc + click_acc).                                   │
 │                                                             │
 │  Goal: imprint human demo behavior into model.pt            │
 └─────────────────────────────────────────────────────────────┘
@@ -97,37 +147,201 @@ The full loop for teaching Intern a task from human demonstrations.
 ┌─────────────────────────────────────────────────────────────┐
 │  INFERENCE + EVALUATION                                     │
 │                                                             │
-│   STEP 4 — RUN & EVALUATE AGENT                             │
+│   STEP 4 — RUN & EVALUATE                                   │
 │     python run_task.py                                      │
-│     Transformer: picks which element to click/type          │
-│     LLM (LM Studio): supplies text values                   │
+│     Transformer: WHERE to click + WHAT action (click/type)  │
+│     LLM (LM Studio): supplies the value when action = type  │
 │                                                             │
-│     Auto-runs after completion:                             │
-│       eval_metrics.py   → TCR, field accuracy, value acc   │
-│       bc_fidelity.py    → BC score vs gold standard         │
-│       rule_extractor.py → infers task ruleset from trace    │
+│   Offline clone check (no live form):                       │
+│     python scripts/test_clone.py <session_dir>              │
+│     Compares model's click_elem_idx to the user's clicked    │
+│     element per frame → exact% + offset distribution.        │
 │                                                             │
-│  Goal: measure how well cloned behavior generalizes         │
+│   Auto-runs after a live run:                               │
+│     eval_metrics.py  → TCR, field/value accuracy            │
+│     bc_fidelity.py   → BC score vs gold standard            │
+│     rule_extractor.py→ infers task ruleset from trace       │
 └─────────────────────────────────────────────────────────────┘
                         ↓
-              (poor metrics → record more → repeat)
+       (poor metrics → clean/record more → retrain → repeat;
+        DAgger: on a failure the agent watches ~4s for the
+        user to do the right action and saves it as a trace)
 ```
 
 **Division of responsibility:**
-- **Transformer** — *where* to click / which element to target (learned from demos)
-- **LLM** — *what* to type (text values from source data)
-- **Goal** — LLM is a crutch. BC is complete when transformer works with `PROVIDER="none"`.
+- **Transformer** — *where* to click (which element) **and** *what* action
+  (click vs type), learned from demos.
+- **LLM** — *what* value to type (from source data). Reserved for the part that
+  needs understanding, not clean lookups.
 
-### Testing Variations
+### Key features that make navigation learnable
+- **`is_filled`** (per element) — does this field currently hold a value, read
+  straight from the observation. Without it the model only saw field *labels* and
+  was blind to which fields were done → it looped. This is *perception*, not a
+  hand-tracked progress signal.
+- **`is_focused`** — which element has keyboard focus.
+- **Action-space collapse → {click, type}** — junk classes (stray `drag`,
+  `backspace` hotkeys) were dropped/remapped so the action-type head stopped
+  collapsing onto classes it could never predict. Action-type accuracy 50% → 80%,
+  and click accuracy rose for free.
 
-To validate that BC generalizes beyond rote memorization, record demos in multiple fill orders and confirm the agent handles all of them:
+### Testing variations (does it clone, or just memorize?)
+Record demos in multiple fill orders and confirm the agent reproduces each:
+- **Top-down** — fields top-to-bottom (baseline). ✅ confirmed
+- **Bottom-up** — fields bottom-to-top. ✅ confirmed (93%, proves not a down-bias)
+- **Random (fixed)** — a chosen non-obvious order, repeated consistently. *pending*
 
-- **Forward** — fill fields top-to-bottom, tab 1 → tab 8 in order (baseline)
-- **Backward** — fill fields bottom-to-top, tab 8 → tab 1
-- **Middle-first** — start from a mid-form tab (e.g. Vehicle or Coverage), then wrap around
+A clone that handles a *different* demonstrated order proves field-level learning,
+not sequence memorization. `scripts/test_clone.py` reports exact% + the offset
+distribution (0 = exact, +1 = next-down, −1 = next-up) so you can see the
+*direction* it learned.
 
-A successful BC clone handles all three. If the agent only works forward, it memorized sequence rather than learned field-level affordances. Run `python scripts/show_progress.py` after each variation to compare T-Dep% and Fields% across runs.
+---
 
+## Roadblocks Ahead
+
+The honest obstacle map between the current vertical slice and a general
+learn-from-demonstration agent. Split into the **Big Three** (architectural —
+what makes it *generalize*) and the **Fundamental** roadblocks (what makes it
+*actually work and be trustworthy*).
+
+### The Big Three (Architectural)
+
+#### 1. Perception: UIA → Vision
+Today perception reads the **UIA accessibility tree** — which hands us
+`bbox, role, label, value, focused, filled` for free, but only on apps that
+*expose* a clean tree (native/wxPython forms). **Most apps don't** — web,
+Electron, canvas, custom-drawn UIs, games. A general agent must **see pixels**:
+screenshot → a vision model that **localizes** elements *and* does **semantic
+contextualization** (what each thing is, its label, its state).
+
+- The schema generalizes if it mirrors the **accessibility element model**
+  (`role + name + value + states[] + actions[] + structure`), not the form
+  subset. `filled` is form-specific → it becomes a derived check; general state
+  lives in `states[]`.
+- **But the abstracted element list alone is lossy** — it drops color coding,
+  charts, progress fills, badges, grayed-out cues, scene-level meaning, and
+  *continuous/non-widget* surfaces (sliders, maps, drawing, terminals) entirely.
+  General perception is therefore **pixels + element overlay + scene
+  understanding**, with a VLM reasoning over both — which is exactly why frontier
+  computer-use agents feed the raw screenshot, not just a parsed tree.
+- **A VLM is the preferable general perceiver** (it reasons over pixels +
+  meaning), but it is *not* free: its **grounding precision** (exact click
+  coordinates) is the #1 weakness, plus cost/latency per step and
+  non-deterministic reliability (dangerous for unattended/irreversible actions).
+- **Best-of-both now:** hybrid — UIA/a11y for precise grounding where it exists,
+  VLM for understanding and for apps with no tree.
+- **The clean part:** the learning layer is **perception-agnostic** — it consumes
+  the semantic element list regardless of source. Swap the *adapter*, keep the
+  brain. The VLM replaces perception; it does **not** learn the user's workflow —
+  that stays Intern's job.
+
+> **Biggest single change.** Everything downstream depends on perception, and
+> leaving clean native controls is the main generalization wall.
+
+#### 2. Action Space: form-fields → universal
+Today: click / type / select (+ a combobox handler). A general agent needs a full
+vocabulary — `click, double_click, type, select, drag, scroll, hotkey, wait,
+verify, menu, file-dialog`. Tractable: the action-type head already supports
+multiple classes; the executor is modular (one handler per action). This is
+**enumerable engineering**, not research — add handlers + demos that exercise
+each action.
+
+#### 3. Workflow Representation: linear → control flow
+Today's task is **linear** — same steps, same order, every run. Real tasks have
+**control flow**:
+- **Branch** — *if* status = lapsed, fill reinstatement; *else* skip.
+- **Loop** — fill a block *for each* driver (count varies: 1 or 5).
+- **Conditional skip** — *if* already filled, skip; *if* popup, dismiss.
+- **Error path** — *if* validation error, fix and retry.
+
+**Why it's hard:** a demonstration is *one linear path* — it shows *what* you did,
+not the *rule* for *when*. Recovering "do 4 driver blocks because there are 4
+drivers" (a loop) or "skip reinstatement because status = active" (a condition)
+means **inferring the program behind the actions** from *varied* demos — classic
+**program synthesis from examples**, research-grade. The pragmatic path: **let an
+LLM be the synthesizer** — feed it multiple demo traces, have it propose a
+workflow *with* `if`/`for`, then **execute + DAgger-correct** it. No formal
+synthesis engine; the LLM induces, execution validates.
+
+### Fundamental Roadblocks
+
+These don't block *generalization* — they block *working reliably and being
+trustworthy*. Several are sneakier and more dangerous than the Big Three.
+
+- **A. Hidden intent / partial observability. ⚠️ a ceiling, not a bug.** The
+  screen doesn't show *why* you act. Same screen → different action based on
+  knowledge in your head. Some workflows are **unlearnable from screen+action
+  alone** because the deciding info isn't on screen.
+- **B. Error detection & recovery.** Does the agent *know* it failed (click
+  missed, value didn't save, validation error)? Without self-monitoring, errors
+  compound silently.
+- **C. Verification — "did it do the task correctly?"** Confirming success (not
+  just "ran N steps"). We struggled to even *measure* on one form.
+- **D. Safety / irreversibility / trust.** Submit, delete, send, pay are
+  irreversible. An unattended general agent needs guardrails, confirmation gates,
+  sandboxing, rollback — and earned trust to run at all.
+- **E. Data-collection burden.** Every task needs clean demos; recording is
+  laborious and noisy (combobox/pane pollution). Scaling across tasks is a
+  bottleneck.
+- **F. Timing / async / readiness.** Knowing *when* the screen is ready and an
+  action completed (dropdown render races, spinners, network waits).
+- **G. Cross-app / system-level.** Real tasks span apps, files, tabs, OS dialogs,
+  copy-paste, window switches (already 2 apps: Notepad → form).
+- **H. Long-horizon memory.** Tracking what's done across many screens / which
+  record/iteration, past the model's context window.
+- **I. Concept drift / maintenance.** App UI updates → learned workflow breaks.
+  Workflows rot and need re-learning.
+- **J. Cost / latency.** VLM + LLM per step = slow and expensive, brutal locally.
+- **K. Privacy / security.** Screen-recording captures PII and secrets — handle
+  responsibly.
+- **L. Task segmentation.** Cutting a continuous stream of user activity into
+  discrete, learnable workflows.
+
+> **The scariest are A, C, D** — fundamental (hidden intent caps what's
+> learnable) and trust-critical (without verification + safety, a "working"
+> general agent is unshippable). They get less attention than perception because
+> they're less glamorous.
+
+---
+
+## Roadmaps to a General Agent
+
+Four coherent paths, differing in how the **workflow** is represented.
+
+| Roadmap | Workflow = | Pros | Cons |
+|---|---|---|---|
+| **1. Pure BC** *(current)* | implicit in model weights | captures style, no rules | no inspectable workflow, data-hungry, brittle at rare states |
+| **2. Workflow induction (RPA-style)** | explicit step graph | inspectable, editable, reliable, no retrain | rigid on novel states; control-flow induction is hard |
+| **3. Hybrid ⭐** | explicit skeleton + ML in the gaps | a workflow you can *see*, executed *robustly* | most moving parts |
+| **4. LLM-skill agent** | a learned prompt/skill | flexible, minimal training | LLM cost/reliability, captures *what* > *how/style* |
+
+**Recommended: Roadmap 3 (Hybrid).** It's the only one that delivers all three
+sub-goals (*learn how the user solves* → *create a workflow* → *execute*) **and
+reuses what's built**: the BC transformer becomes the perception/execution muscle
+under an explicit, induced workflow the LLM can reason over.
+
+```
+Perception adapter (UIA │ Vision-VLM)   →  semantic elements (+ pixels, scene)
+        ↓
+Workflow (LLM-induced from demos: steps + if/for)        ← Intern's novel value
+        ↓  per step
+Transformer (which element / WHERE) + LLM (value / WHAT)
+        ↓
+Executor (modular handlers) + verification + safety gates + DAgger correction
+```
+
+**Strategic fork:** build perception from scratch (own UIA→vision) **vs** stand
+on an existing computer-use/VLM model for perception+grounding and make Intern's
+contribution the **learn-the-user's-workflow** layer on top. The latter is far
+more realistic solo.
+
+**Staged reach:** Stage 0 ✅ vertical slice → Stage 1 domain-general (several
+native apps, linear, achievable solo) → Stage 2 vision perception → Stage 3
+control flow → Stage 4 broadly general (frontier / team-scale). Depth first, then
+breadth.
+
+---
 
 ## Quick Start
 
@@ -155,389 +369,238 @@ Configure `run_task.py` knobs at the top:
 | Constant         | Default                  | Notes                                |
 |------------------|--------------------------|--------------------------------------|
 | `PROVIDER`       | `"lmstudio"`             | Switch to `"groq"` / `"anthropic"` for real reasoning. |
-| `MAX_STEPS`      | `50`                     | Hard cap per run.                    |
+| `MAX_STEPS`      | `200`                    | Hard cap per run.                    |
 | `SOURCE_WINDOW`  | `"Notepad"`              | Title fragment of the source window. |
 
+---
 
 ## Repository Layout
 
 ```
+app/
+  main.py                    GUI recorder (Start/Stop, replay, frame counter)
 components/
   agent/
-    agent.py                 LLMAgent — main loop, provider abstraction
+    agent.py                 LLMAgent — main loop, provider abstraction, merge
     capsule.py               Per-task model routing (goal → .pt file)
     task_plugins/            Task-specific plugins (form-fill, etc.)
-      base_plugin.py         TaskPlugin ABC
-      form_filler_plugin.py  Auto-fill / auto-skip / tab-advance / scan
   data_sources/
-    base.py                  DataSource ABC
     notepad_source.py        Win32 WM_GETTEXT + parse_records helpers
   intelligence/
     model/
       transformer.py         TransformerAgentNetwork — BC policy model
     rule_extractor.py        LLM-based task spec generator / corrector
-    training/
-      bc/                    Behavioral cloning trainer
-      rl/                    RL trainer (future)
-      continual/             Continual learner
+    training/                bc / rl / continual trainers
   observers/
-    vlm/
-      vision_observer/       VLM screenshot → key/value extraction
-      visual_data_reader/    pre_scan + scan_tab + rescan_after_scroll
-  workflow_builder/          Workflow construction utilities
+    ui_observer/             UIA tree walker (semantic element list)
+    vlm/                     VLM screenshot → key/value extraction
+  recorder/
+    recorder.py              DemoRecorder (on-demand subprocess snapshots)
+    correction_handler/      DAgger: watch-for-user-correction on failure
 tasks/
   registry.json              Global capsule registry (goal → model path)
   form_filling/
     model.pt                 Trained BC checkpoint
     ruleset.md               Inferred task spec (auto-updated each session)
-    traces/                  Raw human demo sessions (session_*/)
-    traces_aug/              Augmented copies (session_*_augN/)
-    submissions/             Agent output JSONs
 car_insurance_entry/         wxPython target form (test fixture)
 data_entry_tasks/            Source intake .txt files
+data/demos/                  Recorded sessions (gitignored)
 scripts/
-  augment_traces.py          Dataset augmentation (5× data from existing traces)
-  eval_metrics.py            TCR / field accuracy / value accuracy metrics
+  clean_demos.py             Drop dropdown-selection / junk / dupe clicks
+  oversample_tails.py        Emphasize the … → Submit finish
+  test_clone.py              Offline clone check (exact% + offset)
+  augment_traces.py          Dataset augmentation (jitter)
+  eval_metrics.py            TCR / field / value accuracy
   bc_fidelity.py             BC fidelity score vs gold standard
-  bootstrap_spec.py          One-shot spec bootstrap from all sessions
-  diagnose_click_predictions.py  Debug click head predictions
-run_task.py                  Agent entrypoint (pure transformer + LLM)
-record_trace.py              Human demo recorder
+run_task.py                  Agent entrypoint (transformer + LLM)
+replicate.py                 Duplicate a recorded session N× (terminal)
 train.py                     BC training entrypoint
 build_capsule.py             Package model + metadata into capsule
 ```
 
+---
 
 ## Components
 
 ### Agent
 - **`components/agent/agent.py`** — `LLMAgent` orchestration loop, multi-provider
-  LLM support (Anthropic / Groq / Gemini / LM Studio).
-- **`components/agent/capsule.py`** — Routes goal string + window title to the
-  correct `.pt` checkpoint via `tasks/registry.json`.
-- **`components/agent/task_plugins/`** — Task plugins. The plugin owns task
-  logic; the agent owns the observe → decide → act loop.
+  LLM support (Anthropic / Groq / Gemini / LM Studio). `_merge` glues transformer
+  (WHERE/WHAT) + LLM (value). `disable_auto_handlers` runs pure transformer+LLM
+  with legacy heuristics gated off.
+- **`components/agent/capsule.py`** — Routes goal + window title to the correct
+  `.pt` checkpoint via `tasks/registry.json`.
 
 ### Transformer (BC Policy)
 - **`components/intelligence/model/transformer.py`** — `TransformerAgentNetwork`.
   Causal transformer trained via behavioral cloning. Predicts: action type
-  (click/keyboard/noop), which element to click (pointer head), which source
-  element contains the value to type (source pointer head).
-- Input: UI element list (bbox + type + text embedding) across H history steps.
-- Output: action type logits + per-element click logits + per-element source logits.
-- **LayerNorm on pointer heads** — prevents bilinear Q×K divergence (fixed 197M loss bug).
+  (click/type after action-space collapse), which element to click (pointer head),
+  which source element holds the value (source pointer head).
+- Input per element: `is_real, bbox(4), confidence, window_role, is_focused,
+  ctrl_type, is_filled, text_embedding(384)` (= `ELEM_FEATURES`).
+- **LayerNorm on pointer heads** — prevents bilinear Q×K divergence.
 
 ### Observers
-- **UI Automation Observer** — Walks the UIA tree, returns `{element_id, type,
-  label, bbox, value, focused, …}`.
-- **Vision Observer / Visual Data Reader** — Screenshot → VLM (Groq llama-4-scout
-  or Gemini Flash) → JSON of visible field/value pairs. Used per tab-switch
-  (`scan_tab`) and on cache miss (`rescan_after_scroll`).
-- **OCR fallback** — Tesseract over background-window pixels when UIA returns
-  empty values (Win11 Notepad UIA cap).
+- **UI Automation Observer** — Walks the UIA tree → semantic element list
+  (`element_id, type, label, bbox, value, focused, window_role`).
+- **Vision Observer / Visual Data Reader** — Screenshot → VLM → JSON of visible
+  field/value pairs. The slot for the future vision *perception adapter*.
+- **OCR fallback** — Tesseract over background pixels when UIA returns empty.
+
+### Recorder & Corrections
+- **`components/recorder/recorder.py`** — `DemoRecorder`. On-demand subprocess
+  UIA snapshots (off the main GIL). Clicks always get a fresh snapshot (focus
+  accuracy). Filters: own-GUI-window clicks, F-keys, dropdown-selection clicks.
+- **`correction_handler/`** — DAgger hook: on a validation failure the agent
+  opens a ~4s window, captures the user's correcting action + state, saves it as
+  a trace.
 
 ### Data Sources
-- **`NotepadDataSource`** — Win32 `WM_GETTEXT` reader + `_parse_records`
-  multi-record parser + field-line lookup helpers (`_split_kv`,
-  `_exact_match`, `_find_field_line`).
+- **`NotepadDataSource`** — Win32 `WM_GETTEXT` + `_parse_records` multi-record
+  parser + field-line lookup helpers.
 
 ### Action Executor
-- pyautogui mouse/keyboard. All actions go through this — no OS-level
-  shortcuts that humans can't do.
+- pyautogui mouse/keyboard. All actions go through this — no OS-level shortcuts a
+  human couldn't do.
 
 ### Rule Extractor
-- **`components/intelligence/rule_extractor.py`** — Two modes:
-  - `extract()` — derives rules from completed agent run trace (timestamped log).
-  - `correct()` — reads existing spec + new human demo → LLM produces corrected
-    spec → overwrites `tasks/form_filling/ruleset.md`. Called automatically
-    after every recording session.
+- **`components/intelligence/rule_extractor.py`** — `extract()` derives rules from
+  a completed run; `correct()` reads spec + new demo → corrected spec.
 
 ### Chain-of-Thought (LM Studio only)
+Injects a `<think>…</think>` reasoning step for local models, stripped before JSON
+parsing. Not used for Anthropic (native reasoning is better). Disable by removing
+the CoT lines in `_call_openai_compat()`.
 
-The agent injects a reasoning step for local models to reduce hallucination and
-improve action quality. Only active for LM Studio / OpenAI-compatible providers —
-**not** Anthropic (Claude's native reasoning is superior and handles this
-internally).
-
-**How it works:**
-
-1. `_call_openai_compat()` appends to the system prompt:
-   ```
-   Before choosing an action, reason briefly inside <think>...</think> tags.
-   Then output ONLY a JSON object on the last line.
-   ```
-2. A unique session tag (`[sid:xxxxxxxx]`) is appended per call to break LM
-   Studio's server-side KV-cache accumulation (prevents stale context).
-3. The model responds with optional `<think>` reasoning followed by the JSON
-   action object.
-4. `_parse_llm_response()` strips `<think>...</think>` blocks before JSON
-   parsing — the reasoning is discarded, only the action object reaches the
-   agent loop.
-
-**Why only for local models:**
-Qwen2.5-7B-Instruct (the current LM Studio model) is not a native reasoning
-model. CoT injection via system prompt gives it a structured thinking step it
-wouldn't otherwise take. Anthropic models (Claude) have built-in extended
-thinking and don't benefit from this — injecting CoT prompts into Claude wastes
-tokens and degrades JSON formatting reliability.
-
-**To disable CoT for a specific local model:** remove the CoT injection lines
-from `_call_openai_compat()` in `components/agent/agent.py`. The `<think>` strip
-in `_parse_llm_response()` is a no-op if no think blocks are present, so it is
-safe to leave in place.
-
+---
 
 ## Current Goal
 
-> **Complete the Behavioral Cloning Phase.**
+> **Finish the vertical slice, then prove generalization.**
 >
-> The transformer must fill all 5 records of the car insurance form — all 8 tabs, all fields, correct values — with `PROVIDER="none"` (zero LLM calls), completing in under 400 steps per record, with a success rate of ≥ 80% across 10 consecutive runs.
->
-> When this passes, BC is done and development shifts to the Reinforcement Learning phase.
+> Near-term: complete the third order-cloning test (random), make multi-record
+> fill+submit reliable, and tighten the cold-start. Then the real leap —
+> [Roadblock #1 + #3](#roadblocks-ahead): a perception adapter (UIA→vision) and
+> an LLM-induced workflow layer, so the same loop learns *new* apps/tasks from
+> demonstration.
 
-
-## Live Metrics — Current State
-
-Two test modes: **With LLM** (normal operation) and **Transformer-only** (`PROVIDER="none"`).
-The transformer-only score is the real BC progress indicator — LLM is a crutch, not the goal.
-
-### With LLM (`PROVIDER="lmstudio"`) — 2026-05-27
-
-| Metric | Score | Detail |
-|--------|-------|--------|
-| **Task Completion Rate** | ~30–40% | Multi-tab filling working; Policy + Policyholder + Vehicle confirmed |
-| **Value Accuracy** | 100% | All typed values matched source record |
-| **Action Prediction Accuracy** | ~60–70% | Clicks landing on interactive elements; combobox-fix handles state/education/occupation |
-| **Execution Success Rate** | ~70% | Auto-handlers resolve most fields; LLM called for ~10 steps out of 133+ |
-| **LLM Dependency** | ~7–10% | ~10 LLM steps / 130+ total (was reported 100% — metric bug fixed this session) |
-| **Transformer conf** | ~0.64 avg | Below HIGH_CONF threshold (0.995) so LLM still called for all tagged steps |
-| **Steps per field** | ~4–6 | 133 steps / ~25 fields across 3+ tabs |
-
-**Key infrastructure fixes this session (2026-05-27):**
-- `pure_transformer=False` in run_task.py — was silently disabling ALL auto-handlers
-- Tab advance tracker always trusted over pane detection (pane detection fundamentally broken)
-- `_resolve_target` deprioritizes tabitem/tabitemcontrol — prevents tab headers stealing LLM clicks
-- `_heuristic_steps` counter added — LLM Dependency denominator now includes heuristic steps
-
-### Transformer-Only (`PROVIDER="none"`) — 2026-05-23
-
-| Metric | Score | Detail |
-|--------|-------|--------|
-| **Task Completion Rate** | 5% | 1 field filled / ~20 total |
-| **Action Prediction Accuracy** | 100% | 1 on-target / 1 click |
-| **Execution Success Rate** | 5.6–40% | Fills 1 field (Agency Name or Policy Number), then loops on unresolved keyboard — confirmed across 2 runs |
-
-**What the numbers say right now:**
-- Auto-handlers fill most fields correctly; LLM handles only navigation decisions (~10 steps per run).
-- Value Accuracy 100% — typed values exactly match source data.
-- Main remaining gap: combobox selections (LLM must open dropdown then select correct option).
-- Transformer-only still fails — model conf 0.64 avg, needs retraining on new traces.
-
-**How to track progress:** after each retrain, run both modes and update this table.
-
+---
 
 ## Wish List — Path to Full Behavioral Cloning
 
-What needs to happen, in order, to reach the BC completion criterion (transformer fills all 5 records, all fields, no LLM, ≥80% success rate).
+### Stage 1 — Data volume & quality *(days)*
+- [ ] Record clean, consistent demos per order (top-down ✅, bottom-up ✅, random).
+- [ ] Always `clean_demos.py` before training (strips combobox/pane noise).
+- [ ] Retrain after each batch; check `test_clone.py` exact% + offset.
 
----
+### Stage 2 — Model quality *(parallel)*
+- [x] Scale model to `d_model=128, num_layers=4`.
+- [x] Action-space collapse → {click, type} (action-type 50% → 80%).
+- [x] `is_filled` perception feature (stopped end-game looping).
 
-### Stage 0 — Fix what's broken now *(hours)*
+### Stage 3 — Reliability
+- [ ] Multi-record: fill + submit all records in one unattended run.
+- [ ] Cold-start: reliable first click (DAgger or learned start signal).
+- [ ] Combobox: kill open→miss→retry (timing).
 
-These are blocking every downstream improvement.
-
-- [x] **Bootstrap the correctional task spec** *(→ Finished Tasks)* — `scripts/bootstrap_spec.py` ran `correct()` across all 19 sessions. `form_filling.md` exists and injects into agent system prompt.
-- [x] **Commit all staged changes** *(→ Finished Tasks)* — All files committed and pushed.
-- [x] **Set BC gold standard** *(→ Finished Tasks)* — `scripts/bc_fidelity.py --set-reference-from-source` parses intake .txt directly. 75 fields. No perfect human run needed. Gold standard active.
-- [ ] **Get current fidelity baseline** — Run `python run_task.py` once. Check the fidelity score printed at the end. This is your starting point. Then `python scripts/bc_fidelity.py --progress` to see it.
-- [ ] **Re-run bootstrap with fixed compressor** — `python scripts/bootstrap_spec.py` — `_compress_session()` is now fixed; re-run produces spec with real tab names, field names, and behavior patterns.
-- [ ] **Fix LLM checkbox clicking** — Will emerge naturally from spec once bootstrap re-runs.
-
----
-
-### Stage 1 — Data volume *(days)*
-
-The transformer's click accuracy is ~40% after 19 sessions. It needs to see each field ~50+ times before positions become reliable.
-
-- [ ] **Record 30+ total sessions** — Each session = one complete form fill (all 5 records, all 8 tabs). Currently at 19. Target: 50 sessions = ~25,000 traces before expecting reliable click accuracy.
-- [ ] **Run correctional spec after every new session** — `record_trace.py` calls `RuleExtractor.correct()` automatically on stop. Confirm `ruleset.md` updates each time.
-- [ ] **Retrain after every 5 new sessions** — Dataset cache makes init ~5 sec. Full 50-epoch GPU retrain. Command: `python train.py --trace_dir tasks/form_filling/traces_aug --epochs 50`
-- [ ] **Check fidelity after every retrain** — Run agent → `python scripts/bc_fidelity.py --progress`. Fidelity number goes up = improvement confirmed. Target: ≥80%.
-
----
-
-### Stage 2 — Model quality *(days, parallel with Stage 1)*
-
-More data alone won't close the gap if the model is too small and undertrained.
-
-- [ ] **Scale model to `d_model=128, num_layers=4`** — Current 131k-param model will underfit at 50 sessions. Bump once dataset exceeds 30 sessions.
-- [ ] **Train to 100 epochs** — val_loss was still trending down at epoch 21 (best checkpoint). Extend budget. Early stopping already saves best checkpoint so extra epochs cost nothing if loss plateaus.
-- [ ] **Click accuracy target: ≥75%** — Current: ~19.5%. Each 10-session retrain cycle should move this up. If click_acc stalls below 60% after 40 sessions, revisit click loss weight (currently `lambda_click=2.0` — try 3.0).
-
----
-
-### Stage 3 — LLM-to-transformer handoff *(after Stage 2)*
-
-LLM currently does all reasoning. Transformer needs to take over progressively.
-
-- [ ] **`PROVIDER="none"` smoke test** — Disable LLM entirely. Run agent on the form. Record: how many fields does the transformer fill correctly? Which tabs does it navigate correctly? This is the BC baseline.
-- [ ] **Lower `_HIGH_CONF` threshold** — Currently 0.995 (LLM always decides). Once transformer click_acc ≥ 75%, lower to 0.90 so transformer handles confident clicks, LLM handles ambiguous cases.
-- [ ] **Automate correction → retrain trigger** — After each new session, if `ruleset.md` changed, auto-queue a retrain. Removes manual intervention from the loop.
-
----
-
-### Stage 4 — BC completion proof *(after Stage 3)*
-
-- [ ] **10 consecutive runs, `PROVIDER="none"`, ≥80% field fill accuracy** — All 5 records, all 8 tabs, correct values from Notepad. This is the pass criterion.
-- [ ] **Expected-vs-actual diff at submit** — Compare submitted JSON against source data. Surface fill accuracy per field per record. Required to measure the 80% threshold objectively.
-- [ ] **Freeze BC checkpoint** — Tag the `.pt` file that passes the criterion. This becomes the Actor initialization for the RL phase.
-
----
+### Stage 4 — Generalization (the leap)
+- [ ] Perception adapter interface (UIA + vision swappable).
+- [ ] Explicit workflow induction from demos (LLM-as-synthesizer).
+- [ ] Second app/task on the same architecture, zero code changes.
 
 ### Stage 5 — RL phase (future)
-
-Unlocked after BC passes.
-
-- [ ] **Actor-Critic with PPO** — BC transformer becomes the Actor. Separate critic network evaluates per-step value. Reward = task outcome + KL penalty against BC policy (prevents style drift). PPO clipping keeps updates stable.
-- [ ] **Online fine-tuning** — Agent runs live, reward signal from `StateValidator`. Policy gradient updates weights in real time. Gets agent beyond human-demo quality.
+- [ ] Actor-Critic / PPO with the BC transformer as Actor; KL penalty vs BC to
+      preserve style. Online fine-tuning from `StateValidator` reward.
 
 ---
 
 ## Task List
 
-Priority order — top = most blocking right now.
+Priority order, **generalization-first**: make the form run through a
+scope-agnostic pipeline → prove transfer → complete the form scope → polish.
+*Not* form-polish-first — gold-plating a single-scope contraption only to refactor
+it later (with 3 scopes' coupling) is the trap. Refactor while it's small.
 
-### 🔴 P1 — Blocking (do first)
+> **Why not finish the form first:** navigation *learning* is proven, but the
+> *engine around it* is form-shaped (hardcodes, UIA-coupling, Notepad parser).
+> That coupling — not missing features — is what blocks generalization and is the
+> real source of dissatisfaction. Fix the engine on one scope, then #2/#3 drop in.
 
-- [x] **Fix LLM click position** *(→ Finished Tasks)* — `_merge()` resolves LLM target by label first; transformer click only used as fallback.
-- [x] **Boost click loss weight** *(→ Finished Tasks)* — `lambda_click=2.0`.
-- [x] **Train longer** *(→ Finished Tasks)* — Default epochs 20 → 50, GPU training on RTX 4050.
-- [x] **GPU training** *(→ Finished Tasks)* — CUDA PyTorch 2.6.0+cu124 installed.
-- [x] **Dataset init cache** *(→ Finished Tasks)* — `.dataset_cache.pkl` cuts retrain init from 10 min to ~1 sec.
-- [x] **Element order shuffle** *(→ Finished Tasks)* — `__getitem__` shuffles last state's element order each batch; pointer labels remapped through inverse permutation. Prevents position memorization.
-- [x] **Element dropout label protection** *(→ Finished Tasks)* — Click/source target elements exempt from dropout; zeroed target → masked logit → ~1e9 CE loss bug fixed.
-- [ ] **Fix _compress_session()** — Trace compressor produces near-empty output because JSON structure doesn't match expected fields. LLM gets no specific data → spec stays generic. Must fix before next bootstrap.
-- [ ] **Fix LLM checkbox clicking** — Inferred from spec, not hardcoded. Needs `_compress_session()` fixed first so traces surface checkbox behavior patterns.
-- [ ] **Record more training traces** — 19 sessions. Target 50. Click_acc ~19.5%, needs ~75% for reliable fills. See Stage 1.
+### 🔴 Tier 1 — Foundation: scope-agnostic pipeline *(do now, on one scope)*
+- [ ] **Kill form-specific hardcodes → scope config** — `_detect_section`,
+      `_KNOWN_TABS`, `_TAB_PANE_NAMES`, `RECORD N OF M`. Constructor/scope params
+      with neutral defaults. *(Also serves multi-tab — these ARE the tab logic.)*
+      **← start here: cheapest, most concrete, gates everything.**
+- [ ] **Formalize the perception adapter seam** — one interface; UIA + Excel as
+      drop-in adapters (Excel already emits the schema). Agent consumes it
+      identically regardless of source.
+- [ ] **Generalize the data-source layer** — `DataSource` ABC not coupled to
+      Notepad / RECORD format; each scope plugs in its own source.
+- [ ] **Scope abstraction** — declare a scope (goal + adapter + source + model +
+      metric) in ONE place, not scattered in `run_task.py`. (Finish capsules.)
 
-### 🟡 P2 — Important (do after P1)
+> **Gate / litmus test:** the *same* `agent.py` runs a second scope with only a
+> new adapter + source + demos, **zero agent edits**. When this passes,
+> generalization is unlocked.
 
-- [x] **Correctional ruleset system** *(→ Finished Tasks)* — `RuleExtractor.correct()` + `record_trace.py` auto-calls on session end.
-- [x] **Spec injection into agent** *(→ Finished Tasks)* — `LLMAgent.__init__` loads `tasks/form_filling/ruleset.md` into LLM system prompt.
-- [x] **Data augmentation** *(→ Finished Tasks)* — `scripts/augment_traces.py` creates ×4 copies per session with bbox jitter, click jitter, confidence noise, element order shuffle.
-- [ ] **Train on augmented data** — Run full 50 epochs on `tasks/form_filling/traces_aug` (52k traces, 5× original). Expected to improve click_acc significantly.
-- [ ] **Increase model capacity** — Bump to `d_model=128, num_layers=4` after 30+ sessions.
-- [ ] **PROVIDER="none" smoke test** — Run agent with LLM disabled. Measures pure transformer capability. See Stage 3.
-- [ ] **Automate correction → retrain loop** — After each session, if spec changed, queue retrain. See Stage 3.
+### 🟠 Tier 2 — Prove the thesis core (generalization + cloning)
+- [ ] **Excel end-to-end** — wire the adapter into the loop, record demos, train,
+      measure clone. First *transfer* data point; hard half (perception) is done.
+      **Highest thesis value.**
+- [ ] **Random-order test** — cheap; closes "clones *any* order, not a bias."
 
-### 🟢 P3 — Nice to have (do when P1+P2 are solid)
+### 🟡 Tier 3 — Complete form scope #1
+- [ ] **Multi-tab + multi-record** — driven by the *generalized* section/record
+      config from Tier 1 (not new hardcodes).
+- [ ] **Eval / verification harness** — per-scope "did it do the task correctly?"
+      (expected-vs-actual diff at submit). Needed for every scope.
 
-- [ ] **Actor-Critic Model (PPO) for RL phase** — BC transformer becomes the Actor (pretrained, fine-tuned by RL). A separate small critic network evaluates state value step-by-step, replacing sparse win/loss signal with dense per-step feedback. PPO's clipping mechanism limits policy drift per update, naturally preserving user style while improving performance. Reward = task outcome + KL penalty against BC policy to prevent the agent from diverging beyond the user's learned behavior. Entry point to the full RL phase.
-- [ ] **Online RL fine-tuning** — BC-trained transformer as starting policy → reward = `StateValidator` ok/done signal → policy gradient updates weights in real time. Gets agent beyond human-demo quality.
-- [ ] **Cross-task shared backbone** — Single transformer trunk, task-specific heads per capsule. Click/keyboard patterns transfer between form types.
-- [ ] **No mid-record crash recovery** — Resume from last successfully filled field if agent dies mid-record.
-- [ ] **Expected-vs-actual diff at submit** — Compare submitted values against source data. Surface fill accuracy per record.
-- [ ] **Unit tests for core logic** — `_parse_records`, `_lookup_field`, `encode_state`, tab-advance. Catch regressions before they reach a live run.
-- [ ] **Generalize to Excel / Shopify / web** — New capsule per scope. Same architecture, new training traces.
-- [ ] **Ghost cursor overlay** — A separate translucent cursor (distinct color/icon from the system cursor) that tracks Intern's intended click target before each action executes. Implemented as a small always-on-top transparent window (`tkinter` or `wx` overlay) that animates to the target `click_position` coordinate. User's real cursor is untouched — ghost cursor is read-only visual feedback. Useful for demos, debugging click accuracy, and showing what the transformer/LLM decided without interfering with user control.
-- [ ] **Training readiness indicator** — Circular progress bar (shown in a small HUD or CLI output) that gauges how close the current capsule is to being "useful" without LLM assistance. Computed from: session count vs target (e.g. 50), best val_loss vs threshold, and live click_acc from the last training run. Fills toward 100% as those metrics improve. Gives a single at-a-glance answer to "do I need to record more demos?" without reading training logs.
+### 🟢 Tier 4 — Reliability polish *(don't let these gate Tiers 1–2)*
+- [ ] **Cold-start** — reliable first click (DAgger or learned start-signal).
+- [ ] **Combobox timing** — selection without escape-retry.
+- [ ] **LLM value errors** — wrong field value; better prompt or lookup-as-validator.
+- [ ] Mid-record crash recovery.
+- [ ] Unit tests for `_parse_records`, `_lookup_field`, `encode_state`.
+
+### 🔵 Tier 5 — Scope #3
+- [ ] **Email / ticket triage** — the decision/control-flow scope; drops in after
+      the pipeline is scope-agnostic.
+
+### Nice to have (anytime)
+- [ ] Cross-task shared backbone (trunk + per-task heads).
+- [ ] Ghost cursor overlay (read-only visual of intended click).
+- [ ] Training-readiness indicator (how close to LLM-free).
+- [ ] DAgger productionized — corrections auto-merge + retrain.
 
 ---
 
-### Why completing these tasks finishes the Behavioral Cloning Phase
-
-Behavioral Cloning is complete when the transformer has learned enough from human demonstrations to act correctly on its own — no reasoning, no fallback, no guidance. Each task in the list above directly closes a gap between where the transformer is now and that standard:
-
-- **More traces** give the transformer enough signal to learn click positions and field semantics. Without them, the model is pattern-matching on noise.
-- **Correctional spec → LLM system prompt** makes the LLM a better teacher while the transformer catches up. The spec converges toward a precise task description with every session.
-- **Larger model + more epochs** are the training-side levers that turn raw data into a well-calibrated policy.
-- **PROVIDER="none" smoke test** is the proof. If the transformer fills all 5 records correctly with LLM disabled, BC is done.
-
-At that point BC has done its job: the transformer is a competent, autonomous policy ready to be the Actor in the RL phase.
-
-
-## Roadmap
-
-### Component Maintenance
-- [ ] **Recorder** — Capture human runs as training traces.
-- [ ] **Intelligence**
-  - [ ] LLM provider tuning (cache control, thinking budgets, batching)
-  - [ ] Training pipelines (BC, RL, continual)
-- [ ] **Observers**
-  - [ ] Screen Observer — review code and purpose
-  - [ ] UI Observer — review code and purpose
-  - [ ] VLM
-    - [ ] Vision Observer — finish implementation, wire into live loop
-    - [ ] Visual Data Reader — review code and purpose
-  - [ ] Excel Observer
-  - [ ] Web Observer
-- [ ] **Trace Translator** — review effectiveness and efficiency
-- [ ] **Workflow Builder** — review code and purpose; verify execution states
-      and flow control
-- [ ] **Executor** — translate agent predictions into concrete actions
-
-### Cross-Cutting
-- [ ] Reconcile LLM (reasoning) and Transformer (action policy) — when to use
-      which, and how they hand off.
-- [ ] Standardize data-source interface (Notepad, Excel, web, PDF).
-
-
 ## Known Issues
 
-Specific failure modes worth fixing. Each item names the symptom so someone
-picking it up has the failure mode in hand.
-
-### VLM
-- [ ] **No dedicated VLM** — Currently piggybacks on Groq llama-4-scout (free
-      tier hits 429 fast) with Gemini Flash fallback. Both general-purpose,
-      not specialized for form / document reading.
+### Perception / Observation
+- [ ] **UIA-only** — no vision adapter yet; breaks on apps without a clean tree.
+- [ ] **`is_focused` / `is_filled` hard under vision** — the most critical signals
+      are the hardest to read from pixels.
 
 ### LLM
-- [ ] **No prompt caching** — Anthropic backend would benefit from
-      `cache_control` on the goal + screen-state preamble. Every step pays
-      full prompt cost.
-- [ ] **Each step is an LLM call** — No batching across steps, no
-      thinking-budget tuning, no parallel pre-fetching of next-step decisions.
+- [ ] **Value errors** — local LLM occasionally returns the wrong field's value
+      (e.g. Policy Number into Policy Term). Architecture keeps LLM owning values;
+      fix is better prompting or lookup-as-validator (not silent replacement).
+- [ ] **No prompt caching / each step an LLM call** — no batching, no thinking
+      budget tuning.
 
-### Architecture
-- [ ] **No memory component** — No short-term scratchpad (per-record working
-      notes) and no long-term store (cross-record patterns the agent learns
-      and reuses). Each record runs from a blank slate.
+### Architecture / Generality
+- [ ] **No memory component** — each record runs from a blank slate.
+- [ ] **Task-specific code in `agent.py`** — `_detect_section`, `_KNOWN_TABS`,
+      `_TAB_PANE_NAMES` are car-form-specific; should be constructor params.
+- [ ] **`RECORD N OF M` delimiter hardcoded** — only this intake format parses.
+- [ ] **No control flow** — workflows are linear only (see Roadblock #3).
 
-### Performance & Observability
-- [ ] **No prefetch** — Record N+1's source data could be VLM-extracted while
-      the agent fills record N. The agent currently sits idle during VLM
-      calls.
-- [ ] **No structured trace** — Logging is human-readable only. No
-      record-level summary at end (e.g. "record 1: 78/80 fields filled, 2
-      blanks").
-- [ ] **No expected-vs-actual diff** at submit time — Can't tell whether the
-      fill was correct without manually comparing the form against the
-      source.
-- [ ] **No screenshot history** — When the VLM mis-reads, there is no
-      archived image to inspect what it saw.
-- [ ] **VLM key vs UIA label mismatch** — VLM emits "First Name", UIA may
-      surface "First Name:" or "First Name " (trailing space). Fuzzy match
-      exists but does not log when it fires, so silent mis-mappings go
-      unnoticed.
-- [ ] **No "field done" signal** — `_filled_this_tab` is populated
-      heuristically. If the agent types but the UI rejects the value, the key
-      stays in the set forever and the field is never retried.
+### Observability
+- [ ] **No structured trace / record-level summary.**
+- [ ] **No expected-vs-actual diff at submit.**
+- [ ] **No screenshot history** for VLM mis-reads.
+- [ ] **No unit tests** — every fix is run-and-pray.
 
-### Generality
-- [ ] **`RECORD N OF M` delimiter hardcoded** — Only this intake format
-      parses. Any other source layout is unparseable.
-- [ ] **Task-specific code baked into `agent.py`** — Three pieces are
-      car-insurance-form-specific and break generality:
-      `_detect_section` (regex `section_(driver|vehicle)_(\d+)`),
-      `_KNOWN_TABS` (`{"policy", "policyholder", "vehicle", ...}`), and
-      `_TAB_PANE_NAMES` (`["tab_policy", "tab_policyholder", ...]`).
-      These should be constructor params with neutral defaults so the agent
-      works on any form without modification.
-- [ ] **No unit tests** — Every fix is run-and-pray. A regression suite would
-      catch `_parse_records`, `_lookup_field`, and tab-advance bugs before
-      they reach a real run.
-
+---
 
 ## Non-System Work
 
@@ -551,52 +614,113 @@ picking it up has the failure mode in hand.
 ### Benchmark
 - [ ] Compare against similar systems
 
-### Scopes
-- [ ] Car Insurance Entry Form (current dev fixture)
-- [ ] Excel
-- [ ] Shopify
-- [ ] Generalization
+### Scopes (Thesis Completion Criteria)
+
+Three GUI scopes. Completing all three = thesis **complete**. Chosen to span the
+interesting space — *data entry*, *cross-app transfer*, and *conditional
+judgment* — so the claim is "clones varied GUI workflows," not "fills one form."
+
+- [ ] **1. Data Entry Form Filling** *(in progress — vertical slice)*
+  - **Dimension:** single-app, key-value field entry, (mostly) linear order.
+  - **Status:** loop proven end-to-end on the Policy section (clones order,
+    fills, submits). Remaining: multi-tab, multi-record, cold-start, random-order
+    test. Perception = UIA.
+- [ ] **2. Web Form → Excel**
+  - **Dimension:** **cross-application transfer** (read web source → enter into
+    an Excel grid); 2D grid target; mixed perception (web + Excel).
+  - **Status:** `ExcelObserver` already emits the shared trace-compatible schema
+    (perception adapter done). Remaining: wire into the agent loop, record demos,
+    train, measure. Web source perception = the harder half.
+- [ ] **3. Email / Ticket Triage**
+  - **Dimension:** **decision-making / conditional behavior** — per item, the user
+    decides (archive / flag / reply / route / delete) from visible content.
+    Branching (Roadblock #3) + judgment/style cloning — the strongest
+    personalization claim (two users triage differently).
+  - **Scope tight:** decisions inferable from *visible* content (sender, subject,
+    keywords) to stay learnable (avoid hidden-intent, Roadblock A).
+  - **Status:** not started.
+
+> **Why these three:** entry + transfer + judgment. Each adds a dimension the
+> others don't, so completing all three demonstrates the learn-from-demonstration
+> loop across genuinely different GUI workflows — within the GUI constraint.
+
+### North Star — Generalization (beyond the thesis)
+
+The thesis is *bounded* to the three scopes above, but the **architecture is
+built to generalize** and that is the real goal. The novel contribution is a
+**personalized, demonstration-learned GUI agent** — it learns how *this user*
+does a task and reproduces *their* workflow/style — which neither scripted RPA
+(no learning) nor generic computer-use agents (not personalized) do.
+
+The generalization is **already partly real**: perception is an **adapter**
+(UIA + Excel COM today, both emitting one shared schema), and the downstream
+`transformer(WHERE) + LLM(WHAT)` loop is perception-agnostic. The path beyond the
+thesis (a perception VLM adapter for any app + LLM-induced control-flow workflows
+— [Roadblocks #1, #3](#roadblocks-ahead)) turns "three GUI scopes" into "any GUI
+workflow learned from demonstration."
+
+- [ ] Kill the form-specific hardcodes (`_KNOWN_TABS`, `_detect_section`,
+      `RECORD N OF M`) so the *same code* runs every scope unchanged — the
+      concrete proof of generality.
+- [ ] Vision perception adapter (Roadblock #1) — generality beyond apps with a
+      clean accessibility tree.
+- [ ] LLM-induced workflows with control flow (Roadblock #3) — beyond linear.
+
+### Behavioral Fidelity Benchmarks
+- [ ] **Chess** — clone a human's play (openings, tendencies, time management,
+      blunder patterns). Clone ELO ≈ human ELO + matching style = BC capturing
+      decision-making, not rote actions.
+
+---
 
 ## Finished Tasks
 
-Completed work, preserved for reference. Items here were once in P1/P2/P3 or the Wish List.
+Completed work, preserved for reference.
+
+### Navigation cloning (2026-06)
+- **Proved the transformer clones the demonstrated order** — top-down (74%) vs
+  bottom-up (93%), same architecture → not a bias, genuine cloning.
+- **`is_filled` perception feature** — model can see which fields are done →
+  stopped the end-game looping.
+- **Action-space collapse → {click, type}** — action-type accuracy 50% → 80%,
+  click accuracy up for free.
+- **Wired action-type into the agent** — transformer decides click vs type (was a
+  hardcoded "fillable & empty" rule).
+- **Recorder combobox fix** — clicks while a dropdown is open are value-selections
+  (land on the field under the dropdown) → dropped at record time. Killed the
+  phantom "Expiration Date" pollution.
+- **Tail-oversampling** — emphasized the `… → Submit` finish → model learned to
+  submit on its own (no hardcoded completion rule).
+- **End-to-end run** — fills the whole form in the learned order + clicks Submit +
+  advances record, transformer-driven, no crutch, no human.
+- **Recorder focus fix** — clicks always get a fresh snapshot (was reusing stale
+  state during bursts → focus stuck).
+- **`scripts/clean_demos.py`, `test_clone.py`, `oversample_tails.py`,
+  `replicate.py`** added.
 
 ### Intelligence & Training
-- **GPU training** — CUDA 12.4 / PyTorch 2.6.0+cu124 installed. RTX 4050 Laptop GPU active. Was: P1 Blocking.
-- **Boost click loss weight** — `lambda_click` raised 1.0 → 2.0. Extra gradient pressure on click head. Was: P1 Blocking.
-- **Train longer** — Default epochs 20 → 50. val_loss still trending at epoch 21 so budget increased. Best checkpoint auto-saved. Was: P1 Blocking.
-- **Dataset init cache** — `TrajectoryDataset.__init__` saves filtered file paths + action metadata to `.dataset_cache.pkl`. Invalidated when any session file is newer than cache. Cuts retrain init from 10 min to ~1 sec on second+ run. Was: P1 Blocking.
-- **Lazy loading / LRU cache** — State tensors built on demand in `__getitem__` via LRU cache (50k cap). Fixes OOM crash on large augmented datasets. Was: implicit P1 blocker.
-- **NO_SENT_TRANSFORMERS bypass** — Sentence-transformers caused segfault (exit 139) with torch 2.6.0. Env var skips loading entirely. Was: implicit P1 blocker.
-- **Balanced sampler** — Per-class sampling so click/keyboard classes train equally despite imbalance. Fixed index bug after lazy-load tuple reorder. Was: P2.
-- **Data augmentation** — `scripts/augment_traces.py` creates ×4 copies per session with bbox jitter ±5px, click jitter ±4px, confidence noise ±0.03, element order shuffle. Was: P2.
-- **Element order shuffle** — `__getitem__` shuffles last state's element order each batch; tgt_click_idx and src_idx remapped through inverse permutation. Prevents model memorizing list positions. Was: P1.
-- **Element dropout label protection** — Click/source target elements protected from aug_drop in the current state. Fixes ~1e9 CE loss caused by masked target logits. Was: P1 Blocking.
-- **LayerNorm on pointer heads** — Bilinear Q×K divergence fixed. click_q_norm, click_k_norm, src_q_norm, src_k_norm added. Resolved 197M training loss. Was: P1 Blocking.
-- **Tasks/ reorganization** — model.pt, ruleset.md, traces, submissions moved to `tasks/form_filling/`. Global registry at `tasks/registry.json`. All path references updated. Was: housekeeping.
+- **GPU training** — CUDA 12.4 / PyTorch 2.6.0+cu124, RTX 4050.
+- **Best-acc checkpoint** — saves on `val_acc + click_acc`, not val_loss.
+- **Dataset init cache** — `.dataset_cache.pkl`, retrain init ~1 sec.
+- **LayerNorm on pointer heads** — fixed bilinear Q×K divergence (197M loss bug).
+- **Data augmentation** — `augment_traces.py` (bbox/click/confidence jitter).
+- **Tasks/ reorganization** — model.pt, ruleset.md under `tasks/form_filling/`.
 
 ### Agent & Merge Logic
-- **Fix LLM click position** — `_merge()` now calls `_resolve_target()` on the LLM's named target first. Uses element bbox center directly. Transformer click coords only used as fallback when LLM target doesn't resolve. Was: P1 Blocking.
-- **Stuck guard fixed** — Removed `not _plugin_active` gate so stuck guard fires in pure_transformer mode. Prevents infinite click loops on unresponsive elements. Was: P1 Blocking.
-- **Transformer type override** — When transformer conf ≥ 0.70 and LLM says type but transformer says click, transformer wins on action type. Prevents LLM typing into comboboxes. Was: P1 Blocking.
+- **Crutch-gating in pure mode** — VISITED-ADVANCE + LLM-takeover-when-weak gated
+  off under `disable_auto_handlers` (they fought the model).
+- **Fix LLM click position** — `_merge` resolves LLM target by label; transformer
+  click is fallback.
 
 ### Ruleset & Spec System
-- **Correctional ruleset system** — `RuleExtractor.correct(session_dir, goal)` reads existing `ruleset.md` + new session traces → sends both to LLM → overwrites spec with corrected version. Single truth file, not one file per session. Was: P2.
-- **Spec injection into agent** — `LLMAgent.__init__` loads `tasks/form_filling/ruleset.md` at startup and appends to LLM system prompt. Every agent run uses the latest inferred spec. Was: P2.
-- **Auto-extract on record** — `record_trace.py` calls `RuleExtractor.correct()` automatically when a session ends (≥5 traces). Spec improves with every recording without manual steps. Was: P2.
-- **Bootstrap correctional spec** — `scripts/bootstrap_spec.py` ran `correct()` sequentially across all 19 existing sessions to build the initial `ruleset.md`. Was: Stage 0 blocker.
+- **Correctional ruleset** — `RuleExtractor.correct()` + auto-call on record end.
+- **Spec injection** — `ruleset.md` appended to LLM system prompt.
 
 ### Evaluation
-- **Per-run evaluation metrics** — `evaluate_run(results)` in `scripts/eval_metrics.py` computes Task Completion Rate, Action Prediction Accuracy, and Execution Success Rate from in-memory agent results. Wired into `run_task.py` via `try/finally` — fires on every run including crashes, early stops, and Ctrl+C. Was: not implemented.
-- **`_compress_session()` fixed** — Trace compressor now reads actual JSON structure. Was: producing near-empty output. Was: P1 blocker for bootstrap quality.
-- **BC fidelity scorer** — `scripts/bc_fidelity.py` scores every agent run against a gold standard human submission. Outputs Fidelity Score (0-100%) = `field_match_rate×0.4 + value_accuracy×0.4 + tab_coverage×0.1 + completion_bonus×0.1`. Appends to `data/output/bc_progress.jsonl` for trend tracking. Wired into `run_task.py` — fires after every run. View trend: `python scripts/bc_fidelity.py --progress`. Was: not implemented.
-- **Value accuracy metric** — `evaluate_run()` now infers which source record the agent was filling by best-match scoring of typed values, then computes per-field correct/incorrect breakdown. Was: not implemented.
+- **Per-run metrics** — `eval_metrics.evaluate_run` (TCR, action/value accuracy).
+- **BC fidelity scorer** — `bc_fidelity.py` vs gold standard, trend in
+  `bc_progress.jsonl`.
 
 ### Infrastructure
-- **Capsule registry** — `components/agent/capsule.py` + `build_capsule.py`. Per-task model routing: agent auto-selects `.pt` file based on goal string and window title. Was: architecture item.
-- **`.gitignore` for traces** — `tasks/form_filling/traces/`, `traces_aug/`, excluded. `.dataset_cache.pkl` excluded. Was: housekeeping.
-
-### Behavioral Fidelity Benchmarks
-Tasks specifically designed to measure whether Intern clones *style and decision-making*, not just mechanical actions.
-
-- [ ] **Chess** — Record a human playing games on a chess GUI (e.g. Lichess, Chess.com, or a local engine). Train a capsule on those sessions. Evaluate whether the cloned agent reproduces the same openings, middlegame tendencies, piece preferences, time management, and blunder patterns. ELO of the cloned agent vs ELO of the human is the fidelity metric. If clone ELO ≈ human ELO and playing style matches, BC is working beyond rote memorization — it captured decision-making under uncertainty.
+- **Capsule registry** — per-task model routing.
+- **`.gitignore`** — `data/demos/`, traces, caches, model binaries excluded.
