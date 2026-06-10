@@ -128,12 +128,26 @@ import os as _os
 _OWN_PID: int = _os.getpid()
 
 
-class UIAutomationObserver:
+try:
+    from observers.base import Observer
+except ImportError:  # pragma: no cover
+    from components.observers.base import Observer
+
+
+class UIAutomationObserver(Observer):
     """
     Captures UI element trees from ALL visible windows simultaneously.
     Elements are tagged with their source app, window title, and role
     (active = focused window, background = reference/data-source window).
+
+    UIA output is already canonical (editcontrol/value/window_role) → empty
+    TYPE_MAP/KEY_MAP → normalize() is identity. The transformer is trained on this
+    exact shape; do NOT remap it.
     """
+
+    TYPE_MAP: dict = {}
+    KEY_MAP:  dict = {}
+    source_name = "uia"
 
     def __init__(
         self,
@@ -161,7 +175,7 @@ class UIAutomationObserver:
 
     # ── public ────────────────────────────────────────────────────────────────
 
-    def snapshot(self) -> Dict[str, Any]:
+    def _raw_snapshot(self) -> Dict[str, Any]:
         """
         Capture all visible windows and return a unified trace-compatible
         state dict.  Wraps in UIAutomationInitializerInThread so it is safe
