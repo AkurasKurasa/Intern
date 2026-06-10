@@ -81,7 +81,7 @@ class DemoPanel(tk.Frame):
         self._running = False
         self._frames  = 0
         self._sessions= 0
-        self._out_dir = tk.StringVar(value=os.path.join(_ROOT, "data", "demos", "bottom-top-nav"))
+        self._out_dir = tk.StringVar(value=os.path.join(_ROOT, "data", "demos", "three_Tabs"))
         self._replay_n = 5          # default replay count for the F8 hotkey
         self._build()
         self._start_hotkeys()
