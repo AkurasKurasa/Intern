@@ -32,7 +32,8 @@ This document is for developers working on Intern itself.
 11. [Wish List — Path to Full BC](#wish-list--path-to-full-behavioral-cloning)
 12. [Task List](#task-list) — **P0 complete scope #1 → P1–P4**
 13. [Scopes & North Star](#scopes--north-star)
-14. [Finished Tasks](#finished-tasks)
+14. [Questions & Concerns](#questions--concerns) — **open threads**
+15. [Finished Tasks](#finished-tasks)
 
 ---
 
@@ -716,6 +717,56 @@ path beyond the thesis — a vision perception adapter
 ([Roadblock #1](#roadblocks-ahead)) + LLM-induced control-flow
 ([Roadblock #3](#roadblocks-ahead)) — turns "three GUI scopes" into "any GUI
 workflow learned from demonstration."
+
+---
+
+## Questions & Concerns
+
+Open threads — honest unknowns and risks that aren't yet tasks. Each needs a
+decision or an experiment before it becomes one.
+
+### Open technical questions
+- **Will full-form cloning scale on data alone?** Policy tab (~10 fields) needed
+  ~20–30 passes. The full form is 176 fields / 8 tabs with rare **tab-transition**
+  events. Unknown whether ~30–50 passes clone it, or whether long-trajectory BC
+  needs far more demos than is feasible to hand-record. *(The `three_Tabs` probe
+  is the cheap test of this.)*
+- **Cold-start without hardcoding.** First click from a blank screen is ~0% and
+  proven resistant to data + model size. Needs DAgger / a learned start-signal —
+  but a deterministic anchor is off the table (no hardcoding). Open: how?
+- **Is the >95% transformer-dependency target even right?** Stuck ~62–68%. By
+  design the LLM owns *values*, so the transformer can't drive the value-typing
+  steps. Maybe the honest ceiling is lower and the metric should exclude
+  value-steps — needs a definition decision.
+- **Excel action half is untested.** Perception swap is proven, but *acting* on
+  cells (click → type → Enter, grid navigation) isn't. Will the form-specific
+  executor handlers (combobox/checkbox) interfere on Excel? Probe before P1.
+- **Cycle-restart loop root cause** — new record re-clicks the already-checked
+  Renewal checkbox → Tab → no-change loop. Is it a per-record state-reset bug or a
+  model issue? Decides whether it's an easy fix or needs data.
+
+### Strategic / thesis concerns
+- **Is perception-swap enough evidence, or must we show full Excel completion?**
+  We proved Excel *perception* conforms (zero edits). The stronger claim — a model
+  actually completing a task on a 2nd app — needs action + demos + training. How
+  much does the thesis require?
+- **Scope #3 (triage) is blocked on un-scheduled roadblocks** — Action-Space (#2)
+  and Control-Flow (#3) are parked in North Star but triage *depends* on both.
+  They must be scheduled, or scope #3 stalls.
+- **Web perception may force the vision adapter early.** Scope #2's web source may
+  lack a clean accessibility tree → could pull Roadblock #1 (vision) forward of
+  plan. De-risk: probe the web source's tree before committing.
+
+### Risks / debt
+- **Slow iteration loop** — every model test = record → retrain → live run.
+  Velocity risk for the P0 reliability work.
+- **Is the DAgger / correction loop actually working?** `CorrectionHandler`
+  captures *0 steps* in live runs. Either nothing to correct, or it's not wired —
+  verify before relying on it for cold-start.
+- **Stale tests** — `test_transformer_bc / html_detector / two_state` fail to
+  collect (`ModuleNotFound: components.intelligence.model.dataset`). Fix or delete.
+- **Pixel-coordinate brittleness** — clicks use absolute screen px from the
+  observer; sensitive to resolution / window position. Robustness concern at scale.
 
 ---
 
