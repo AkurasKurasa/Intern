@@ -52,9 +52,12 @@ This document is for developers working on Intern itself.
 - **Division holds:** transformer = WHERE (which element) + WHAT (click vs type);
   LLM = the value.
 
-**Honest gaps remaining on the slice:** cold-start (first click from a blank
-screen), multi-record reliability, combobox retry timing, and the fundamental
-limits below. See [Roadblocks](#roadblocks-ahead).
+**Honest gaps remaining on the slice:** the form fills only **~4% (7/176 fields,
+1 of 8 tabs, 1 record)** — it navigates and clones correctly but does not yet
+*complete the task*. Closing that (multi-tab, multi-record, cold-start, looping)
+is **the current priority** — see [Task List → P0](#task-list). The
+scope-agnostic engine is already built (foundation); finishing scope #1 builds the
+general muscle the other scopes reuse.
 
 ---
 
@@ -559,60 +562,101 @@ the CoT lines in `_call_openai_compat()`.
 
 ## Task List
 
-Priority order, **generalization-first**: make the form run through a
-scope-agnostic pipeline → prove transfer → complete the form scope → polish.
-*Not* form-polish-first — gold-plating a single-scope contraption only to refactor
-it later (with 3 scopes' coupling) is the trap. Refactor while it's small.
+**Priority: COMPLETE SCOPE #1 (the form) first — then generalize.**
 
-> **Why not finish the form first:** navigation *learning* is proven, but the
-> *engine around it* is form-shaped (hardcodes, UIA-coupling, Notepad parser).
-> That coupling — not missing features — is what blocks generalization and is the
-> real source of dissatisfaction. Fix the engine on one scope, then #2/#3 drop in.
+The scope-agnostic *engine* is built (foundation below). But the form itself only
+fills **~4% (7/176 fields, 1 of 8 tabs, 1 record)** — it does not yet *complete a
+task*. Chasing a 2nd scope before the 1st completes is premature: you'd spread
+across scopes while none works end-to-end.
 
-### 🔴 Tier 1 — Foundation: scope-agnostic pipeline *(do now, on one scope)*
-- [x] **Kill form-specific hardcodes → scope config** — `_detect_section`,
-      `_KNOWN_TABS`, `_TAB_PANE_NAMES`, `RECORD N OF M` → injected `ScopeConfig`
-      (`components/agent/scope.py`). Agent application-blind. ✅ tested + live-verified.
-- [x] **Formalize the perception adapter seam** — observer injectable; canonical
-      element contract (`observers/schema.py`) + loud validation on first observe.
-      UIA/Excel/web plug into one slot. ✅ tested (`test_perception_schema.py`).
-- [ ] **Generalize the data-source layer** — `DataSource` ABC not coupled to
-      Notepad / RECORD format; each scope plugs in its own source. **← next.**
-- [ ] **Scope abstraction** — declare a scope (goal + adapter + source + model +
-      metric) in ONE place, not scattered in `run_task.py`. (Finish capsules.)
+> **Reframe — finishing the form IS generalization work.** Its remaining gaps —
+> multi-tab navigation, multi-record, cold-start, looping — are *general*
+> capabilities every scope hits. Solve them once, on the form. Only
+> combobox-timing / pixel-perfect are throwaway polish. So "finish scope #1" is
+> not a detour from the thesis; it builds the muscle Excel + triage will reuse.
 
-> **Gate / litmus test:** the *same* `agent.py` runs a second scope with only a
-> new adapter + source + demos, **zero agent edits**. When this passes,
-> generalization is unlocked.
+> **The foundation refactor was still right to do early** (cheap on one scope, no
+> dependency on the form being finished). What was premature was *jumping to a 2nd
+> scope* — that's the order we corrected.
 
-### 🟠 Tier 2 — Prove the thesis core (generalization + cloning)
-- [ ] **Excel end-to-end** — wire the adapter into the loop, record demos, train,
-      measure clone. First *transfer* data point; hard half (perception) is done.
-      **Highest thesis value.**
-- [ ] **Random-order test** — cheap; closes "clones *any* order, not a bias."
+---
 
-### 🟡 Tier 3 — Complete form scope #1
-- [ ] **Multi-tab + multi-record** — driven by the *generalized* section/record
-      config from Tier 1 (not new hardcodes).
-- [ ] **Eval / verification harness** — per-scope "did it do the task correctly?"
-      (expected-vs-actual diff at submit). Needed for every scope.
+### ✅ Foundation — scope-agnostic engine *(DONE — keep)*
+- [x] **ScopeConfig** — form hardcodes (`_detect_section`, `_KNOWN_TABS`,
+      `_TAB_PANE_NAMES`, `RECORD N OF M`) → injected config. Agent app-blind.
+- [x] **Perception adapter seam** — `Observer` base (capture→normalize→validate);
+      observer injectable; canonical element schema (`observers/schema.py`); loud
+      validation. UIA identity (live-verified), **Excel perception swap PROVEN**.
+- [x] **DataSource injection** *(partial)* — `data_source` injectable; agent reads
+      source I/O through the seam. Follow-up: extract `_refresh_record_cache`
+      orchestration.
+- [ ] **Scope abstraction** — declare a scope (goal+config+observer+source+model)
+      in ONE place, not scattered in `run_task.py`. *Defer: do when wiring scope #2.*
 
-### 🟢 Tier 4 — Reliability polish *(don't let these gate Tiers 1–2)*
-- [ ] **Cold-start** — reliable first click (DAgger or learned start-signal).
-- [ ] **Combobox timing** — selection without escape-retry.
-- [ ] **LLM value errors** — wrong field value; better prompt or lookup-as-validator.
+---
+
+### 🔴 P0 — Complete Scope #1 (the form)  *— THE focus*
+
+**Definition of done:** agent fills **all 5 records**, **all 8 tabs + Driver/Vehicle
+sections**, in the demonstrated order, **submits each**, **no human help** —
+Completion ~100%, Field-Match high, low wasted steps.
+
+**Dependency chain:**
+```
+full-form demos (YOU) → retrain → multi-tab works
+   → fix cycle-restart loop + cold-start → cycles repeat clean
+   → multi-record ×5 + per-record data
+   → end-to-end verification (Completion ~100%)
+```
+
+#### Stage 1 — Breadth: model traverses the WHOLE form  *(DATA-gated)*
+- [ ] **Record full-form demos** — all 8 tabs + Driver/Vehicle sections, several
+      consistent passes. *Model is blind past the Policy tab — no code fixes this;
+      it must watch the whole form.* **← YOU. This is the gate.**
+- [ ] **Retrain** on full-form demos.
+- [ ] **Verify multi-tab traversal + repeated-section navigation** (lands on every
+      tab/section, fills in order).
+
+#### Stage 2 — Reliability: no stalling  *(engineering)*
+- [ ] **Cycle-restart loop** — new record re-clicks the already-checked Renewal
+      checkbox → Tab → no-change loop. Reset per-record state clean. *(blocks multi-record)*
+- [ ] **Cold-start** — reliable first click from a blank screen (0% now; DAgger /
+      learned start-signal).
+- [ ] **Looping / no-progress** — model orbits filled fields (`is_filled` helped;
+      multi-tab will stress it).
+- [ ] **Combobox retry** — open→miss→Escape→retry; timing.
+
+#### Stage 3 — Multi-record: all 5  *(data + eng)*
+- [ ] **Record advance ×5** — proven 1→2; need all 5 clean.
+- [ ] **Per-record data refresh** — `refresh(record_num)` for records 2–5 (only
+      record 1 verified).
+
+#### Stage 4 — Verification: prove it's done  *(engineering)*
+- [ ] **End-to-end metric** — Completion 0% → ~100%, Field-Match 12% → high.
+- [ ] **Expected-vs-actual diff at submit** — per-record correctness report.
+
+> **Who does what:** YOU = record full-form demos (the gate) + run live tests.
+> ME = cycle-restart loop, cold-start, combobox, per-record refresh, verification
+> harness. BOTH = retrain + test loop.
+
+---
+
+### 🟠 P1 — Generalize *(only AFTER #1 completes a task)*
+- [ ] **Finish scope abstraction** (foundation #4).
+- [ ] **Excel full transfer** — wire source/target + executor for cells, record
+      Excel demos, train, measure clone. *Perception swap already PROVEN; this is
+      the action + data + model half.*
+- [ ] **Random-order test** — closes "clones *any* order, not a bias."
+
+### 🔵 P2 — Scope #3
+- [ ] **Email / ticket triage** — needs Action-Space (Roadblock #2) +
+      Control-Flow (Roadblock #3). Surface those deps before starting.
+
+### 🟢 P3 — Polish / nice-to-have
+- [ ] LLM value errors (better prompt / lookup-as-validator).
 - [ ] Mid-record crash recovery.
-- [ ] Unit tests for `_parse_records`, `_lookup_field`, `encode_state`.
-
-### 🔵 Tier 5 — Scope #3
-- [ ] **Email / ticket triage** — the decision/control-flow scope; drops in after
-      the pipeline is scope-agnostic.
-
-### Nice to have (anytime)
 - [ ] Cross-task shared backbone (trunk + per-task heads).
-- [ ] Ghost cursor overlay (read-only visual of intended click).
-- [ ] Training-readiness indicator (how close to LLM-free).
-- [ ] DAgger productionized — corrections auto-merge + retrain.
+- [ ] Ghost cursor overlay; training-readiness indicator; DAgger productionized.
 
 ---
 
@@ -632,16 +676,20 @@ it later (with 3 scopes' coupling) is the trap. Refactor while it's small.
 
 ### Architecture / Generality
 - [ ] **No memory component** — each record runs from a blank slate.
-- [ ] **Task-specific code in `agent.py`** — `_detect_section`, `_KNOWN_TABS`,
-      `_TAB_PANE_NAMES` are car-form-specific; should be constructor params.
-- [ ] **`RECORD N OF M` delimiter hardcoded** — only this intake format parses.
+- [x] ~~Task-specific code in `agent.py`~~ — `_detect_section` / `_KNOWN_TABS` /
+      `_TAB_PANE_NAMES` moved to injected `ScopeConfig` (2026-06-09).
+- [x] ~~`RECORD N OF M` delimiter hardcoded~~ — now an overridable `_parse_records`
+      param; delimiter is scope config (2026-06-09).
 - [ ] **No control flow** — workflows are linear only (see Roadblock #3).
 
 ### Observability
 - [ ] **No structured trace / record-level summary.**
-- [ ] **No expected-vs-actual diff at submit.**
+- [ ] **No expected-vs-actual diff at submit.** *(P0 Stage 4)*
 - [ ] **No screenshot history** for VLM mis-reads.
-- [ ] **No unit tests** — every fix is run-and-pray.
+- [x] ~~No unit tests~~ — `tests/` suite added (2026-06-09): scope, perception
+      schema, observer base, Excel normalize, Notepad source. **36 green.** Run
+      `pytest tests/`. *(Pre-existing `test_transformer_bc/html_detector/two_state`
+      are stale — broken import, not in the new net.)*
 
 ---
 
