@@ -30,10 +30,9 @@ This document is for developers working on Intern itself.
 9. [Components](#components)
 10. [Current Goal](#current-goal)
 11. [Wish List — Path to Full BC](#wish-list--path-to-full-behavioral-cloning)
-12. [Task List](#task-list)
-13. [Known Issues](#known-issues)
-14. [Non-System Work](#non-system-work)
-15. [Finished Tasks](#finished-tasks)
+12. [Task List](#task-list) — **P0 complete scope #1 → P1–P4**
+13. [Scopes & North Star](#scopes--north-star)
+14. [Finished Tasks](#finished-tasks)
 
 ---
 
@@ -652,115 +651,71 @@ full-form demos (YOU) → retrain → multi-tab works
 - [ ] **Email / ticket triage** — needs Action-Space (Roadblock #2) +
       Control-Flow (Roadblock #3). Surface those deps before starting.
 
-### 🟢 P3 — Polish / nice-to-have
-- [ ] LLM value errors (better prompt / lookup-as-validator).
-- [ ] Mid-record crash recovery.
-- [ ] Cross-task shared backbone (trunk + per-task heads).
+### 🟢 P3 — Polish & known issues *(non-blocking)*
+- [ ] **LLM value errors** — local LLM sometimes returns the wrong field's value
+      (e.g. Policy Number into Policy Term). LLM keeps owning values; fix = better
+      prompt or lookup-as-validator (not silent replacement).
+- [ ] **No prompt caching** — each step is a fresh LLM call; no batching / budget.
+- [ ] **No memory component** — each record runs from a blank slate.
+- [ ] **Observability** — no structured trace / record-level summary; no screenshot
+      history for VLM mis-reads. *(expected-vs-actual diff is P0 Stage 4.)*
+- [ ] **Combobox / mid-record crash recovery.**
+- [ ] **Cross-task shared backbone** (trunk + per-task heads).
 - [ ] Ghost cursor overlay; training-readiness indicator; DAgger productionized.
 
----
+> **Architectural limits** (UIA-only / no vision, `is_focused`+`is_filled` under
+> vision, no control flow, no memory) are tracked in
+> [Roadblocks Ahead](#roadblocks-ahead) — not duplicated here. **Recently solved**
+> (form hardcodes, RECORD delimiter, unit-test net) are in
+> [Solved Problems](#solved-problems).
 
-## Known Issues
-
-### Perception / Observation
-- [ ] **UIA-only** — no vision adapter yet; breaks on apps without a clean tree.
-- [ ] **`is_focused` / `is_filled` hard under vision** — the most critical signals
-      are the hardest to read from pixels.
-
-### LLM
-- [ ] **Value errors** — local LLM occasionally returns the wrong field's value
-      (e.g. Policy Number into Policy Term). Architecture keeps LLM owning values;
-      fix is better prompting or lookup-as-validator (not silent replacement).
-- [ ] **No prompt caching / each step an LLM call** — no batching, no thinking
-      budget tuning.
-
-### Architecture / Generality
-- [ ] **No memory component** — each record runs from a blank slate.
-- [x] ~~Task-specific code in `agent.py`~~ — `_detect_section` / `_KNOWN_TABS` /
-      `_TAB_PANE_NAMES` moved to injected `ScopeConfig` (2026-06-09).
-- [x] ~~`RECORD N OF M` delimiter hardcoded~~ — now an overridable `_parse_records`
-      param; delimiter is scope config (2026-06-09).
-- [ ] **No control flow** — workflows are linear only (see Roadblock #3).
-
-### Observability
-- [ ] **No structured trace / record-level summary.**
-- [ ] **No expected-vs-actual diff at submit.** *(P0 Stage 4)*
-- [ ] **No screenshot history** for VLM mis-reads.
-- [x] ~~No unit tests~~ — `tests/` suite added (2026-06-09): scope, perception
-      schema, observer base, Excel normalize, Notepad source. **36 green.** Run
-      `pytest tests/`. *(Pre-existing `test_transformer_bc/html_detector/two_state`
-      are stale — broken import, not in the new net.)*
-
----
-
-## Non-System Work
-
-### Documentation / Thesis
-- [ ] Finish Chapter 3
-- [ ] Revise paper if nominated
-
-### Data Collection
-- [ ] 500,000 traces in a convenience-sampling setting
-
-### Benchmark
-- [ ] Compare against similar systems
-
-### Scopes (Thesis Completion Criteria)
-
-Three GUI scopes. Completing all three = thesis **complete**. Chosen to span the
-interesting space — *data entry*, *cross-app transfer*, and *conditional
-judgment* — so the claim is "clones varied GUI workflows," not "fills one form."
-
-- [ ] **1. Data Entry Form Filling** *(in progress — vertical slice)*
-  - **Dimension:** single-app, key-value field entry, (mostly) linear order.
-  - **Status:** loop proven end-to-end on the Policy section (clones order,
-    fills, submits). Remaining: multi-tab, multi-record, cold-start, random-order
-    test. Perception = UIA.
-- [ ] **2. Web Form → Excel**
-  - **Dimension:** **cross-application transfer** (read web source → enter into
-    an Excel grid); 2D grid target; mixed perception (web + Excel).
-  - **Status:** `ExcelObserver` already emits the shared trace-compatible schema
-    (perception adapter done). Remaining: wire into the agent loop, record demos,
-    train, measure. Web source perception = the harder half.
-- [ ] **3. Email / Ticket Triage**
-  - **Dimension:** **decision-making / conditional behavior** — per item, the user
-    decides (archive / flag / reply / route / delete) from visible content.
-    Branching (Roadblock #3) + judgment/style cloning — the strongest
-    personalization claim (two users triage differently).
-  - **Scope tight:** decisions inferable from *visible* content (sender, subject,
-    keywords) to stay learnable (avoid hidden-intent, Roadblock A).
-  - **Status:** not started.
-
-> **Why these three:** entry + transfer + judgment. Each adds a dimension the
-> others don't, so completing all three demonstrates the learn-from-demonstration
-> loop across genuinely different GUI workflows — within the GUI constraint.
-
-### North Star — Generalization (beyond the thesis)
-
-The thesis is *bounded* to the three scopes above, but the **architecture is
-built to generalize** and that is the real goal. The novel contribution is a
-**personalized, demonstration-learned GUI agent** — it learns how *this user*
-does a task and reproduces *their* workflow/style — which neither scripted RPA
-(no learning) nor generic computer-use agents (not personalized) do.
-
-The generalization is **already partly real**: perception is an **adapter**
-(UIA + Excel COM today, both emitting one shared schema), and the downstream
-`transformer(WHERE) + LLM(WHAT)` loop is perception-agnostic. The path beyond the
-thesis (a perception VLM adapter for any app + LLM-induced control-flow workflows
-— [Roadblocks #1, #3](#roadblocks-ahead)) turns "three GUI scopes" into "any GUI
-workflow learned from demonstration."
-
-- [ ] Kill the form-specific hardcodes (`_KNOWN_TABS`, `_detect_section`,
-      `RECORD N OF M`) so the *same code* runs every scope unchanged — the
-      concrete proof of generality.
-- [ ] Vision perception adapter (Roadblock #1) — generality beyond apps with a
-      clean accessibility tree.
-- [ ] LLM-induced workflows with control flow (Roadblock #3) — beyond linear.
-
-### Behavioral Fidelity Benchmarks
-- [ ] **Chess** — clone a human's play (openings, tendencies, time management,
-      blunder patterns). Clone ELO ≈ human ELO + matching style = BC capturing
+### ⚪ P4 — Non-system: thesis / data / benchmark *(parallel track)*
+- [ ] **Thesis** — finish Chapter 3; revise paper if nominated.
+- [ ] **Data collection** — 500,000 traces in a convenience-sampling setting.
+- [ ] **Benchmark** — compare against similar systems.
+- [ ] **Chess fidelity benchmark** — clone a human's play (openings, tendencies,
+      time management, blunders); clone-ELO ≈ human-ELO + matching style = BC of
       decision-making, not rote actions.
+
+---
+
+## Scopes & North Star
+
+*Reference — the thesis-completion criteria and the generalization vision. The
+actionable work lives in the [Task List](#task-list) (P0–P4); this is the* why.
+
+### The three scopes *(thesis = all three)*
+Chosen to span the interesting space — *data entry*, *cross-app transfer*,
+*conditional judgment* — so the claim is "clones varied GUI workflows," not "fills
+one form."
+
+1. **Data Entry Form Filling** — *in progress ([P0](#task-list)).* Single-app
+   key-value entry, (mostly) linear. Loop proven on the Policy section (clones
+   order, fills, submits); remaining = multi-tab, multi-record, cold-start.
+   Perception = UIA.
+2. **Web Form → Excel** — *not started ([P1](#task-list)).* Cross-application
+   transfer (web source → Excel grid); 2D target; mixed perception. Excel
+   perception swap **PROVEN** (`ExcelObserver` normalizes to canonical); remaining
+   = web source, action on cells, demos, train.
+3. **Email / Ticket Triage** — *not started ([P2](#task-list)).* Decision-making /
+   conditional behavior; the strongest personalization claim (two users triage
+   differently). Needs branching ([Roadblock #3](#roadblocks-ahead)) + judgment
+   cloning. Kept to decisions inferable from *visible* content (avoid hidden-intent,
+   Roadblock A).
+
+### North Star — generalization (beyond the thesis)
+The thesis is *bounded* to those three, but the **architecture is built to
+generalize** — that is the real goal. The novel contribution: a **personalized,
+demonstration-learned GUI agent** that learns how *this user* does a task and
+reproduces *their* workflow — which scripted RPA (no learning) and generic
+computer-use agents (not personalized) don't.
+
+Already partly real: perception is an **adapter** (UIA + Excel today, one shared
+schema) and the `transformer(WHERE) + LLM(WHAT)` loop is perception-agnostic. The
+path beyond the thesis — a vision perception adapter
+([Roadblock #1](#roadblocks-ahead)) + LLM-induced control-flow
+([Roadblock #3](#roadblocks-ahead)) — turns "three GUI scopes" into "any GUI
+workflow learned from demonstration."
 
 ---
 
