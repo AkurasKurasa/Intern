@@ -93,11 +93,26 @@ MAX_COLS = 20
 #  ExcelObserver
 # ══════════════════════════════════════════════════════════════════════════════
 
-class ExcelObserver:
+try:
+    from observers.base import Observer
+except ImportError:  # pragma: no cover
+    from components.observers.base import Observer
+
+
+class ExcelObserver(Observer):
     """
     Connects to a running Microsoft Excel instance and snapshots its semantic
     state as a trace-compatible dict on each call to snapshot().
+
+    Raw Excel dialect (cell/header_cell/active_cell, value+label under `semantic`)
+    is mapped to the canonical schema in normalize() so the agent reads cells
+    exactly like UIA fields.
     """
+
+    # raw cell types → canonical control types
+    TYPE_MAP = {"cell": "editcontrol", "header_cell": "textcontrol",
+                "active_cell": "editcontrol"}
+    source_name = "excel"
 
     def __init__(self):
         self._xl:   Optional[Any] = None   # Excel.Application COM object
@@ -132,10 +147,11 @@ class ExcelObserver:
 
     # ── Snapshot ──────────────────────────────────────────────────────────────
 
-    def snapshot(self) -> Dict[str, Any]:
+    def _raw_snapshot(self) -> Dict[str, Any]:
         """
         Read the current Excel state and return a trace-compatible state dict.
         Falls back to a minimal empty state if Excel is unreachable.
+        (Base snapshot() then runs normalize() + schema validation.)
         """
         if not self.connected:
             return _empty_state()
@@ -145,6 +161,19 @@ class ExcelObserver:
         except Exception as exc:
             print(f"[ExcelObserver] snapshot() error: {exc}")
             return _empty_state()
+
+    def normalize(self, state: Dict[str, Any]) -> Dict[str, Any]:
+        """Map raw Excel cells to the canonical element schema: type via TYPE_MAP,
+        value/label pulled out of `semantic`, window_role added."""
+        for e in state.get("elements", []):
+            sem = e.get("semantic", {}) or {}
+            e["type"]  = self.TYPE_MAP.get(e.get("type"), e.get("type"))
+            e["value"] = sem.get("raw_value", "") or ""
+            e["label"] = sem.get("column_header", "") or ""
+            e.setdefault("window_role", "active")
+        if not state.get("source"):
+            state["source"] = self.source_name
+        return state
 
     # ── Internal ──────────────────────────────────────────────────────────────
 
