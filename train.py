@@ -67,6 +67,9 @@ def main():
                         help="Feedforward dim (default: 128)")
     parser.add_argument("--dropout",        type=float, default=0.2,
                         help="Dropout rate (default: 0.2)")
+    parser.add_argument("--hist_len",       type=int,   default=4,
+                        help="Action-history window the model sees (default: 4; "
+                             "try 8-12 for long multi-tab trajectories)")
     args = parser.parse_args()
 
     # Resolve relative paths from the project root
@@ -96,6 +99,7 @@ def main():
         num_layers=args.num_layers,
         dim_feedforward=args.dim_feedforward,
         dropout=args.dropout,
+        hist_len=args.hist_len,
     )
 
     print(f"\n{'='*60}")

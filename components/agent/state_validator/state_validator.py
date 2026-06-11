@@ -142,7 +142,10 @@ class StateValidator:
                     new_elements=new_elems,
                     lost_elements=lost_elems,
                 )
-            if any(kw in text for kw in _DONE_KEYWORDS):
+            # Only a SHORT element counts as a completion dialog ("Record saved!").
+            # Long blobs (e.g. the Notepad intake packet, which contains words like
+            # "complete"/"saved" in its instructions) are NOT completion signals.
+            if len(text) < 120 and any(kw in text for kw in _DONE_KEYWORDS):
                 return ValidationResult(
                     status="done",
                     reason=f"Completion indicator: {elem.get('text','')!r}",

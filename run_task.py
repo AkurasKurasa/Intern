@@ -70,6 +70,9 @@ if __name__ == "__main__":
     _parser.add_argument("--start_tab", type=int, default=0,
                          help="Tab index to start from (0=Policy … 4=Drivers). "
                               "Manually click that tab in the form before running.")
+    _parser.add_argument("--model", default="tasks/form_filling/model.pt",
+                         help="Transformer checkpoint to load (default = Policy model). "
+                              "e.g. tasks/form_filling/model_three_tabs.pt")
     _args = _parser.parse_args()
 
     _active_key = API_KEY if PROVIDER == "anthropic" else GROQ_API_KEY if PROVIDER == "groq" else API_KEY
@@ -104,7 +107,10 @@ if __name__ == "__main__":
         step_delay       = STEP_DELAY,
         start_tab_idx    = _args.start_tab,
         scope            = INSURANCE_SCOPE,   # the only place insurance-specifics live
+        model_path       = _args.model,
+        route_capsule    = False,             # honor --model; don't let the capsule router override
     )
+    logger.info("Model checkpoint: %s", _args.model)
     if _args.start_tab:
         logger.info("Drill mode: starting at tab index %d — manually click that tab first.", _args.start_tab)
 

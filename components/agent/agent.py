@@ -529,6 +529,7 @@ class LLMAgent:
         scope:             Optional[Any]  = None,   # ScopeConfig — app-specific tabs/sections/records
         observer:          Optional[Any]  = None,   # perception adapter (snapshot()→schema); default=UIA
         data_source:       Optional[Any]  = None,   # DataSource for field values; default=Notepad
+        route_capsule:     bool           = True,   # False = use model_path as-is (skip capsule router)
     ):
         # Per-application config (tabs, sections, record delimiter). Default =
         # fully generic: no tabs, no sections, no assumptions. Each scope passes
@@ -540,19 +541,21 @@ class LLMAgent:
         self._scope = scope if scope is not None else ScopeConfig()
         self.goal       = goal
         self.provider   = provider.lower().strip()
-        # Capsule routing: if a registered capsule matches goal/window, use its model
-        try:
-            from agent.capsule import CapsuleRegistry
-            _reg = CapsuleRegistry()
-            _window = ""  # window title not known yet at init; re-route on first observe
-            _routed = _reg.route(goal, _window, fallback=model_path)
-            if _routed != model_path:
-                import logging as _lg
-                _lg.getLogger(__name__).info(
-                    "Capsule router: matched '%s' → %s", goal[:60], _routed)
-            model_path = _routed
-        except Exception:
-            pass
+        # Capsule routing: if a registered capsule matches goal/window, use its model.
+        # Skipped when route_capsule=False (caller passed an explicit model_path).
+        if route_capsule:
+            try:
+                from agent.capsule import CapsuleRegistry
+                _reg = CapsuleRegistry()
+                _window = ""  # window title not known yet at init; re-route on first observe
+                _routed = _reg.route(goal, _window, fallback=model_path)
+                if _routed != model_path:
+                    import logging as _lg
+                    _lg.getLogger(__name__).info(
+                        "Capsule router: matched '%s' → %s", goal[:60], _routed)
+                model_path = _routed
+            except Exception:
+                pass
         self.model_path = model_path
         # Resolve relative model path against repo root so CWD doesn't matter
         if not os.path.isabs(self.model_path):
@@ -1611,39 +1614,98 @@ class LLMAgent:
                     _pos2 = t_pred.get("click_position")
                     if _pos2 and (_pos2[0] > 1 or _pos2[1] > 1):
                         _snap2 = self._snap(_pos2, state) or _pos2
-                        # VISITED-ADVANCE: assume each clicked field is handled. If
-                        # the (collapsed) pointer repeats a visited field, jump to
-                        # the next UNVISITED fillable field so the run covers the
-                        # whole form instead of looping on one spot.
-                        # VISITED-ADVANCE is a crutch for a collapsed pointer. With
-                        # the model's own is_visited feature it FIGHTS the model
-                        # (yanks correct repeats to other fields), so it's gated OFF
-                        # in pure mode — let the transformer's pointer stand.
-                        if not self._no_autohandlers:
-                            _vis = getattr(self, "_visited_pos", None)
-                            if _vis is None:
-                                _vis = self._visited_pos = set()
-                            _vk = (round(_snap2[0] / 15) * 15, round(_snap2[1] / 15) * 15)
-                            if _vk in _vis:
-                                _cands = sorted(
-                                    [e for e in state.get("elements", [])
-                                     if e.get("window_role") != "background"
-                                     and e.get("type") in ("editcontrol", "input",
-                                                           "comboboxcontrol", "combobox")
-                                     and e.get("bbox")],
-                                    key=lambda e: (e["bbox"][1], e["bbox"][0]))
-                                for _e in _cands:
-                                    _b = _e["bbox"]
-                                    _cx, _cy = (_b[0] + _b[2]) / 2, (_b[1] + _b[3]) / 2
-                                    _ck = (round(_cx / 15) * 15, round(_cy / 15) * 15)
-                                    if _ck not in _vis:
-                                        _snap2 = [_cx, _cy]; _vk = _ck
-                                        logger.info("[VISITED-ADVANCE] pointer repeated — next unvisited field @ (%.0f,%.0f)", _cx, _cy)
-                                        break
-                            _vis.add(_vk)
-                        prediction = {"action_type": "click", "click_position": _snap2}
-                        logger.info("[OPT2] TRANSFORMER navigates → click @ (%.0f,%.0f)  ptr_conf=%.2f",
-                                    _snap2[0], _snap2[1], t_pred.get("_click_conf", 0.0))
+                        # COMBOBOX-AS-FILL: demos action comboboxes as CLICKS, so the
+                        # model clicks them; but a plain click only toggles the
+                        # dropdown → open/close oscillation. A click on an EMPTY
+                        # combobox = intent to SET its value → route to FILL (focus it,
+                        # then the LLM value + open/select handler below).
+                        _cbox = None
+                        if not self._pure_transformer and self._llm_client:
+                            _cbox = next(
+                                (e for e in state.get("elements", [])
+                                 if e.get("type") == "comboboxcontrol"
+                                 and not (e.get("value") or "").strip()
+                                 and e.get("bbox")
+                                 and e["bbox"][0] - 2 <= _snap2[0] <= e["bbox"][2] + 2
+                                 and e["bbox"][1] - 2 <= _snap2[1] <= e["bbox"][3] + 2),
+                                None)
+                        if _cbox is not None:
+                            _cb_label = (_cbox.get("label") or _cbox.get("text") or "").strip()
+                            logger.info("[OPT2] CLICK on empty combobox %r → treat as FILL", _cb_label[:30])
+                            _cb_sec = self._detect_section(state, _cbox)
+                            _cb_val = self._lookup_field(_cb_label, section=_cb_sec)
+                            # ONE click opens the dropdown; select inline + continue.
+                            # (Don't route to the type-handler — its own open-click would
+                            #  TOGGLE the dropdown shut → no options → Escape loop.)
+                            self._executor.execute({"action_type": "click", "click_position": _snap2})
+                            if not _cb_val:
+                                logger.info("[OPT2] combobox %r — no value, Tab", _cb_label)
+                                self._executor.execute({"action_type": "keyboard",
+                                                        "key_count": 1, "keystrokes": ["escape"]})
+                                self._executor.execute({"action_type": "keyboard",
+                                                        "key_count": 1, "keystrokes": ["tab"]})
+                                time.sleep(self.step_delay * 0.5)
+                                continue
+                            _items = []
+                            for _try in range(4):
+                                time.sleep(0.35)
+                                _cs = self._observe()
+                                _items = [e for e in _cs.get("elements", [])
+                                          if e.get("type") == "listitemcontrol"
+                                          and e.get("window_role") != "background" and e.get("bbox")]
+                                if _items:
+                                    break
+                            _vlc = _cb_val.strip().lower()
+                            _o = lambda e: (e.get("text") or e.get("label") or "").strip()
+                            _hit = next((e for e in _items if _o(e).lower() == _vlc), None) \
+                                or next((e for e in _items if _o(e).lower().startswith(_vlc)
+                                         or _vlc.startswith(_o(e).lower())), None)
+                            if _hit:
+                                _b = _hit["bbox"]
+                                self._executor.execute({"action_type": "click",
+                                                        "click_position": [(_b[0]+_b[2])/2, (_b[1]+_b[3])/2]})
+                                logger.info("Combobox(click-fill): %r → selected %r", _cb_label, _cb_val)
+                                time.sleep(0.25)
+                                self._executor.execute({"action_type": "keyboard",
+                                                        "key_count": 1, "keystrokes": ["tab"]})
+                                self._filled_this_tab.add(_cb_label)
+                            else:
+                                if _items:
+                                    logger.warning("Combobox(click-fill): %r not in options %s",
+                                                   _cb_val, [_o(e) for e in _items][:12])
+                                else:
+                                    logger.warning("Combobox(click-fill): dropdown for %r did not render", _cb_label)
+                                self._executor.execute({"action_type": "keyboard",
+                                                        "key_count": 1, "keystrokes": ["escape"]})
+                            time.sleep(self.step_delay * 0.5)
+                            continue
+                        else:
+                            # VISITED-ADVANCE crutch (gated off in pure/no-autohandler mode)
+                            if not self._no_autohandlers:
+                                _vis = getattr(self, "_visited_pos", None)
+                                if _vis is None:
+                                    _vis = self._visited_pos = set()
+                                _vk = (round(_snap2[0] / 15) * 15, round(_snap2[1] / 15) * 15)
+                                if _vk in _vis:
+                                    _cands = sorted(
+                                        [e for e in state.get("elements", [])
+                                         if e.get("window_role") != "background"
+                                         and e.get("type") in ("editcontrol", "input",
+                                                               "comboboxcontrol", "combobox")
+                                         and e.get("bbox")],
+                                        key=lambda e: (e["bbox"][1], e["bbox"][0]))
+                                    for _e in _cands:
+                                        _b = _e["bbox"]
+                                        _cx, _cy = (_b[0] + _b[2]) / 2, (_b[1] + _b[3]) / 2
+                                        _ck = (round(_cx / 15) * 15, round(_cy / 15) * 15)
+                                        if _ck not in _vis:
+                                            _snap2 = [_cx, _cy]; _vk = _ck
+                                            logger.info("[VISITED-ADVANCE] pointer repeated — next unvisited field @ (%.0f,%.0f)", _cx, _cy)
+                                            break
+                                _vis.add(_vk)
+                            prediction = {"action_type": "click", "click_position": _snap2}
+                            logger.info("[OPT2] TRANSFORMER navigates → click @ (%.0f,%.0f)  ptr_conf=%.2f",
+                                        _snap2[0], _snap2[1], t_pred.get("_click_conf", 0.0))
                     else:
                         prediction = {"action_type": "keyboard", "key_count": 1, "keystrokes": ["tab"]}
                         logger.info("[OPT2] pointer invalid — Tab fallback")
@@ -1943,12 +2005,19 @@ class LLMAgent:
                                   and e.get("bbox")]
                     if _listitems:
                         break
-                _match = next(
-                    (e for e in _listitems
-                     if (e.get("text") or e.get("label") or "").strip().lower()
-                        == _combo_value.strip().lower()),
-                    None,
-                )
+                _cv_lc = _combo_value.strip().lower()
+                def _opt(e): return (e.get("text") or e.get("label") or "").strip()
+                # exact first, then prefix-fuzzy (handles 'Full Coverage' vs
+                # 'Full Coverage (Comprehensive)'); avoid loose substring so
+                # 'Active' never matches 'Inactive'.
+                _match = next((e for e in _listitems if _opt(e).lower() == _cv_lc), None)
+                if not _match:
+                    _match = next((e for e in _listitems
+                                   if _opt(e).lower().startswith(_cv_lc)
+                                   or _cv_lc.startswith(_opt(e).lower())), None)
+                if not _match and _listitems:
+                    logger.warning("Combobox: %r not in options %s",
+                                   _combo_value, [_opt(e) for e in _listitems][:12])
                 if _match:
                     _lx1, _ly1, _lx2, _ly2 = _match["bbox"]
                     self._executor.execute({"action_type": "click",

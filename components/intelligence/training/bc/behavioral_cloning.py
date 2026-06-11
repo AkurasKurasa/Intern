@@ -70,6 +70,7 @@ class BCTrainer:
         num_layers:      int   = 2,
         dim_feedforward: int   = 128,
         dropout:         float = 0.2,
+        hist_len:        int   = 4,
     ):
         self.trace_dir       = trace_dir
         self.save_path       = save_path
@@ -83,6 +84,7 @@ class BCTrainer:
         self.num_layers      = num_layers
         self.dim_feedforward = dim_feedforward
         self.dropout         = dropout
+        self.hist_len        = hist_len
 
     def train(self, trace_dir: Optional[str] = None, epochs: Optional[int] = None):
         """
@@ -113,6 +115,7 @@ class BCTrainer:
             num_layers      = self.num_layers,
             dim_feedforward = self.dim_feedforward,
             dropout         = self.dropout,
+            hist_len        = self.hist_len,
         )
         logger.info("BCTrainer: checkpoint saved → %s", self.save_path)
         return model
