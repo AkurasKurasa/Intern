@@ -725,6 +725,51 @@ workflow learned from demonstration."
 Open threads — honest unknowns and risks that aren't yet tasks. Each needs a
 decision or an experiment before it becomes one.
 
+### Decisions made
+
+**WHAT does the transformer learn — Pure (A) vs Division-of-labor (B)? → CHOSE B.**
+The 3-tab navigation marathon (2026-06-11) exposed that the transformer's
+*action-type head* (deciding click-vs-type per step) is **unstable** — it whipsaws
+between all-click (combobox/field spiral) and all-keyboard (tabs through, never
+clicks) across retrains. Two ways forward:
+
+- **Option A — Pure transformer.** The transformer learns *everything*, including
+  click-vs-type, purely from demos, **zero rules.** Honest cost: a days-to-weeks
+  data + training grind (more consistent + transition-dense demos, bigger model,
+  stable recipe, likely DAgger), with real risk of a BC ceiling (long-horizon +
+  rare events + compounding error is the textbook case where pure BC underperforms).
+- **Option B — Division of labor *(CHOSEN)*.** The **transformer drives WHERE** —
+  which element, what order, *when to switch tabs* (the learned, personalized
+  navigation = the thesis claim, 100% intact). **Widget TYPE drives HOW** — type
+  into an editcontrol, click a tabitem, open+select a combobox, toggle a checkbox
+  (universal GUI mechanics, identical for every user/app — *not* form-specific).
+
+**Why B:** click-vs-type is **not personalization** — it's universal plumbing, true
+for every app. Forcing the unstable head to learn it blocks scope #1 for zero
+thesis benefit. B keeps the personalization claim ("learns the user's navigation/
+order/workflow") fully intact while freeing the one unstable decision onto rules
+that **already exist in the agent** (combobox/checkbox handlers etc. are already
+widget heuristics — the agent was never "pure"). Net: ~5 universal widget→action
+rules, no form-specifics, navigation still 100% learned. Finishes scope #1 in
+hours vs weeks. *(If a reviewer asks: the claim is "clones the user's workflow,"
+not "learned how to physically touch every widget with zero rules.")*
+
+### DAgger — how to implement *(if/when pure-BC drift needs it)*
+The principled fix for the live drift seen on 2026-06-11 (agent leaves the form,
+oscillates) = train on the states the agent ITSELF visits, not just clean demos.
+Loop: train → run policy → label the correct action for visited (drift) states →
+aggregate → retrain → repeat. Labeling is the only real choice:
+- **Manual (closest to ready):** the `CorrectionHandler` seam already exists but
+  **captures 0 steps (broken)** — fix it so after a failed/no-change step the agent
+  pauses, the user performs the right action, and `(state, action)` is recorded.
+  Targeted (only fix mistakes), far cheaper than re-recording passes.
+- **Autonomous (no human):** demo-retrieval oracle — embed the visited state
+  (`encode_state`), find the nearest demo state, copy its action as the label.
+  Approximate but fully automatic; fits the "learn from demos, not manual" goal.
+- **Blocker:** `CorrectionHandler` capturing 0 is *why DAgger isn't usable yet* —
+  un-breaking it is the first concrete step. Needs a few run→correct→retrain rounds
+  to converge.
+
 ### Open technical questions
 - **Will full-form cloning scale on data alone?** Policy tab (~10 fields) needed
   ~20–30 passes. The full form is 176 fields / 8 tabs with rare **tab-transition**
