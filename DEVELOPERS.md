@@ -623,16 +623,14 @@ the slice works.
 - [x] **Option B (WHERE/HOW division)** — the **focused widget's type** decides
       fill-vs-navigate, replacing the unstable action-type head. Result: Policy tab
       fills cleanly @~0.9 conf, **whipsaw gone.** (See Decisions.)
-- [ ] **TAB-TARGETING — the one remaining gap.** Pointer fixates on the last
-      checkbox, won't predict the Policyholder tab (tab-clicks ~2% of demos).
-      **Fix (no hardcode): record TRANSITION-DENSE demos** — fill **2–3 fields →
-      switch tab → repeat**, ~15–20 passes. Raises the tab signal ratio with REAL
-      data (not synthetic oversampling, which destabilized — see Concerns).
-      **← YOU. The gate.**
-- [ ] **Retrain on FULL + DENSE combined** (don't replace the 20 full passes →
-      avoids forgetting field-fill order; dense passes add the tab signal). Stable
-      recipe, no oversampling.
-- [ ] **Verify** the pointer clicks a tab (x≈881–1360) → Policyholder fields appear.
+- [x] **TAB-TARGETING — SOLVED (2026-06-12).** Recorded 20 transition-dense passes
+      (3 fields/tab → click-switch) into `three_Tabs` (now 40 total: 20 full + 20
+      dense), retrained on the combined set. **The transformer's pointer now predicts
+      the tabs itself** — live: Policy → (pointer 992,136, conf 0.93) → Policyholder
+      → (pointer 1070,136, conf 0.73) → Vehicle, filling fields on each. **0% wasted,
+      1.8 steps/field, 100% value-acc.** No oversampling — real dense data did it.
+- [x] **MULTI-TAB TRAVERSAL WORKS** — transformer-driven 3-tab switch + fill, clean.
+      *(P0 Stage 1 core goal achieved.)*
 
 #### Stage 2 — Reliability: no stalling  *(engineering)*
 - [ ] **Checkbox cycle-loop** — pointer fixates on the already-checked Renewal
