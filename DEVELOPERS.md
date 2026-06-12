@@ -601,18 +601,22 @@ across scopes while none works end-to-end.
 sections**, in the demonstrated order, **submits each**, **no human help** —
 Completion ~100%, Field-Match high, low wasted steps.
 
-**Where we are (2026-06-12):** the model fills the **entire Policy tab cleanly at
-~0.9 confidence** (after the wins below). The **only** thing blocking multi-tab is
-that the transformer's **pointer fixates on the last checkbox and won't predict the
-tab** — tab-clicks were ~2% of demos, so it under-learned them. Everything else on
-the slice works.
+**Where we are (2026-06-12, evening):** the model fills **3 FULL tabs**
+(Policy → Policyholder incl. below-fold phones → Vehicle, 13 fields) in one run —
+**19 fields, 100% value-acc, 100% action-acc, 2.8% wasted, ZERO drift.** Drift,
+empty-field fixation, and below-fold reach are all SOLVED (see Stage 2). The model
+only knows **3 tabs** (the demos go Policy→Policyholder→Vehicle→Submit&New→next
+record), so after Vehicle it correctly loops back toward a new record — it has no
+training for Coverage→Payment. **The remaining gate is DATA: demos through all 8
+tabs.** Commit d859b5e.
 
 **Dependency chain:**
 ```
-[DONE] combobox click-fill + false-done guard + Option B (widget-type decides
-       fill-vs-navigate → action stable, no whipsaw, Policy fills @0.9)
-   → [NEXT] pointer targets the TAB → transition-dense demos + retrain → multi-tab works
-   → fix checkbox cycle-loop + cold-start → cycles repeat clean
+[DONE] Option B + combobox click-fill + false-done guard (Policy @0.9, no whipsaw)
+[DONE] multi-tab traversal (transformer predicts+switches tabs itself)
+[DONE] 'attempted' feature (kills empty-optional loop) + form-window lock +
+       in-form click guard (kills drift; Tab reaches below-fold) → 3 FULL tabs
+   → [NEXT] 8-tab demos + retrain → all tabs fill (kills the "loop back after Vehicle")
    → multi-record ×5 + per-record data
    → end-to-end verification (Completion ~100%)
 ```
@@ -633,11 +637,22 @@ the slice works.
       *(P0 Stage 1 core goal achieved.)*
 
 #### Stage 2 — Reliability: no stalling  *(engineering)*
-- [ ] **Checkbox cycle-loop** — pointer fixates on the already-checked Renewal
-      checkbox (970,666) → "already checked → Tab" → no_change forever. Anti-
-      oscillation (catch A↔A even when a Tab briefly changes focus). *(also blocks tabs)*
-- [ ] **Cold-start** — reliable first click from a blank screen (DAgger / start-signal).
-- [ ] **Looping / no-progress** — model orbits filled fields.
+- [x] **Empty-field fixation → SOLVED (2026-06-12).** `'attempted'` state-feature
+      (ELEM_FEATURES 394→395): once a field is acted on this session, attempted=1 so
+      the transformer stops re-targeting it. Killed the Suffix loop `is_filled` can't
+      (empty field's is_filled never flips). Retrain: val 0.60→0.781, click 0.705→0.855.
+- [x] **Drift → SOLVED (2026-06-12).** Form-window LOCK (capture hwnd at GO,
+      re-assert foreground every step) + in-form click guard (target outside the live
+      form rect → Tab, not a drifting click). No more typing into PowerShell / clicking
+      Notepad. Observation + action always on the form.
+- [x] **Below-fold reach → SOLVED (2026-06-12).** The guard's Tab doubles as scroll:
+      wx ScrolledPanel auto-scrolls the focused field into view, so Tab reaches
+      off-screen fields (Home/Cell Phone filled). Backstop: record∩visible
+      scroll-to-reveal trigger on the live form viewport.
+- [x] **'99' double-type → FIXED (2026-06-12).** Typing now idempotent (select-all
+      before paste) so a retried step overwrites instead of appending.
+- [ ] **Checkbox cold-start / first-click** — reliable first action from a blank
+      screen (Renewal checkbox handling; DAgger / start-signal).
 - [ ] **Combobox retry** — open→miss→Escape→retry; timing.
 
 #### Stage 3 — Multi-record: all 5  *(data + eng)*
@@ -649,9 +664,9 @@ the slice works.
 - [ ] **End-to-end metric** — Completion 0% → ~100%, Field-Match 12% → high.
 - [ ] **Expected-vs-actual diff at submit** — per-record correctness report.
 
-> **Who does what:** YOU = record transition-dense tab demos (the gate) + run live
-> tests. ME = retrain (full+dense), anti-oscillation, cold-start, per-record
-> refresh, verification harness. BOTH = retrain + test loop.
+> **Who does what:** YOU = record **full 8-tab demos** (Policy→…→Payment, all
+> fields, Submit&New) — the current gate — + run live tests. ME = retrain, cold-start,
+> per-record refresh, verification harness. BOTH = retrain + test loop.
 
 ---
 

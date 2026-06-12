@@ -155,9 +155,15 @@ class ActionExecutor:
                     import pyperclip
                     pyperclip.copy(text)
                     time.sleep(0.15)
+                    # Select-all before paste so typing is IDEMPOTENT: if a step is
+                    # retried (e.g. validator false no_change), the paste OVERWRITES
+                    # the field instead of appending (was producing '9'+'9'='99').
+                    pyautogui.hotkey("ctrl", "a")
+                    time.sleep(0.05)
                     pyautogui.hotkey("ctrl", "v")
                     time.sleep(self.post_click_delay)
                 except Exception:
+                    pyautogui.hotkey("ctrl", "a")
                     for ch in text:
                         pyautogui.typewrite(ch, interval=self.keyboard_delay)
             return list(text)
