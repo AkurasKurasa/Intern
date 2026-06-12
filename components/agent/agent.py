@@ -1589,12 +1589,21 @@ class LLMAgent:
                 _fe2  = next((e for e in state.get("elements", [])
                               if e.get("element_id") == _fid2), None)
 
-                # The TRANSFORMER decides WHAT: click (navigate) vs type (fill).
-                # Its action-type head is now ~80% (was a coin-flip) after the
-                # action-space collapse, so it DRIVES the decision — no hardcoded
-                # "fillable & empty" rule. When it says type, the LLM supplies the
-                # value for the focused field (WHAT-value = LLM).
-                _t_is_type = str(t_type).lower() in ("keyboard", "type")
+                # ── OPTION B (DEVELOPERS.md → Decisions): the FOCUSED widget's TYPE
+                # decides fill-vs-navigate — NOT the transformer's action-type head
+                # (which whipsaws click↔keyboard across retrains). A fillable+empty
+                # focused field → FILL it (LLM value); otherwise the transformer's
+                # POINTER navigates (click), and when its pointer lands on a tab /
+                # button that IS the tab-switch / submit. Navigation — which element,
+                # what order, WHEN to switch tabs — stays 100% transformer; only this
+                # universal "is the focused thing a fillable empty field?" check
+                # replaces the unstable head. Widget mechanics are universal GUI
+                # semantics, not form-specific rules.
+                _fe2_ty  = (_fe2.get("type") or "").lower() if _fe2 else ""
+                _fe2_val = (_fe2.get("value") or "").strip() if _fe2 else ""
+                _t_is_type = (_fe2_ty in ("editcontrol", "input", "comboboxcontrol",
+                                          "checkboxcontrol", "checkbox")
+                              and not _fe2_val)
 
                 if _t_is_type and self._llm_client:
                     # transformer chose to FILL → LLM supplies the value (the WHAT).

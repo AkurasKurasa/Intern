@@ -601,29 +601,45 @@ across scopes while none works end-to-end.
 sections**, in the demonstrated order, **submits each**, **no human help** —
 Completion ~100%, Field-Match high, low wasted steps.
 
+**Where we are (2026-06-12):** the model fills the **entire Policy tab cleanly at
+~0.9 confidence** (after the wins below). The **only** thing blocking multi-tab is
+that the transformer's **pointer fixates on the last checkbox and won't predict the
+tab** — tab-clicks were ~2% of demos, so it under-learned them. Everything else on
+the slice works.
+
 **Dependency chain:**
 ```
-full-form demos (YOU) → retrain → multi-tab works
-   → fix cycle-restart loop + cold-start → cycles repeat clean
+[DONE] combobox click-fill + false-done guard + Option B (widget-type decides
+       fill-vs-navigate → action stable, no whipsaw, Policy fills @0.9)
+   → [NEXT] pointer targets the TAB → transition-dense demos + retrain → multi-tab works
+   → fix checkbox cycle-loop + cold-start → cycles repeat clean
    → multi-record ×5 + per-record data
    → end-to-end verification (Completion ~100%)
 ```
 
-#### Stage 1 — Breadth: model traverses the WHOLE form  *(DATA-gated)*
-- [ ] **Record full-form demos** — all 8 tabs + Driver/Vehicle sections, several
-      consistent passes. *Model is blind past the Policy tab — no code fixes this;
-      it must watch the whole form.* **← YOU. This is the gate.**
-- [ ] **Retrain** on full-form demos.
-- [ ] **Verify multi-tab traversal + repeated-section navigation** (lands on every
-      tab/section, fills in order).
+#### Stage 1 — Multi-tab traversal
+- [x] **Combobox click-fill** — empty combobox click → open+select (no spiral).
+- [x] **False-done guard** — Notepad intake text no longer triggers false completion.
+- [x] **Option B (WHERE/HOW division)** — the **focused widget's type** decides
+      fill-vs-navigate, replacing the unstable action-type head. Result: Policy tab
+      fills cleanly @~0.9 conf, **whipsaw gone.** (See Decisions.)
+- [ ] **TAB-TARGETING — the one remaining gap.** Pointer fixates on the last
+      checkbox, won't predict the Policyholder tab (tab-clicks ~2% of demos).
+      **Fix (no hardcode): record TRANSITION-DENSE demos** — fill **2–3 fields →
+      switch tab → repeat**, ~15–20 passes. Raises the tab signal ratio with REAL
+      data (not synthetic oversampling, which destabilized — see Concerns).
+      **← YOU. The gate.**
+- [ ] **Retrain on FULL + DENSE combined** (don't replace the 20 full passes →
+      avoids forgetting field-fill order; dense passes add the tab signal). Stable
+      recipe, no oversampling.
+- [ ] **Verify** the pointer clicks a tab (x≈881–1360) → Policyholder fields appear.
 
 #### Stage 2 — Reliability: no stalling  *(engineering)*
-- [ ] **Cycle-restart loop** — new record re-clicks the already-checked Renewal
-      checkbox → Tab → no-change loop. Reset per-record state clean. *(blocks multi-record)*
-- [ ] **Cold-start** — reliable first click from a blank screen (0% now; DAgger /
-      learned start-signal).
-- [ ] **Looping / no-progress** — model orbits filled fields (`is_filled` helped;
-      multi-tab will stress it).
+- [ ] **Checkbox cycle-loop** — pointer fixates on the already-checked Renewal
+      checkbox (970,666) → "already checked → Tab" → no_change forever. Anti-
+      oscillation (catch A↔A even when a Tab briefly changes focus). *(also blocks tabs)*
+- [ ] **Cold-start** — reliable first click from a blank screen (DAgger / start-signal).
+- [ ] **Looping / no-progress** — model orbits filled fields.
 - [ ] **Combobox retry** — open→miss→Escape→retry; timing.
 
 #### Stage 3 — Multi-record: all 5  *(data + eng)*
@@ -635,9 +651,9 @@ full-form demos (YOU) → retrain → multi-tab works
 - [ ] **End-to-end metric** — Completion 0% → ~100%, Field-Match 12% → high.
 - [ ] **Expected-vs-actual diff at submit** — per-record correctness report.
 
-> **Who does what:** YOU = record full-form demos (the gate) + run live tests.
-> ME = cycle-restart loop, cold-start, combobox, per-record refresh, verification
-> harness. BOTH = retrain + test loop.
+> **Who does what:** YOU = record transition-dense tab demos (the gate) + run live
+> tests. ME = retrain (full+dense), anti-oscillation, cold-start, per-record
+> refresh, verification harness. BOTH = retrain + test loop.
 
 ---
 
