@@ -464,7 +464,7 @@ class TrajectoryDataset(Dataset):
         _cache_path = root / ".dataset_cache.pkl"
         # ELEM_FEATURES in the key → a change in the feature layout invalidates
         # any stale cache built with a different one.
-        _cache_key  = (max_elements, hist_len, aug_drop_prob, ELEM_FEATURES, "v3_filled")
+        _cache_key  = (max_elements, hist_len, aug_drop_prob, ELEM_FEATURES, "v4_rareweight")
 
         def _cache_valid() -> bool:
             if not _cache_path.exists():
@@ -491,6 +491,7 @@ class TrajectoryDataset(Dataset):
                     self._grouped_files     = _cached["grouped_files"]
                     self._grouped_manifests = _cached["grouped_manifests"]
                     self._samples           = _cached["samples"]
+                    self._sample_weights    = _cached.get("sample_weights")
                     print(f"[Dataset] Loaded from cache: {len(self._samples)} samples "
                           f"from {len(self._grouped_files)} session(s).")
                     self._preload_tensors()
@@ -542,6 +543,7 @@ class TrajectoryDataset(Dataset):
         grouped_action_meta: List[List[Tuple[int, float, float, float, str]]] = []
         grouped_src_idx:     List[List[int]] = []
         grouped_click_idx:   List[List[int]] = []
+        grouped_click_type:  List[List[str]] = []   # clicked element's type (rare-action weighting)
 
         import gc as _gc
         total_files = sum(len(g) for g in file_groups)
@@ -552,6 +554,7 @@ class TrajectoryDataset(Dataset):
             g_actions:    List[Tuple] = []
             g_src_idx:    List[int]   = []
             g_click_idx:  List[int]   = []
+            g_click_type: List[str]   = []
             manifest = _load_manifest(group_files)
 
             for fpath in group_files:
@@ -584,10 +587,16 @@ class TrajectoryDataset(Dataset):
                     _find_click_elem_idx(t.get("mouse", {}), state, max_elements)
                     if action[0] == ACTION_CLICK else -1
                 )
+                # Remember the clicked element's TYPE → used for rare-action loss
+                # weighting (general inverse-frequency; rare target types like tabs
+                # get up-weighted, no hardcoded class).
+                click_type = ((elems[click_idx].get("type") or "").lower()
+                              if 0 <= click_idx < len(elems) else "")
                 valid_files.append(fpath)
                 g_actions.append(action)
                 g_src_idx.append(src_idx)
                 g_click_idx.append(click_idx)
+                g_click_type.append(click_type)
                 t = None  # release JSON dict immediately — prevents memory accumulation
 
             _gc.collect()  # force reclaim after each session group
@@ -598,6 +607,7 @@ class TrajectoryDataset(Dataset):
                 grouped_action_meta.append(g_actions)
                 grouped_src_idx.append(g_src_idx)
                 grouped_click_idx.append(g_click_idx)
+                grouped_click_type.append(g_click_type)
 
         if skipped:
             print(f"[Dataset] Skipped {skipped} traces with no active form controls.")
@@ -619,8 +629,9 @@ class TrajectoryDataset(Dataset):
             for i in range(N - hist_len + 1):
                 ctx       = g_actions[i : i + hist_len - 1]
                 tgt       = g_actions[i + hist_len - 1]
-                src_idx   = grouped_src_idx[gi][i + hist_len - 1]
-                click_idx = grouped_click_idx[gi][i + hist_len - 1]
+                src_idx    = grouped_src_idx[gi][i + hist_len - 1]
+                click_idx  = grouped_click_idx[gi][i + hist_len - 1]
+                click_type = grouped_click_type[gi][i + hist_len - 1]
                 if tgt[0] == ACTION_NOOP:
                     continue
                 self._samples.append((
@@ -629,7 +640,25 @@ class TrajectoryDataset(Dataset):
                     [a[0] for a in ctx],               # past action types
                     [[a[1], a[2], a[3]] for a in ctx], # past cont (cx, cy, key_norm)
                     tgt[0], click_idx, tgt[3], src_idx,
+                    click_type,                        # 9th (temp): clicked target type
                 ))
+
+        # ── Rare-action loss weighting (general, inverse-frequency) ──────────────
+        # Up-weight samples whose CLICK target is a RARE element type (e.g. tabs),
+        # so the model learns them without distorting the data (no recording tricks,
+        # no duplication). weight ∝ 1/freq(type), normalized so mean click-weight ≈ 1,
+        # capped to avoid blow-ups. Non-click samples → 1.0. Auto-detects whatever is
+        # rare — NO hardcoded class. (DEVELOPERS.md → Concepts: rare-action handling.)
+        from collections import Counter as _Counter
+        _RARE_W_CAP = 8.0
+        _tc = _Counter(s[8] for s in self._samples if s[8])
+        _n_click, _n_types = sum(_tc.values()), max(len(_tc), 1)
+        _wmap = {ty: min(_n_click / (_n_types * c), _RARE_W_CAP) for ty, c in _tc.items()}
+        self._sample_weights: List[float] = [_wmap.get(s[8], 1.0) for s in self._samples]
+        self._samples = [s[:8] for s in self._samples]   # strip the temp type field
+        if _wmap:
+            _top = sorted(_wmap.items(), key=lambda kv: -kv[1])[:4]
+            print(f"[Dataset] rare-action weights (top): {[(t, round(w, 1)) for t, w in _top]}")
 
         if total_traces < hist_len:
             raise ValueError(
@@ -648,6 +677,7 @@ class TrajectoryDataset(Dataset):
                     "grouped_files":     self._grouped_files,
                     "grouped_manifests": self._grouped_manifests,
                     "samples":           self._samples,
+                    "sample_weights":    getattr(self, "_sample_weights", None),
                 }, _cf, protocol=4)
             print(f"[Dataset] Cache saved -> {_cache_path}")
         except Exception as _se:
@@ -761,6 +791,8 @@ class TrajectoryDataset(Dataset):
             past_types = torch.zeros(0, dtype=torch.long)
             past_cont  = torch.zeros(0, 3,     dtype=torch.float32)
 
+        _w = getattr(self, "_sample_weights", None)
+        sample_weight = float(_w[idx]) if _w is not None else 1.0
         return (
             states,
             past_types,
@@ -769,6 +801,7 @@ class TrajectoryDataset(Dataset):
             torch.tensor(tgt_click_idx, dtype=torch.long),
             torch.tensor(tgt_key,       dtype=torch.float32),
             torch.tensor(src_idx,       dtype=torch.long),
+            torch.tensor(sample_weight, dtype=torch.float32),
         )
 
     def class_counts(self) -> dict:
@@ -1034,23 +1067,29 @@ def _run_epoch(model, loader, optimizer, device, lambda_click, lambda_key, label
                   correct=0, click_correct=0, click_total=0,
                   samples=0, batches=0)
 
-    ce_click = nn.CrossEntropyLoss(ignore_index=-1)  # -1 = non-click step or click didn't match any element
+    ce_click = nn.CrossEntropyLoss(ignore_index=-1, reduction="none")  # per-sample → rare-action weighting
     ce_src   = nn.CrossEntropyLoss(ignore_index=-1)  # -1 = no source label for this step
     ctx = torch.enable_grad() if is_train else torch.no_grad()
     with ctx:
-        for states, p_types, p_cont, tgt_types, tgt_click_idx, tgt_keys, tgt_src in loader:
+        for states, p_types, p_cont, tgt_types, tgt_click_idx, tgt_keys, tgt_src, sample_w in loader:
             states, p_types, p_cont = states.to(device), p_types.to(device), p_cont.to(device)
             tgt_types, tgt_click_idx, tgt_keys, tgt_src = (
                 tgt_types.to(device), tgt_click_idx.to(device),
                 tgt_keys.to(device),  tgt_src.to(device)
             )
+            sample_w = sample_w.to(device)
             out    = model(states, p_types, p_cont)
             l_type = ce(out.type_logits, tgt_types)
 
-            # Click pointer loss — ignore non-click steps (tgt=-1) and unmatched clicks
+            # Click pointer loss — ignore non-click steps (tgt=-1) and unmatched clicks.
+            # Per-sample CE × rare-action weight (up-weights rare click targets like
+            # tabs), then mean over the valid clicks. Common targets weight ~1.
             valid_click = (tgt_click_idx != -1)
-            l_click = (ce_click(out.click_elem, tgt_click_idx)
-                       if valid_click.any() else out.click_elem.sum() * 0.0)
+            if valid_click.any():
+                _per_click = ce_click(out.click_elem, tgt_click_idx)   # 0 where ignored
+                l_click = (_per_click * sample_w).sum() / valid_click.sum().clamp(min=1)
+            else:
+                l_click = out.click_elem.sum() * 0.0
 
             l_key = _masked_mse(out.key_count.squeeze(-1), tgt_keys, tgt_types == ACTION_KEYBOARD)
 

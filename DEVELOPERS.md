@@ -787,6 +787,25 @@ aggregate → retrain → repeat. Labeling is the only real choice:
   to converge.
 
 ### Open technical questions
+- **Loss-weighting is less plug-and-play — how do we improve it in the future?**
+  The 2026-06-12 rare-event fix (up-weight the rare action's frames in the loss so
+  the model learns it without distorting the data — see Concepts) still requires
+  *manually labelling which action class is rare* (here: clicks whose target is a
+  `tabitem`). For a truly general system, that labelling should be **automatic.**
+  Directions to explore:
+  - **Auto-detect rare classes by frequency** — at dataset build, histogram the
+    target action classes (per element-type / per action), then weight each
+    **inversely to its frequency** (`w ∝ 1/freq`). Zero manual tagging; any rare
+    action self-emphasizes. The general version of what we hand-built for tabs.
+  - **Focal loss** — automatically down-weights easy/common examples and focuses
+    gradient on hard/rare ones, *without* any class labels at all. The most
+    plug-and-play; no frequency bookkeeping.
+  - **Make rare actions CONDITIONAL (state feature)** — give the model a signal
+    that predicts the rare action (e.g. "section-complete fraction"), so rarity
+    stops mattering. More robust but needs the trigger identified per action.
+  → Likely end-state: **inverse-frequency auto-weighting (or focal loss) as the
+  universal default**, with optional state-features for robustness where a clear
+  trigger exists. Reusable across every scope's rare actions.
 - **Will full-form cloning scale on data alone?** Policy tab (~10 fields) needed
   ~20–30 passes. The full form is 176 fields / 8 tabs with rare **tab-transition**
   events. Unknown whether ~30–50 passes clone it, or whether long-trajectory BC
