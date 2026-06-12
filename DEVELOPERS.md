@@ -32,7 +32,7 @@ This document is for developers working on Intern itself.
 11. [Wish List — Path to Full BC](#wish-list--path-to-full-behavioral-cloning)
 12. [Task List](#task-list) — **P0 complete scope #1 → P1–P4**
 13. [Scopes & North Star](#scopes--north-star)
-14. [Questions & Concerns](#questions--concerns) — **open threads**
+14. [Questions, Concerns, and Concepts](#questions-concerns-and-concepts) — **open threads + design concepts**
 15. [Finished Tasks](#finished-tasks)
 
 ---
@@ -720,12 +720,14 @@ workflow learned from demonstration."
 
 ---
 
-## Questions & Concerns
+## Questions, Concerns, and Concepts
 
-Open threads — honest unknowns and risks that aren't yet tasks. Each needs a
-decision or an experiment before it becomes one.
+Open threads, honest unknowns/risks, and the **design concepts** (architectural
+decisions + approaches like the WHERE/HOW division and DAgger) that shape how the
+system evolves. **Questions** = unknowns to resolve · **Concerns** = risks to watch
+· **Concepts** = decisions made + design patterns to build toward.
 
-### Decisions made
+### Decisions & concepts
 
 **WHAT does the transformer learn — Pure (A) vs Division-of-labor (B)? → CHOSE B.**
 The 3-tab navigation marathon (2026-06-11) exposed that the transformer's
