@@ -2085,6 +2085,12 @@ class LLMAgent:
                         logger.info("Pre-type clear: field has %r — ctrl+a.", _foc_val[:40])
                         self._executor.execute({"action_type": "keyboard",
                                                 "key_count": 1, "keystrokes": ["ctrl+a"]})
+            # Foreground guard: before a keystroke, re-assert the window we OBSERVED.
+            # If a stray click knocked the form out of front, keystrokes would leak
+            # into whatever stole focus (e.g. the terminal → "Windows PowerShell").
+            # Universal (re-focus the observed active window), not form-specific.
+            if prediction.get("action_type") == "keyboard":
+                self._ensure_foreground(state)
             result = self._executor.execute(prediction)
             logger.info("%s", result)
 
@@ -2783,6 +2789,26 @@ class LLMAgent:
 
         except Exception:
             pass   # never block the agent over a cosmetic action
+
+    def _ensure_foreground(self, state: Dict[str, Any]) -> None:
+        """Re-assert the observed active window as foreground before typing, so
+        keystrokes can't leak into a window that stole focus (e.g. the terminal).
+        Best-effort + universal — re-focuses whatever window we just observed."""
+        try:
+            import win32gui
+            title = (state.get("window_title") or "").strip()
+            if not title:
+                return
+            fg = win32gui.GetForegroundWindow()
+            if (win32gui.GetWindowText(fg) or "").strip() == title:
+                return                      # already in front — nothing to do
+            hwnd = win32gui.FindWindow(None, title)
+            if hwnd:
+                win32gui.SetForegroundWindow(hwnd)
+                time.sleep(0.05)
+                logger.info("Foreground guard: re-focused %r before typing", title[:40])
+        except Exception:
+            pass
 
     def _detect_section(self, state: Dict[str, Any], focused_el: Dict) -> str:
         """
