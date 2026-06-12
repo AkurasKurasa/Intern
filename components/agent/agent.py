@@ -624,6 +624,17 @@ class LLMAgent:
         self._validator         = StateValidator()
         self._correction        = CorrectionHandler()
         self._record_num: int               = record_num
+        # 'attempted' state-feature (inference side): identities of fields acted on
+        # this session, fed to the transformer so it stops re-targeting them (the
+        # principled fix for empty-optional-field loops). Reset per record.
+        self._attempted_keys: set            = set()
+        self._attempted_record_num: int      = record_num
+        # Form-window lock: captured on the first observe (the window the user
+        # clicks at "GO"), re-asserted foreground every step so a stray click can
+        # never drift focus into another window (PowerShell/Notepad) and cascade
+        # wrong observations/clicks/scrolls. Also the live viewport for scroll.
+        self._locked_hwnd: Optional[int]     = None
+        self._locked_title: str              = ""
         self._visual_cache: Dict[str, str]  = visual_cache or {}   # Gemini pre-scan data
         self._visual_reader: Optional[Any]  = visual_reader        # VisualDataReader instance
         self._source_window: str            = source_window        # Notepad/source window title
@@ -809,8 +820,13 @@ class LLMAgent:
 
         for step_idx in range(n):
           try:
-            # 1. Observe
+            # 1. Observe — but first re-assert the locked form as foreground so a
+            # stray click last step can't leave us observing/acting on a drifted
+            # window. Lock is captured on the first observe (form is in front at GO).
+            self._reassert_form_window()
             state      = self._observe()
+            if self._locked_hwnd is None:
+                self._lock_form_window(state)
             llm_action: Dict[str, Any] = {}
             _steps_on_tab += 1
             _cur_elem_count = len(state.get("elements", []))
@@ -1558,6 +1574,40 @@ class LLMAgent:
                         time.sleep(self.step_delay)
                         continue
 
+            # ── Scroll-to-reveal (universal mechanic — runs in EVERY mode) ────────
+            # The transformer can only target RENDERED elements; fields below the
+            # fold are invisible to it, so it guesses a below-fold position → blind
+            # click → drift. When no actionable empty field is visible, reveal more
+            # by scrolling (perception-driven, no field names/coords). Scrolls
+            # exhausted at the true bottom → advance the tab. The consecutive-scroll
+            # cap only counts DEAD scrolls — it resets the moment a field is visible,
+            # so a long tab can scroll as many times as it has fields. Gated purely on
+            # field visibility (self-protecting): a transient empty frame can't advance
+            # the tab until _MAX_TAB_SCROLLS dead scrolls have actually happened.
+            if not self._no_visible_empty_field(state):
+                _tab_scroll_count = 0                # actionable field visible → reset cap
+            else:
+                if _tab_scroll_count < _MAX_TAB_SCROLLS and self._scroll_form_down(state):
+                    _tab_scroll_count += 1
+                    _last_auto_step   = step_idx
+                    logger.info("Scroll-reveal: no visible empty field — scrolled (%d/%d).",
+                                _tab_scroll_count, _MAX_TAB_SCROLLS)
+                    time.sleep(self.step_delay * 0.75)
+                    state = self._observe()
+                    self._focus_first_empty_field(state, after_scroll=True)
+                    time.sleep(0.3)
+                    _heuristic_steps += 1
+                    continue
+                elif _tab_scroll_count >= _MAX_TAB_SCROLLS and self._try_advance_tab(state):
+                    logger.info("Scroll-reveal: scrolls exhausted (%d) — advancing tab.",
+                                _tab_scroll_count)
+                    _tab_just_switched = True
+                    _tab_scroll_count  = 0
+                    _last_auto_step    = step_idx
+                    self._refresh_record_cache(self._observe())
+                    time.sleep(self.step_delay)
+                    continue
+
             # 2. Transformer always runs — learned behavioral engine
             llm_action = None
 
@@ -1648,9 +1698,14 @@ class LLMAgent:
                             #  TOGGLE the dropdown shut → no options → Escape loop.)
                             self._executor.execute({"action_type": "click", "click_position": _snap2})
                             if not _cb_val:
+                                # Optional field with no record value (e.g. Suffix).
+                                # Escape + Tab past it, and MARK it attempted so the
+                                # transformer stops re-targeting it (the real fix is the
+                                # 'attempted' state-feature; this just records the hit).
                                 logger.info("[OPT2] combobox %r — no value, Tab", _cb_label)
                                 self._executor.execute({"action_type": "keyboard",
                                                         "key_count": 1, "keystrokes": ["escape"]})
+                                self._mark_attempted(_cbox)
                                 self._executor.execute({"action_type": "keyboard",
                                                         "key_count": 1, "keystrokes": ["tab"]})
                                 time.sleep(self.step_delay * 0.5)
@@ -1712,6 +1767,17 @@ class LLMAgent:
                                             logger.info("[VISITED-ADVANCE] pointer repeated — next unvisited field @ (%.0f,%.0f)", _cx, _cy)
                                             break
                                 _vis.add(_vk)
+                            if not self._point_in_form(_snap2, state):
+                                # Hallucinated target outside the form (e.g. (114,72)
+                                # into another window, or below the viewport). Don't
+                                # drift — Tab instead (stays in-form; wx auto-scrolls
+                                # the focused field into view).
+                                logger.warning("[GUARD] target (%.0f,%.0f) OUTSIDE form window — Tab instead of drifting.",
+                                               _snap2[0], _snap2[1])
+                                self._executor.execute({"action_type": "keyboard",
+                                                        "key_count": 1, "keystrokes": ["tab"]})
+                                time.sleep(self.step_delay * 0.5)
+                                continue
                             prediction = {"action_type": "click", "click_position": _snap2}
                             logger.info("[OPT2] TRANSFORMER navigates → click @ (%.0f,%.0f)  ptr_conf=%.2f",
                                         _snap2[0], _snap2[1], t_pred.get("_click_conf", 0.0))
@@ -2134,6 +2200,10 @@ class LLMAgent:
             validation  = self._validator.validate(state, state_after, prediction)
             logger.info("Validator → %s: %s", validation.status, validation.reason)
 
+            # Record the field acted on this step (attempted feature) — mirrors the
+            # train-time derivation (every click/type target becomes 'attempted').
+            self._record_attempt(state, prediction)
+
             if validation.status == "done":
                 logger.info("StateValidator: task appears complete.")
                 break
@@ -2483,6 +2553,11 @@ class LLMAgent:
         if records:
             rec = records.get(self._record_num, records.get(min(records), {}))
             self._cached_record = rec
+            # New record = new session → clear attempted history so fields on the
+            # fresh record aren't pre-marked from the previous one.
+            if self._record_num != self._attempted_record_num:
+                self._attempted_keys.clear()
+                self._attempted_record_num = self._record_num
             sample = list(rec.items())[:5]
             logger.info("Record cache refreshed: %d fields for record %d  sample=%r",
                         len(rec), self._record_num, sample)
@@ -2790,6 +2865,76 @@ class LLMAgent:
         except Exception:
             pass   # never block the agent over a cosmetic action
 
+    def _lock_form_window(self, state: Dict[str, Any]) -> None:
+        """Capture the form's window handle once (the window in front at 'GO'),
+        so we can re-assert it every step and never drift into another window."""
+        if self._locked_hwnd is not None:
+            return
+        try:
+            import win32gui
+            title = (state.get("window_title") or "").strip()
+            hwnd = win32gui.FindWindow(None, title) if title else win32gui.GetForegroundWindow()
+            if hwnd:
+                self._locked_hwnd  = hwnd
+                self._locked_title = title
+                logger.info("Form window LOCKED: %r (hwnd=%s)", title[:40], hwnd)
+        except Exception as exc:
+            logger.debug("Form-lock failed: %s", exc)
+
+    def _reassert_form_window(self) -> None:
+        """Bring the locked form back to foreground if focus drifted away. Runs at
+        the top of every step → the model physically cannot act on another window."""
+        if not self._locked_hwnd:
+            return
+        try:
+            import win32gui
+            if win32gui.GetForegroundWindow() == self._locked_hwnd:
+                return
+            if not win32gui.IsWindow(self._locked_hwnd):
+                return
+            # Alt keypress satisfies the SetForegroundWindow focus-steal restriction.
+            try:
+                import win32com.client
+                win32com.client.Dispatch("WScript.Shell").SendKeys('%')
+            except Exception:
+                pass
+            win32gui.SetForegroundWindow(self._locked_hwnd)
+            time.sleep(0.05)
+            logger.info("Re-asserted form foreground (focus had drifted off the form).")
+        except Exception as exc:
+            logger.debug("Re-assert form failed: %s", exc)
+
+    def _form_rect(self, state: Dict[str, Any]):
+        """Live (l, t, r, b) of the locked form window."""
+        try:
+            import win32gui
+            hwnd = self._locked_hwnd or win32gui.GetForegroundWindow()
+            return win32gui.GetWindowRect(hwnd)
+        except Exception:
+            sw, sh = state.get("screen_resolution", [1920, 1200])
+            return (0, 0, sw, sh)
+
+    def _point_in_form(self, pos, state: Dict[str, Any], margin: int = 6) -> bool:
+        """True if a click target falls inside the locked form window (so the
+        transformer can't drift a click into another window)."""
+        if not pos or len(pos) < 2:
+            return False
+        l, t, r, b = self._form_rect(state)
+        return (l - margin) <= pos[0] <= (r + margin) and (t - margin) <= pos[1] <= (b + margin)
+
+    def _form_viewport_bottom(self, state: Dict[str, Any]) -> float:
+        """Live bottom edge of the form's scroll viewport (locked window rect,
+        clamped to the screen). Used to tell on-screen fields from scrolled-off
+        ones — the window size varies per run, so this must be read live."""
+        sh = state.get("screen_resolution", [1920, 1200])[1]
+        try:
+            import win32gui
+            hwnd = self._locked_hwnd or win32gui.GetForegroundWindow()
+            _, _, _, wb = win32gui.GetWindowRect(hwnd)
+            return min(wb, sh)
+        except Exception:
+            return sh
+
     def _ensure_foreground(self, state: Dict[str, Any]) -> None:
         """Re-assert the observed active window as foreground before typing, so
         keystrokes can't leak into a window that stole focus (e.g. the terminal).
@@ -3055,6 +3200,34 @@ class LLMAgent:
         ev = expected.lower().strip()
         should_check = ev.startswith("yes") or ev in {"check", "true", "1", "checked"}
         return (field_name, should_check)
+
+    def _no_visible_empty_field(self, state: Dict[str, Any]) -> bool:
+        """
+        True when NO actionable empty field is currently on-screen — the signal to
+        scroll-to-reveal. Universal mechanic (no field names / coords / app names):
+          fillable WIDGET TYPE (edit/combobox) + empty VALUE + not yet 'attempted'
+          + geometry inside the active window's on-screen rect (GetWindowRect bottom).
+        Off-fold fields still report real bboxes, so we gate on the window's actual
+        visible bottom rather than the raw screen height.
+        """
+        v_bottom = self._form_viewport_bottom(state) - 8   # live form viewport bottom
+        _FILL = {"editcontrol", "input", "comboboxcontrol"}
+        for e in state.get("elements", []):
+            if e.get("window_role") == "background":
+                continue
+            if (e.get("type") or "").lower() not in _FILL:
+                continue
+            if (e.get("value") or "").strip():          # already filled
+                continue
+            if self._attempt_key(e) in self._attempted_keys:   # tried (empty optional)
+                continue
+            b = e.get("bbox")
+            if not b or len(b) != 4:
+                continue
+            cy = (b[1] + b[3]) / 2
+            if b[1] >= 0 and cy <= v_bottom:            # inside the visible window
+                return False                            # an actionable field is visible
+        return True
 
     def _scroll_form_down(self, state: Dict[str, Any]) -> bool:
         """
@@ -3933,7 +4106,8 @@ class LLMAgent:
         """Match the recorder's slim EXACTLY so the transformer sees the same
         element shape it trained on (else inputs are out-of-distribution)."""
         _KEEP = ("element_id", "type", "label", "text", "value", "bbox",
-                 "window_role", "window_title", "app", "focused", "confidence")
+                 "window_role", "window_title", "app", "focused", "confidence",
+                 "attempted")
         out = dict(state)
         slim = []
         for e in state.get("elements", []):
@@ -3949,12 +4123,63 @@ class LLMAgent:
         out["elements"] = slim
         return out
 
+    def _attempt_key(self, elem: Dict[str, Any]):
+        """Match transformer._attempt_key exactly (label-primary, scroll-stable)."""
+        lbl = (elem.get("label") or elem.get("text") or "").strip().lower()
+        if lbl:
+            return lbl
+        b = elem.get("bbox") or [0, 0, 0, 0]
+        return ("@", round((b[0] + b[2]) / 2 / 20) * 20, round((b[1] + b[3]) / 2 / 20) * 20)
+
+    def _mark_attempted(self, elem: Dict[str, Any]) -> None:
+        """Record that a field has been acted on this session (attempted feature)."""
+        if isinstance(elem, dict):
+            self._attempted_keys.add(self._attempt_key(elem))
+
+    def _elem_at(self, state: Dict[str, Any], pos) -> Optional[Dict[str, Any]]:
+        """Element whose bbox contains pos (nearest center on ties)."""
+        if not pos or len(pos) < 2:
+            return None
+        px, py = pos[0], pos[1]
+        best, best_d = None, 1e18
+        for e in state.get("elements", []):
+            b = e.get("bbox")
+            if not b or len(b) != 4:
+                continue
+            if b[0] - 2 <= px <= b[2] + 2 and b[1] - 2 <= py <= b[3] + 2:
+                d = ((b[0] + b[2]) / 2 - px) ** 2 + ((b[1] + b[3]) / 2 - py) ** 2
+                if d < best_d:
+                    best, best_d = e, d
+        return best
+
+    def _record_attempt(self, state: Dict[str, Any], prediction: Dict[str, Any]) -> None:
+        """Mark the element this step acted on — keyboard→focused, click→element
+        under the cursor — so the transformer sees it as attempted next frame."""
+        at = prediction.get("action_type")
+        elem = None
+        if at == "keyboard":
+            fid = state.get("focused_element_id")
+            elem = next((e for e in state.get("elements", []) if e.get("element_id") == fid), None)
+        elif at == "click":
+            elem = self._elem_at(state, prediction.get("click_position") or [])
+        if elem is not None:
+            self._mark_attempted(elem)
+
+    def _stamp_attempted_live(self, state: Dict[str, Any]) -> None:
+        """Stamp attempted=1 on observed elements acted on earlier this session."""
+        if not self._attempted_keys:
+            return
+        for e in state.get("elements", []):
+            if self._attempt_key(e) in self._attempted_keys:
+                e["attempted"] = 1.0
+
     def _predict(self, state: Dict[str, Any]) -> Dict[str, Any]:
         try:
             try:
                 from components.intelligence.model.transformer import predict
             except ImportError:
                 from intelligence.model.transformer import predict
+            self._stamp_attempted_live(state)
             return predict(
                 state=self._slim_for_model(state),
                 history=self._history[-3:],

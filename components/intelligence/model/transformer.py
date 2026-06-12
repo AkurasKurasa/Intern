@@ -82,12 +82,20 @@ NUM_HOTKEYS = len(HOTKEYS)
 _HOTKEY_IDX = {h: i for i, h in enumerate(HOTKEYS)}
 
 # is_real(1) + bbox(4) + confidence(1) + window_role(1) + is_focused(1) + ctrl_type(1)
-#   + is_filled(1) + text_embedding(384)
+#   + is_filled(1) + attempted(1) + text_embedding(384)
 # is_filled is PERCEPTION (does this field currently hold a value), read straight
 # from the observed element — NOT a hand-tracked progress signal. Without it the
 # model only saw field labels and was blind to which fields were already done,
 # so it looped / re-entered filled fields.
-ELEM_FEATURES = 10 + _EMBED_DIM
+# attempted is INTERACTION HISTORY: has the operator already acted on this field
+# earlier in this session (click or type), regardless of whether it ended up
+# filled. is_filled handles "field has a value"; attempted handles the case
+# is_filled cannot — an EMPTY optional field (e.g. Suffix with no record value)
+# that the model would otherwise re-target forever (is_filled never flips). Once
+# acted on, attempted=1 → the model learns to move on. Derived from demo step
+# order at train time; tracked by the agent at inference. (This is the principled
+# successor to the old is_visited feature — keyed on "acted on", not nav-order.)
+ELEM_FEATURES = 11 + _EMBED_DIM
 _REAL_ELEM_FLAG_IDX = 0  # feature index for the is_real flag
 
 # Numeric encoding for control types — focused/interactive types get distinct values
@@ -198,6 +206,20 @@ def _elem_label(elem: dict) -> str:
     return ((elem.get("label") or elem.get("text") or "").strip())
 
 
+def _attempt_key(elem: dict):
+    """
+    Session-stable identity for the 'attempted' feature. Label-primary so it
+    survives scroll (positions shift, labels don't); falls back to a coarse
+    bbox-center bucket for unlabeled elements. Must match between train-time
+    derivation and the agent's inference-time tracking.
+    """
+    lbl = (elem.get("label") or elem.get("text") or "").strip().lower()
+    if lbl:
+        return lbl
+    b = elem.get("bbox") or [0, 0, 0, 0]
+    return ("@", round((b[0] + b[2]) / 2 / 20) * 20, round((b[1] + b[3]) / 2 / 20) * 20)
+
+
 def _encode_element(elem: dict, W: float, H: float, focused_id=None) -> List[float]:
     x1, y1, x2, y2 = (float(v) for v in elem.get("bbox", [0, 0, 0, 0])[:4])
     conf       = float(elem.get("confidence", 0.0))
@@ -208,13 +230,16 @@ def _encode_element(elem: dict, W: float, H: float, focused_id=None) -> List[flo
     # element itself. Lets the model tell a done field from an empty one.
     _val       = (elem.get("value") or "").strip()
     is_filled  = 1.0 if _val else 0.0
+    # INTERACTION HISTORY: has this field already been acted on this session?
+    # Stamped onto the element dict (train: from demo order; inference: by agent).
+    attempted  = 1.0 if elem.get("attempted") else 0.0
     # embed label + current value so a filled field is semantically distinct from
     # the same field empty (was embedding only the label → filled == empty).
     text_emb   = _embed_text(((elem.get("text") or "") + " " + _val).strip())
     # is_real=1.0 at index 0 ensures real elements are never zero-masked even if all
     # other features happen to be zero (e.g. top-left element with empty text, unknown type)
     return [1.0, x1 / W, y1 / H, x2 / W, y2 / H, conf, role, is_focused, ctrl_type,
-            is_filled] + text_emb
+            is_filled, attempted] + text_emb
 
 
 def encode_state(state: dict, max_elements: int = 128) -> torch.Tensor:
@@ -464,7 +489,7 @@ class TrajectoryDataset(Dataset):
         _cache_path = root / ".dataset_cache.pkl"
         # ELEM_FEATURES in the key → a change in the feature layout invalidates
         # any stale cache built with a different one.
-        _cache_key  = (max_elements, hist_len, aug_drop_prob, ELEM_FEATURES, "v4_rareweight")
+        _cache_key  = (max_elements, hist_len, aug_drop_prob, ELEM_FEATURES, "v5_attempted")
 
         def _cache_valid() -> bool:
             if not _cache_path.exists():
@@ -492,6 +517,7 @@ class TrajectoryDataset(Dataset):
                     self._grouped_manifests = _cached["grouped_manifests"]
                     self._samples           = _cached["samples"]
                     self._sample_weights    = _cached.get("sample_weights")
+                    self._attempted_by_file = _cached.get("attempted_by_file", {})
                     print(f"[Dataset] Loaded from cache: {len(self._samples)} samples "
                           f"from {len(self._grouped_files)} session(s).")
                     self._preload_tensors()
@@ -539,6 +565,9 @@ class TrajectoryDataset(Dataset):
         # on large datasets. Only action metadata (ints/floats) stored at init.
         self._grouped_files:    List[List[Path]]                    = []
         self._grouped_manifests: List[Optional[Dict[str, Any]]]     = []
+        # fpath -> frozenset of attempt-keys acted on EARLIER in the same session.
+        # Stamped onto each state's elements before encoding (the 'attempted' feat).
+        self._attempted_by_file: Dict[str, frozenset]               = {}
         skipped = 0
         grouped_action_meta: List[List[Tuple[int, float, float, float, str]]] = []
         grouped_src_idx:     List[List[int]] = []
@@ -555,6 +584,7 @@ class TrajectoryDataset(Dataset):
             g_src_idx:    List[int]   = []
             g_click_idx:  List[int]   = []
             g_click_type: List[str]   = []
+            g_acted: set              = set()   # attempt-keys acted on so far (this session)
             manifest = _load_manifest(group_files)
 
             for fpath in group_files:
@@ -592,6 +622,17 @@ class TrajectoryDataset(Dataset):
                 # get up-weighted, no hardcoded class).
                 click_type = ((elems[click_idx].get("type") or "").lower()
                               if 0 <= click_idx < len(elems) else "")
+                # 'attempted' derivation: this step SEES every field acted on in
+                # PRIOR steps (snapshot before adding the current target). Then
+                # record this step's target so later steps see it as attempted.
+                self._attempted_by_file[str(fpath)] = frozenset(g_acted)
+                _tgt_elem = None
+                if action[0] == ACTION_CLICK and 0 <= click_idx < len(elems):
+                    _tgt_elem = elems[click_idx]
+                elif action[0] == ACTION_KEYBOARD and 0 <= src_idx < len(elems):
+                    _tgt_elem = elems[src_idx]
+                if _tgt_elem is not None:
+                    g_acted.add(_attempt_key(_tgt_elem))
                 valid_files.append(fpath)
                 g_actions.append(action)
                 g_src_idx.append(src_idx)
@@ -678,6 +719,7 @@ class TrajectoryDataset(Dataset):
                     "grouped_manifests": self._grouped_manifests,
                     "samples":           self._samples,
                     "sample_weights":    getattr(self, "_sample_weights", None),
+                    "attempted_by_file": self._attempted_by_file,
                 }, _cf, protocol=4)
             print(f"[Dataset] Cache saved -> {_cache_path}")
         except Exception as _se:
@@ -707,6 +749,7 @@ class TrajectoryDataset(Dataset):
             for i, fpath in enumerate(unique_files):
                 t = _load_trace(fpath)
                 state = t.get("state", {}) if t else {}
+                self._stamp_attempted(fpath, state)
                 self._tensor_cache[fpath] = encode_state(state, self.max_elements)
                 if (i + 1) % 1000 == 0 or (i + 1) == total:
                     pct = (i + 1) / total * 100
@@ -723,6 +766,16 @@ class TrajectoryDataset(Dataset):
             print(f"[Dataset] Large dataset ({len(unique_files)} files) — "
                   f"using LRU tensor cache (max={_PRELOAD_LIMIT}).", flush=True)
 
+    def _stamp_attempted(self, fpath, state: dict) -> None:
+        """Mark elements that were acted on EARLIER in this session (the
+        'attempted' feature) by mutating the state dict before encoding."""
+        keys = self._attempted_by_file.get(str(fpath))
+        if not keys:
+            return
+        for e in state.get("elements", []):
+            if _attempt_key(e) in keys:
+                e["attempted"] = 1.0
+
     def _get_tensor(self, fpath: "Path") -> torch.Tensor:
         """Fetch encoded state tensor, using preload dict or LRU cache."""
         if self._tensor_cache is not None:
@@ -733,6 +786,7 @@ class TrajectoryDataset(Dataset):
             return self._lru_cache[fpath]
         t = _load_trace(fpath)
         state = t.get("state", {}) if t else {}
+        self._stamp_attempted(fpath, state)
         tensor = encode_state(state, self.max_elements)
         self._lru_cache[fpath] = tensor
         if len(self._lru_cache) > self._lru_maxsize:
