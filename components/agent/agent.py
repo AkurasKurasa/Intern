@@ -1676,6 +1676,20 @@ class LLMAgent:
                                if _fe2 else "(no focus)")
                     logger.info("[OPT2] TRANSFORMER chose TYPE → LLM value for '%s' → %r",
                                 _flabel, prediction.get("text", "")[:40])
+                    # Leave-blank guard: if the resolved value means "leave empty"
+                    # (record said '(leave blank)' / none / n-a, possibly with a note),
+                    # DON'T type the placeholder literally — Tab past + mark attempted.
+                    # Generic (substring match, no field names).
+                    _txt  = (prediction.get("text") or "").strip()
+                    _norm = _txt.lower().strip().strip("()").strip()
+                    if (not _txt) or _norm in {"none", "n/a", "na"} or _norm.startswith("leave blank"):
+                        logger.info("[OPT2] %r → leave-blank/empty — Tab past (skip).", _flabel)
+                        if _fe2 is not None:
+                            self._mark_attempted(_fe2)
+                        self._executor.execute({"action_type": "keyboard",
+                                                "key_count": 1, "keystrokes": ["tab"]})
+                        time.sleep(self.step_delay * 0.4)
+                        continue
                 else:
                     # Transformer pointer navigates to the next field
                     _decision_maker = "transformer"
@@ -3042,18 +3056,25 @@ class LLMAgent:
         """
         if not self._cached_record:
             return ""
-        _skip_vals = {"(none)", "none", "(leave blank)", "n/a", "yes (check)",
-                      "leave blank — liability only", "leave blank — owned outright"}
         rec = self._cached_record
 
         import re as _re
 
+        def _is_blank(v: str) -> bool:
+            """A record value that means 'leave the field empty'. Robust to parens
+            and trailing notes: '(leave blank)', 'leave blank — liability only',
+            '(none)', 'none', 'n/a' all count as blank → field is skipped."""
+            if not v:
+                return True
+            n = v.lower().strip().strip("()").strip()
+            return (n in {"none", "n/a", "na", ""}
+                    or n.startswith("leave blank")
+                    or n.startswith("none "))
+
         def _get(key: str) -> str:
             kl = key.lower()
             v = rec.get(key) or next((rv for rk, rv in rec.items() if rk.lower() == kl), "")
-            if not v or v.lower().strip("()") in _skip_vals:
-                return ""
-            return v
+            return "" if _is_blank(v) else v
 
         def _get_fuzzy(key: str) -> str:
             """Strip punctuation/spaces and match any record key that contains all words."""
@@ -3063,7 +3084,7 @@ class LLMAgent:
             for rk, rv in rec.items():
                 rk_words = set(_re.sub(r"[^a-z0-9 ]", " ", rk.lower()).split())
                 if kl_words <= rk_words or rk_words <= kl_words:
-                    if rv and rv.lower().strip("()") not in _skip_vals:
+                    if not _is_blank(rv):
                         return rv
             return ""
 
