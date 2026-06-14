@@ -1587,20 +1587,29 @@ class LLMAgent:
             if not self._no_visible_empty_field(state):
                 _tab_scroll_count = 0                # actionable field visible → reset cap
             else:
-                if _tab_scroll_count < _MAX_TAB_SCROLLS and self._scroll_form_down(state):
-                    _tab_scroll_count += 1
+                # Reasoned WHEN: nothing fillable on screen → reveal more.
+                # VERIFIED HOW: scroll ONCE, then check the visible-field signature
+                # actually CHANGED. Changed → new content revealed, let the transformer
+                # act on it. Unchanged → the view didn't move = we're at the bottom
+                # (don't blind-spin) → advance the tab. NO SetFocus here — it yanks the
+                # view back and fights the scroll (that was the old 6× spin bug).
+                _sig_before = self._visible_field_sig(state)
+                _scrolled   = self._scroll_form_down(state)
+                time.sleep(self.step_delay * 0.6)
+                _state_after = self._observe()
+                if _scrolled and self._visible_field_sig(_state_after) != _sig_before:
+                    logger.info("Scroll-reveal: scroll moved the view — new fields revealed.")
+                    state             = _state_after
+                    _tab_scroll_count = 0
                     _last_auto_step   = step_idx
-                    logger.info("Scroll-reveal: no visible empty field — scrolled (%d/%d).",
-                                _tab_scroll_count, _MAX_TAB_SCROLLS)
-                    time.sleep(self.step_delay * 0.75)
-                    state = self._observe()
-                    self._focus_first_empty_field(state, after_scroll=True)
-                    time.sleep(0.3)
                     _heuristic_steps += 1
                     continue
-                elif _tab_scroll_count >= _MAX_TAB_SCROLLS and self._try_advance_tab(state):
-                    logger.info("Scroll-reveal: scrolls exhausted (%d) — advancing tab.",
-                                _tab_scroll_count)
+                # View did not move → bottom of this tab.
+                _tab_scroll_count += 1
+                logger.info("Scroll-reveal: view unchanged after scroll (%d) — at bottom of tab.",
+                            _tab_scroll_count)
+                if _tab_scroll_count >= 2 and self._try_advance_tab(state):
+                    logger.info("Scroll-reveal: bottom reached — advancing tab.")
                     _tab_just_switched = True
                     _tab_scroll_count  = 0
                     _last_auto_step    = step_idx
@@ -2042,7 +2051,33 @@ class LLMAgent:
                 )
                 if _tab_hit:
                     _hit_name = (_tab_hit.get("text") or _tab_hit.get("label") or "?").strip()
-                    logger.info("LLM clicked tab element %r — routing through _try_advance_tab.", _hit_name)
+                    # Go to the tab the model ACTUALLY clicked — NOT current+1.
+                    # (Routing every tab-click through advance-to-next made repeated
+                    # clicks on one tab race through ALL tabs, filling none.)
+                    _sorted_tabs = sorted(_all_tabs, key=lambda e: e["bbox"][0])
+                    _hit_idx = _sorted_tabs.index(_tab_hit)
+                    if _hit_idx != self._current_tab_idx:
+                        x1, y1, x2, y2 = _tab_hit["bbox"]
+                        logger.info("Tab-click → navigating to %r (idx %d).", _hit_name, _hit_idx)
+                        self._executor.execute({"action_type": "click",
+                                                "click_position": [(x1 + x2) / 2, (y1 + y2) / 2]})
+                        self._current_tab_idx = _hit_idx
+                        _no_change_streak  = 0
+                        _tab_just_switched = True
+                        _tab_scroll_count  = 0
+                        _last_auto_step    = step_idx
+                        self._filled_this_tab.clear()
+                        _confirmed_blank_fields.clear()
+                        self._refresh_record_cache(state)
+                        time.sleep(self.step_delay)
+                        continue
+                    # Model re-clicked the tab it's ALREADY on → don't race. Fill the
+                    # next unfilled field instead; only if none left, advance to next tab.
+                    if self._focus_first_empty_field(state):
+                        logger.info("Tab %r already active — focusing next unfilled field instead.", _hit_name)
+                        time.sleep(0.3)
+                        _heuristic_steps += 1
+                        continue
                     if self._try_advance_tab(state):
                         _no_change_streak  = 0
                         _tab_just_switched = True
@@ -2053,7 +2088,6 @@ class LLMAgent:
                         self._refresh_record_cache(state)
                         time.sleep(self.step_delay)
                         continue
-                    # Tab advance failed (already on last tab) — fall through to execute
                     prediction = {"action_type": "no_op"}
 
             # Combobox: type-into-combobox → open dropdown + click matching listitem
@@ -3200,6 +3234,26 @@ class LLMAgent:
         ev = expected.lower().strip()
         should_check = ev.startswith("yes") or ev in {"check", "true", "1", "checked"}
         return (field_name, should_check)
+
+    def _visible_field_sig(self, state: Dict[str, Any]) -> frozenset:
+        """Signature of fillable fields currently inside the form viewport
+        (label + rounded y). Used to VERIFY a scroll actually moved the view:
+        signature changes → new content revealed; unchanged → at the bottom."""
+        vb = self._form_viewport_bottom(state)
+        sig = set()
+        for e in state.get("elements", []):
+            if e.get("window_role") == "background":
+                continue
+            if (e.get("type") or "").lower() not in ("editcontrol", "comboboxcontrol", "checkboxcontrol"):
+                continue
+            b = e.get("bbox")
+            if not b or len(b) != 4:
+                continue
+            cy = (b[1] + b[3]) / 2
+            if b[1] >= 0 and cy <= vb:
+                lbl = (e.get("label") or e.get("text") or "").strip().lower()
+                sig.add((lbl, round(cy / 15) * 15))
+        return frozenset(sig)
 
     def _no_visible_empty_field(self, state: Dict[str, Any]) -> bool:
         """

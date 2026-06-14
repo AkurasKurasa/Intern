@@ -844,6 +844,11 @@ class CarInsuranceFrame(wx.Frame):
         self._auto_save(data)
         self._record_counter += 1
         self._clear_all_fields()
+        # Reset EVERY tab's scroll position to its very top for the next record.
+        for _i in range(self.nb.GetPageCount()):
+            _pg = self.nb.GetPage(_i)
+            if hasattr(_pg, "Scroll"):
+                _pg.Scroll(0, 0)
         self.nb.SetSelection(0)
         self._status_lbl.SetLabel(
             f"  Submitted #{self._record_counter} — Ready for next record"
