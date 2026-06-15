@@ -396,16 +396,34 @@ task* end-to-end (tab order erratic, leave-blank literal, scroll dead, single re
 Chasing a 2nd scope before the 1st completes is premature.
 
 ### ⭐ PRIORITY ORDER — next actions (do top-down, ONE at a time, re-test each)
-1. **Fix `(leave blank)` literal-typing** — substring-match leave-blank/none → skip
-   (Tab past) in `_lookup_field` + LLM value path. (Quick, pure win, no retrain.)
-2. **Verify + fix scroll actually moves** the wx panel (else below-fold fields on tall
+1. **Fix `(leave blank)` literal-typing** — DONE as a deterministic skip (band-aid).
+   Pure fix = #2 below (infer it). Current: `_lookup_field` blank-normalizer + type-path skip.
+2. **CLOSE THE RULESET-INFERENCE LOOP** — *the no-hardcode path.* Wiring exists:
+   `scripts/build_ruleset.py` runs `correct()` over recorded demos → persistent
+   `tasks/form_filling/ruleset.md` → agent loads it into the LLM system prompt at startup.
+   **BLOCKER found (2026-06-14):** `_compress_session` can't read the **action-based
+   recorder's** traces — they store raw `mouse`/`keyboard`, not the decoded `action` dict
+   it expects → it skips every step → `correct()` gets empty → spec unchanged. AND even
+   when decoded, the compressor emits only the USER'S ACTIONS, **not the source-screen
+   text** (the Notepad "(leave blank)") that the rule must be inferred from. The OLD
+   recorder's traces had both → that's why it could infer leave-blank. **Fix (additive,
+   low-risk — RuleExtractor is OFFLINE, agent only READS ruleset.md, keep .bak + hardcode
+   backup):** (a) new compressor for the new trace format — decode `mouse`/`keyboard`
+   (reuse transformer `_decode_actions`); (b) include per-step SOURCE values
+   (`window_role="background"` elems / `session_manifest.json`) so the LLM sees "source
+   said X, user did Y" → can induce value/skip rules. **Eyeball the output before
+   overwriting `ruleset.md` or adding any recorder auto-hook.** Then the leave-blank
+   hardcode (#1) becomes redundant backup, and conditional rules (Big Three #3) become
+   learnable. `scripts/build_ruleset.py` = the run-over-demos driver (built, works once
+   the compressor is fixed).
+3. **Verify + fix scroll actually moves** the wx panel (else below-fold fields on tall
    tabs are skipped). Confirm `pyautogui.scroll` moves the form; fix target/focus.
-3. **Tab-visit order** — model skips/revisits tabs. Cleaner left-to-right demos and/or
+4. **Tab-visit order** — model skips/revisits tabs. Cleaner left-to-right demos and/or
    a generic "prefer unvisited tab" cue. NO hardcoded order.
-4. **Strip WHERE-crutches** (Stage 2.5) — let the 0.88 transformer navigate; agent does
+5. **Strip WHERE-crutches** (Stage 2.5) — let the 0.88 transformer navigate; agent does
    only HOW. One at a time, re-test (guards perturb model history).
-5. **Multi-record ×5** + per-record refresh.
-6. **End-to-end verification** (Completion → ~100%).
+6. **Multi-record ×5** + per-record refresh.
+7. **End-to-end verification** (Completion → ~100%).
 > Commit the working batch (reverted agent + tab-click fix + verified-scroll) before
 > #1 so there's a clean restore point.
 
