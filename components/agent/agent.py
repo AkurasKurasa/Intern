@@ -638,6 +638,8 @@ class LLMAgent:
         # Tab past instead of re-typing. Keyed by _attempt_key (scroll-stable).
         # Generic (any unfillable widget), reset per record.
         self._fill_fail_count: dict          = {}
+        self._verify_fix_count: dict         = {}   # verify: field → times re-corrected (accept as dead after 2)
+        self._keystroke_retried: dict        = {}   # field → tried keystroke-typing after a paste no_change
         self._dead_fill_keys:  set           = set()
         # How many times _reveal_missing_by_scroll focused a field that was
         # already visible but still unfilled. After 2 attempts we mark it dead
@@ -817,6 +819,8 @@ class LLMAgent:
         _last_auto_step:   int            = -1  # step_idx of last step where an auto-handler fired
         _DROUGHT_LIMIT:    int            = 10  # scroll form after this many non-fill steps in a row
         _tab_scroll_count: int            = 0   # scrolls performed on current tab
+        _expose_scrolls:   int            = 0   # Mechanism-2 proactive expose-scrolls on current tab
+        _m2_at_bottom:     bool           = False  # M2: _scrollbar_drag returned no-move → already at bottom
         _MAX_TAB_SCROLLS:  int            = 6   # max drought-scrolls per tab before giving up
         _steps_on_tab:     int            = 0   # steps spent on current tab — forces advance if too many
         _TAB_STEP_LIMIT:   int            = 40  # force tab advance after this many steps on same tab
@@ -825,7 +829,7 @@ class LLMAgent:
         _confirmed_blank_fields: set      = set()  # fields where peek found no value → treat as blank
         _heuristic_steps:        int      = 0      # steps decided by auto-handlers (not LLM/transformer)
         _steps_since_fill:       int      = 0      # steps since a field VALUE actually changed (a real fill)
-        _STALL_LIMIT:            int      = 2      # model fixating (clicks "succeed" but nothing fills) → take over: NAVIGATION PROTOCOL (fires fast, before patience/interrupt)
+        _STALL_LIMIT:            int      = 6      # no real fill for N steps → stuck (oscillation/dead-clicks) → sweep. 6 lets normal multi-step nav (click→type) breathe; M2 handles the routine feed.
         _prev_filled_labels:     set      = set()  # filled-field fingerprint last step — path-independent progress detector
 
         _record_cache_loaded     = False
@@ -867,13 +871,18 @@ class LLMAgent:
             if self._locked_hwnd is None:
                 self._lock_form_window(state)
             # Refresh the Submit/finish-button bboxes for the chokepoint guard.
+            # ACCUMULATE across steps (union) — a submit button can drop out of one
+            # observation (scrolled/not-rendered); if we only used the current frame,
+            # a click there would leak through unblocked (which submitted the form
+            # early). Buttons don't move, so keeping every bbox we've ever seen is safe.
             _SUBMIT_KW = ("submit", "finish", "& new", "save", "accept")
-            self._submit_bboxes = [
-                e["bbox"] for e in state.get("elements", [])
-                if (e.get("type") or "").lower() in ("buttoncontrol", "button")
-                and e.get("bbox")
-                and any(k in (e.get("text") or e.get("label") or "").lower() for k in _SUBMIT_KW)
-            ]
+            for _e in state.get("elements", []):
+                if ((_e.get("type") or "").lower() in ("buttoncontrol", "button")
+                        and _e.get("bbox")
+                        and any(k in (_e.get("text") or _e.get("label") or "").lower() for k in _SUBMIT_KW)):
+                    _bb = _e["bbox"]
+                    if _bb not in self._submit_bboxes:
+                        self._submit_bboxes.append(_bb)
             llm_action: Dict[str, Any] = {}
             _steps_on_tab += 1
             _cur_elem_count = len(state.get("elements", []))
@@ -913,6 +922,46 @@ class LLMAgent:
                 self._reassert_form_window()
                 _prev_elem_count = 0
                 continue
+
+            # ── Mechanism 2: Proactive Expose-Scroll ─────────────────────────
+            # The transformer can only target VISIBLE elements. When visible empties
+            # run low the transformer starves, fixates, and the LLM sweep takes over.
+            # Pre-emptively scroll to expose the next batch of empty fields BEFORE
+            # the transformer prediction so it always has targets to choose from.
+            # Generic: driven by widget-type + geometry (viewport bottom) only.
+            #
+            # NOTE: _has_offfold_empty is NOT used as a hard gate here.
+            # wx ScrolledPanel reports below-fold fields with coords that may not
+            # exceed GetWindowRect bottom (outer frame vs. scroll viewport), so
+            # _has_offfold_empty can be False even when more content exists.
+            # Instead, we rely on _scrollbar_drag's movement verification: if the
+            # panel did NOT move (returns False), we set _m2_at_bottom so M2 stops
+            # trying for the rest of this tab — the correct bottom-of-scroll stop.
+            _M2_EXPOSE_CAP = 6   # max proactive scrolls per tab
+            _m2_vis = self._visible_empty_count(state)
+            _m2_offfold = self._has_offfold_empty(state)
+            logger.debug("M2-check: vis_empty=%d offfold=%s just_switched=%s scrolls=%d/%d at_bottom=%s",
+                         _m2_vis, _m2_offfold, _tab_just_switched,
+                         _expose_scrolls, _M2_EXPOSE_CAP, _m2_at_bottom)
+            # NOTE: deliberately NOT gated on _no_autohandlers — M2 is the intended
+            # transformer-feeding mechanic (keep the screen stocked with empties),
+            # not a legacy heuristic. run_task passes disable_auto_handlers=True, which
+            # must NOT switch M2 off.
+            if (_expose_scrolls < _M2_EXPOSE_CAP
+                    and not _m2_at_bottom
+                    and _m2_vis <= 1):
+                _moved = self._scrollbar_drag(state, 240.0)
+                if _moved:
+                    _expose_scrolls += 1
+                    time.sleep(self.step_delay * 0.5)
+                    state = self._observe()
+                    logger.info("Expose-scroll: visible empties low → scrolled to reveal next batch "
+                                "(now %d visible, scroll %d/%d).",
+                                self._visible_empty_count(state), _expose_scrolls, _M2_EXPOSE_CAP)
+                else:
+                    _m2_at_bottom = True
+                    logger.info("Expose-scroll: _scrollbar_drag returned no-move → already at bottom "
+                                "for this tab (stopping M2 proactive scroll).")
 
             # Load record cache on first step
             if not _record_cache_loaded:
@@ -981,7 +1030,11 @@ class LLMAgent:
             # field; if the tab is genuinely complete it advances via the LLM gap.
             # This is the trigger that was missing — scroll only fired on tab-clicks
             # or empty-screen, never during an in-view fixation.
-            if _steps_since_fill >= _STALL_LIMIT and not self._no_autohandlers:
+            # NOT gated on _no_autohandlers — the stall rescue is the intended
+            # fallback (run_task sets disable_auto_handlers=True, which must NOT switch
+            # it off). Catches A-B-A-B oscillation / dead-click fixation that the
+            # exact-repeat guard misses: no field VALUE filled for _STALL_LIMIT steps.
+            if _steps_since_fill >= _STALL_LIMIT:
                 # NAVIGATION PROTOCOL — SWEEP. When the transformer stalls, the
                 # protocol TAKES OVER and drives the whole tab to completion instead
                 # of filling one field and handing back (the model just re-fixates).
@@ -994,6 +1047,8 @@ class LLMAgent:
                 state, _finish = self._sweep_tab(state)
                 _steps_since_fill  = 0
                 _tab_scroll_count  = 0
+                _expose_scrolls    = 0
+                _m2_at_bottom      = False
                 _tab_just_switched = True
                 _last_auto_step    = step_idx
                 _heuristic_steps  += 1
@@ -1030,6 +1085,8 @@ class LLMAgent:
                 _tab_just_switched  = False
                 _steps_on_tab       = 0
                 _tab_scroll_count   = 0
+                _expose_scrolls     = 0
+                _m2_at_bottom       = False
                 _no_change_streak   = 0
                 _last_auto_step     = step_idx
                 if self._visual_reader:
@@ -1060,6 +1117,8 @@ class LLMAgent:
                 _tab_just_switched    = False
                 _steps_on_tab         = 0
                 _tab_scroll_count     = 0
+                _expose_scrolls       = 0
+                _m2_at_bottom         = False
                 _no_change_streak     = 0
                 _last_auto_step       = step_idx  # treat tab switch as an auto step
                 _pane_escape_last_field = ""
@@ -1776,9 +1835,45 @@ class LLMAgent:
                     continue   # source-check disagrees → keep working
                 _gpred = self._llm_action_to_prediction(_gap, state)
                 if _gpred.get("action_type") not in ("no_op", "wait"):
-                    logger.info("[GAP] tab done → LLM → %s %r", _gtype, _gap.get("target", "")[:30])
+                    _gtgt = (_gap.get("target") or "").strip()
+                    # Mark the destination tab visited so the unvisited count actually
+                    # shrinks (else the LLM keeps being told tabs remain → re-picks).
+                    if _gtgt:
+                        self._visited_tabs.add(_gtgt)
+                    # Anti-loop: LLM re-picking the SAME tab → it's stuck (already there /
+                    # tab has only unfillable empties). Force the next GENUINELY-unvisited
+                    # tab by index instead of trusting the LLM's repeat.
+                    _gl = _gtgt.lower()
+                    self._gap_same = (getattr(self, "_gap_same", 0) + 1) if _gl and _gl == getattr(self, "_last_gap_tgt", "") else 0
+                    self._last_gap_tgt = _gl
+                    if self._gap_same >= 2:
+                        _vlow = {v.lower() for v in self._visited_tabs}
+                        _nxt = next((e for e in self._tab_elems_now(state)
+                                     if (e.get("text") or e.get("label") or "").strip().lower() not in _vlow), None)
+                        if _nxt is not None:
+                            _nb = _nxt["bbox"]; _nm = (_nxt.get("text") or _nxt.get("label") or "?").strip()
+                            logger.warning("[GAP] LLM stuck re-picking %r — forcing unvisited tab %r.", _gtgt, _nm)
+                            self._executor.execute({"action_type": "click",
+                                                    "click_position": [(_nb[0] + _nb[2]) / 2, (_nb[1] + _nb[3]) / 2]})
+                            self._visited_tabs.add(_nm)
+                        else:
+                            logger.info("[GAP] no unvisited tab left — checking finish.")
+                            if self._confirm_finished(state):
+                                break
+                        self._gap_same = 0
+                        _tab_scroll_count = _expose_scrolls = 0
+                        _m2_at_bottom = False
+                        _last_auto_step = step_idx
+                        _heuristic_steps += 1
+                        self._filled_this_tab.clear()
+                        self._refresh_record_cache(self._observe())
+                        time.sleep(self.step_delay)
+                        continue
+                    logger.info("[GAP] tab done → LLM → %s %r", _gtype, _gtgt[:30])
                     self._executor.execute(_gpred)
                     _tab_scroll_count  = 0
+                    _expose_scrolls    = 0          # M2: new tab → fresh scroll budget
+                    _m2_at_bottom      = False       # M2: new tab is not at bottom
                     _last_auto_step    = step_idx
                     _heuristic_steps  += 1
                     self._filled_this_tab.clear()
@@ -1874,6 +1969,11 @@ class LLMAgent:
                     _pos2 = t_pred.get("click_position")
                     if _pos2 and (_pos2[0] > 1 or _pos2[1] > 1):
                         _snap2 = self._snap(_pos2, state) or _pos2
+                        # MECHANISM 1: if the transformer picked an off-fold field,
+                        # scroll it into view and retarget to its fresh coords (agent
+                        # HOW). Keeps the transformer driving WHERE across the whole
+                        # tab instead of starving → handing to the LLM-sweep.
+                        state, _snap2 = self._reveal_target(state, _snap2)
                         # COMBOBOX-AS-FILL: demos action comboboxes as CLICKS, so the
                         # model clicks them; but a plain click only toggles the
                         # dropdown → open/close oscillation. A click on an EMPTY
@@ -2145,11 +2245,26 @@ class LLMAgent:
                 # etc.). Don't re-type into the void and don't Tab — abandon it and let
                 # the navigation protocol scroll to the next needed field.
                 if _fel is not None and self._attempt_key(_fel) in self._dead_fill_keys:
-                    logger.warning("Dead-field: %r won't accept fill — model fixated; invoking SWEEP.", _flabel_full)
                     self._mark_attempted(_fel)
-                    # The dead-field hit is the RELIABLE fixation signal — the model
-                    # lands here every time it stalls. Drive the whole tab to
-                    # completion via the Navigation Protocol now (no flaky counter).
+                    # Dead field = the transformer fixated on an unfillable widget
+                    # (SpinCtrl etc.). This is the RELIABLE fixation signal. Mechanism 2
+                    # REACTIVE: before handing to the LLM-sweep, scroll the dead field
+                    # off-screen and expose the next batch so the TRANSFORMER keeps
+                    # driving. Only fall to the sweep when the panel can't move (truly
+                    # at the bottom) — so M2 feeds the transformer on EVERY fixation,
+                    # not just once when visible-empties first run low.
+                    if (not _m2_at_bottom and _expose_scrolls < _M2_EXPOSE_CAP
+                            and self._scrollbar_drag(state, 240.0)):
+                        _expose_scrolls += 1
+                        time.sleep(self.step_delay * 0.5)
+                        state = self._observe()
+                        logger.info("Fixation expose-scroll: dead field %r → scrolled past it to "
+                                    "feed the transformer (scroll %d/%d).",
+                                    _flabel_full[:24], _expose_scrolls, _M2_EXPOSE_CAP)
+                        _heuristic_steps += 1
+                        _last_auto_step   = step_idx
+                        continue
+                    logger.warning("Dead-field: %r won't accept fill + panel at bottom — invoking SWEEP.", _flabel_full)
                     state, _df_fin = self._sweep_tab(state)
                     _heuristic_steps += 1
                     _steps_since_fill = 0
@@ -2194,6 +2309,12 @@ class LLMAgent:
                                         self._filled_this_tab.add(_flabel_full)
                                 except Exception as _cbe:
                                     logger.warning("Checkbox BM_SETCHECK failed: %s", _cbe)
+                        # Checkbox is DONE for this tab whether we checked it or left it
+                        # unchecked (NO). Mark attempted so the observer's missing-checkbox
+                        # state-feature flips and the transformer stops re-targeting it —
+                        # else PIP/Medical/Uninsured loop forever (checked-state isn't a
+                        # readable "value", so they always look empty).
+                        self._mark_attempted(_fel)
                     else:
                         logger.warning("LLM type into non-edit [%s] %r — pressing Tab instead.",
                                        _fel.get("type","?"), _flabel[:40])
@@ -2226,12 +2347,14 @@ class LLMAgent:
                             _already = (_wa2.SendMessage(_hwnd2, BM_GETCHECK, 0, 0) == BST_CHECKED)
                             if _chk_label in self._checked_fields or _already:
                                 logger.warning("Checkbox %r already checked — Tab instead.", _chk_label)
+                                self._mark_attempted(_chk_at_cp)   # stop re-targeting it
                                 prediction = {"action_type": "keyboard", "key_count": 1, "keystrokes": ["tab"]}
                             else:
                                 _wa2.SendMessage(_hwnd2, BM_SETCHECK, BST_CHECKED, 0)
                                 logger.info("Checkbox %r checked via Win32 BM_SETCHECK.", _chk_label)
                                 self._checked_fields.add(_chk_label)
                                 self._filled_this_tab.add(_chk_label)
+                                self._mark_attempted(_chk_at_cp)   # done for this tab — don't loop
                                 _no_change_streak = 0
                                 _last_auto_step   = step_idx
                                 prediction = {"action_type": "keyboard", "key_count": 1, "keystrokes": ["tab"]}
@@ -2330,6 +2453,8 @@ class LLMAgent:
                         _no_change_streak  = 0
                         _tab_just_switched = True
                         _tab_scroll_count  = 0
+                        _expose_scrolls    = 0          # M2: new tab → fresh scroll budget
+                        _m2_at_bottom      = False       # M2: new tab is not at bottom
                         _last_auto_step    = step_idx
                         self._filled_this_tab.clear()
                         _confirmed_blank_fields.clear()
@@ -2419,9 +2544,15 @@ class LLMAgent:
             else:
                 _fp = (_atype,)
             _action_history.append(_fp)
-            if (len(_action_history) >= _REPEAT_LIMIT
-                    and len(set(_action_history)) == 1):
-                logger.warning("Repeat-action guard: same action %dx — model FIXATED; invoking Navigation Protocol.", _REPEAT_LIMIT)
+            # Loop detector (caveat 4): catch BOTH an exact repeat (A,A,A) AND a
+            # CYCLE (A,B,A,B / A,B,C,A,B,C) where nothing is actually getting filled.
+            # The old guard only saw identical repeats, so an oscillation between two
+            # dead clicks ran forever. "Nothing changing" = no new fill since.
+            _exact_repeat = len(_action_history) >= _REPEAT_LIMIT and len(set(_action_history)) == 1
+            _cycling = _steps_since_fill >= 2 and self._is_cycling(_action_history)
+            if _exact_repeat or _cycling:
+                logger.warning("Loop guard: %s — model FIXATED; breaking loop via Navigation Protocol.",
+                               "repeat" if _exact_repeat else "A-B cycle (nothing filling)")
                 _action_history.clear()
                 _no_change_streak = 0
                 _steps_since_fill = 0
@@ -2435,9 +2566,24 @@ class LLMAgent:
                 _nav = self._navigation_protocol(state)
                 _nav_act = (_nav.get("action") or "").lower()
                 if _nav_act == "fill" and (_nav.get("field") or "").strip():
+                    _nf = _nav["field"].strip()
                     logger.info("[NAV] (fixation) fill/verify %r → %r",
-                                (_nav["field"])[:28], str(_nav.get("value") or "")[:30])
-                    self._nav_fill_field(state, _nav["field"].strip(), _nav.get("value") or "")
+                                _nf[:28], str(_nav.get("value") or "")[:30])
+                    _ok = self._nav_fill_field(state, _nf, _nav.get("value") or "")
+                    # If the fill failed (e.g. a 50-item combobox whose option isn't in
+                    # the rendered dropdown), count it; after 2 fails mark the field DEAD
+                    # so the protocol stops re-proposing it and we don't loop forever.
+                    if not _ok:
+                        _nk = _nf.lower()
+                        self._fill_fail_count[_nk] = self._fill_fail_count.get(_nk, 0) + 1
+                        if self._fill_fail_count[_nk] >= 2:
+                            _de = next((e for e in state.get("elements", [])
+                                        if (e.get("label") or e.get("text") or "").strip().lower() == _nk
+                                        and e.get("bbox")), None)
+                            if _de is not None:
+                                self._dead_fill_keys.add(self._attempt_key(_de))
+                                self._mark_attempted(_de)
+                            logger.warning("[NAV] (fixation) %r unfillable 2x — marking dead, skipping.", _nf[:28])
                 elif _nav_act == "tab" and _nav.get("click_position"):
                     logger.info("[NAV] (fixation) page done → switch tab %r", (_nav.get("target") or "")[:24])
                     self._executor.execute({"action_type": "click", "click_position": _nav["click_position"]})
@@ -2519,8 +2665,15 @@ class LLMAgent:
             self._record_attempt(state, prediction)
 
             if validation.status == "done":
-                logger.info("StateValidator: task appears complete.")
-                break
+                # A "Submitted" / completion indicator on screen is NOT enough to end
+                # the run — every tab must be verified-complete first. Otherwise a
+                # stray/leaked submit (or a default status label) ends Scope #1 with
+                # tabs unfilled. Gate on _confirm_finished; else keep working.
+                if self._confirm_finished(state):
+                    logger.info("StateValidator: task complete AND source-verified — done.")
+                    break
+                logger.warning("StateValidator saw a completion indicator but NOT all tabs verified "
+                               "— ignoring, keep working.")
 
             _cur_focused_id = state.get("focused_element_id")
             # Track scroll-specific no-change so we can break scroll loops
@@ -2548,6 +2701,23 @@ class LLMAgent:
                                 if e.get("element_id") == _cur_focused_id), None)
                     if _ff is not None:
                         _ffk = self._attempt_key(_ff)
+                        _ffv = prediction.get("text", "")
+                        # FIRST no_change on a fill: the widget may reject CLIPBOARD PASTE
+                        # (wx SpinCtrl accepts typed digits but not Ctrl+V). Before counting
+                        # a fail, retry by TYPING the value as individual keystrokes into the
+                        # still-focused field. Generic: any widget, keyed on paste-reject
+                        # behaviour, not on field/type name.
+                        if (self._fill_fail_count.get(_ffk, 0) == 0 and _ffv
+                                and len(_ffv) <= 24 and not self._keystroke_retried.get(_ffk)):
+                            self._keystroke_retried[_ffk] = True
+                            logger.info("Fill no_change on %r — retry via keystroke-typing (paste-reject widget?).",
+                                        (_ff.get('label') or _ff.get('text') or '?'))
+                            self._executor.execute({"action_type": "keyboard", "key_count": 1,
+                                                    "keystrokes": ["ctrl+a"]})
+                            self._executor.execute({"action_type": "keyboard",
+                                                    "key_count": len(_ffv), "keystrokes": list(_ffv)})
+                            time.sleep(self.step_delay * 0.5)
+                            continue   # re-observe next step; if it took, field is now filled
                         self._fill_fail_count[_ffk] = self._fill_fail_count.get(_ffk, 0) + 1
                         if self._fill_fail_count[_ffk] >= 2:
                             self._dead_fill_keys.add(_ffk)
@@ -2890,6 +3060,7 @@ class LLMAgent:
                 self._attempted_keys.clear()
                 self._visited_tabs.clear()
                 self._fill_fail_count.clear()
+                self._keystroke_retried.clear()
                 self._dead_fill_keys.clear()
                 self._reveal_focus_count.clear()
                 self._attempted_record_num = self._record_num
@@ -3317,6 +3488,63 @@ class LLMAgent:
         except Exception:
             return sh
 
+    def _scroll_pane_bottom(self, state: Dict[str, Any]) -> float:
+        """Bottom edge of the ACTIVE ScrolledPanel (the scroll fold), NOT the outer
+        window frame. Uses UIA: walks up from the first visible EditControl found
+        in state elements (geometry-driven, no hardcoded field names) until a
+        VerticallyScrollable pane is found, then returns its BoundingRectangle.bottom.
+        Falls back to _form_viewport_bottom if the pane cannot be located."""
+        try:
+            import uiautomation as _uia
+            import win32gui as _w32g
+
+            hwnd = self._locked_hwnd or _w32g.GetForegroundWindow()
+            root = _uia.ControlFromHandle(hwnd)
+
+            # Find ANY visible EditControl from state elements (type-driven, not name-driven).
+            _anchor = None
+            for _e in state.get("elements", []):
+                if (_e.get("type") or "").lower() != "editcontrol":
+                    continue
+                _b = _e.get("bbox")
+                if not _b:
+                    continue
+                _cx, _cy = (_b[0] + _b[2]) / 2, (_b[1] + _b[3]) / 2
+                _cand = root.EditControl(searchDepth=25)
+                # Walk the tree to find a control whose center matches this bbox.
+                # Faster: use ControlFromPoint to get the control at the field center.
+                try:
+                    _cand = _uia.ControlFromPoint(int(_cx), int(_cy))
+                    if _cand is not None and _cand.Exists(maxSearchSeconds=0):
+                        _anchor = _cand
+                        break
+                except Exception:
+                    continue
+            if _anchor is None:
+                _anchor = _uia.GetFocusedControl()
+            if _anchor is None:
+                return self._form_viewport_bottom(state)
+
+            # Walk UP from the anchor to the first VerticallyScrollable pane.
+            _cur = _anchor
+            for _ in range(15):
+                if _cur is None:
+                    break
+                try:
+                    _spc = _cur.GetScrollPattern()
+                    if _spc is not None and _spc.VerticallyScrollable:
+                        br = _cur.BoundingRectangle
+                        return float(br.bottom)
+                except Exception:
+                    pass
+                try:
+                    _cur = _cur.GetParentControl()
+                except Exception:
+                    break
+        except Exception:
+            pass
+        return self._form_viewport_bottom(state)
+
     def _ensure_foreground(self, state: Dict[str, Any]) -> None:
         """Re-assert the observed active window as foreground before typing, so
         keystrokes can't leak into a window that stole focus (e.g. the terminal).
@@ -3380,6 +3608,103 @@ class LLMAgent:
         if m:
             return self._scope.section_format(*m.groups())
         return ""
+
+    @staticmethod
+    def _is_cycling(history) -> bool:
+        """Detect a short repeating CYCLE in the recent action history (not just an
+        exact repeat): period-2 (A,B,A,B) or period-3 (A,B,C,A,B,C). Used with a
+        'no fill happened' check to spot oscillation loops the exact-repeat guard
+        misses. Generic — operates on opaque action fingerprints."""
+        h = list(history)
+        if len(h) >= 4 and h[-1] == h[-3] and h[-2] == h[-4] and h[-1] != h[-2]:
+            return True                                  # A,B,A,B
+        if len(h) >= 6 and h[-1] == h[-4] and h[-2] == h[-5] and h[-3] == h[-6] \
+                and len({h[-1], h[-2], h[-3]}) > 1:
+            return True                                  # A,B,C,A,B,C
+        return False
+
+    @staticmethod
+    def _norm(s: str) -> str:
+        """Normalize a value for comparison: lowercase, strip, drop spaces and common
+        punctuation, normalize dates. Generic — so '(951) 440-2281' == '9514402281'
+        and '7/14/1978' == '07/14/1978'. No field-specific rules."""
+        import re
+        s = (s or "").strip().lower()
+        # date m/d/y → zero-pad parts so 7/14/1978 == 07/14/1978
+        _m = re.match(r"^(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})$", s)
+        if _m:
+            return "/".join(f"{int(p):02d}" if i < 2 else p for i, p in enumerate(_m.groups()))
+        # else strip all non-alphanumerics
+        return re.sub(r"[^a-z0-9]", "", s)
+
+    def _is_checked(self, elem: Dict[str, Any]) -> bool:
+        """Read a checkbox's actual ticked state. PRIMARY: UIA TogglePattern by the
+        checkbox's own name — the reliable, standard way (no pixel guessing, which
+        misreads when the bbox centre lands on the label, not the box). Falls back to
+        BM_GETCHECK via WindowFromPoint. Generic — any checkbox, any tab."""
+        _lbl = (elem.get("label") or elem.get("text") or "").strip()
+        if _lbl:
+            try:
+                import uiautomation as _uia, win32gui as _wgg
+                _root = _uia.ControlFromHandle(self._locked_hwnd or _wgg.GetForegroundWindow())
+                if _root is not None:
+                    _cb = _root.CheckBoxControl(searchDepth=25, Name=_lbl)
+                    if _cb.Exists(maxSearchSeconds=0.3):
+                        _tp = _cb.GetTogglePattern()
+                        if _tp is not None:
+                            return _tp.ToggleState == 1            # ToggleState_On
+            except Exception:
+                pass
+        b = elem.get("bbox")
+        if not b:
+            return False
+        try:
+            import win32gui as _wg, win32api as _wa
+            _h = _wg.WindowFromPoint((int((b[0] + b[2]) / 2), int((b[1] + b[3]) / 2)))
+            return bool(_h) and _wa.SendMessage(_h, 0x00F0, 0, 0) == 1   # BM_GETCHECK == BST_CHECKED
+        except Exception:
+            return False
+
+    def _field_matches(self, elem: Dict[str, Any], expected) -> bool:
+        """True if the control's REAL value already equals `expected` — checkbox
+        ticked-state (read live) or normalized text/combo value. Used to veto a false
+        re-fix proposal (esp. checkboxes the LLM can't see) so verify can't loop."""
+        expected = "" if expected is None else str(expected)
+        if (elem.get("type") or "").lower() == "checkboxcontrol":
+            _want = expected.strip().lower() in ("yes", "yes (check)", "true", "checked", "x", "1")
+            return _want == self._is_checked(elem)
+        return self._norm(elem.get("value") or "") == self._norm(expected)
+
+    def _view_mismatches(self, state: Dict[str, Any]):
+        """DETERMINISTIC check of the current view: for every fillable control, read
+        its REAL value (text/combo = value, checkbox = ticked-state), look up the
+        expected value by the control's OWN label in the source, normalized-compare.
+        Returns a list of (element, expected_value) that are CLEARLY wrong/empty but
+        should hold a value. Skips controls the source has no value for (ambiguous /
+        leave-blank → handled by the LLM fallback). Generic: type + label + source."""
+        out = []
+        for e in state.get("elements", []):
+            if e.get("window_role") == "background" or not e.get("bbox"):
+                continue
+            _typ = (e.get("type") or "").lower()
+            if _typ not in ("editcontrol", "comboboxcontrol", "checkboxcontrol"):
+                continue
+            _lbl = (e.get("label") or e.get("text") or "").strip()
+            if not _lbl:
+                continue
+            if self._attempt_key(e) in self._dead_fill_keys:
+                continue   # proven unfillable (tried+failed) — accept it, don't block submit
+            _exp = self._lookup_field(_lbl, section=self._detect_section(state, e))
+            if not _exp:
+                continue   # source has no value (blank/ambiguous) — leave to LLM fallback
+            if _typ == "checkboxcontrol":
+                _want = _exp.strip().lower() in ("yes", "yes (check)", "true", "checked", "x", "1")
+                if _want != self._is_checked(e):
+                    out.append((e, _exp))
+            else:
+                if self._norm(e.get("value") or "") != self._norm(_exp):
+                    out.append((e, _exp))
+        return out
 
     def _lookup_field(self, field_name: str, section: str = "") -> str:
         """
@@ -3694,6 +4019,57 @@ class LLMAgent:
     # Tab. Reveal = scroll · advance = scroll-to-next · tab-switch only when the
     # whole tab has no missing field. Generic: widget TYPE + own value/key + geometry.
 
+    def _visible_empty_count(self, state: Dict[str, Any]) -> int:
+        """Count fillable empty fields that are currently ON-SCREEN (within the
+        live viewport). Generic: driven by widget type + geometry only.
+        Excludes dead/attempted fields — mirrors _find_missing_field's filter."""
+        vp_bottom = self._scroll_pane_bottom(state)
+        count = 0
+        for e in state.get("elements", []):
+            if e.get("window_role") == "background":
+                continue
+            if (e.get("type") or "").lower() not in (
+                    "editcontrol", "comboboxcontrol", "checkboxcontrol"):
+                continue
+            b = e.get("bbox")
+            if not b or not e.get("enabled", True):
+                continue
+            if (e.get("value") or "").strip():
+                continue                               # already filled
+            k = self._attempt_key(e)
+            if k in self._attempted_keys or k in self._dead_fill_keys:
+                continue                               # dead / already attempted
+            # On-screen: field's top edge is above the viewport bottom.
+            # (Fields scrolled above the top will have negative bbox tops but are
+            # still counted as visible by the transformer — exclude only those
+            # clipped below the fold, i.e. top >= vp_bottom.)
+            if b[1] < vp_bottom:
+                count += 1
+        return count
+
+    def _has_offfold_empty(self, state: Dict[str, Any]) -> bool:
+        """True if there is at least one fillable empty field (not dead/attempted)
+        whose bbox bottom is BELOW the current scroll-pane fold — i.e. there is
+        more content to reveal by scrolling down. Generic: geometry-driven only."""
+        vp_bottom = self._scroll_pane_bottom(state)
+        for e in state.get("elements", []):
+            if e.get("window_role") == "background":
+                continue
+            if (e.get("type") or "").lower() not in (
+                    "editcontrol", "comboboxcontrol", "checkboxcontrol"):
+                continue
+            b = e.get("bbox")
+            if not b or not e.get("enabled", True):
+                continue
+            if (e.get("value") or "").strip():
+                continue
+            k = self._attempt_key(e)
+            if k in self._attempted_keys or k in self._dead_fill_keys:
+                continue
+            if b[3] > vp_bottom:          # bottom edge is below the visible area
+                return True
+        return False
+
     def _find_missing_field(self, state: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """Topmost fillable field (edit/combo) that still needs a value: empty,
         not yet attempted, not dead. ANY vertical position incl. below the fold.
@@ -3788,17 +4164,22 @@ class LLMAgent:
             hwnd = self._locked_hwnd or _w32g.GetForegroundWindow()
             root = _uia.ControlFromHandle(hwnd)
 
-            # Anchor on a REAL field (the probe proved walking up from a field finds
-            # the active 'tab_policyholder' pane — the one that actually scrolls).
-            _anchor = None
-            for _nm in ("Last Name", "Email Address", "ZIP Code", "City", "First Name",
-                        "Date of Birth", "Credit Score"):
-                _c = root.EditControl(searchDepth=25, Name=_nm)
-                if _c.Exists(maxSearchSeconds=0.2):
-                    _anchor = _c
-                    break
-            if _anchor is None:
-                _anchor = _uia.GetFocusedControl()
+            # Anchor on a REAL field on the CURRENT tab — GENERIC (no hardcoded names,
+            # else it only works on Policyholder and every other tab fails to scroll).
+            # Prefer the focused control (always on the active tab); else the first
+            # edit/combo/checkbox found anywhere in the form.
+            _anchor = _uia.GetFocusedControl()
+            try:
+                _ok = _anchor is not None and _anchor.BoundingRectangle.width() > 0
+            except Exception:
+                _ok = False
+            if not _ok:
+                _anchor = None
+                for _finder in (root.EditControl, root.ComboBoxControl, root.CheckBoxControl):
+                    _c = _finder(searchDepth=25)
+                    if _c.Exists(maxSearchSeconds=0.2):
+                        _anchor = _c
+                        break
 
             def _anchor_y():
                 try:
@@ -3824,7 +4205,28 @@ class LLMAgent:
                     break
 
             if _panel is None:
-                logger.warning("Scroll: no scrollable pane found (anchor-walk).")
+                # Fallback: DFS the whole tree for any vertically-scrollable pane
+                # (focus may be on a tab/button outside the pane on this tab).
+                def _dfs_pane(node, d=0):
+                    if node is None or d > 10:
+                        return None
+                    try:
+                        _s = node.GetScrollPattern()
+                        if _s is not None and _s.VerticallyScrollable:
+                            return node
+                    except Exception:
+                        pass
+                    try:
+                        for _ch in node.GetChildren():
+                            _r = _dfs_pane(_ch, d + 1)
+                            if _r is not None:
+                                return _r
+                    except Exception:
+                        pass
+                    return None
+                _panel = _dfs_pane(root)
+            if _panel is None:
+                logger.warning("Scroll: no scrollable pane found (anchor-walk + DFS).")
                 return False
 
             _sp = _panel.GetScrollPattern()
@@ -4943,25 +5345,178 @@ class LLMAgent:
                 _r["click_position"] = [(_b[0] + _b[2]) / 2, (_b[1] + _b[3]) / 2]
         return _r
 
+    def _verify_pass(self, state: Dict[str, Any]) -> bool:
+        """DETERMINISTIC VERIFICATION (the finish gate). Visit EVERY tab, scroll
+        through it, and on each view run the source-check (Navigation Protocol vs the
+        SOURCE record). Any field the LLM reports as missing/wrong → fix it on the
+        spot. Returns True ONLY if a full sweep of all tabs needs ZERO corrections —
+        i.e. every fillable, non-dead field matches the source. Else it fixes what it
+        can and returns False so the run keeps working. Dead/unfillable fields
+        (SpinCtrl, 50-item combos) are excluded by the protocol, so they don't block.
+        Generic: tab elements by geometry, fields by the protocol's source-check."""
+        _tabs = self._tab_elems_now(state)
+        if not _tabs:
+            logger.warning("[VERIFY] no tab elements found — cannot verify.")
+            return False
+        _fixed = 0
+        logger.info("[VERIFY] deterministic pass over %d tab(s) — reading every field vs source.", len(_tabs))
+        for _t in _tabs:
+            _nm = (_t.get("text") or _t.get("label") or "?").strip()
+            _b = _t["bbox"]
+            self._executor.execute({"action_type": "click",
+                                    "click_position": [(_b[0] + _b[2]) / 2, (_b[1] + _b[3]) / 2]})
+            time.sleep(self.step_delay * 0.5)
+            self._visited_tabs.add(_nm)
+            self._refresh_record_cache(self._observe())
+            _st = self._observe()
+            _done_here = set()                           # fields already settled this tab-pass
+            for _scan in range(8):                       # scroll passes per tab
+                # 1) DETERMINISTIC, SECTION-AWARE read-back: for each box in view, read
+                #    its REAL value (text/combo value, checkbox ticked-state) and compare
+                #    to the source using the SECTION-correct key (Driver 2 DL Expiration,
+                #    not bare DL Expiration). Fix clear mismatches. No LLM → no wrong-
+                #    section guesses, no checkbox loop. This is what makes verify finish.
+                _mm = [(e, x) for (e, x) in self._view_mismatches(_st)
+                       if (e.get("label") or e.get("text") or "").strip().lower() not in _done_here]
+                if _mm:
+                    for _e, _exp in _mm:
+                        _el = (_e.get("label") or _e.get("text") or "").strip()
+                        # TERMINATION GUARANTEE: if a box has been "corrected" twice
+                        # across verify and STILL won't confirm (scroll can't reach it
+                        # / checkbox read unreliable), accept it as dead so verify can
+                        # reach 0 corrections and Submit — else it re-fixes forever.
+                        _vk = self._attempt_key(_e)
+                        self._verify_fix_count[_vk] = self._verify_fix_count.get(_vk, 0) + 1
+                        if self._verify_fix_count[_vk] > 2:
+                            self._dead_fill_keys.add(_vk)
+                            self._mark_attempted(_e)
+                            logger.warning("[VERIFY] %s: %r won't confirm after 2 tries — accepting (dead).",
+                                           _nm[:14], _el[:22])
+                            _done_here.add(_el.lower())
+                            continue
+                        logger.info("[VERIFY] %s: fix %r → %r", _nm[:14], _el[:22], str(_exp)[:22])
+                        if self._nav_fill_field(_st, _el, _exp):
+                            _fixed += 1
+                        _done_here.add(_el.lower())
+                    _st = self._observe()
+                    continue
+                # 2) LLM fallback — only for ambiguous fields whose label the source
+                #    can't resolve (so _view_mismatches skipped them). Veto if already ok.
+                _nav = self._navigation_protocol(_st)
+                _act = (_nav.get("action") or "").lower()
+                if _act == "fill" and (_nav.get("field") or "").strip():
+                    _vf = _nav["field"].strip()
+                    _vv = str(_nav.get("value") or "")
+                    _fe = next((e for e in _st.get("elements", [])
+                                if (e.get("label") or e.get("text") or "").strip().lower() == _vf.lower()
+                                and e.get("bbox")), None)
+                    if _vf.lower() in _done_here or (_fe is not None and self._field_matches(_fe, _vv)):
+                        _done_here.add(_vf.lower())
+                        if _fe is not None:
+                            self._mark_attempted(_fe)
+                        if not self._scrollbar_drag(_st, 240.0):
+                            break
+                        time.sleep(self.step_delay * 0.4)
+                        _st = self._observe()
+                        continue
+                    logger.info("[VERIFY] %s: LLM-fix %r → %r", _nm[:14], _vf[:24], _vv[:24])
+                    if self._nav_fill_field(_st, _vf, _vv):
+                        _fixed += 1
+                    _done_here.add(_vf.lower())
+                    _st = self._observe()
+                    continue
+                # nothing to fix on this view → scroll to reveal more; stop at bottom
+                if not self._scrollbar_drag(_st, 240.0):
+                    break
+                time.sleep(self.step_delay * 0.5)
+                _st = self._observe()
+        logger.info("[VERIFY] pass complete — %d field(s) corrected.", _fixed)
+        return _fixed == 0
+
     def _confirm_finished(self, state: Dict[str, Any]) -> bool:
         """Authoritative finish-check — NEVER trust a visible-empty/degraded 'done'.
-        The form is finished only if BOTH hold:
-          (1) every tab has actually been visited (coarse coverage floor that a
-              partial observation can't fake), and
-          (2) the Navigation Protocol, checking the SOURCE record against this
-              page, returns 'done' (no missing/wrong field).
-        Returns True only when both agree. Used to gate every finish/break."""
+        Finished only if BOTH hold:
+          (1) every tab visited (coarse coverage floor a partial observation can't fake),
+          (2) a full DETERMINISTIC verification pass (_verify_pass) over ALL tabs needs
+              ZERO corrections — every field read back matches the SOURCE record.
+        Returns True only when both agree. Gates every finish/Submit."""
         if self._tabs_total > 0 and len(self._visited_tabs) < self._tabs_total:
             logger.warning("[CONFIRM] not finished — only %d/%d tabs visited.",
                            len(self._visited_tabs), self._tabs_total)
             return False
-        _nav = self._navigation_protocol(state)
-        _act = (_nav.get("action") or "").lower()
-        if _act == "done":
-            logger.info("[CONFIRM] source-check agrees: form complete.")
+        if self._verify_pass(state):
+            logger.info("[CONFIRM] verification pass clean — form complete.")
+            # Press Submit HERE so every finish path submits (some callers just
+            # break). Idempotent: _click_submit no-ops if already submitted.
+            self._click_submit(self._observe())
             return True
-        logger.warning("[CONFIRM] source-check says NOT done (action=%r) — continuing.", _act)
+        logger.warning("[CONFIRM] verification corrected field(s) / found gaps — NOT done, continuing.")
         return False
+
+    def _reveal_target(self, state: Dict[str, Any], snap):
+        """MECHANISM 1 — feed the transformer. If the field the transformer just
+        pointed at is OFF the viewport (it's in the element tree with off-screen
+        coords), scroll that exact field into view (agent HOW, no LLM) and return
+        (fresh_state, fresh_on-screen_coord). Else return unchanged. This lets the
+        transformer keep picking ANY field — including below-fold ones — instead of
+        starving once the visible batch is filled and handing off to the LLM-sweep.
+        Conservative: no-ops unless it clearly finds an off-fold field at the pick."""
+        if not snap:
+            return state, snap
+        _FILL = ("editcontrol", "comboboxcontrol", "checkboxcontrol")
+        _el = next((e for e in state.get("elements", [])
+                    if (e.get("type") or "").lower() in _FILL and e.get("bbox")
+                    and e["bbox"][0] - 2 <= snap[0] <= e["bbox"][2] + 2
+                    and e["bbox"][1] - 2 <= snap[1] <= e["bbox"][3] + 2), None)
+        if _el is None:
+            return state, snap
+        vb = self._form_viewport_bottom(state) - 8
+        _ty, _by = _el["bbox"][1], _el["bbox"][3]
+        if 0 <= _ty and _by <= vb:
+            return state, snap          # already fully on screen — nothing to do
+        _lbl = (_el.get("label") or _el.get("text") or "").strip()
+        if not _lbl:
+            return state, snap
+        if self._scroll_into_view(_lbl):
+            time.sleep(self.step_delay * 0.5)
+            _ns = self._observe()
+            _ne = next((e for e in _ns.get("elements", [])
+                        if (e.get("label") or e.get("text") or "").strip().lower() == _lbl.lower()
+                        and e.get("bbox")), None)
+            if _ne is not None:
+                _b = _ne["bbox"]
+                logger.info("Reveal-target: scrolled %r into view for the transformer.", _lbl[:24])
+                return _ns, [(_b[0] + _b[2]) / 2, (_b[1] + _b[3]) / 2]
+            # Label re-find failed (trailing colon / case mismatch between
+            # perception snapshot and live UIA Name).  Query the live UIA
+            # bounding rectangle directly — same lookup pattern as
+            # _focus_field_uia — so we return fresh coords rather than the
+            # pre-scroll stale snap.
+            try:
+                import uiautomation as _uia
+                import win32gui as _w32
+                _hwnd = self._locked_hwnd or _w32.GetForegroundWindow()
+                _root = _uia.ControlFromHandle(_hwnd)
+                if _root is not None:
+                    _ctrl = _root.EditControl(searchDepth=25, Name=_lbl)
+                    if not _ctrl.Exists(maxSearchSeconds=0.3):
+                        _ctrl = _root.ComboBoxControl(searchDepth=25, Name=_lbl)
+                    if not _ctrl.Exists(maxSearchSeconds=0.3):
+                        _ctrl = _root.CheckBoxControl(searchDepth=25, Name=_lbl)
+                    if _ctrl.Exists(maxSearchSeconds=0.3):
+                        _br = _ctrl.BoundingRectangle
+                        if _br.width() > 0 and _br.height() > 0:
+                            logger.info(
+                                "Reveal-target: label re-find failed, used live UIA rect for %r.",
+                                _lbl[:24],
+                            )
+                            return _ns, [
+                                (_br.left + _br.right) / 2,
+                                (_br.top + _br.bottom) / 2,
+                            ]
+            except Exception as _exc:
+                logger.debug("Reveal-target UIA-rect fallback failed for %r: %s", _lbl[:24], _exc)
+        return state, snap
 
     def _focus_field_uia(self, label: str) -> bool:
         """Focus the EXACT field by UIA identity (precise — also auto-scrolls it into
@@ -5001,15 +5556,19 @@ class LLMAgent:
         each step). Used by the executor chokepoint to block premature submits."""
         if not pos or len(pos) < 2:
             return False
+        _M = 14   # margin (px) — snap/rounding can land a few px off the button bbox
         for b in getattr(self, "_submit_bboxes", []):
-            if b and b[0] <= pos[0] <= b[2] and b[1] <= pos[1] <= b[3]:
+            if b and (b[0] - _M) <= pos[0] <= (b[2] + _M) and (b[1] - _M) <= pos[1] <= (b[3] + _M):
                 return True
         return False
 
     def _click_submit(self, state: Dict[str, Any]) -> bool:
         """DETERMINISTIC FINISH — click the Submit/finish button. Called ONLY after
         the LLM verification (_confirm_finished) passes. The transformer never does
-        this itself. Generic: button widget + generic finish-keyword text."""
+        this itself. Generic: button widget + generic finish-keyword text.
+        Idempotent — submits at most once per run (callers may invoke it twice)."""
+        if getattr(self, "_submitted", False):
+            return True
         _KW = ("submit", "finish", "save", "accept", "done", "& new", "new")
         _btn = next((e for e in state.get("elements", [])
                      if (e.get("type") or "").lower() in ("buttoncontrol", "button")
@@ -5028,6 +5587,7 @@ class LLMAgent:
                                     "click_position": [(_b[0] + _b[2]) / 2, (_b[1] + _b[3]) / 2]})
         finally:
             self._allow_submit = False
+        self._submitted = True
         return True
 
     def _tab_elems_now(self, state: Dict[str, Any]) -> list:
@@ -5144,6 +5704,7 @@ class LLMAgent:
         it directly (combobox open+select · checkbox set · edit idempotent paste).
         Used by the Navigation Protocol to fix a specific empty/wrong field. Returns
         True if it acted. Generic: widget type + label + geometry."""
+        value = "" if value is None else str(value)   # LLM may return an int (e.g. 4) → coerce
         _ll = field_label.strip().lower()
         def _find(st):
             _cands = [e for e in st.get("elements", [])
@@ -5185,8 +5746,39 @@ class LLMAgent:
         x1, y1, x2, y2 = el["bbox"]
         cx, cy = (x1 + x2) / 2, (y1 + y2) / 2
         if typ == "checkboxcontrol":
-            self._executor.execute({"action_type": "click", "click_position": [cx, cy]})
+            # Interpret the source value: truthy → should be CHECKED, falsy/NO/blank →
+            # should be UNCHECKED (the default). Mark attempted either way so it stops
+            # being re-proposed (the loop). Only toggle if it's in the WRONG state, and
+            # use Win32 BM_SETCHECK (a pyautogui click doesn't toggle a wx checkbox).
+            _want = value.strip().lower() in ("yes", "yes (check)", "true", "checked", "x", "1")
             self._mark_attempted(el)
+            if _want == self._is_checked(el):
+                return True                       # already correct (esp. NO = unchecked)
+            # Set via UIA TogglePattern by name (matches the read — so it actually
+            # changes the right control and reads back consistent). Falls back to
+            # BM_SETCHECK by point.
+            try:
+                import uiautomation as _uia, win32gui as _wgg
+                _root = _uia.ControlFromHandle(self._locked_hwnd or _wgg.GetForegroundWindow())
+                _cb = _root.CheckBoxControl(searchDepth=25, Name=_real) if _root else None
+                if _cb is not None and _cb.Exists(maxSearchSeconds=0.3):
+                    _tp = _cb.GetTogglePattern()
+                    if _tp is not None and (_tp.ToggleState == 1) != _want:
+                        _tp.Toggle()
+                    if _want:
+                        self._checked_fields.add(_real)
+                    return True
+            except Exception:
+                pass
+            try:
+                import win32gui as _wg, win32api as _wa
+                _h = _wg.WindowFromPoint((int(cx), int(cy)))
+                if _h:
+                    _wa.SendMessage(_h, 0x00F1, 1 if _want else 0, 0)   # BM_SETCHECK
+                    if _want:
+                        self._checked_fields.add(_real)
+            except Exception as _ce:
+                logger.debug("nav_fill checkbox set failed: %s", _ce)
             return True
         if typ == "comboboxcontrol":
             self._executor.execute({"action_type": "click", "click_position": [cx, cy]})

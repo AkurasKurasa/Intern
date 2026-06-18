@@ -24,6 +24,15 @@ try:
 except Exception:
     pass
 
+import sys as _sys_enc
+# Windows console is cp1252 by default → printing the metrics summary (which has
+# Unicode arrows ←/→) crashes with UnicodeEncodeError. Force UTF-8 stdout/stderr.
+for _stream in (_sys_enc.stdout, _sys_enc.stderr):
+    try:
+        _stream.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+
 import json
 import logging
 import sys
@@ -43,10 +52,21 @@ if os.path.exists(_env_path):
                 _k, _v = _line.split("=", 1)
                 os.environ.setdefault(_k.strip(), _v.strip())
 
+# Enable ANSI colour on the Windows console (VT processing), so logs aren't the
+# default red-on-stderr. Then send logs to STDOUT (PowerShell paints stderr red)
+# and colour them green.
+try:
+    import ctypes as _ct
+    _k = _ct.windll.kernel32
+    _k.SetConsoleMode(_k.GetStdHandle(-11), 7)   # STD_OUTPUT, ENABLE_VIRTUAL_TERMINAL_PROCESSING|...
+except Exception:
+    pass
+
 logging.basicConfig(
-    format="[%(asctime)s] [%(levelname)s] %(name)s — %(message)s",
+    format="\x1b[32m[%(asctime)s] [%(levelname)s] %(name)s — %(message)s\x1b[0m",
     datefmt="%H:%M:%S",
     level=logging.INFO,
+    stream=_sys_enc.stdout,      # stdout, not stderr → no red
 )
 logger = logging.getLogger("run_task")
 
@@ -56,7 +76,7 @@ PROVIDER      = "lmstudio"    # anthropic | groq | gemini | lmstudio | none
 API_KEY       = os.environ.get("ANTHROPIC_API_KEY", "")
 GROQ_API_KEY  = os.environ.get("GROQ_API_KEY", "")
 SOURCE_WINDOW = "Notepad"     # title fragment of the data source window
-MAX_STEPS     = 200
+MAX_STEPS     = 400   # 8 full tabs (~176 fields) + scrolls/tab-switches need headroom to reach Submit
 STEP_DELAY    = 1.5
 
 # ── run ───────────────────────────────────────────────────────────────────────
