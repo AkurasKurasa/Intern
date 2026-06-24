@@ -1,0 +1,12 @@
+# Vision perception (CV detector + OCR observer) — runs fully local.
+# Install on the project interpreter:  py -3.14 -m pip install -r this_file
+#
+# Plus a SYSTEM install of Tesseract OCR (not pip-installable):
+#   Windows: https://github.com/UB-Mannheim/tesseract/wiki  (add to PATH)
+#   Already present on this machine: Tesseract v5.5.
+
+opencv-python>=4.8.0     # box detection (edges / contours)
+pytesseract>=0.3.10      # Tesseract OCR wrapper (text + values)
+mss>=9.0.0               # fast screen capture
+Pillow>=10.0.0           # image I/O
+numpy>=1.24.0            # array ops
