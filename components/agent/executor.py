@@ -31,6 +31,14 @@ for _p in (_ROOT, _COMP_DIR):
     if _p not in sys.path:
         sys.path.insert(0, _p)
 
+try:
+    from components.agent.semantic_action import SemanticAction
+except ImportError:
+    try:
+        from agent.semantic_action import SemanticAction
+    except ImportError:
+        from semantic_action import SemanticAction
+
 # ── optional dependency: pyautogui ────────────────────────────────────────────
 try:
     import pyautogui
@@ -100,7 +108,9 @@ class ActionExecutor:
                 "Or use dry_run=True."
             )
 
-    def execute(self, prediction: Dict[str, Any]) -> ExecutionResult:
+    def execute(self, prediction: "Dict[str, Any] | SemanticAction") -> ExecutionResult:
+        if isinstance(prediction, SemanticAction):
+            prediction = prediction.to_legacy_dict()
         action_type = prediction.get("action_type", "no_op")
         ts          = datetime.now().isoformat()
         try:

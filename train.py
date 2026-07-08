@@ -70,6 +70,9 @@ def main():
     parser.add_argument("--hist_len",       type=int,   default=4,
                         help="Action-history window the model sees (default: 4; "
                              "try 8-12 for long multi-tab trajectories)")
+    parser.add_argument("--action_space",   default="legacy", choices=["legacy", "semantic"],
+                        help="legacy: original click/keyboard/hotkey/scroll scheme (default). "
+                             "semantic: Universal Semantic Action Space verb labels.")
     args = parser.parse_args()
 
     # Resolve relative paths from the project root
@@ -100,6 +103,7 @@ def main():
         dim_feedforward=args.dim_feedforward,
         dropout=args.dropout,
         hist_len=args.hist_len,
+        action_space=args.action_space,
     )
 
     print(f"\n{'='*60}")

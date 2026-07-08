@@ -69,6 +69,19 @@ ACTION_DCLICK   = 5
 ACTION_DRAG     = 6
 NUM_ACTIONS     = 7
 
+# ── Universal Semantic Action Space (opt-in: action_space="semantic") ──────────
+# Alternative, richer action-type vocabulary sourced from
+# components/recorder/action_labeler.py instead of _decode_actions(). Kept
+# fully separate from the legacy ACTION_* scheme above — default behavior
+# (action_space="legacy") is completely unchanged. See semantic_action.Verb
+# for what each class means.
+from components.agent.semantic_action import Verb as _Verb, SemanticAction
+from components.recorder.action_labeler import translate_step as _translate_step
+SEMANTIC_VERBS       = list(_Verb)
+NUM_SEMANTIC_ACTIONS = len(SEMANTIC_VERBS)
+VERB_TO_ID           = {v: i for i, v in enumerate(SEMANTIC_VERBS)}
+ID_TO_VERB           = {i: v for i, v in enumerate(SEMANTIC_VERBS)}
+
 # Hotkey vocabulary — each gets a unique index for the hotkey_head classifier
 HOTKEYS = [
     "tab", "shift+tab", "enter", "escape", "backspace", "delete",
@@ -457,10 +470,13 @@ class TrajectoryDataset(Dataset):
         hist_len: int = 4,
         glob: str = "*.json",
         aug_drop_prob: float = 0.0,   # probability of zeroing a UI element row
+        action_space: str = "legacy",  # "legacy" | "semantic"
     ):
         self.max_elements  = max_elements
         self.hist_len      = hist_len
         self.aug_drop_prob = aug_drop_prob
+        assert action_space in ("legacy", "semantic")
+        self.action_space  = action_space
 
         # Collect trace files as *groups* — each group is a contiguous recording
         # session whose traces are temporally adjacent.  The flat files in `root`
@@ -489,7 +505,7 @@ class TrajectoryDataset(Dataset):
         _cache_path = root / ".dataset_cache.pkl"
         # ELEM_FEATURES in the key → a change in the feature layout invalidates
         # any stale cache built with a different one.
-        _cache_key  = (max_elements, hist_len, aug_drop_prob, ELEM_FEATURES, "v5_attempted")
+        _cache_key  = (max_elements, hist_len, aug_drop_prob, ELEM_FEATURES, "v5_attempted", action_space)
 
         def _cache_valid() -> bool:
             if not _cache_path.exists():
@@ -608,15 +624,41 @@ class TrajectoryDataset(Dataset):
                 res  = state.get("screen_resolution", [DEFAULT_W, DEFAULT_H])
                 W    = float(res[0]) or DEFAULT_W
                 H_px = float(res[1]) or DEFAULT_H
-                action = _decode_actions(t.get("mouse", {}), t.get("keyboard", {}), W, H_px)
-                src_idx = (
-                    _find_source_elem_idx(action[4], state, max_elements, manifest)
-                    if action[0] == ACTION_KEYBOARD else -1
-                )
-                click_idx = (
-                    _find_click_elem_idx(t.get("mouse", {}), state, max_elements)
-                    if action[0] == ACTION_CLICK else -1
-                )
+
+                if self.action_space == "semantic":
+                    sem = _translate_step(t)
+                    _pos = sem.position or (0.0, 0.0)
+                    if sem.verb == _Verb.SET_VALUE:
+                        _aux = min(len(sem.value) / 100.0, 1.0)
+                    elif sem.verb == _Verb.SCROLL_TO:
+                        _sign = 1.0 if sem.direction == "down" else -1.0
+                        _aux  = max(-1.0, min(1.0, (sem.clicks / 10.0) * _sign))
+                    else:
+                        _aux = 0.0
+                    action = (VERB_TO_ID[sem.verb], float(_pos[0]) / W, float(_pos[1]) / H_px,
+                              _aux, sem.value)
+                    _tgt = sem.target_idx if sem.target_idx is not None else -1
+                    # Two separate pointer jobs, same split as the legacy scheme
+                    # (click_elem vs source_elem) — just re-purposed by VERB instead
+                    # of by action-type. FOCUS/SET_VALUE ("where to type") reuse the
+                    # legacy background-copy-source head as a typing-target pointer;
+                    # click_idx stays scoped to click-like verbs only. Mixing both
+                    # jobs onto one head (first attempt) made that head solve a
+                    # bigger, harder task and measurably hurt click_acc.
+                    if sem.verb in (_Verb.FOCUS, _Verb.SET_VALUE):
+                        click_idx, src_idx = -1, _tgt
+                    else:
+                        click_idx, src_idx = _tgt, -1
+                else:
+                    action = _decode_actions(t.get("mouse", {}), t.get("keyboard", {}), W, H_px)
+                    src_idx = (
+                        _find_source_elem_idx(action[4], state, max_elements, manifest)
+                        if action[0] == ACTION_KEYBOARD else -1
+                    )
+                    click_idx = (
+                        _find_click_elem_idx(t.get("mouse", {}), state, max_elements)
+                        if action[0] == ACTION_CLICK else -1
+                    )
                 # Remember the clicked element's TYPE → used for rare-action loss
                 # weighting (general inverse-frequency; rare target types like tabs
                 # get up-weighted, no hardcoded class).
@@ -626,11 +668,15 @@ class TrajectoryDataset(Dataset):
                 # PRIOR steps (snapshot before adding the current target). Then
                 # record this step's target so later steps see it as attempted.
                 self._attempted_by_file[str(fpath)] = frozenset(g_acted)
-                _tgt_elem = None
-                if action[0] == ACTION_CLICK and 0 <= click_idx < len(elems):
-                    _tgt_elem = elems[click_idx]
-                elif action[0] == ACTION_KEYBOARD and 0 <= src_idx < len(elems):
-                    _tgt_elem = elems[src_idx]
+                if self.action_space == "semantic":
+                    _acted_idx = click_idx if click_idx >= 0 else src_idx
+                    _tgt_elem = elems[_acted_idx] if 0 <= _acted_idx < len(elems) else None
+                else:
+                    _tgt_elem = None
+                    if action[0] == ACTION_CLICK and 0 <= click_idx < len(elems):
+                        _tgt_elem = elems[click_idx]
+                    elif action[0] == ACTION_KEYBOARD and 0 <= src_idx < len(elems):
+                        _tgt_elem = elems[src_idx]
                 if _tgt_elem is not None:
                     g_acted.add(_attempt_key(_tgt_elem))
                 valid_files.append(fpath)
@@ -661,6 +707,7 @@ class TrajectoryDataset(Dataset):
         self._samples = []
         total_traces = 0
         dropped_short_groups = 0
+        _noop_id = VERB_TO_ID[_Verb.WAIT] if self.action_space == "semantic" else ACTION_NOOP
         for gi, g_actions in enumerate(grouped_action_meta):
             N = len(g_actions)
             total_traces += N
@@ -673,7 +720,7 @@ class TrajectoryDataset(Dataset):
                 src_idx    = grouped_src_idx[gi][i + hist_len - 1]
                 click_idx  = grouped_click_idx[gi][i + hist_len - 1]
                 click_type = grouped_click_type[gi][i + hist_len - 1]
-                if tgt[0] == ACTION_NOOP:
+                if tgt[0] == _noop_id:
                     continue
                 self._samples.append((
                     gi,                                # group index
@@ -860,9 +907,12 @@ class TrajectoryDataset(Dataset):
 
     def class_counts(self) -> dict:
         from collections import Counter
-        names = {ACTION_NOOP: "no_op", ACTION_CLICK: "click", ACTION_KEYBOARD: "keyboard",
-                 ACTION_HOTKEY: "hotkey", ACTION_SCROLL: "scroll",
-                 ACTION_DCLICK: "double_click", ACTION_DRAG: "drag"}
+        if self.action_space == "semantic":
+            names = {i: v.value for i, v in ID_TO_VERB.items()}
+        else:
+            names = {ACTION_NOOP: "no_op", ACTION_CLICK: "click", ACTION_KEYBOARD: "keyboard",
+                     ACTION_HOTKEY: "hotkey", ACTION_SCROLL: "scroll",
+                     ACTION_DCLICK: "double_click", ACTION_DRAG: "drag"}
         return {names.get(k, f"action_{k}"): v
                 for k, v in Counter(s[4] for s in self._samples).items()}
 
@@ -1113,12 +1163,14 @@ def _masked_mse(pred, target, mask) -> torch.Tensor:
     return nn.functional.mse_loss(pred[mask], target[mask])
 
 
-def _run_epoch(model, loader, optimizer, device, lambda_click, lambda_key, label_smoothing, class_weights=None):
+def _run_epoch(model, loader, optimizer, device, lambda_click, lambda_key, label_smoothing,
+               class_weights=None, key_verb_id=ACTION_KEYBOARD, lambda_src=0.5):
     is_train = optimizer is not None
     model.train(is_train)
     ce = nn.CrossEntropyLoss(label_smoothing=label_smoothing, weight=class_weights)
     totals = dict(loss=0.0, type=0.0, click=0.0, key=0.0,
                   correct=0, click_correct=0, click_total=0,
+                  src_correct=0, src_total=0,
                   samples=0, batches=0)
 
     ce_click = nn.CrossEntropyLoss(ignore_index=-1, reduction="none")  # per-sample → rare-action weighting
@@ -1145,14 +1197,14 @@ def _run_epoch(model, loader, optimizer, device, lambda_click, lambda_key, label
             else:
                 l_click = out.click_elem.sum() * 0.0
 
-            l_key = _masked_mse(out.key_count.squeeze(-1), tgt_keys, tgt_types == ACTION_KEYBOARD)
+            l_key = _masked_mse(out.key_count.squeeze(-1), tgt_keys, tgt_types == key_verb_id)
 
             # Source-element pointer loss — only keyboard steps with a resolved source
             valid_src = (tgt_src != -1)
             l_src = (ce_src(out.source_elem, tgt_src)
                      if valid_src.any() else out.source_elem.sum() * 0.0)
 
-            loss = l_type + lambda_click * l_click + lambda_key * l_key + 0.5 * l_src
+            loss = l_type + lambda_click * l_click + lambda_key * l_key + lambda_src * l_src
 
 
             if is_train:
@@ -1169,6 +1221,10 @@ def _run_epoch(model, loader, optimizer, device, lambda_click, lambda_key, label
                 click_pred = out.click_elem[valid_click].argmax(-1)
                 totals["click_correct"] += (click_pred == tgt_click_idx[valid_click]).sum().item()
                 totals["click_total"]   += int(valid_click.sum().item())
+            if valid_src.any():
+                src_pred = out.source_elem[valid_src].argmax(-1)
+                totals["src_correct"] += (src_pred == tgt_src[valid_src]).sum().item()
+                totals["src_total"]   += int(valid_src.sum().item())
             totals["samples"] += tgt_types.size(0)
             totals["batches"] += 1
 
@@ -1180,6 +1236,7 @@ def _run_epoch(model, loader, optimizer, device, lambda_click, lambda_key, label
         "l_key":      totals["key"]   / n,
         "accuracy":   totals["correct"] / max(totals["samples"], 1),
         "click_acc":  totals["click_correct"] / max(totals["click_total"], 1),
+        "src_acc":    totals["src_correct"] / max(totals["src_total"], 1),
     }
 
 
@@ -1207,6 +1264,7 @@ def train(
     balanced_sampler: bool = True,             # WeightedRandomSampler for type imbalance (default on — see Run 6)
     device_str: str = "auto",
     verbose: bool = True,
+    action_space: str = "legacy",              # "legacy" | "semantic" (Universal Semantic Action Space)
 ) -> TransformerAgentNetwork:
     """
     Train TransformerAgentNetwork via Behavioral Cloning.
@@ -1237,8 +1295,14 @@ def train(
 
     dataset = TrajectoryDataset(
         data_dir, max_elements=max_elements, hist_len=hist_len,
-        aug_drop_prob=aug_drop_prob,
+        aug_drop_prob=aug_drop_prob, action_space=action_space,
     )
+    _num_actions   = NUM_SEMANTIC_ACTIONS if action_space == "semantic" else NUM_ACTIONS
+    _key_verb_id   = VERB_TO_ID[_Verb.SET_VALUE] if action_space == "semantic" else ACTION_KEYBOARD
+    # In semantic mode, src_idx carries the typing-target pointer (FOCUS/SET_VALUE
+    # — the majority of samples), not a vestigial background-copy hint, so it
+    # deserves the same weight as the click pointer instead of the legacy 0.5.
+    _lambda_src    = lambda_click if action_space == "semantic" else 0.5
     if verbose:
         print(f"[train] {dataset}")
 
@@ -1277,7 +1341,7 @@ def train(
     model = TransformerAgentNetwork(
         elem_features=ELEM_FEATURES, max_elements=max_elements, d_model=d_model,
         nhead=nhead, num_layers=num_layers, dim_feedforward=dim_feedforward,
-        dropout=dropout, hist_len=hist_len,
+        dropout=dropout, hist_len=hist_len, num_actions=_num_actions,
     ).to(device)
 
     if verbose:
@@ -1298,13 +1362,16 @@ def train(
         # General over ALL action classes by index (was hardcoded to 3). Inverse-
         # frequency weights punish collapsing onto one class — fixes the observed
         # action-head collapse (always-scroll, then always-hotkey).
-        _name_by_idx = {
-            ACTION_NOOP: "no_op", ACTION_CLICK: "click", ACTION_KEYBOARD: "keyboard",
-            ACTION_HOTKEY: "hotkey", ACTION_SCROLL: "scroll",
-            ACTION_DCLICK: "double_click", ACTION_DRAG: "drag",
-        }
+        if action_space == "semantic":
+            _name_by_idx = {i: v.value for i, v in ID_TO_VERB.items()}
+        else:
+            _name_by_idx = {
+                ACTION_NOOP: "no_op", ACTION_CLICK: "click", ACTION_KEYBOARD: "keyboard",
+                ACTION_HOTKEY: "hotkey", ACTION_SCROLL: "scroll",
+                ACTION_DCLICK: "double_click", ACTION_DRAG: "drag",
+            }
         raw = []
-        for i in range(NUM_ACTIONS):
+        for i in range(_num_actions):
             cnt = max(_cc.get(_name_by_idx.get(i, ""), 0), 1)
             w = _total / cnt
             raw.append(w ** 0.5 if class_weight_mode == "sqrt_inverse" else w)
@@ -1312,7 +1379,7 @@ def train(
         _class_weights = _class_weights / _class_weights.sum() * len(_class_weights)
         if verbose:
             _wstr = "  ".join(f"{_name_by_idx.get(i,i)}={_class_weights[i]:.2f}"
-                              for i in range(NUM_ACTIONS))
+                              for i in range(_num_actions))
             print(f"[train] class weights ({class_weight_mode}): {_wstr}")
 
     optimizer = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=weight_decay)
@@ -1325,15 +1392,15 @@ def train(
     save_path_p.parent.mkdir(parents=True, exist_ok=True)
 
     for epoch in range(1, epochs + 1):
-        train_m = _run_epoch(model, train_loader, optimizer, device, lambda_click, lambda_key, label_smoothing, _class_weights)
-        val_m   = _run_epoch(model, val_loader,   None,      device, lambda_click, lambda_key, label_smoothing, _class_weights)
+        train_m = _run_epoch(model, train_loader, optimizer, device, lambda_click, lambda_key, label_smoothing, _class_weights, _key_verb_id, _lambda_src)
+        val_m   = _run_epoch(model, val_loader,   None,      device, lambda_click, lambda_key, label_smoothing, _class_weights, _key_verb_id, _lambda_src)
         scheduler.step()
 
         if verbose:
             print(
                 f"Epoch {epoch:>3}/{epochs}  |  "
-                f"train_loss={train_m['loss']:.4f}  acc={train_m['accuracy']:.3f}  click_acc={train_m['click_acc']:.3f}  |  "
-                f"val_loss={val_m['loss']:.4f}  acc={val_m['accuracy']:.3f}  click_acc={val_m['click_acc']:.3f}  "
+                f"train_loss={train_m['loss']:.4f}  acc={train_m['accuracy']:.3f}  click_acc={train_m['click_acc']:.3f}  src_acc={train_m['src_acc']:.3f}  |  "
+                f"val_loss={val_m['loss']:.4f}  acc={val_m['accuracy']:.3f}  click_acc={val_m['click_acc']:.3f}  src_acc={val_m['src_acc']:.3f}  "
                 f"[type={train_m['l_type']:.3f} click={train_m['l_click']:.3f} key={train_m['l_key']:.4f}]"
             )
 
@@ -1357,7 +1424,8 @@ def train(
                     "elem_features": ELEM_FEATURES, "max_elements": max_elements,
                     "d_model": d_model, "nhead": nhead, "num_layers": num_layers,
                     "dim_feedforward": dim_feedforward, "dropout": dropout,
-                    "hist_len": hist_len,
+                    "hist_len": hist_len, "num_actions": _num_actions,
+                    "action_space": action_space,
                 },
             }, save_path_p)
             if verbose:
@@ -1399,7 +1467,8 @@ def train(
                 "elem_features": ELEM_FEATURES, "max_elements": max_elements,
                 "d_model": d_model, "nhead": nhead, "num_layers": num_layers,
                 "dim_feedforward": dim_feedforward, "dropout": dropout,
-                "hist_len": hist_len,
+                "hist_len": hist_len, "num_actions": _num_actions,
+                "action_space": action_space,
             },
         }, save_path_p)
         if verbose:
@@ -1429,9 +1498,11 @@ def _load_model(model_path: str, device: torch.device) -> TransformerAgentNetwor
             d_model=hp.get("d_model", 128), nhead=hp.get("nhead", 4),
             num_layers=hp.get("num_layers", 4), dim_feedforward=hp.get("dim_feedforward", 256),
             dropout=hp.get("dropout", 0.1), hist_len=hp.get("hist_len", 4),
+            num_actions=hp.get("num_actions", NUM_ACTIONS),
         ).to(device)
         m.load_state_dict(ckpt["model_state_dict"])
         m.eval()
+        m.action_space = hp.get("action_space", "legacy")   # stamped for predict() to decode correctly
         _model_cache[key] = m
     return _model_cache[key]
 
@@ -1514,21 +1585,62 @@ def predict(
 
     import torch.nn.functional as F
     probs = F.softmax(out.type_logits[0], dim=-1).tolist()
-    result: Dict[str, Any] = {
-        "action_type": _ACTION_LABELS.get(idx, "no_op"),
-        "confidence":  round(max(probs), 4),
-        "_scores": {_ACTION_LABELS.get(i, str(i)): round(p, 3) for i, p in enumerate(probs)},
-    }
+    _is_semantic = getattr(model, "action_space", "legacy") == "semantic"
+    if _is_semantic:
+        _verb = ID_TO_VERB.get(idx, _Verb.WAIT)
+        _legacy_type = SemanticAction(verb=_verb).to_legacy_dict()["action_type"]
+        result: Dict[str, Any] = {
+            "action_type": _legacy_type,
+            "verb":        _verb.value,
+            "confidence":  round(max(probs), 4),
+            "_scores": {ID_TO_VERB.get(i, _Verb.WAIT).value: round(p, 3)
+                        for i, p in enumerate(probs)},
+        }
+    else:
+        result: Dict[str, Any] = {
+            "action_type": _ACTION_LABELS.get(idx, "no_op"),
+            "confidence":  round(max(probs), 4),
+            "_scores": {_ACTION_LABELS.get(i, str(i)): round(p, 3) for i, p in enumerate(probs)},
+        }
 
-    # ALWAYS expose the click pointer (which field) — this is the transformer's
-    # navigation signal and it's good (click_acc ~0.76). Decoupled from the
-    # action-type head (which collapses), so the merge can use the transformer's
-    # "which field" even when the action-type head misfires.
-    click_idx  = int(out.click_elem[0].argmax(-1).item())
-    click_conf = F.softmax(out.click_elem[0], dim=-1).max().item()
+    # ALWAYS expose the WHERE pointer (which field) — this is the transformer's
+    # navigation signal, decoupled from the action-type head (which collapses),
+    # so the merge can use "which field" even when the action-type head misfires.
+    # In semantic mode there are TWO separate pointer heads (click_elem for
+    # click-like verbs, source_elem repurposed as the typing-target pointer for
+    # FOCUS/SET_VALUE) — pick whichever one matches the predicted verb.
+    if _is_semantic and ID_TO_VERB.get(idx) in (_Verb.FOCUS, _Verb.SET_VALUE):
+        _where_logits = out.source_elem[0]
+    else:
+        _where_logits = out.click_elem[0]
+    _where_probs = F.softmax(_where_logits, dim=-1)
+    click_idx  = int(_where_logits.argmax(-1).item())
+    click_conf = _where_probs.max().item()
     result["click_elem_idx"] = click_idx
     result["_click_conf"]    = round(click_conf, 3)
     elems = state.get("elements", [])[:max_elements]
+
+    # RANKED WHERE — the pointer head scores EVERY element, not just the winner.
+    # Expose the top-k so the agent can arbitrate: when the #1 target is dead /
+    # already filled / unresponsive, fall to the model's own #2, #3, … instead
+    # of re-clicking the same spot (fixation) or handing WHERE to the LLM.
+    _k = min(8, len(elems))
+    if _k > 0:
+        _top = torch.topk(_where_probs, min(_k, _where_probs.shape[-1]))
+        click_topk = []
+        for _p, _i in zip(_top.values.tolist(), _top.indices.tolist()):
+            if not (0 <= _i < len(elems)):
+                continue
+            _bb = elems[_i].get("bbox", [])
+            if len(_bb) < 4:
+                continue
+            click_topk.append([_i, round(_p, 4),
+                               [(float(_bb[0]) + float(_bb[2])) / 2.0,
+                                (float(_bb[1]) + float(_bb[3])) / 2.0]])
+        result["click_topk"] = click_topk
+    else:
+        result["click_topk"] = []
+
     if 0 <= click_idx < len(elems):
         bbox = elems[click_idx].get("bbox", [0, 0, 0, 0])
         if len(bbox) >= 4:
@@ -1540,7 +1652,12 @@ def predict(
     else:
         result["click_position"] = [0.0, 0.0]
 
-    if idx == ACTION_KEYBOARD:
+    if _is_semantic:
+        if ID_TO_VERB.get(idx) == _Verb.SET_VALUE:
+            result["key_count"] = max(1, round(out.key_count[0, 0].item() * 100))
+            # source_elem/background-copy pointer is retired in semantic mode —
+            # WHAT (the value) comes from the LLM, not a copied background span.
+    elif idx == ACTION_KEYBOARD:
         result["key_count"]       = max(1, round(out.key_count[0, 0].item() * 100))
         result["source_elem_idx"] = int(out.source_elem[0].argmax(-1).item())
         result["_source_conf"]    = round(F.softmax(out.source_elem[0], dim=-1).max().item(), 3)
@@ -1579,6 +1696,10 @@ def _parse_args() -> argparse.Namespace:
     p.add_argument("--balanced_sampler", action=argparse.BooleanOptionalAction, default=True,
                    help="Use WeightedRandomSampler to balance click vs keyboard per epoch "
                         "(default: on — disable with --no-balanced_sampler)")
+    p.add_argument("--action_space",    default="legacy", choices=["legacy", "semantic"],
+                   help="legacy: original click/keyboard/hotkey/scroll scheme (default). "
+                        "semantic: Universal Semantic Action Space verb labels from "
+                        "components/recorder/action_labeler.py.")
     # Predict args
     p.add_argument("--trace_path",      default=None)
     return p.parse_args()
@@ -1597,6 +1718,7 @@ if __name__ == "__main__":
             class_weight_mode=args.class_weight_mode,
             balanced_sampler=args.balanced_sampler,
             device_str=args.device_str,
+            action_space=args.action_space,
         )
     else:
         if not args.trace_path:

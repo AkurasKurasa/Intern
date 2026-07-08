@@ -71,6 +71,7 @@ class BCTrainer:
         dim_feedforward: int   = 128,
         dropout:         float = 0.2,
         hist_len:        int   = 4,
+        action_space:    str   = "legacy",
     ):
         self.trace_dir       = trace_dir
         self.save_path       = save_path
@@ -85,6 +86,7 @@ class BCTrainer:
         self.dim_feedforward = dim_feedforward
         self.dropout         = dropout
         self.hist_len        = hist_len
+        self.action_space    = action_space
 
     def train(self, trace_dir: Optional[str] = None, epochs: Optional[int] = None):
         """
@@ -116,6 +118,7 @@ class BCTrainer:
             dim_feedforward = self.dim_feedforward,
             dropout         = self.dropout,
             hist_len        = self.hist_len,
+            action_space    = self.action_space,
         )
         logger.info("BCTrainer: checkpoint saved → %s", self.save_path)
         return model

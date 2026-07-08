@@ -22,6 +22,7 @@ sys.path.insert(0, str(ROOT))
 
 from components.agent.executor import ActionExecutor, ExecutionResult
 from components.agent.agent import LLMAgent as ExecutorAgent
+from components.agent.semantic_action import SemanticAction, Verb
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -129,6 +130,74 @@ class TestActionExecutor:
         monkeypatch.setattr(mod, "_PYAUTOGUI_AVAILABLE", False)
         with pytest.raises(ImportError, match="pyautogui"):
             ActionExecutor(dry_run=False)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  SemanticAction -> executor equivalence
+#  (Universal Semantic Action Space refactor: SemanticAction must produce the
+#  EXACT same ExecutionResult as the legacy dict it's meant to replace, for
+#  every existing agent.py call-site to keep working during the incremental
+#  migration.)
+# ══════════════════════════════════════════════════════════════════════════════
+
+class TestSemanticActionExecution:
+
+    def _assert_equivalent(self, executor, legacy_dict, semantic_action):
+        r_legacy   = executor.execute(legacy_dict)
+        r_semantic = executor.execute(semantic_action)
+        assert r_legacy.action_type == r_semantic.action_type
+        assert r_legacy.position    == r_semantic.position
+        assert r_legacy.key_count   == r_semantic.key_count
+        assert r_legacy.keystrokes  == r_semantic.keystrokes
+        assert r_legacy.success     == r_semantic.success
+
+    def test_invoke_equals_legacy_click(self, executor):
+        self._assert_equivalent(
+            executor,
+            {"action_type": "click", "click_position": [100, 200]},
+            SemanticAction(verb=Verb.INVOKE, position=(100, 200)),
+        )
+
+    def test_toggle_equals_legacy_click(self, executor):
+        self._assert_equivalent(
+            executor,
+            {"action_type": "click", "click_position": [50, 60]},
+            SemanticAction(verb=Verb.TOGGLE, position=(50, 60)),
+        )
+
+    def test_set_value_equals_legacy_keyboard_text(self, executor):
+        self._assert_equivalent(
+            executor,
+            {"action_type": "keyboard", "text": "hello", "key_count": 5},
+            SemanticAction(verb=Verb.SET_VALUE, value="hello"),
+        )
+
+    def test_hotkey_equals_legacy_keyboard_keystrokes(self, executor):
+        self._assert_equivalent(
+            executor,
+            {"action_type": "keyboard", "keystrokes": ["tab"], "key_count": 1},
+            SemanticAction(verb=Verb.HOTKEY, keystrokes=["tab"]),
+        )
+
+    def test_scroll_to_equals_legacy_scroll(self, executor):
+        self._assert_equivalent(
+            executor,
+            {"action_type": "scroll", "click_position": [5, 5],
+             "direction": "down", "clicks": 3},
+            SemanticAction(verb=Verb.SCROLL_TO, position=(5, 5),
+                           direction="down", clicks=3),
+        )
+
+    def test_wait_equals_legacy_noop(self, executor):
+        self._assert_equivalent(
+            executor,
+            {"action_type": "no_op"},
+            SemanticAction(verb=Verb.WAIT),
+        )
+
+    def test_semantic_action_dry_run_true(self, executor):
+        result = executor.execute(SemanticAction(verb=Verb.INVOKE, position=(1, 1)))
+        assert result.dry_run is True
 
 
 # ══════════════════════════════════════════════════════════════════════════════
