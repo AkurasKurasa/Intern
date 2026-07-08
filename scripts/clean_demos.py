@@ -21,7 +21,15 @@ from __future__ import annotations
 import sys, os, glob, json, shutil
 
 FIELD = {"editcontrol", "input", "comboboxcontrol", "combobox",
-         "checkboxcontrol", "checkbox", "buttoncontrol", "button"}
+         "checkboxcontrol", "checkbox", "buttoncontrol", "button",
+         # tab items ARE the multi-tab transitions — keep them, don't drop as junk
+         "tabitemcontrol", "tabitem"}
+
+# Utility/footer buttons that are NOT part of the fill order. They get recorded
+# mid-sequence (reset/navigation) and the model clones them -> footer churn at
+# inference. Dropped. NOTE: 'Submit  New' is KEPT (legit end-of-record action).
+FOOTER_DROP = {"clear all", "close", "print preview", "load record",
+               "save record", "cancel", "reset", "help", "about"}
 
 
 def elem_at(state, pos, role="active"):
@@ -92,6 +100,10 @@ def main():
                 ty = (tgt.get("type") or "").lower()
                 lbl = tgt.get("label") or tgt.get("text") or ""
                 if ty not in FIELD:
+                    drop_junk += 1
+                    continue
+                # footer/utility buttons = recorded noise the model would clone
+                if lbl.strip().lower() in FOOTER_DROP:
                     drop_junk += 1
                     continue
                 if lbl and lbl == prev_lbl:   # combobox open + reopen on same field
