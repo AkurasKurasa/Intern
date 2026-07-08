@@ -641,6 +641,13 @@ class LLMAgent:
         self._verify_fix_count: dict         = {}   # verify: field → times re-corrected (accept as dead after 2)
         self._keystroke_retried: dict        = {}   # field → tried keystroke-typing after a paste no_change
         self._dead_fill_keys:  set           = set()
+        # Fixation-recovery escalation: how many times the SAME spot has triggered
+        # the loop-guard's "FIXATED" recovery this tab. First hit tries the normal
+        # NAV fill/verify recovery. If that same spot fixates AGAIN, the recovery
+        # isn't sticking (dead-mark ignored, or the fill trivially "succeeds" with
+        # nothing to change) — stop trusting it and force a hard tab-advance instead
+        # of looping forever. Generic: keyed by attempt_key, reset per tab.
+        self._fixation_hits:   dict          = {}
         # How many times _reveal_missing_by_scroll focused a field that was
         # already visible but still unfilled. After 2 attempts we mark it dead
         # so _find_missing_field stops returning the same stuck field forever.
@@ -1123,7 +1130,7 @@ class LLMAgent:
                 _last_auto_step       = step_idx  # treat tab switch as an auto step
                 _pane_escape_last_field = ""
                 _pane_escape_streak     = 0
-                self._filled_this_tab.clear()     # new tab — reset filled-field tracking
+                self._filled_this_tab.clear(); self._fixation_hits.clear()     # new tab — reset filled-field tracking
                 self._nochange_click_pos.clear()  # new tab — reset failed-click blacklist
                 _confirmed_blank_fields.clear()   # new tab — reset peek-confirmed-blank set
                 _tc_advance_verified = False      # new tab — reset full-scan gate
@@ -1301,7 +1308,7 @@ class LLMAgent:
                     _tab_scroll_count    = 0
                     _last_auto_step      = step_idx
                     _tc_advance_verified = False
-                    self._filled_this_tab.clear()
+                    self._filled_this_tab.clear(); self._fixation_hits.clear()
                     _confirmed_blank_fields.clear()
                     self._refresh_record_cache(state)
                     time.sleep(self.step_delay)
@@ -1371,7 +1378,7 @@ class LLMAgent:
                             _tab_just_switched = True
                             _tab_scroll_count  = 0
                             _last_auto_step    = step_idx
-                            self._filled_this_tab.clear()
+                            self._filled_this_tab.clear(); self._fixation_hits.clear()
                             _confirmed_blank_fields.clear()
                             self._refresh_record_cache(state)
                             time.sleep(self.step_delay)
@@ -1865,7 +1872,7 @@ class LLMAgent:
                         _m2_at_bottom = False
                         _last_auto_step = step_idx
                         _heuristic_steps += 1
-                        self._filled_this_tab.clear()
+                        self._filled_this_tab.clear(); self._fixation_hits.clear()
                         self._refresh_record_cache(self._observe())
                         time.sleep(self.step_delay)
                         continue
@@ -1876,7 +1883,7 @@ class LLMAgent:
                     _m2_at_bottom      = False       # M2: new tab is not at bottom
                     _last_auto_step    = step_idx
                     _heuristic_steps  += 1
-                    self._filled_this_tab.clear()
+                    self._filled_this_tab.clear(); self._fixation_hits.clear()
                     self._refresh_record_cache(self._observe())
                     time.sleep(self.step_delay)
                     continue
@@ -1967,6 +1974,35 @@ class LLMAgent:
                     # Transformer pointer navigates to the next field
                     _decision_maker = "transformer"
                     _pos2 = t_pred.get("click_position")
+                    # RANKED WHERE: arbitrate over the pointer head's full top-k
+                    # instead of blindly taking argmax. Masked #1 (dead / filled /
+                    # blacklisted) → the model's own next-best target, same step,
+                    # no guard, no LLM. None → nothing actionable is visible.
+                    _ranked = self._pick_ranked_target(state, t_pred)
+                    if _ranked is not None:
+                        _r_elem, _r_pos, _r_conf = _ranked
+                        if _pos2 and (abs(_r_pos[0] - _pos2[0]) > 5 or abs(_r_pos[1] - _pos2[1]) > 5):
+                            logger.info("[RANKED] top-1 masked → model's next-best %r @ (%.0f,%.0f) conf=%.2f",
+                                        (_r_elem.get("label") or _r_elem.get("text") or "?")[:28],
+                                        _r_pos[0], _r_pos[1], _r_conf)
+                        _pos2 = _r_pos
+                    elif t_pred.get("click_topk"):
+                        # Every ranked candidate masked → visible batch is spent.
+                        # NAVIGATION PROTOCOL rule 2: jump to the densest window of
+                        # empty fields; fall back to the missing-field reveal, then
+                        # to the pointer-invalid Tab fallback if the tab is done.
+                        logger.info("[RANKED] all candidates masked — optimal-viewport jump.")
+                        _jmp = self._optimal_viewport_jump(state)
+                        if isinstance(_jmp, dict):
+                            state = _jmp
+                            time.sleep(self.step_delay * 0.5)
+                            continue
+                        _rev = self._reveal_missing_by_scroll(state)
+                        if isinstance(_rev, dict):
+                            state = _rev
+                            time.sleep(self.step_delay * 0.5)
+                            continue
+                        _pos2 = None
                     if _pos2 and (_pos2[0] > 1 or _pos2[1] > 1):
                         _snap2 = self._snap(_pos2, state) or _pos2
                         # MECHANISM 1: if the transformer picked an off-fold field,
@@ -1974,6 +2010,10 @@ class LLMAgent:
                         # HOW). Keeps the transformer driving WHERE across the whole
                         # tab instead of starving → handing to the LLM-sweep.
                         state, _snap2 = self._reveal_target(state, _snap2)
+                        # (MECHANISM 2 removed 2026-07-08 — superseded by the
+                        # NAVIGATION PROTOCOL core rule: visible-first ranking in
+                        # _pick_ranked_target + _optimal_viewport_jump when the
+                        # visible batch is spent.)
                         # COMBOBOX-AS-FILL: demos action comboboxes as CLICKS, so the
                         # model clicks them; but a plain click only toggles the
                         # dropdown → open/close oscillation. A click on an EMPTY
@@ -2456,7 +2496,7 @@ class LLMAgent:
                         _expose_scrolls    = 0          # M2: new tab → fresh scroll budget
                         _m2_at_bottom      = False       # M2: new tab is not at bottom
                         _last_auto_step    = step_idx
-                        self._filled_this_tab.clear()
+                        self._filled_this_tab.clear(); self._fixation_hits.clear()
                         _confirmed_blank_fields.clear()
                         self._refresh_record_cache(self._observe())
                         time.sleep(self.step_delay)
@@ -2466,7 +2506,7 @@ class LLMAgent:
                         _tab_just_switched = True
                         _tab_scroll_count  = 0
                         _last_auto_step    = step_idx
-                        self._filled_this_tab.clear()
+                        self._filled_this_tab.clear(); self._fixation_hits.clear()
                         _confirmed_blank_fields.clear()
                         self._refresh_record_cache(state)
                         time.sleep(self.step_delay)
@@ -2559,12 +2599,30 @@ class LLMAgent:
                 # Mark the fixated spot dead so the model stops re-targeting it
                 # (it's been clicked N× with no fill — it isn't going to fill).
                 _fx = self._elem_at(state, prediction.get("click_position") or [])
+                _fx_key = None
                 if _fx is not None:
-                    self._dead_fill_keys.add(self._attempt_key(_fx))
+                    _fx_key = self._attempt_key(_fx)
+                    self._dead_fill_keys.add(_fx_key)
                     self._mark_attempted(_fx)
+                # Escalation: has THIS EXACT spot already fixated once this tab? If the
+                # dead-mark above didn't stop the model from re-targeting it, or the NAV
+                # fill/verify keeps trivially "succeeding" because the field's already
+                # correct (nothing to change → no forward progress either way), a second
+                # fixation on the same spot means recovery isn't working — stop trusting
+                # it and force a hard tab-advance instead of retrying fill again.
+                _fx_hits = self._fixation_hits.get(_fx_key, 0) + 1 if _fx_key else 1
+                if _fx_key:
+                    self._fixation_hits[_fx_key] = _fx_hits
+                _escalate = _fx_hits >= 2
+                if _escalate:
+                    logger.warning("[NAV] (fixation) %r fixated 2x — recovery not sticking, "
+                                    "forcing tab-advance instead of retrying fill.",
+                                    (_fx.get("label") or _fx.get("text") or "")[:28] if _fx else "?")
                 # Navigation Protocol: check SOURCE, fix/verify, or navigate. No Tab.
                 _nav = self._navigation_protocol(state)
                 _nav_act = (_nav.get("action") or "").lower()
+                if _escalate and _nav_act == "fill":
+                    _nav_act = "tab"   # don't retry the same trivially-succeeding fill again
                 if _nav_act == "fill" and (_nav.get("field") or "").strip():
                     _nf = _nav["field"].strip()
                     logger.info("[NAV] (fixation) fill/verify %r → %r",
@@ -2588,11 +2646,40 @@ class LLMAgent:
                     logger.info("[NAV] (fixation) page done → switch tab %r", (_nav.get("target") or "")[:24])
                     self._executor.execute({"action_type": "click", "click_position": _nav["click_position"]})
                     self._visited_tabs.add((_nav.get("target") or "").strip())
-                    self._filled_this_tab.clear()
+                    self._filled_this_tab.clear(); self._fixation_hits.clear()
                     self._refresh_record_cache(self._observe())
                 elif _nav_act == "done" and self._confirm_finished(state):
                     logger.info("[NAV] (fixation) finish confirmed against source — done.")
                     break
+                elif _escalate:
+                    # The LLM's nav response didn't give us a clickable tab (still "fill"
+                    # with no field, or "tab" with an unresolved target name) — don't fall
+                    # through and let the same spot fixate a 3rd time. Advance deterministically:
+                    # click the first unvisited tab ourselves, geometry only, no LLM needed.
+                    _next_tab = next((t for t in self._tab_elems_now(state)
+                                      if (t.get("text") or t.get("label") or "").strip().lower()
+                                      not in {v.lower() for v in self._visited_tabs}), None)
+                    if _next_tab is not None:
+                        _tb = _next_tab["bbox"]
+                        _tnm = (_next_tab.get("text") or _next_tab.get("label") or "").strip()
+                        logger.warning("[NAV] (fixation) escalation fallback — forcing tab %r directly.", _tnm[:24])
+                        self._executor.execute({"action_type": "click",
+                                                "click_position": [(_tb[0] + _tb[2]) / 2, (_tb[1] + _tb[3]) / 2]})
+                        self._visited_tabs.add(_tnm)
+                        self._filled_this_tab.clear(); self._fixation_hits.clear()
+                        self._refresh_record_cache(self._observe())
+                    else:
+                        # LAST TAB — nowhere to advance. Escalation used to no-op here
+                        # (click → no_change → guard → escalate → no tab → repeat forever).
+                        # Hand the tab to the SWEEP instead: it drives every remaining
+                        # field to fill/verify with its own 3-strike dead-marking (the
+                        # fixated field is already dead-marked above, so it gets skipped),
+                        # and finishes via source-confirm when the page is clean.
+                        logger.warning("[NAV] (fixation) escalation on LAST tab — no tab to advance; "
+                                       "invoking sweep to finish the page.")
+                        state, _fx_finish = self._sweep_tab(state)
+                        if _fx_finish:
+                            break
                 time.sleep(self.step_delay * 0.5)
                 continue
 
@@ -2691,6 +2778,15 @@ class LLMAgent:
                     _fcp = prediction.get("click_position", [])
                     if len(_fcp) >= 2:
                         self._nochange_click_pos.add((round(_fcp[0] / 10) * 10, round(_fcp[1] / 10) * 10))
+                        # Also blacklist the CONTAINING element's bbox center — snap can
+                        # shift a click a few px off center, and the ranked-target
+                        # arbitration masks by center key; both keys must match.
+                        _ce_bl = self._elem_at(state, _fcp)
+                        if _ce_bl and _ce_bl.get("bbox"):
+                            _bb_bl = _ce_bl["bbox"]
+                            self._nochange_click_pos.add(
+                                (round((_bb_bl[0] + _bb_bl[2]) / 2 / 10) * 10,
+                                 round((_bb_bl[1] + _bb_bl[3]) / 2 / 10) * 10))
                 # A fill (type-with-text) that produced no_change = the widget didn't
                 # accept the value (e.g. wx SpinCtrl rejects clipboard paste). Count
                 # per field; after 2 fails mark it DEAD so the type path Tabs past it
@@ -3488,6 +3584,18 @@ class LLMAgent:
         except Exception:
             return sh
 
+    def _form_viewport_top(self, state: Dict[str, Any]) -> float:
+        """Top edge of the form's scroll viewport. The pane does NOT start at
+        y=0 — the title bar + tab strip sit above it, so an element scrolled UP
+        out of the pane keeps a stale bbox in that zone (y≈120-145) and passes
+        any `top >= 0` visibility check, then gets clicked → tab-strip mis-hit.
+        Geometry-driven: viewport starts just below the lowest tab item in the
+        ACTIVE window; falls back to 0 (legacy behavior) if no tab strip."""
+        _tabs_bot = [e["bbox"][3] for e in state.get("elements", [])
+                     if (e.get("type") or "").lower() in ("tabitem", "tabitemcontrol")
+                     and e.get("window_role") != "background" and e.get("bbox")]
+        return (max(_tabs_bot) + 2) if _tabs_bot else 0.0
+
     def _scroll_pane_bottom(self, state: Dict[str, Any]) -> float:
         """Bottom edge of the ACTIVE ScrolledPanel (the scroll fold), NOT the outer
         window frame. Uses UIA: walks up from the first visible EditControl found
@@ -4268,6 +4376,7 @@ class LLMAgent:
             return None                                     # tab complete
 
         vb  = self._form_viewport_bottom(state) - 8
+        vt  = self._form_viewport_top(state)
         top = miss["bbox"][1]
         bot = miss["bbox"][3]
 
@@ -4280,7 +4389,7 @@ class LLMAgent:
         # Guard: if the same visible field has been clicked N times without being
         # filled, it is genuinely unfillable → mark dead so _find_missing_field
         # skips it, then look for the next missing field in the same call.
-        if top >= 0 and bot <= vb:
+        if top >= vt and bot <= vb:
             fkey = self._attempt_key(miss)
             count = self._reveal_focus_count.get(fkey, 0) + 1
             self._reveal_focus_count[fkey] = count
@@ -4999,6 +5108,12 @@ class LLMAgent:
             # named target only if the transformer pointer is invalid.
             _click_conf = t_pred.get("_click_conf", 0.0)
             _t_pos      = t_pred.get("click_position")
+            # RANKED WHERE: prefer the model's best NON-masked candidate over its
+            # raw argmax — dead/filled/blacklisted targets fall through to the
+            # model's own next choice instead of forcing the LLM to take WHERE.
+            _rk = self._pick_ranked_target(state, t_pred)
+            if _rk is not None:
+                _t_pos, _click_conf = _rk[1], _rk[2]
             # In pure mode the transformer ALWAYS owns WHERE (LLM only supplies
             # values). Drop the confidence gate so the LLM can't hijack the click
             # target when the pointer is merely low-confidence.
@@ -5453,6 +5568,166 @@ class LLMAgent:
         logger.warning("[CONFIRM] verification corrected field(s) / found gaps — NOT done, continuing.")
         return False
 
+    def _topmost_missing(self, state: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """Topmost unfilled fillable on the current tab that is still worth
+        acting on (not dead, not attempted, not background). Includes fields
+        scrolled above the pane — a skipped field must pull the view BACK, not
+        get abandoned. Checkboxes excluded (unchecked may be a correct NO)."""
+        best = None
+        for e in state.get("elements", []):
+            ety = (e.get("type") or "").lower()
+            if ety not in ("editcontrol", "input", "comboboxcontrol", "combobox",
+                           "spincontrolcontrol", "spincontrol"):
+                continue
+            if e.get("window_role") == "background" or not e.get("bbox"):
+                continue
+            if (e.get("value") or "").strip():
+                continue
+            k = self._attempt_key(e)
+            if k in self._dead_fill_keys or k in self._attempted_keys:
+                continue
+            if best is None or e["bbox"][1] < best["bbox"][1]:
+                best = e
+        return best
+
+    def _optimal_viewport_jump(self, state: Dict[str, Any]):
+        """NAVIGATION PROTOCOL core rule (user spec 2026-07-08):
+          1. fill the current viewport first (enforced by visible-first ranking);
+          2. when NO empty target is left on screen, jump the scroll position to
+             the window holding the MOST empty fields — ideally a whole screen
+             of them — so the transformer always works dense batches.
+
+        Pure geometry: slide a viewport-height window over the y-centers of
+        every still-actionable empty fillable (UIA lists off-screen elements
+        with virtual coords), take the densest window, scroll its topmost
+        field to the top of the pane. Returns fresh state after the jump, or
+        None when there is nothing to jump to (tab done) or the current view
+        already IS optimal."""
+        vt = self._form_viewport_top(state)
+        vb = self._form_viewport_bottom(state) - 8
+        H  = max(vb - vt, 100)
+        empties = []
+        for e in state.get("elements", []):
+            ety = (e.get("type") or "").lower()
+            if ety not in ("editcontrol", "input", "comboboxcontrol", "combobox",
+                           "spincontrolcontrol", "spincontrol", "checkboxcontrol", "checkbox"):
+                continue
+            if e.get("window_role") == "background" or not e.get("bbox"):
+                continue
+            if (e.get("value") or "").strip():
+                continue
+            if ety in ("checkboxcontrol", "checkbox"):
+                continue          # unchecked may be a correct NO — never drives a jump
+            k = self._attempt_key(e)
+            if k in self._dead_fill_keys or k in self._attempted_keys:
+                continue
+            if not (e.get("label") or e.get("text") or "").strip():
+                continue
+            empties.append(e)
+        if not empties:
+            return None
+        empties.sort(key=lambda e: (e["bbox"][1] + e["bbox"][3]) / 2)
+        ys = [(e["bbox"][1] + e["bbox"][3]) / 2 for e in empties]
+        # densest window of height H over the y-centers (two-pointer)
+        best_j, best_cnt = 0, 0
+        i = 0
+        for j in range(len(ys)):
+            if i < j:
+                i = j
+            while i < len(ys) and ys[i] <= ys[j] + (H - 60):
+                i += 1
+            if i - j > best_cnt:
+                best_cnt, best_j = i - j, j
+        # already optimal? (as many empties fully visible as the best window holds)
+        vis_now = sum(1 for e in empties if e["bbox"][1] >= vt and e["bbox"][3] <= vb)
+        if vis_now >= best_cnt:
+            return None
+        anchor = empties[best_j]
+        albl   = (anchor.get("label") or anchor.get("text") or "").strip()
+        logger.info("[NAV] optimal-viewport jump → window with %d empty fields, anchor %r.",
+                    best_cnt, albl[:28])
+        if not self._scroll_into_view(albl):
+            return None
+        time.sleep(self.step_delay * 0.4)
+        # park the anchor at the top edge so the whole dense window is on screen
+        self._maximize_reveal(went_down=ys[best_j] >= vt)
+        return self._observe()
+
+    def _maximize_reveal(self, went_down: bool = True, max_pages: int = 3) -> None:
+        """VIEWPORT OPTIMIZER — wx SetFocus auto-scroll reveals a target at the
+        NEAR edge (bottom when scrolling down), so exactly ONE fresh field
+        becomes visible per reveal → the run crawls field-by-field with a
+        scroll between every fill. After the minimal reveal, keep paging in
+        the SAME direction until the revealed target sits near the FAR edge:
+        the target stays visible AND a full page of upcoming fields comes on
+        screen with it, giving the transformer's ranked pointer many live
+        targets per viewport instead of one. Pure UIA ScrollPattern geometry —
+        no LLM, no field names, any scrollable pane. Assumes the revealed
+        field HAS focus (that's how _scroll_into_view reveals it)."""
+        try:
+            import uiautomation as _uia
+            ctrl = _uia.GetFocusedControl()
+            if ctrl is None:
+                return
+            pane, cur = None, ctrl
+            for _ in range(15):
+                if cur is None:
+                    break
+                try:
+                    _sp = cur.GetScrollPattern()
+                    if _sp is not None and _sp.VerticallyScrollable:
+                        pane = cur
+                        break
+                except Exception:
+                    pass
+                try:
+                    cur = cur.GetParentControl()
+                except Exception:
+                    break
+            if pane is None:
+                return
+            sp     = pane.GetScrollPattern()
+            prect  = pane.BoundingRectangle
+            margin = max(60, int((prect.bottom - prect.top) * 0.12))
+            fwd  = _uia.ScrollAmount.LargeIncrement if went_down else _uia.ScrollAmount.LargeDecrement
+            back = _uia.ScrollAmount.LargeDecrement if went_down else _uia.ScrollAmount.LargeIncrement
+            pages = 0
+            for _ in range(max_pages):
+                try:
+                    r = ctrl.BoundingRectangle
+                except Exception:
+                    break
+                if r.height() <= 0:
+                    break
+                at_far_edge = (r.top <= prect.top + margin) if went_down \
+                              else (r.bottom >= prect.bottom - margin)
+                if at_far_edge:
+                    break
+                # (Stranding guard REMOVED 2026-07-08 — it let one skipped field
+                # veto every page forever → the one-row-per-fill crawl. Window
+                # choice now belongs to _optimal_viewport_jump; fields left
+                # behind a jump are counted in later windows or swept at the end.)
+                _y0 = r.top
+                sp.Scroll(_uia.ScrollAmount.NoAmount, fwd)
+                time.sleep(0.18)
+                try:
+                    r2 = ctrl.BoundingRectangle
+                except Exception:
+                    break
+                if r2.top == _y0:
+                    break                       # pane refused — end of scroll range
+                overshot = (r2.bottom <= prect.top) if went_down else (r2.top >= prect.bottom)
+                if overshot:
+                    sp.Scroll(_uia.ScrollAmount.NoAmount, back)
+                    time.sleep(0.15)
+                    break
+                pages += 1
+            if pages:
+                logger.info("Maximize-reveal: paged %d× past the minimal reveal — "
+                            "target at far edge, full page of fresh fields exposed.", pages)
+        except Exception as exc:
+            logger.debug("Maximize-reveal skipped: %s", exc)
+
     def _reveal_target(self, state: Dict[str, Any], snap):
         """MECHANISM 1 — feed the transformer. If the field the transformer just
         pointed at is OFF the viewport (it's in the element tree with off-screen
@@ -5471,18 +5746,29 @@ class LLMAgent:
         if _el is None:
             return state, snap
         vb = self._form_viewport_bottom(state) - 8
+        _vt = self._form_viewport_top(state)
         _ty, _by = _el["bbox"][1], _el["bbox"][3]
-        if 0 <= _ty and _by <= vb:
+        if _vt <= _ty and _by <= vb:
             return state, snap          # already fully on screen — nothing to do
         _lbl = (_el.get("label") or _el.get("text") or "").strip()
         if not _lbl:
             return state, snap
         if self._scroll_into_view(_lbl):
             time.sleep(self.step_delay * 0.5)
+            # Minimal reveal parks the target at the near edge with nothing new
+            # behind it — page on so a full viewport of upcoming fields is
+            # exposed for the ranked pointer (fixes the one-field-per-scroll crawl).
+            self._maximize_reveal(went_down=_by > vb)
             _ns = self._observe()
+            # Re-find restricted to FILLABLE types: the static text label and the
+            # edit control share the same label string — an unfiltered match
+            # returned the STATIC LABEL and the retarget click hit dead text
+            # (observed live: 'Last Name' @ (928,166) → no_change).
             _ne = next((e for e in _ns.get("elements", [])
                         if (e.get("label") or e.get("text") or "").strip().lower() == _lbl.lower()
-                        and e.get("bbox")), None)
+                        and (e.get("type") or "").lower() in _FILL
+                        and e.get("bbox")
+                        and e.get("window_role") != "background"), None)
             if _ne is not None:
                 _b = _ne["bbox"]
                 logger.info("Reveal-target: scrolled %r into view for the transformer.", _lbl[:24])
@@ -5617,7 +5903,10 @@ class LLMAgent:
             _miss = self._find_missing_field(state)
             if _miss is not None:
                 _ml = (_miss.get("label") or _miss.get("text") or "").strip()
-                self._scroll_into_view(_ml)
+                if self._scroll_into_view(_ml):
+                    # park the revealed field at the far edge so a full page of
+                    # upcoming fields comes with it (not one field per scroll)
+                    self._maximize_reveal(went_down=_miss["bbox"][1] >= 0)
             else:
                 self._scrollbar_drag(state, 240.0)   # nothing empty in tree → blind page-down
             time.sleep(self.step_delay * 0.5)
@@ -5661,7 +5950,7 @@ class LLMAgent:
                 logger.info("[NAV] tab swept clean → switch tab %r", (_nav.get("target") or "")[:24])
                 self._executor.execute({"action_type": "click", "click_position": _nav["click_position"]})
                 self._visited_tabs.add((_nav.get("target") or "").strip())
-                self._filled_this_tab.clear()
+                self._filled_this_tab.clear(); self._fixation_hits.clear()
                 self._refresh_record_cache(self._observe())
                 return self._observe(), False
             if _act == "done":
@@ -5689,7 +5978,7 @@ class LLMAgent:
                     self._executor.execute({"action_type": "click",
                                             "click_position": [(_nb[0] + _nb[2]) / 2, (_nb[1] + _nb[3]) / 2]})
                     self._visited_tabs.add(_nm)
-                    self._filled_this_tab.clear()
+                    self._filled_this_tab.clear(); self._fixation_hits.clear()
                     self._refresh_record_cache(self._observe())
                     return self._observe(), False
                 return state, False
@@ -5734,12 +6023,26 @@ class LLMAgent:
         # fold OR not in our snapshot yet (below-fold fields exist in the UIA tree
         # with off-screen coords). No pixels, no scrollbar drag.
         vb = self._form_viewport_bottom(state) - 8
-        if el is None or not (el["bbox"][1] >= 0 and el["bbox"][3] <= vb):
+        vt = self._form_viewport_top(state)
+        if el is None or not (el["bbox"][1] >= vt and el["bbox"][3] <= vb):
             self._scroll_into_view(_real)
             time.sleep(self.step_delay * 0.5)
             state = self._observe()
             el = _find(state)
             if el is None:
+                return False
+            # STALE-COORD GUARD: if the field is STILL outside the pane after the
+            # reveal (scrolled-past element with a stale bbox in the tab-strip
+            # zone), clicking it would hit whatever actually lives at those
+            # coords (observed live: 'State' @ y=130 → tab-strip click → escape
+            # → re-propose loop). Refuse instead — caller counts it as a fail
+            # and dead-marks after 2, which breaks the loop.
+            vt = self._form_viewport_top(state)
+            vb = self._form_viewport_bottom(state) - 8
+            if not (el["bbox"][1] >= vt and el["bbox"][3] <= vb):
+                logger.warning("[NAV] fill %r — still outside pane after reveal "
+                               "(bbox y=%.0f, viewport %.0f-%.0f) — refusing stale-coord click.",
+                               _real[:28], el["bbox"][1], vt, vb)
                 return False
             _real = (el.get("label") or el.get("text") or field_label).strip()
         typ = (el.get("type") or "").lower()
@@ -6001,6 +6304,85 @@ class LLMAgent:
         """Record that a field has been acted on this session (attempted feature)."""
         if isinstance(elem, dict):
             self._attempted_keys.add(self._attempt_key(elem))
+
+    # Fillable widget types for ranked-target arbitration (universal control
+    # types, not field names). Buttons/tabs are deliberately NOT here — they are
+    # legitimately re-clickable (tab advance, submit) and only get masked by the
+    # per-tab no_change blacklist.
+    _FILLABLE_TYPES = ("editcontrol", "input", "comboboxcontrol", "combobox",
+                       "checkboxcontrol", "checkbox", "spincontrolcontrol", "spincontrol")
+
+    # Clickable at all (fillables + buttons/tabs/list items/radios/links).
+    # Decorative containers (pane/window/document/titlebar) are NEVER legal
+    # ranked targets — clicking them is exactly the wasted-click noise the
+    # dataset's pointer loss already drops (-1 labels).
+    _CLICKABLE_TYPES = _FILLABLE_TYPES + (
+        "button", "buttoncontrol", "tabitem", "tabitemcontrol",
+        "listitem", "listitemcontrol", "radiobutton", "radiobuttoncontrol",
+        "hyperlink", "hyperlinkcontrol", "menuitem", "menuitemcontrol",
+        "datetime", "datetimecontrol", "calendar", "calendarcontrol")
+
+    def _pick_ranked_target(self, state: Dict[str, Any], t_pred: Dict[str, Any]):
+        """RANKED WHERE arbitration. Walk the transformer pointer head's OWN
+        top-k ranking and return the best target that is still actionable:
+
+          skip if — background window; click position blacklisted (gave
+          no_change this tab); fillable AND (dead / attempted / already filled).
+          An already-filled field is marked filled-this-tab on the spot, so
+          'already correct' structurally means MOVE ON, never retry.
+
+        VISIBLE-FIRST (NAV rule 1: fill the current viewport before moving it):
+        pass 1 considers only candidates fully inside the viewport; only when
+        every visible candidate is masked does pass 2 consider off-fold ones.
+
+        Returns (elem, [cx, cy], conf) or None when every ranked candidate is
+        masked — which is the caller's signal that nothing actionable is
+        visible (optimal-viewport-jump territory, not another click).
+        Navigation stays 100% the transformer's choice: this only applies a
+        legality filter over ITS ranking; nothing here picks a target the
+        model didn't propose.
+        """
+        elems = state.get("elements", [])
+        _filled_l = {f.lower() for f in self._filled_this_tab}
+        _vt = self._form_viewport_top(state)
+        _vb = self._form_viewport_bottom(state) - 8
+
+        def _scan(require_visible: bool):
+            for entry in t_pred.get("click_topk", []) or []:
+                try:
+                    idx, conf, pos = int(entry[0]), float(entry[1]), entry[2]
+                except (TypeError, ValueError, IndexError):
+                    continue
+                if not (0 <= idx < len(elems)):
+                    continue
+                e = elems[idx]
+                if e.get("window_role") == "background" or not e.get("bbox"):
+                    continue
+                ety = (e.get("type") or "").lower()
+                if ety not in self._CLICKABLE_TYPES:
+                    continue
+                if require_visible and not (e["bbox"][1] >= _vt and e["bbox"][3] <= _vb):
+                    continue
+                _pk = (round(pos[0] / 10) * 10, round(pos[1] / 10) * 10)
+                if _pk in self._nochange_click_pos:
+                    continue
+                if ety in self._FILLABLE_TYPES:
+                    k = self._attempt_key(e)
+                    if k in self._dead_fill_keys or k in self._attempted_keys:
+                        continue
+                    lbl = (e.get("label") or e.get("text") or "").strip()
+                    if lbl and lbl.lower() in _filled_l:
+                        continue
+                    if (e.get("value") or "").strip() and ety not in ("checkboxcontrol", "checkbox"):
+                        # Field already holds a value — done, not a target. Record
+                        # it so every later ranking pass skips it instantly.
+                        if lbl:
+                            self._filled_this_tab.add(lbl)
+                        continue
+                return e, [float(pos[0]), float(pos[1])], conf
+            return None
+
+        return _scan(require_visible=True) or _scan(require_visible=False)
 
     def _elem_at(self, state: Dict[str, Any], pos) -> Optional[Dict[str, Any]]:
         """Element whose bbox contains pos (nearest center on ties)."""
