@@ -21,17 +21,15 @@ This document is for developers working on Intern itself.
 
 1. [Current Status](#current-status)
 2. [How It Works](#how-it-works)
-3. [Behavioral Cloning Process](#behavioral-cloning-process)
-4. [Solved Problems](#solved-problems) — **what's behind us**
-5. [Quick Start](#quick-start)
-6. [Repository Layout](#repository-layout)
-7. [Components](#components)
-8. [Current Goal](#current-goal)
-9. [Task List](#task-list) — **P0 complete scope #1 → P1–P5** (incl. Big Three +
-   Fundamental roadblocks, Hybrid roadmap, RL phase — merged here)
-10. [Scopes & North Star](#scopes--north-star)
-11. [Questions, Concerns, and Concepts](#questions-concerns-and-concepts) — **open threads + design concepts**
-12. [Finished Tasks](#finished-tasks)
+3. [Quick Start](#quick-start)
+4. [Components](#components)
+5. [Task List and Priority List](#task-list-and-priority-list)
+6. [Decisions and Concepts](#decisions-and-concepts)
+7. [DAgger — How to Implement](#dagger--how-to-implement)
+8. [Open Technical Questions](#open-technical-questions)
+9. [Strategic & Thesis Concerns](#strategic--thesis-concerns)
+10. [Risks & Technical Debt](#risks--technical-debt)
+11. [Finished Tasks](#finished-tasks)
 
 ---
 
@@ -50,13 +48,80 @@ This document is for developers working on Intern itself.
 - **Division holds:** transformer = WHERE (which element) + WHAT (click vs type);
   LLM = the value.
 
-**Honest gaps remaining on the slice (2026-06-14):** the model now **navigates all 8
-tabs and fills deep tabs** (Drivers/History/Claims, click_acc 0.88) — but doesn't yet
-*complete the task* end-to-end. Open: erratic tab-visit order, `(leave blank)` typed
-literally, scroll not actually moving, single record only. Closing those is **the
-current priority** — see [Task List → P0](#task-list). The scope-agnostic engine is
-already built (foundation); finishing scope #1 builds the general muscle the other
-scopes reuse.
+**MILESTONE (2026-06-18): Scope #1 runs END-TO-END.** One unattended run (~124 steps)
+fills all 8 tabs, runs a self-verification pass over every tab, and presses Submit — no
+premature submit, no infinite loop, no crash. Committed+pushed (`nav-protocol-scroll-submit`,
+3b24421). The **Navigation Protocol** is the governing loop:
+*fill → feed the transformer (scroll) → page-done? → next tab → all tabs → verify → submit.*
+
+**MILESTONE (2026-07-08/09): Universal Semantic Action Space + Navigation Protocol v2.**
+Two P1-scale pieces landed early (uncommitted work from 07-07/08 sessions, committed 07-09):
+- **Universal Semantic Action Space** (P1 "Action Space: Form-Fields → Universal", core
+  delivered): verb vocabulary (`semantic_action.py`: FOCUS/SET_VALUE/SELECT_OPTION/TOGGLE/
+  INVOKE/SCROLL_TO/HOTKEY/WAIT/VERIFY/DONE), offline demo labeler (`recorder/action_labeler.py`,
+  control-type + before/after state diff, validated on all 6,950 eight_Tabs traces), and an
+  opt-in `--action_space semantic` training path. **v2 split-head model BEATS the legacy
+  baseline: click_acc 0.957 vs 0.878, plus a new typing-target pointer (src_acc 0.856)** →
+  `model_eight_tabs_semantic_v2.pt`. v1 (single merged pointer head) scored 0.828 — one
+  pointer head per job is the lesson.
+- **Navigation Protocol v2 (ranked WHERE + optimal viewport).** The transformer's pointer
+  head scores EVERY element; the agent now consumes the ranked top-k instead of argmax:
+  (1) *visible-first arbitration* (`_pick_ranked_target`) — masked/dead/filled/blacklisted
+  targets fall through to the model's own next-best, on-screen candidates before off-fold;
+  "already correct" = auto-marked filled and skipped, structurally (the 06-18 fixation class
+  is impossible by construction); (2) *optimal-viewport jump* (`_optimal_viewport_jump`) —
+  when zero visible targets remain, slide a viewport-height window over all remaining empty
+  fields and jump to the densest one. Replaces the M1-minimal-reveal crawl (one field per
+  scroll), the M2 fold-trigger, and the stranding guard. Live-verified 2026-07-09.
+- **Fixation escalation + last-tab sweep handoff** — 2nd fixation on the same spot forces
+  tab-advance; on the last tab (no unvisited tabs) it hands the page to `_sweep_tab` instead
+  of no-oping (the 07-08 Payment-tab infinite loop).
+- **Viewport-top fix** — pane top is ~149 (below tab strip), not 0; three visibility checks
+  used `y >= 0`, so fields scrolled UP out of the pane kept "visible" stale bboxes and got
+  clicked in the tab-strip zone (`_form_viewport_top`, applied in `_nav_fill_field` /
+  `_reveal_missing_by_scroll` / `_reveal_target`; `_nav_fill_field` refuses stale-coord clicks).
+
+**Honest gaps remaining (2026-07-09):** the *flow* works and navigation waste is down;
+what's left is **field-level accuracy** and **scale**, not the core loop. Current problems:
+- **Transformer↔LLM balance** — LLM still ~50% of decisions (target <5%). Ranked arbitration
+  reduces guard-noise but the agent loop still consumes legacy dicts — the full verb-driven
+  loop (executor dispatch by predicted verb) is the remaining architecture step.
+- **A few widgets don't fill** — 50-state dropdowns + spin fields get skipped; combobox
+  dropdown sometimes fails to render at fold edges.
+- **Value quality (WHAT)** — LLM occasionally grabs the wrong intake line / wrong
+  Driver 2/3 section / false leave-blank; nondeterministic on repeat queries.
+- **Scale** — single record only; no automated scoring harness yet.
+See [Task List and Priority List](#task-list-and-priority-list). The scope-agnostic engine (foundation) is built;
+finishing scope #1 *correctly* builds the general muscle the other scopes reuse.
+
+### The Three Scopes (Thesis Scope)
+Chosen to span the interesting space — *data entry*, *cross-app transfer*,
+*conditional judgment* — so the claim is "clones varied GUI workflows," not "fills
+one form."
+
+1. **Data Entry Form Filling** — *in progress ([P0](#task-list-and-priority-list)).* Single-app
+   key-value entry, (mostly) linear. Loop proven on the Policy section (clones
+   order, fills, submits); remaining = multi-tab, multi-record, cold-start.
+   Perception = UIA.
+2. **Web Form → Excel** — *not started ([P1](#task-list-and-priority-list)).* Cross-application
+   transfer (web source → Excel grid); 2D target; mixed perception. Excel
+   perception swap **PROVEN** (`ExcelObserver` normalizes to canonical); remaining
+   = web source, action on cells, demos, train.
+3. **Email / Ticket Triage** — *not started ([P2](#task-list-and-priority-list)).* Decision-making /
+   conditional behavior; the strongest personalization claim (two users triage
+   differently). Needs branching ([Big Three #3](#task-list-and-priority-list)) + judgment
+   cloning. Kept to decisions inferable from *visible* content (avoid hidden-intent).
+
+### North Star — Generalization (Beyond the Thesis)
+The thesis is *bounded* to those three, but the **architecture is built to
+generalize** — that is the real goal. The novel contribution: a **personalized,
+demonstration-learned GUI agent** that learns how *this user* does a task and
+reproduces *their* workflow — which scripted RPA (no learning) and generic
+computer-use agents (not personalized) don't.
+
+Already partly real: perception is an **adapter** (UIA + Excel today, one shared
+schema) and the `transformer(WHERE) + LLM(WHAT)` loop is perception-agnostic. The
+path beyond the thesis — a vision perception adapter ([Big Three #1](#task-list-and-priority-list)) + LLM-induced control-flow ([Big Three #3](#task-list-and-priority-list)) — turns "three GUI scopes" into "any GUI workflow learned from demonstration."
 
 ---
 
@@ -110,11 +175,9 @@ The agent re-observes after every action and loops until the plugin signals
 controls). The downstream pipeline consumes a semantic element list
 (`bbox, role, name, value, states, …`), so the perception source is swappable —
 UIA now, a vision/VLM adapter later — without touching the learning layer. See
-[Big Three #1](#task-list).
+[Big Three #1](#task-list-and-priority-list).
 
----
-
-## Behavioral Cloning Process
+### Behavioral Cloning Process
 
 The full loop for teaching Intern a task from human demonstrations.
 
@@ -177,7 +240,7 @@ The full loop for teaching Intern a task from human demonstrations.
 - **LLM** — *what* value to type (from source data). Reserved for the part that
   needs understanding, not clean lookups.
 
-### Key features that make navigation learnable
+#### Key features that make navigation learnable
 - **`is_filled`** (per element) — does this field currently hold a value, read
   straight from the observation. Without it the model only saw field *labels* and
   was blind to which fields were done → it looped. This is *perception*, not a
@@ -188,7 +251,7 @@ The full loop for teaching Intern a task from human demonstrations.
   collapsing onto classes it could never predict. Action-type accuracy 50% → 80%,
   and click accuracy rose for free.
 
-### Testing variations (does it clone, or just memorize?)
+#### Testing variations (does it clone, or just memorize?)
 Record demos in multiple fill orders and confirm the agent reproduces each:
 - **Top-down** — fields top-to-bottom (baseline). ✅ confirmed
 - **Bottom-up** — fields bottom-to-top. ✅ confirmed (93%, proves not a down-bias)
@@ -198,49 +261,6 @@ A clone that handles a *different* demonstrated order proves field-level learnin
 not sequence memorization. `scripts/test_clone.py` reports exact% + the offset
 distribution (0 = exact, +1 = next-down, −1 = next-up) so you can see the
 *direction* it learned.
-
----
-
-## Solved Problems
-
-What's *behind* us — the mirror of the roadblocks ahead. Each was a real blocker;
-each is now closed with a verification that guards against regression.
-
-### Behavioral cloning — the core thesis
-- **The transformer clones the demonstrated order, not a bias.** Top-down→74% /
-  bottom-up→93% exact on each order's own data. Same architecture, opposite
-  orders → genuine cloning. *(Proof: offset-distribution analysis, `test_clone.py`.)*
-- **WHERE/WHAT division works.** Transformer drives element + click/type; LLM
-  supplies the value. Live: 100% value accuracy when on the right field.
-- **Learned the finish.** Clicks Submit on its own via tail-oversampling — no
-  hardcoded end-game rule.
-
-### Perception / data quality
-- **Looping from fill-blindness.** Model re-entered filled fields because state
-  embedded only labels, never values. Fixed with the `is_filled` feature + folding
-  value into the embedding → click_acc 0.95→1.00.
-- **Action-type collapse.** Junk classes (backspace/drag) wrecked the action head.
-  Collapsed action-space to {click, type} → action-type 29/51% → 80/80%.
-- **Combobox phantom fields.** Clicks while a dropdown was open landed on the field
-  beneath it → recorded a phantom order. Fixed at record time (drop selection-clicks).
-
-### Generalization foundation *(Tier 1 — in progress, two closed)*
-- **✅ Form-specific hardcodes killed → injected `ScopeConfig`.** `_detect_section`,
-  `_KNOWN_TABS`, `_TAB_PANE_NAMES`, the `RECORD N OF M` delimiter — all moved out of
-  agent.py into a per-scope config with generic defaults. The agent is now
-  **application-blind**; a new scope passes its own config with zero agent edits.
-  *(Guard: `tests/test_detect_section.py` — 8/8, locks behavior + proves the default
-  scope is a no-op. Live-verified: form fills + submits unchanged.)*
-- **✅ Perception adapter seam.** The observer is now **injectable** (UIA / Excel /
-  web plug into one slot), and a canonical element schema (`observers/schema.py`)
-  defines the one language every adapter must speak. The agent **validates the
-  adapter on first observe and fails LOUD** — no more silent blank-screen when an
-  adapter emits a different dialect (e.g. Excel `type=cell` / value-under-`text`).
-  *(Guard: `tests/test_perception_schema.py` — 8/8, conforming passes clean, Excel's
-  raw dialect is flagged with actionable errors.)*
-
-> Still open in Tier 1: generalize the data-source layer, and the scope
-> abstraction (declare a scope in one place). See [Task List](#task-list).
 
 ---
 
@@ -272,52 +292,6 @@ Configure `run_task.py` knobs at the top:
 | `PROVIDER`       | `"lmstudio"`             | Switch to `"groq"` / `"anthropic"` for real reasoning. |
 | `MAX_STEPS`      | `200`                    | Hard cap per run.                    |
 | `SOURCE_WINDOW`  | `"Notepad"`              | Title fragment of the source window. |
-
----
-
-## Repository Layout
-
-```
-app/
-  main.py                    GUI recorder (Start/Stop, replay, frame counter)
-components/
-  agent/
-    agent.py                 LLMAgent — main loop, provider abstraction, merge
-    capsule.py               Per-task model routing (goal → .pt file)
-    task_plugins/            Task-specific plugins (form-fill, etc.)
-  data_sources/
-    notepad_source.py        Win32 WM_GETTEXT + parse_records helpers
-  intelligence/
-    model/
-      transformer.py         TransformerAgentNetwork — BC policy model
-    rule_extractor.py        LLM-based task spec generator / corrector
-    training/                bc / rl / continual trainers
-  observers/
-    ui_observer/             UIA tree walker (semantic element list)
-    vlm/                     VLM screenshot → key/value extraction
-  recorder/
-    recorder.py              DemoRecorder (on-demand subprocess snapshots)
-    correction_handler/      DAgger: watch-for-user-correction on failure
-tasks/
-  registry.json              Global capsule registry (goal → model path)
-  form_filling/
-    model.pt                 Trained BC checkpoint
-    ruleset.md               Inferred task spec (auto-updated each session)
-car_insurance_entry/         wxPython target form (test fixture)
-data_entry_tasks/            Source intake .txt files
-data/demos/                  Recorded sessions (gitignored)
-scripts/
-  clean_demos.py             Drop dropdown-selection / junk / dupe clicks
-  oversample_tails.py        Emphasize the … → Submit finish
-  test_clone.py              Offline clone check (exact% + offset)
-  augment_traces.py          Dataset augmentation (jitter)
-  eval_metrics.py            TCR / field / value accuracy
-  bc_fidelity.py             BC fidelity score vs gold standard
-run_task.py                  Agent entrypoint (transformer + LLM)
-replicate.py                 Duplicate a recorded session N× (terminal)
-train.py                     BC training entrypoint
-build_capsule.py             Package model + metadata into capsule
-```
 
 ---
 
@@ -374,336 +348,102 @@ the CoT lines in `_call_openai_compat()`.
 
 ---
 
-## Current Goal
+## Task List and Priority List
 
-> **Finish the vertical slice, then prove generalization.**
->
-> Near-term: complete the third order-cloning test (random), make multi-record
-> fill+submit reliable, and tighten the cold-start. Then the real leap —
-> [Big Three #1 + #3](#task-list): a perception adapter (UIA→vision) and
-> an LLM-induced workflow layer, so the same loop learns *new* apps/tasks from
-> demonstration.
+**Goal: COMPLETE SCOPE #1 (the form) first — then generalize.**
+
+**MILESTONE (2026-06-18): Scope #1 runs END-TO-END.** One unattended run (~124 steps) fills all 8 tabs, runs a self-verification pass over every tab, and presses Submit. Roles: transformer=WHERE, LLM=WHAT, agent=HOW.
 
 ---
 
-## Task List
+### 🔴 CURRENT STAGE (P0 — Complete Scope #1)
+*Definition of Done: Agent fills all 5 records, all 8 tabs (including Driver/Vehicle sub-sections) in demonstrated order, submits each, with no human help, high field-match, and minimal waste.*
 
-**Priority: COMPLETE SCOPE #1 (the form) first — then generalize.**
-
-The scope-agnostic *engine* is built (foundation below). The form now **navigates all
-8 tabs and fills deep tabs** (model click_acc 0.88) — but doesn't yet *complete a
-task* end-to-end (tab order erratic, leave-blank literal, scroll dead, single record).
-Chasing a 2nd scope before the 1st completes is premature.
-
-### ⭐ PRIORITY ORDER — next actions (do top-down, ONE at a time, re-test each)
-1. **Fix `(leave blank)` literal-typing** — DONE as a deterministic skip (band-aid).
-   Pure fix = #2 below (infer it). Current: `_lookup_field` blank-normalizer + type-path skip.
-2. **CLOSE THE RULESET-INFERENCE LOOP** — *the no-hardcode path.* Wiring exists:
-   `scripts/build_ruleset.py` runs `correct()` over recorded demos → persistent
-   `tasks/form_filling/ruleset.md` → agent loads it into the LLM system prompt at startup.
-   **BLOCKER found (2026-06-14):** `_compress_session` can't read the **action-based
-   recorder's** traces — they store raw `mouse`/`keyboard`, not the decoded `action` dict
-   it expects → it skips every step → `correct()` gets empty → spec unchanged. AND even
-   when decoded, the compressor emits only the USER'S ACTIONS, **not the source-screen
-   text** (the Notepad "(leave blank)") that the rule must be inferred from. The OLD
-   recorder's traces had both → that's why it could infer leave-blank. **Fix (additive,
-   low-risk — RuleExtractor is OFFLINE, agent only READS ruleset.md, keep .bak + hardcode
-   backup):** (a) new compressor for the new trace format — decode `mouse`/`keyboard`
-   (reuse transformer `_decode_actions`); (b) include per-step SOURCE values
-   (`window_role="background"` elems / `session_manifest.json`) so the LLM sees "source
-   said X, user did Y" → can induce value/skip rules. **Eyeball the output before
-   overwriting `ruleset.md` or adding any recorder auto-hook.** Then the leave-blank
-   hardcode (#1) becomes redundant backup, and conditional rules (Big Three #3) become
-   learnable. `scripts/build_ruleset.py` = the run-over-demos driver (built, works once
-   the compressor is fixed).
-3. **Verify + fix scroll actually moves** the wx panel (else below-fold fields on tall
-   tabs are skipped). Confirm `pyautogui.scroll` moves the form; fix target/focus.
-4. **Tab-visit order** — model skips/revisits tabs. Cleaner left-to-right demos and/or
-   a generic "prefer unvisited tab" cue. NO hardcoded order.
-5. **Strip WHERE-crutches** (Stage 2.5) — let the 0.88 transformer navigate; agent does
-   only HOW. One at a time, re-test (guards perturb model history).
-6. **Multi-record ×5** + per-record refresh.
-7. **End-to-end verification** (Completion → ~100%).
-> Commit the working batch (reverted agent + tab-click fix + verified-scroll) before
-> #1 so there's a clean restore point.
-
-> **Reframe — finishing the form IS generalization work.** Its remaining gaps —
-> multi-tab navigation, multi-record, cold-start, looping — are *general*
-> capabilities every scope hits. Solve them once, on the form. Only
-> combobox-timing / pixel-perfect are throwaway polish. So "finish scope #1" is
-> not a detour from the thesis; it builds the muscle Excel + triage will reuse.
-
-> **The foundation refactor was still right to do early** (cheap on one scope, no
-> dependency on the form being finished). What was premature was *jumping to a 2nd
-> scope* — that's the order we corrected.
+- [x] **Combobox click-fill** — Fix combobox spiral by clicking to open and select.
+- [x] **False-done guard** — Notepad source data no longer triggers premature completion.
+- [x] **Option B (WHERE/HOW division)** — Use focused widget type to decide action, bypassing unstable action-type head.
+- [x] **Tab-targeting** — Transformer's pointer predicts and targets tab items directly (Policy/Policyholder/Vehicle/etc.).
+- [x] **Tab-routing** — A tab-click now navigates to the tab the model clicked, not blind incremental advance.
+- [x] **Tab-visit coverage** — Keep agent-side visited tracking to prevent loops and ensure all tabs are visited.
+- [x] **Empty-field fixation** — Add `'attempted'` feature so transformer stops re-targeting fields already acted on.
+- [x] **Drift lock** — Lock form window focus and prevent click coordinates outside the form boundaries.
+- [x] **Idempotent typing** — Select-all before pasting so retried fields overwrite instead of appending.
+- [x] **`(leave blank)` handler** — Skip fields if value indicates blank/none/na.
+- [x] **Real panel scrolling** — Implement UIA `ScrollPattern.Scroll` rather than mouse scrolling.
+- [x] **Checkbox TogglePattern** — Query and set checkbox state deterministically.
+- [x] **Verification pass** — Perform automated verification pass over all tabs before final Submit.
+- [ ] **Scroll no-ops on tabs** — Fix `ScrollPattern.Scroll` failure on Claims/History/Drivers so all below-fold fields are reached, then remove the verification "accept-after-2-tries" band-aid. *(2026-07-09: optimal-viewport jump + viewport-top fix improve reach; deep-tab scroll still unverified end-to-end.)*
+- [ ] **Hard-to-fill widgets** — Implement type-to-filter select for 50-state dropdowns and digit keystrokes/read-back for numeric SpinCtrl widgets.
+- [ ] **Value quality (LLM mapping)** — Improve label-to-record mapping and inject section keys so LLM doesn't grab incorrect intake lines or wrong sections.
+- [ ] **Deterministic verification polish** — Remove verification band-aids, cut per-field LLM reasoning calls, and speed up the validation pass.
+- [ ] **Multi-record scaling (×5)** — Implement automated record advance, per-record data refresh, and reset loops for all 5 records.
+- [ ] **Automate scoring harness** — Extend `scripts/bc_fidelity.py` to report blank fields, print full breakdowns, save scorecards, and fix Unicode print issues (do before fixing correctness).
+- [ ] **Strip WHERE-crutches** (Stage 2.5) — Remove agent-side navigation helpers (`_try_advance_tab`, `_focus_first_empty_field`, auto-advance-at-bottom) to let the transformer navigate fully. *(2026-07-09: ranked arbitration replaces several crutches at the source — WHERE stays the model's own ranking, agent only legality-filters; M2 + stranding guard deleted rather than added-to.)*
+- [ ] **Close ruleset-inference loop** — Fix `_compress_session` to decode new trace format and capture notepad/source values to infer skip/leave-blank rules.
 
 ---
 
-### ✅ Foundation — scope-agnostic engine *(DONE — keep)*
-- [x] **ScopeConfig** — form hardcodes (`_detect_section`, `_KNOWN_TABS`,
-      `_TAB_PANE_NAMES`, `RECORD N OF M`) → injected config. Agent app-blind.
-- [x] **Perception adapter seam** — `Observer` base (capture→normalize→validate);
-      observer injectable; canonical element schema (`observers/schema.py`); loud
-      validation. UIA identity (live-verified), **Excel perception swap PROVEN**.
-- [x] **DataSource injection** *(partial)* — `data_source` injectable; agent reads
-      source I/O through the seam. Follow-up: extract `_refresh_record_cache`
-      orchestration.
-- [ ] **Scope abstraction** — declare a scope (goal+config+observer+source+model)
-      in ONE place, not scattered in `run_task.py`. *Defer: do when wiring scope #2.*
+### 🟢 P1 — Generalize (Post Scope #1 Completion)
+- [ ] **Perception: Accessibility Tree → Vision**
+  - [ ] Research grounding stacks: Compare OS-World, ShowUI, Microsoft Computer Use, or custom-trained VLM models for grounding.
+  - [ ] Modularize Observer input: Ensure screenshot capturing and OCR fallback are decoupled from the accessibility tree, producing identical canonical element representations.
+  - [ ] VLM Prompt Engineering: Construct prompt templates that map coordinate grids to semantic labels for the target application.
+  - [ ] Hybrid grounding model: Implement fallback checks where VLM reads values and UIA/coordinates determine bounding boxes.
+- [~] **Action Space: Form-Fields → Universal** *(core landed 2026-07-08 — see Current Status)*
+  - [x] Semantic verb vocabulary: `components/agent/semantic_action.py` (`Verb` enum + `SemanticAction` dataclass, legacy-dict conversion both ways; executor accepts either).
+  - [x] Demo → verb labeler: `components/recorder/action_labeler.py` (control-type + state-diff, no hardcode; per-window element-id collision fixed).
+  - [x] Semantic training path: `--action_space semantic` through dataset/train/predict/checkpoint; split pointer heads (click verbs → `click_elem`, FOCUS/SET_VALUE → repurposed `source_elem`); v2 beats baseline (0.957 vs 0.878).
+  - [ ] Verb-driven agent loop: agent still consumes legacy dicts from `predict()`; dispatch mechanics by predicted verb and retire the corresponding guards.
+  - [ ] Pluggable Executor Refactor: Create abstract base `ActionExecutor` class and migrate pyautogui mappings into concrete sub-actions.
+  - [ ] Drag & Drop Action: Code coordinate-to-coordinate click-and-drag logic.
+  - [ ] Keyboard Hotkeys: Code window-aware key combos (e.g., Ctrl+S, Ctrl+P).
+  - [ ] Double Click & Right Click: Implement standard mouse gesture variants.
+  - [ ] File Dialog Handling: Automate path input for Windows native Open/Save dialogs.
+  - [ ] Demo Recording Expansion: Update `DemoRecorder` to record drag coordinates, double-clicks, and hotkeys correctly.
+- [ ] **Finish scope abstraction** — Declare a scope (goal, config, observer, source, model) in a single place.
+- [ ] **Excel full transfer (Scope #2)**
+  - [ ] Configure ExcelObserver: Fully test `ExcelObserver` against live Excel sheets to output cell text, formulas, coordinates, and sheet names.
+  - [ ] Excel Action implementation: Implement target coordinate mapping for moving active cell selection via clicks or arrow keys.
+  - [ ] Excel Trace recording: Record 15-20 demos transferring web form data to an Excel template.
+  - [ ] Train Excel BC Model: Train a task-specific network and measure cloning fidelity.
+- [ ] **Random-order test** — Retrain on non-standard demonstrated paths to verify order cloning vs memorization.
 
----
+### 🔵 P2 — Scope #3 (Email/Triage)
+- [ ] **Workflow: Linear → Control Flow** (Decision-Making/Judgment Cloning)
+  - [ ] Multi-trace branch dataset: Record user responses to varied inputs (e.g., active policies get one response, lapsed policies get a warning email, missing fields prompt an inquiry).
+  - [ ] Workflow induction engine: Build a parser that extracts sequence transitions from multiple traces, identifying key conditional branch variables.
+  - [ ] Branching spec syntax: Define a schema (JSON or Markdown-based) representing the execution graph.
+  - [ ] DAgger loop integration: Fully wire `CorrectionHandler` to pause the agent on invalid branches, record user correction, and retrain in real-time.
+- [ ] **Email/ticket triage (Scope #3)**
+  - [ ] Email perception hook: Create an observer for a target mail client (e.g., Outlook UIA or web client).
+  - [ ] Triage categorization: Define classification tasks for LLM (e.g., policy renewal request, claims update, billing issue).
+  - [ ] Train Triage BC Model: Train policy to select appropriate quick-reply templates based on email category.
 
-### 🔴 P0 — Complete Scope #1 (the form)  *— THE focus*
+### 🟡 P3 — Polish & Non-Blocking Gaps
+- [ ] **LLM value errors** — Integrate value lookup constraints (e.g. matching policy number patterns) or ask the user when confidence falls below a threshold.
+- [ ] **Prompt caching & cost optimization** — Implement prompt caching for Gemini/Groq/Anthropic to reuse system specs and avoid paying for target/source context on every step.
+- [ ] **Memory component / State persistence** — Enable context transfer between records (currently runs blank slate).
+- [ ] **Execution Observability Dashboard** — Generate local HTML trace logs containing step-by-step screenshots, transformer probabilities, and LLM reasoning steps.
+- [ ] **Robust Crash Recovery** — Implement auto-restart for target windows and recovery from frozen combobox dropdowns.
+- [ ] **Cross-task shared backbone** — Train a shared model trunk with task-specific headers.
+- [ ] **Automate DEVELOPERS.md upkeep** — Add automated hooks/scripts to update progress.
 
-**Definition of done:** agent fills **all 5 records**, **all 8 tabs + Driver/Vehicle
-sections**, in the demonstrated order, **submits each**, **no human help** —
-Completion ~100%, Field-Match high, low wasted steps.
+### 🟣 P4 — Academic & Benchmarks
+- [ ] **Thesis revision** — Complete Chapter 3 (Methodology) and Chapter 4 (Evaluation Results).
+- [ ] **Data collection** — Amass 500,000 trace steps for the thesis dataset.
+- [ ] **Benchmarks** — Compare performance on form-filling and ELO cloning against general agents (e.g., OS-World).
+- [ ] **Chess fidelity benchmark** — Train the transformer architecture on chess PGN game traces to measure style replication (openings, blunders, ELO matching) as a proxy for pure decision cloning.
 
-**Where we are (2026-06-14):** trained the **8-tab model** on 20 full demos →
-`model_eight_tabs.pt`, **click_acc 0.58 (6 demos) → 0.79 (12) → 0.88 (20)**. At 0.88
-the pointer **stopped fixating** (the Renewal-checkbox obsession is gone). Live, it
-now **fills DEEP tabs** — Drivers (Driver 2 + Driver 3 sections), History, Claims —
-with section-aware lookups, high value-acc, no drift, no loops. Two agent fixes
-landed on the reverted-clean base: **tab-click → go to the clicked tab** (killed the
-tab-race) and **verified-scroll** (scroll + signature-compare bottom-detect).
-**Uncommitted** (reverted agent.py to d1fee5f, then re-added only these two).
+### 🟤 P5 — Reinforcement Learning Phase
+- [ ] **RL environment setup** — Build a Gym-style wrapper around the wxPython/target application that computes rewards based on field correctness.
+- [ ] **KL-Divergence constraint** — Add a KL penalty term to the RL policy update to prevent the agent from deviating from the human's demonstrated interaction style.
+- [ ] **StateValidator Reward Function** — Integrate verification metrics from `_verify_pass` as rewards for the RL agent.
 
-**Remaining gaps (the live edge):**
-1. **Tab order is erratic** — the model jumps/ revisits tabs (e.g. Policy→Drivers,
-   skipping Policyholder/Vehicle/Coverage). Fills deep where it lands, but doesn't
-   visit all tabs in order. → model/data (tab-order not cleanly learned).
-2. **`(leave blank)` typed literally** — pre-existing bug: in no-autohandler mode the
-   auto-skip is gated off, AND `_lookup_field` skip-check mismatches (`"(leave blank)"
-   .strip("()")` → `"leave blank"` ∉ skip-set). → returns the literal → LLM types it.
-3. **Scroll likely not moving the form** — verified-scroll bottom-detects fine, but
-   `pyautogui.scroll` may not actually move the wx panel (signature never changes →
-   instant "bottom" → advance). Deep fills came from field-clicks + Tab, not scroll.
-
-**Dependency chain:**
-```
-[DONE] Option B + combobox click-fill + false-done guard
-[DONE] multi-tab traversal + 'attempted' + form lock + in-form guard
-[DONE] 8-tab demos ×20 → click 0.88 (fixation gone) + tab-click-to-clicked-tab fix
-   → [NEXT] fix leave-blank skip · verify/fix scroll actually moves · tab-order
-   → strip WHERE-crutches (let 0.88 transformer navigate alone — thesis cleanup)
-   → multi-record ×5 + per-record data
-   → end-to-end verification (Completion ~100%)
-```
-
-#### Stage 1 — Multi-tab traversal
-- [x] **Combobox click-fill** — empty combobox click → open+select (no spiral).
-- [x] **False-done guard** — Notepad intake text no longer triggers false completion.
-- [x] **Option B (WHERE/HOW division)** — the **focused widget's type** decides
-      fill-vs-navigate, replacing the unstable action-type head. Result: Policy tab
-      fills cleanly @~0.9 conf, **whipsaw gone.** (See Decisions.)
-- [x] **TAB-TARGETING — SOLVED (2026-06-12).** Recorded 20 transition-dense passes
-      (3 fields/tab → click-switch) into `three_Tabs` (now 40 total: 20 full + 20
-      dense), retrained on the combined set. **The transformer's pointer now predicts
-      the tabs itself** — live: Policy → (pointer 992,136, conf 0.93) → Policyholder
-      → (pointer 1070,136, conf 0.73) → Vehicle, filling fields on each. **0% wasted,
-      1.8 steps/field, 100% value-acc.** No oversampling — real dense data did it.
-- [x] **MULTI-TAB TRAVERSAL WORKS** — transformer-driven 3-tab switch + fill, clean.
-      *(P0 Stage 1 core goal achieved.)*
-- [x] **ALL 8 TABS — model trained (2026-06-14).** 20 full 8-tab demos →
-      `model_eight_tabs.pt`, click_acc **0.88**. Fills deep tabs (Drivers w/ Driver 2+3
-      sections, History, Claims). Fixation gone at 0.88.
-- [x] **Tab-click → clicked tab (2026-06-14).** A tab-click now navigates to the tab
-      the model actually clicked (sorted-index), not blind current+1. Killed the
-      "race through all 8 tabs filling none" bug.
-- [ ] **Tab-visit ORDER** — model jumps/revisits tabs (skips Policyholder/Vehicle/
-      Coverage). Fix via cleaner demos (consistent left-to-right order) and/or a
-      generic "prefer an unvisited tab" cue. NO hardcoded tab order.
-
-#### Stage 2 — Reliability: no stalling  *(engineering)*
-- [x] **Empty-field fixation → SOLVED (2026-06-12).** `'attempted'` state-feature
-      (ELEM_FEATURES 394→395): once a field is acted on this session, attempted=1 so
-      the transformer stops re-targeting it. Killed the Suffix loop `is_filled` can't
-      (empty field's is_filled never flips). Retrain: val 0.60→0.781, click 0.705→0.855.
-- [x] **Drift → SOLVED (2026-06-12).** Form-window LOCK (capture hwnd at GO,
-      re-assert foreground every step) + in-form click guard (target outside the live
-      form rect → Tab, not a drifting click). No more typing into PowerShell / clicking
-      Notepad. Observation + action always on the form.
-- [x] **Below-fold reach → SOLVED (2026-06-12).** The guard's Tab doubles as scroll:
-      wx ScrolledPanel auto-scrolls the focused field into view, so Tab reaches
-      off-screen fields (Home/Cell Phone filled). Backstop: record∩visible
-      scroll-to-reveal trigger on the live form viewport.
-- [x] **'99' double-type → FIXED (2026-06-12).** Typing now idempotent (select-all
-      before paste) so a retried step overwrites instead of appending.
-- [ ] **`(leave blank)` typed literally** — pre-existing skip bug. `_lookup_field`
-      skip-check does `.strip("()")` → `"leave blank"` which isn't in the skip-set
-      `{"(leave blank)",…}`; and the auto-skip block is gated off in no-autohandler
-      mode. Fix: match leave-blank/none as a substring (skip → Tab past), in BOTH the
-      lookup and the LLM value path. Generic, no field names.
-- [ ] **Scroll doesn't actually move the form** — verified-scroll bottom-detects, but
-      `pyautogui.scroll` likely isn't moving the wx ScrolledPanel (signature never
-      changes → instant "bottom"). Verify it scrolls; if not, fix the scroll action
-      (correct target window / focus) so below-fold reveal works on tall tabs.
-- [ ] **Checkbox cold-start / first-click** — reliable first action from a blank
-      screen (Renewal checkbox handling; DAgger / start-signal).
-- [ ] **Combobox retry** — open→miss→Escape→retry; timing.
-
-#### Stage 2.5 — Thesis cleanup: transformer navigates, agent only does HOW
-> **No hardcode anywhere** (audited 2026-06-14: no field names / tab names / coords /
-> app names). BUT the agent still makes some **navigation (WHERE)** decisions via
-> generic crutches — dilutes "the transformer clones navigation." Strip these now
-> that the model is at 0.88, ONE at a time (each change perturbs model history — see
-> Lessons), re-testing each:
-- [ ] **`_try_advance_tab` stuck-guard auto-advance** — agent decides tab switches.
-      Let the transformer drive tab switches; keep advance only as a last-resort.
-- [ ] **`_focus_first_empty_field`** — agent picks the next field. Prefer transformer.
-- [ ] **scroll-reveal → advance-tab at bottom** — agent decides the switch. Keep scroll
-      (HOW) but let the model choose the next tab.
-> KEEP (legit HOW-mechanics): type value (LLM), combobox open+select, checkbox
-> BM_SETCHECK, foreground lock, in-form guard, scroll-to-reveal.
-
-#### Stage 3 — Multi-record: all 5  *(data + eng)*
-- [ ] **Record advance ×5** — proven 1→2; need all 5 clean.
-- [ ] **Per-record data refresh** — `refresh(record_num)` for records 2–5 (only
-      record 1 verified).
-
-#### Stage 4 — Verification: prove it's done  *(engineering)*
-- [ ] **End-to-end metric** — Completion 0% → ~100%, Field-Match 12% → high.
-- [ ] **Expected-vs-actual diff at submit** — per-record correctness report.
-
-> **Who does what:** YOU = record demos (8-tab ×20 done; more for tab-order if
-> needed) + run live tests. ME = leave-blank skip fix, scroll-move fix, WHERE-crutch
-> stripping (one at a time), per-record refresh, verification harness. BOTH = retrain
-> + test loop.
-
-> **LESSON (2026-06-14):** agent guards perturb the transformer's action-history
-> (hist_len=4) → can destabilize a brittle model (we piled ~8 guards, regressed
-> navigation, reverted to d1fee5f). Add/strip agent logic **ONE at a time, re-test
-> each**. The durable fix for fixation/mis-prediction is **more demos**, not more
-> guards. Guards backup: `scratch/agent_8tab_guards_session_20260614.py`.
-
----
-
-### 🟠 P1 — Generalize *(only AFTER #1 completes a task)*
-- [ ] **Finish scope abstraction** (foundation #4).
-- [ ] **Excel full transfer** — wire source/target + executor for cells, record
-      Excel demos, train, measure clone. *Perception swap already PROVEN; this is
-      the action + data + model half.*
-- [ ] **Random-order test** — closes "clones *any* order, not a bias."
-
-#### The Big Three — architectural blockers to a *general* agent
-*(was the "Roadblocks Ahead" section — these gate generalization, tackle during P1/P2.)*
-1. **Perception: UIA → Vision.** Today reads the UIA a11y tree (free `bbox/role/
-   label/value/states`) — only works on apps with a clean tree. General agent must
-   **see pixels**: screenshot → VLM that localizes + semantically reads elements.
-   Keep the learning layer **perception-agnostic** (swap the adapter, keep the brain);
-   hybrid UIA-for-grounding + VLM-for-understanding. **Biggest single change** —
-   everything downstream depends on perception. VLM weakness = grounding precision.
-2. **Action space: form-fields → universal.** Today click/type/select(+combobox).
-   Need `click, double_click, type, select, drag, scroll, hotkey, wait, verify, menu,
-   file-dialog`. Enumerable engineering (modular executor + demos per action), not
-   research.
-3. **Workflow: linear → control flow.** Demos are one linear path; real tasks branch
-   (`if status=lapsed…`), loop (`for each driver`), skip, error-recover. Recovering the
-   *program* from varied demos = program-synthesis. Pragmatic path: **LLM induces the
-   workflow (if/for) from multiple traces → execute → DAgger-correct.**
-
-> **Chosen roadmap = Hybrid ⭐** (of: pure-BC / RPA-induction / hybrid / LLM-skill):
-> explicit LLM-induced workflow skeleton + BC transformer as the perception/execution
-> muscle in the gaps. Delivers all three sub-goals (learn-how → make-workflow →
-> execute) and reuses what's built. **Strategic fork:** stand on an existing
-> computer-use/VLM for perception+grounding and make Intern's contribution the
-> *learn-the-user's-workflow* layer (far more realistic solo) vs. build perception
-> from scratch. **Staged reach:** Stage 0 ✅ slice → 1 domain-general (native apps,
-> linear) → 2 vision perception → 3 control flow → 4 broadly general. Depth, then breadth.
-
-### 🔵 P2 — Scope #3
-- [ ] **Email / ticket triage** — needs Action-Space (Big Three #2) +
-      Control-Flow (Big Three #3). Surface those deps before starting.
-
-### 🟢 P3 — Polish & known issues *(non-blocking)*
-- [ ] **LLM value errors** — local LLM sometimes returns the wrong field's value
-      (e.g. Policy Number into Policy Term). LLM keeps owning values; fix = better
-      prompt or lookup-as-validator (not silent replacement).
-- [ ] **No prompt caching** — each step is a fresh LLM call; no batching / budget.
-- [ ] **No memory component** — each record runs from a blank slate.
-- [ ] **Observability** — no structured trace / record-level summary; no screenshot
-      history for VLM mis-reads. *(expected-vs-actual diff is P0 Stage 4.)*
-- [ ] **Combobox / mid-record crash recovery.**
-- [ ] **Cross-task shared backbone** (trunk + per-task heads).
-- [ ] Ghost cursor overlay; training-readiness indicator; DAgger productionized.
-
-> **Fundamental roadblocks** *(don't block generalization — block working *reliably/
-> trustworthily*; was its own section):* **A. Hidden intent** (screen doesn't show
-> *why* you act — a ceiling, some workflows unlearnable from screen+action alone) ·
-> **B. Error detection/recovery** (does it know it failed?) · **C. Verification**
-> (did it do the task right — not just "ran N steps") · **D. Safety/irreversibility**
-> (submit/delete/pay need guardrails + trust) · E. Data-collection burden · F. Timing/
-> async/readiness · G. Cross-app/system-level · H. Long-horizon memory · I. Concept
-> drift · J. Cost/latency · K. Privacy/PII · L. Task segmentation. **Scariest = A, C,
-> D** (fundamental + trust-critical). **Recently solved** items live in
-> [Solved Problems](#solved-problems).
-
-### ⚪ P4 — Non-system: thesis / data / benchmark *(parallel track)*
-- [ ] **Thesis** — finish Chapter 3; revise paper if nominated.
-- [ ] **Data collection** — 500,000 traces in a convenience-sampling setting.
-- [ ] **Benchmark** — compare against similar systems.
-- [ ] **Chess fidelity benchmark** — clone a human's play (openings, tendencies,
-      time management, blunders); clone-ELO ≈ human-ELO + matching style = BC of
-      decision-making, not rote actions.
-
-### 🟣 P5 — RL phase *(future, was Wish List Stage 5)*
-- [ ] Actor-Critic / PPO with the BC transformer as Actor; KL penalty vs BC to
-      preserve the user's style. Online fine-tuning from `StateValidator` reward.
-
----
-
-## Scopes & North Star
-
-*Reference — the thesis-completion criteria and the generalization vision. The
-actionable work lives in the [Task List](#task-list) (P0–P4); this is the* why.
-
-### The three scopes *(thesis = all three)*
-Chosen to span the interesting space — *data entry*, *cross-app transfer*,
-*conditional judgment* — so the claim is "clones varied GUI workflows," not "fills
-one form."
-
-1. **Data Entry Form Filling** — *in progress ([P0](#task-list)).* Single-app
-   key-value entry, (mostly) linear. Loop proven on the Policy section (clones
-   order, fills, submits); remaining = multi-tab, multi-record, cold-start.
-   Perception = UIA.
-2. **Web Form → Excel** — *not started ([P1](#task-list)).* Cross-application
-   transfer (web source → Excel grid); 2D target; mixed perception. Excel
-   perception swap **PROVEN** (`ExcelObserver` normalizes to canonical); remaining
-   = web source, action on cells, demos, train.
-3. **Email / Ticket Triage** — *not started ([P2](#task-list)).* Decision-making /
-   conditional behavior; the strongest personalization claim (two users triage
-   differently). Needs branching ([Big Three #3](#task-list)) + judgment
-   cloning. Kept to decisions inferable from *visible* content (avoid hidden-intent,
-   Fundamental roadblock A).
-
-### North Star — generalization (beyond the thesis)
-The thesis is *bounded* to those three, but the **architecture is built to
-generalize** — that is the real goal. The novel contribution: a **personalized,
-demonstration-learned GUI agent** that learns how *this user* does a task and
-reproduces *their* workflow — which scripted RPA (no learning) and generic
-computer-use agents (not personalized) don't.
-
-Already partly real: perception is an **adapter** (UIA + Excel today, one shared
-schema) and the `transformer(WHERE) + LLM(WHAT)` loop is perception-agnostic. The
-path beyond the thesis — a vision perception adapter
-([Big Three #1](#task-list)) + LLM-induced control-flow
-([Big Three #3](#task-list)) — turns "three GUI scopes" into "any GUI
-workflow learned from demonstration."
-
----
-
-## Questions, Concerns, and Concepts
-
-Open threads, honest unknowns/risks, and the **design concepts** (architectural
-decisions + approaches like the WHERE/HOW division and DAgger) that shape how the
-system evolves. **Questions** = unknowns to resolve · **Concerns** = risks to watch
-· **Concepts** = decisions made + design patterns to build toward.
-
-### Decisions & concepts
+## Decisions and Concepts
 
 **WHAT does the transformer learn — Pure (A) vs Division-of-labor (B)? → CHOSE B.**
 The 3-tab navigation marathon (2026-06-11) exposed that the transformer's
-*action-type head* (deciding click-vs-type per step) is **unstable** — it whipsaws
+action-type head (deciding click-vs-type per step) is **unstable** — it whipsaws
 between all-click (combobox/field spiral) and all-keyboard (tabs through, never
 clicks) across retrains. Two ways forward:
 
@@ -728,7 +468,7 @@ rules, no form-specifics, navigation still 100% learned. Finishes scope #1 in
 hours vs weeks. *(If a reviewer asks: the claim is "clones the user's workflow,"
 not "learned how to physically touch every widget with zero rules.")*
 
-### DAgger — how to implement *(if/when pure-BC drift needs it)*
+## DAgger — How to Implement *(if/when pure-BC drift needs it)*
 The principled fix for the live drift seen on 2026-06-11 (agent leaves the form,
 oscillates) = train on the states the agent ITSELF visits, not just clean demos.
 Loop: train → run policy → label the correct action for visited (drift) states →
@@ -744,7 +484,8 @@ aggregate → retrain → repeat. Labeling is the only real choice:
   un-breaking it is the first concrete step. Needs a few run→correct→retrain rounds
   to converge.
 
-### Open technical questions
+## Open Technical Questions
+- **How are we different or simply just a worse version of Codex's new Record and Replay?**
 - **Loss-weighting is less plug-and-play — how do we improve it in the future?**
   The 2026-06-12 rare-event fix (up-weight the rare action's frames in the loss so
   the model learns it without distorting the data — see Concepts) still requires
@@ -783,7 +524,7 @@ aggregate → retrain → repeat. Labeling is the only real choice:
   Renewal checkbox → Tab → no-change loop. Is it a per-record state-reset bug or a
   model issue? Decides whether it's an easy fix or needs data.
 
-### Strategic / thesis concerns
+## Strategic & Thesis Concerns
 - **Is perception-swap enough evidence, or must we show full Excel completion?**
   We proved Excel *perception* conforms (zero edits). The stronger claim — a model
   actually completing a task on a 2nd app — needs action + demos + training. How
@@ -795,7 +536,7 @@ aggregate → retrain → repeat. Labeling is the only real choice:
   lack a clean accessibility tree → could pull Big Three #1 (vision) forward of
   plan. De-risk: probe the web source's tree before committing.
 
-### Risks / debt
+## Risks & Technical Debt
 - **Slow iteration loop** — every model test = record → retrain → live run.
   Velocity risk for the P0 reliability work.
 - **Is the DAgger / correction loop actually working?** `CorrectionHandler`
@@ -810,52 +551,75 @@ aggregate → retrain → repeat. Labeling is the only real choice:
 
 ## Finished Tasks
 
-Completed work, preserved for reference.
+Completed work and solved problems, preserved for reference.
 
-### Navigation cloning (2026-06)
-- **Proved the transformer clones the demonstrated order** — top-down (74%) vs
-  bottom-up (93%), same architecture → not a bias, genuine cloning.
-- **`is_filled` perception feature** — model can see which fields are done →
-  stopped the end-game looping.
-- **Action-space collapse → {click, type}** — action-type accuracy 50% → 80%,
-  click accuracy up for free.
-- **Wired action-type into the agent** — transformer decides click vs type (was a
-  hardcoded "fillable & empty" rule).
-- **Recorder combobox fix** — clicks while a dropdown is open are value-selections
-  (land on the field under the dropdown) → dropped at record time. Killed the
-  phantom "Expiration Date" pollution.
-- **Tail-oversampling** — emphasized the `… → Submit` finish → model learned to
-  submit on its own (no hardcoded completion rule).
-- **End-to-end run** — fills the whole form in the learned order + clicks Submit +
-  advances record, transformer-driven, no crutch, no human.
-- **Recorder focus fix** — clicks always get a fresh snapshot (was reusing stale
-  state during bursts → focus stuck).
-- **`scripts/clean_demos.py`, `test_clone.py`, `oversample_tails.py`,
-  `replicate.py`** added.
+### Universal Semantic Action Space + Navigation Protocol v2 (2026-07-07 → 07-09)
+- **Semantic Action Space core.** Verb vocabulary + `SemanticAction` dataclass with legacy
+  interop (`semantic_action.py`); executor accepts both shapes, verified byte-identical
+  results. Offline labeler (`action_labeler.py`) validated on 6,950 traces; found+fixed
+  element-id-per-window collision (form + Notepad both emit `elem_8` — diff keys on
+  `(element_id, window_role)`). Renamed from `trace_translator.py` (name collision with the
+  unrelated HTML/CV detector package). Tests: `test_semantic_action.py`,
+  `test_action_labeler.py`, executor-equivalence suite.
+- **Split-pointer-head training** (`--action_space semantic`): v1 merged both WHERE jobs
+  onto one head → click_acc 0.828 (WORSE than 0.878 baseline); v2 split (click verbs →
+  `click_elem`, FOCUS/SET_VALUE → repurposed `source_elem`, `lambda_src`=`lambda_click`,
+  new `src_acc` metric) → **click_acc 0.957, src_acc 0.856**. LESSON: one pointer head per
+  job — mixing where-to-click with where-to-type measurably hurts both.
+- **Ranked-target arbitration.** `predict()` exposes pointer-head top-k (`click_topk`);
+  `_pick_ranked_target` walks the model's OWN ranking, skipping dead/attempted/filled/
+  blacklisted/background/decorative targets, visible-first. Fixation on an already-correct
+  field (the 07-07 Claims 37-step stall) is impossible by construction — "already correct"
+  auto-marks filled and moves on. no_change clicks blacklist both the clicked point and the
+  containing element's center (snap-drift-proof).
+- **Optimal-viewport jump.** When zero visible targets remain: densest window over all
+  remaining empty fields (two-pointer sweep over virtual y-coords), scroll its top field to
+  the pane top. Replaced the one-field-per-scroll crawl (wx SetFocus auto-scroll reveals at
+  the NEAR edge), the M2 fold-trigger, and the stranding guard (which let one skipped field
+  veto every scroll). Live-verified 2026-07-09.
+- **Fixation escalation.** `_fixation_hits`: 2nd fixation on the same spot overrides NAV
+  "fill"→"tab"; deterministic geometry fallback clicks the first unvisited tab; on the LAST
+  tab hands the page to `_sweep_tab` (was: silent no-op → the 07-08 Payment infinite loop).
+- **Viewport-top fix.** `_form_viewport_top` (pane starts below the tab strip, not y=0);
+  fixed three `y >= 0` visibility checks that let scrolled-off fields pass as "visible" with
+  stale bboxes → tab-strip mis-clicks; `_nav_fill_field` refuses stale-coord clicks (counts
+  as fill-failure → dead-mark after 2). Also fixed `_reveal_target`'s label re-find clicking
+  the static text label instead of the edit control (no type filter).
+- **Makefile** — `make help/record/train/train-semantic/run/run-semantic/form/test`.
+
+### Core Loop & Navigation Cloning Milestone (2026-06-18)
+- **END-TO-END Scope #1 (2026-06-18).** One unattended run fills all 8 tabs, runs a self-verification pass over every tab, and Submits (~124 steps) — no premature submit, no infinite loop, no crash. The Navigation Protocol (*fill → feed transformer via scroll → page-done? → next tab → all tabs → verify → submit*) is the governing loop. Key mechanisms: M2 expose-scroll feeds the transformer, real UIA ScrollPattern scroll, explicit loop/cycle detector, deterministic verify (UIA value + checkbox TogglePattern, section-aware), submit chokepoint (idempotent, gated on a clean verify). Committed `nav-protocol-scroll-submit` 3b24421.
+- **Order cloning proven.** Top-down (74% exact) vs bottom-up (93% exact) on each order's own data. Same architecture, opposite orders, each learned its own.
+- **Learned the finish.** Clicks Submit on its own via tail-oversampling — no hardcoded end-game rule.
+- **`is_filled` perception feature.** Model can see which fields are done -> stopped the end-game looping.
+- **Action-space collapse to {click, type}** + wired into agent (action-type accuracy 50% → 80%, click accuracy up for free).
+- **Recorder combobox fix.** Clicks while a dropdown is open are value-selections (land on the field under the dropdown) -> dropped at record time to avoid phantom order pollution.
+- **Recorder focus fix.** Clicks always get a fresh snapshot (was reusing stale state during bursts).
+- **Added utility scripts:** `clean_demos.py`, `test_clone.py`, `oversample_tails.py`, `replicate.py`.
 
 ### Intelligence & Training
-- **GPU training** — CUDA 12.4 / PyTorch 2.6.0+cu124, RTX 4050.
-- **Best-acc checkpoint** — saves on `val_acc + click_acc`, not val_loss.
-- **Dataset init cache** — `.dataset_cache.pkl`, retrain init ~1 sec.
-- **LayerNorm on pointer heads** — fixed bilinear Q×K divergence (197M loss bug).
-- **Data augmentation** — `augment_traces.py` (bbox/click/confidence jitter).
-- **Tasks/ reorganization** — model.pt, ruleset.md under `tasks/form_filling/`.
+- **GPU training.** CUDA 12.4 / PyTorch 2.6.0+cu124, RTX 4050.
+- **Best-acc checkpoint.** Saves on `val_acc + click_acc`, not val_loss.
+- **Dataset init cache.** `.dataset_cache.pkl`, retrain init ~1 sec.
+- **LayerNorm on pointer heads.** Fixed bilinear Q×K divergence (197M loss bug).
+- **Data augmentation.** `augment_traces.py` (bbox/click/confidence jitter).
+- **Reorganized tasks/ directory.** model.pt, ruleset.md under `tasks/form_filling/`.
 
-### Agent & Merge Logic
-- **Crutch-gating in pure mode** — VISITED-ADVANCE + LLM-takeover-when-weak gated
-  off under `disable_auto_handlers` (they fought the model).
-- **Fix LLM click position** — `_merge` resolves LLM target by label; transformer
-  click is fallback.
+### Agent, Merge Logic, & Generalization Foundation
+- **Form-specific hardcodes killed -> injected ScopeConfig.** Application-blind agent: `_detect_section`, `_KNOWN_TABS`, `_TAB_PANE_NAMES`, and the `RECORD N OF M` delimiter moved to per-scope config.
+- **Perception adapter seam.** Injectable observers (UIA/Excel), canonical element schema (`observers/schema.py`), and loud validation. Excel perception swap proven.
+- **WHERE/WHAT division.** Transformer drives element + click/type; LLM supplies the value.
+- **Crutch-gating in pure mode.** Gated off `VISITED-ADVANCE` + `LLM-takeover-when-weak` under `disable_auto_handlers`.
+- **Fix LLM click position.** `_merge` resolves LLM target by label; transformer click is fallback.
 
 ### Ruleset & Spec System
-- **Correctional ruleset** — `RuleExtractor.correct()` + auto-call on record end.
-- **Spec injection** — `ruleset.md` appended to LLM system prompt.
+- **Correctional ruleset.** `RuleExtractor.correct()` + auto-call on record end.
+- **Spec injection.** `ruleset.md` appended to LLM system prompt.
 
-### Evaluation
-- **Per-run metrics** — `eval_metrics.evaluate_run` (TCR, action/value accuracy).
-- **BC fidelity scorer** — `bc_fidelity.py` vs gold standard, trend in
-  `bc_progress.jsonl`.
+### Evaluation & Metrics
+- **Per-run metrics.** `eval_metrics.evaluate_run` (TCR, action/value accuracy).
+- **BC fidelity scorer.** `bc_fidelity.py` vs gold standard, trend in `bc_progress.jsonl`.
 
 ### Infrastructure
-- **Capsule registry** — per-task model routing.
-- **`.gitignore`** — `data/demos/`, traces, caches, model binaries excluded.
+- **Capsule registry.** Per-task model routing.
+- **`.gitignore`.** `data/demos/`, traces, caches, model binaries excluded.
