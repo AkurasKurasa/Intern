@@ -1042,15 +1042,22 @@ class LLMAgent:
             # it off). Catches A-B-A-B oscillation / dead-click fixation that the
             # exact-repeat guard misses: no field VALUE filled for _STALL_LIMIT steps.
             if _steps_since_fill >= _STALL_LIMIT:
-                # NAVIGATION PROTOCOL — SWEEP. When the transformer stalls, the
-                # protocol TAKES OVER and drives the whole tab to completion instead
-                # of filling one field and handing back (the model just re-fixates).
-                # Loop: ask the LLM supervisor for the next action vs the SOURCE →
-                #   fill   → fill that field (scroll to reach below-fold ones), re-observe, repeat
-                #   tab    → page is clean → switch to the next unvisited tab
-                #   done   → confirm against source (+all tabs visited) → finish
-                # Bypasses the model entirely until the page is clean. No Tab key.
-                logger.info("[NAV] STUCK %d steps — invoking sweep.", _steps_since_fill)
+                # NAVIGATION PROTOCOL — stall rescue. FIRST try the optimal-
+                # viewport jump: a stall usually means the visible batch is spent
+                # (or a dead widget burned the steps) while plenty of empty fields
+                # sit off-screen — reposition and hand the tab BACK to the
+                # transformer. The LLM-sweep (one LLM call per field, the slow
+                # crawl) is the LAST resort, only when there is nothing to jump to.
+                logger.info("[NAV] STUCK %d steps — trying optimal-viewport jump before sweep.",
+                            _steps_since_fill)
+                _stall_jmp = self._optimal_viewport_jump(state)
+                if isinstance(_stall_jmp, dict):
+                    state = _stall_jmp
+                    _steps_since_fill = 0
+                    _last_auto_step   = step_idx
+                    time.sleep(self.step_delay * 0.5)
+                    continue
+                logger.info("[NAV] nothing to jump to — invoking sweep.")
                 state, _finish = self._sweep_tab(state)
                 _steps_since_fill  = 0
                 _tab_scroll_count  = 0
@@ -1940,8 +1947,14 @@ class LLMAgent:
                 # semantics, not form-specific rules.
                 _fe2_ty  = (_fe2.get("type") or "").lower() if _fe2 else ""
                 _fe2_val = (_fe2.get("value") or "").strip() if _fe2 else ""
+                # spin controls included: the viewport jump focuses its anchor, and
+                # a focused-but-unfillable type loops the jump forever (observed
+                # live: 'Cylinders' SpinCtrl, 6 identical jumps). Typing digits into
+                # a focused spin works; paste-reject is handled by keystroke-retry.
                 _t_is_type = (_fe2_ty in ("editcontrol", "input", "comboboxcontrol",
-                                          "checkboxcontrol", "checkbox")
+                                          "checkboxcontrol", "checkbox",
+                                          "spincontrolcontrol", "spincontrol",
+                                          "spinnercontrol", "spinner")
                               and not _fe2_val)
 
                 if _t_is_type and self._llm_client:
@@ -1979,6 +1992,39 @@ class LLMAgent:
                     # blacklisted) → the model's own next-best target, same step,
                     # no guard, no LLM. None → nothing actionable is visible.
                     _ranked = self._pick_ranked_target(state, t_pred)
+                    # THIN-VIEW JUMP: wx focus auto-scroll trickles ONE fresh field
+                    # into view after every fill, so on tall tabs "zero visible
+                    # targets" never occurs — the viewport slides row-by-row (the
+                    # one-by-one crawl, observed live on Vehicle). When visible
+                    # work is thin (≤2 empties), try the jump NOW; it no-ops when
+                    # the current view is already the densest available, so this
+                    # never fires on the genuine last fields of a tab.
+                    if _ranked is not None:
+                        _vt_tv = self._form_viewport_top(state)
+                        _vb_tv = self._form_viewport_bottom(state) - 8
+                        _vis_tv = 0
+                        for _e_tv in state.get("elements", []):
+                            if (_e_tv.get("type") or "").lower() not in self._FILLABLE_TYPES:
+                                continue
+                            if (_e_tv.get("type") or "").lower() in ("checkboxcontrol", "checkbox"):
+                                continue
+                            if _e_tv.get("window_role") == "background" or not _e_tv.get("bbox"):
+                                continue
+                            if (_e_tv.get("value") or "").strip():
+                                continue
+                            _k_tv = self._attempt_key(_e_tv)
+                            if _k_tv in self._dead_fill_keys or _k_tv in self._attempted_keys:
+                                continue
+                            _cy_tv = (_e_tv["bbox"][1] + _e_tv["bbox"][3]) / 2
+                            if _vt_tv <= _cy_tv <= _vb_tv:
+                                _vis_tv += 1
+                        if _vis_tv <= 2:
+                            _jmp_tv = self._optimal_viewport_jump(state)
+                            if isinstance(_jmp_tv, dict):
+                                logger.info("[NAV] thin view (%d visible empties) — jumped to denser window.", _vis_tv)
+                                state = _jmp_tv
+                                time.sleep(self.step_delay * 0.4)
+                                continue
                     if _ranked is not None:
                         _r_elem, _r_pos, _r_conf = _ranked
                         if _pos2 and (abs(_r_pos[0] - _pos2[0]) > 5 or abs(_r_pos[1] - _pos2[1]) > 5):
@@ -5474,6 +5520,7 @@ class LLMAgent:
             logger.warning("[VERIFY] no tab elements found — cannot verify.")
             return False
         _fixed = 0
+        _fixed_names: set = set()      # which fields this pass corrected (convergence check)
         logger.info("[VERIFY] deterministic pass over %d tab(s) — reading every field vs source.", len(_tabs))
         for _t in _tabs:
             _nm = (_t.get("text") or _t.get("label") or "?").strip()
@@ -5512,6 +5559,7 @@ class LLMAgent:
                         logger.info("[VERIFY] %s: fix %r → %r", _nm[:14], _el[:22], str(_exp)[:22])
                         if self._nav_fill_field(_st, _el, _exp):
                             _fixed += 1
+                            _fixed_names.add(_el.lower())
                         _done_here.add(_el.lower())
                     _st = self._observe()
                     continue
@@ -5534,9 +5582,25 @@ class LLMAgent:
                         time.sleep(self.step_delay * 0.4)
                         _st = self._observe()
                         continue
+                    # TERMINATION GUARANTEE (same as the deterministic branch above —
+                    # this branch lacked it, so a field the LLM kept re-proposing with
+                    # flip-flopping values ('Auto-Pay Enrolled' YES↔leave-blank) or a
+                    # fill that keeps getting refused ('Balance Due ($)') re-fixed
+                    # forever and verify never reached 0 → Submit never fired.
+                    _vk_l = _vf.strip().lower()
+                    self._verify_fix_count[_vk_l] = self._verify_fix_count.get(_vk_l, 0) + 1
+                    if self._verify_fix_count[_vk_l] > 2:
+                        if _fe is not None:
+                            self._dead_fill_keys.add(self._attempt_key(_fe))
+                            self._mark_attempted(_fe)
+                        logger.warning("[VERIFY] %s: LLM-fix %r won't settle after 2 tries — accepting (dead).",
+                                       _nm[:14], _vf[:22])
+                        _done_here.add(_vf.lower())
+                        continue
                     logger.info("[VERIFY] %s: LLM-fix %r → %r", _nm[:14], _vf[:24], _vv[:24])
                     if self._nav_fill_field(_st, _vf, _vv):
                         _fixed += 1
+                        _fixed_names.add(_vf.lower())
                     _done_here.add(_vf.lower())
                     _st = self._observe()
                     continue
@@ -5546,6 +5610,7 @@ class LLMAgent:
                 time.sleep(self.step_delay * 0.5)
                 _st = self._observe()
         logger.info("[VERIFY] pass complete — %d field(s) corrected.", _fixed)
+        self._last_verify_fixes = _fixed_names
         return _fixed == 0
 
     def _confirm_finished(self, state: Dict[str, Any]) -> bool:
@@ -5559,10 +5624,24 @@ class LLMAgent:
             logger.warning("[CONFIRM] not finished — only %d/%d tabs visited.",
                            len(self._visited_tabs), self._tabs_total)
             return False
+        _prev_fixes = getattr(self, "_last_verify_fixes", None)
         if self._verify_pass(state):
             logger.info("[CONFIRM] verification pass clean — form complete.")
             # Press Submit HERE so every finish path submits (some callers just
             # break). Idempotent: _click_submit no-ops if already submitted.
+            self._click_submit(self._observe())
+            return True
+        # CONVERGENCE GATE: a pass that corrects the SAME fields as the previous
+        # pass is making zero progress — flaky reads / nondeterministic LLM values
+        # / refused fills will re-"correct" forever (observed live 2026-07-09:
+        # verify lapped the form twice on the identical field set and Submit
+        # never fired). Stable-but-imperfect = accept honestly: log the dead
+        # list, submit, report. Perfection is the enemy of termination.
+        _cur_fixes = getattr(self, "_last_verify_fixes", set())
+        if _prev_fixes is not None and _cur_fixes and _cur_fixes == _prev_fixes:
+            logger.warning("[CONFIRM] verification STABLE but not clean — same %d field(s) "
+                           "re-corrected with no progress (%s). Accepting state and submitting.",
+                           len(_cur_fixes), sorted(_cur_fixes))
             self._click_submit(self._observe())
             return True
         logger.warning("[CONFIRM] verification corrected field(s) / found gaps — NOT done, continuing.")
@@ -5644,6 +5723,19 @@ class LLMAgent:
             return None
         anchor = empties[best_j]
         albl   = (anchor.get("label") or anchor.get("text") or "").strip()
+        # LOOP-BREAKER: the same anchor twice in a row means the last jump
+        # produced no progress (anchor focused but nothing filled — e.g. a
+        # widget type the fill path can't act on). Mark it attempted so the
+        # window recomputes without it, instead of jumping forever (observed
+        # live: 'Cylinders' anchored 6 identical jumps).
+        _ak = self._attempt_key(anchor)
+        if getattr(self, "_last_jump_anchor", None) == _ak:
+            logger.warning("[NAV] jump anchor %r repeated with no progress — marking attempted, re-picking.",
+                           albl[:28])
+            self._mark_attempted(anchor)
+            self._last_jump_anchor = None
+            return self._optimal_viewport_jump(self._observe())
+        self._last_jump_anchor = _ak
         logger.info("[NAV] optimal-viewport jump → window with %d empty fields, anchor %r.",
                     best_cnt, albl[:28])
         if not self._scroll_into_view(albl):
@@ -6037,12 +6129,18 @@ class LLMAgent:
             # coords (observed live: 'State' @ y=130 → tab-strip click → escape
             # → re-propose loop). Refuse instead — caller counts it as a fail
             # and dead-marks after 2, which breaks the loop.
+            # Judged by the element's CENTER, not the full bbox — wx auto-scroll
+            # legitimately parks a revealed field 1-3px over the pane edge
+            # (observed live: 'Balance Due ($)' top y=153 vs pane top 155 →
+            # full-bbox check refused the fill every verify pass → verification
+            # never came back clean → Submit never fired).
             vt = self._form_viewport_top(state)
             vb = self._form_viewport_bottom(state) - 8
-            if not (el["bbox"][1] >= vt and el["bbox"][3] <= vb):
-                logger.warning("[NAV] fill %r — still outside pane after reveal "
-                               "(bbox y=%.0f, viewport %.0f-%.0f) — refusing stale-coord click.",
-                               _real[:28], el["bbox"][1], vt, vb)
+            _cy_guard = (el["bbox"][1] + el["bbox"][3]) / 2
+            if not (vt <= _cy_guard <= vb):
+                logger.warning("[NAV] fill %r — center outside pane after reveal "
+                               "(cy=%.0f, viewport %.0f-%.0f) — refusing stale-coord click.",
+                               _real[:28], _cy_guard, vt, vb)
                 return False
             _real = (el.get("label") or el.get("text") or field_label).strip()
         typ = (el.get("type") or "").lower()
@@ -6331,13 +6429,19 @@ class LLMAgent:
           An already-filled field is marked filled-this-tab on the spot, so
           'already correct' structurally means MOVE ON, never retry.
 
-        VISIBLE-FIRST (NAV rule 1: fill the current viewport before moving it):
-        pass 1 considers only candidates fully inside the viewport; only when
-        every visible candidate is masked does pass 2 consider off-fold ones.
+        VISIBLE-ONLY for fillables (NAV rule 1: fill the current viewport
+        before moving it): a fillable candidate outside the viewport is NOT
+        pickable — off-screen work belongs to _optimal_viewport_jump, which
+        only triggers when this returns None. (First version had an off-fold
+        fallback pass here; the model always has below-fold fields in its
+        top-8, so the fallback ALWAYS answered, the jump never fired, and the
+        one-field-per-scroll crawl returned. The picker and the jump must not
+        compete for the same case.) Tabs/buttons are always eligible — they
+        legitimately live OUTSIDE the scroll pane (tab strip above, footer
+        below), and masking them would block tab-advance and submit.
 
         Returns (elem, [cx, cy], conf) or None when every ranked candidate is
-        masked — which is the caller's signal that nothing actionable is
-        visible (optimal-viewport-jump territory, not another click).
+        masked — the caller's signal to run the optimal-viewport jump.
         Navigation stays 100% the transformer's choice: this only applies a
         legality filter over ITS ranking; nothing here picks a target the
         model didn't propose.
@@ -6347,42 +6451,54 @@ class LLMAgent:
         _vt = self._form_viewport_top(state)
         _vb = self._form_viewport_bottom(state) - 8
 
-        def _scan(require_visible: bool):
-            for entry in t_pred.get("click_topk", []) or []:
-                try:
-                    idx, conf, pos = int(entry[0]), float(entry[1]), entry[2]
-                except (TypeError, ValueError, IndexError):
+        for entry in t_pred.get("click_topk", []) or []:
+            try:
+                idx, conf, pos = int(entry[0]), float(entry[1]), entry[2]
+            except (TypeError, ValueError, IndexError):
+                continue
+            if not (0 <= idx < len(elems)):
+                continue
+            e = elems[idx]
+            if e.get("window_role") == "background" or not e.get("bbox"):
+                continue
+            ety = (e.get("type") or "").lower()
+            if ety not in self._CLICKABLE_TYPES:
+                continue
+            _pk = (round(pos[0] / 10) * 10, round(pos[1] / 10) * 10)
+            if _pk in self._nochange_click_pos:
+                continue
+            if ety in self._FILLABLE_TYPES:
+                # fillables must be INSIDE the scroll viewport (center-based —
+                # wx parks revealed fields 1-3px over the edge)
+                _cy = (e["bbox"][1] + e["bbox"][3]) / 2
+                if not (_vt <= _cy <= _vb):
                     continue
-                if not (0 <= idx < len(elems)):
+                k = self._attempt_key(e)
+                if k in self._dead_fill_keys or k in self._attempted_keys:
                     continue
-                e = elems[idx]
-                if e.get("window_role") == "background" or not e.get("bbox"):
+                lbl = (e.get("label") or e.get("text") or "").strip()
+                if lbl and lbl.lower() in _filled_l:
                     continue
-                ety = (e.get("type") or "").lower()
-                if ety not in self._CLICKABLE_TYPES:
+                if (e.get("value") or "").strip() and ety not in ("checkboxcontrol", "checkbox"):
+                    # Field already holds a value — done, not a target. Record
+                    # it so every later ranking pass skips it instantly.
+                    if lbl:
+                        self._filled_this_tab.add(lbl)
                     continue
-                if require_visible and not (e["bbox"][1] >= _vt and e["bbox"][3] <= _vb):
+            else:
+                # Buttons/tabs: only while NO fill work remains on this tab.
+                # The model's top-8 almost always contains SOME low-confidence
+                # button (Submit zone at 0.26, Print Preview at 0.00 — both
+                # observed live), so unconditional eligibility meant the picker
+                # never returned None and the optimal-viewport jump never fired.
+                # Fill first; press buttons / advance tabs when the page is done.
+                if self._topmost_missing(state) is not None:
                     continue
-                _pk = (round(pos[0] / 10) * 10, round(pos[1] / 10) * 10)
-                if _pk in self._nochange_click_pos:
-                    continue
-                if ety in self._FILLABLE_TYPES:
-                    k = self._attempt_key(e)
-                    if k in self._dead_fill_keys or k in self._attempted_keys:
-                        continue
-                    lbl = (e.get("label") or e.get("text") or "").strip()
-                    if lbl and lbl.lower() in _filled_l:
-                        continue
-                    if (e.get("value") or "").strip() and ety not in ("checkboxcontrol", "checkbox"):
-                        # Field already holds a value — done, not a target. Record
-                        # it so every later ranking pass skips it instantly.
-                        if lbl:
-                            self._filled_this_tab.add(lbl)
-                        continue
-                return e, [float(pos[0]), float(pos[1])], conf
-            return None
-
-        return _scan(require_visible=True) or _scan(require_visible=False)
+            # actionable work found → any later jump re-using the previous
+            # anchor is legitimate again (progress happened in between)
+            self._last_jump_anchor = None
+            return e, [float(pos[0]), float(pos[1])], conf
+        return None
 
     def _elem_at(self, state: Dict[str, Any], pos) -> Optional[Dict[str, Any]]:
         """Element whose bbox contains pos (nearest center on ties)."""
