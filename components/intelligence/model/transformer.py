@@ -219,15 +219,51 @@ def _elem_label(elem: dict) -> str:
     return ((elem.get("label") or elem.get("text") or "").strip())
 
 
-def _attempt_key(elem: dict):
+# Section panes carry this label prefix in the canonical perception schema
+# (e.g. 'section_driver_2'). Used ONLY to qualify identity keys on
+# repeated-section forms — the pane's own label, not an app-specific name.
+_SECTION_PANE_PREFIX = "section_"
+
+
+def _section_of(elem: dict, state: Optional[dict]) -> str:
+    """Label of the lowest section pane whose top edge is at/above the
+    element's vertical center — the section the element belongs to.
+    '' when the form has no section panes (non-sectioned scopes)."""
+    if not state or not elem.get("bbox"):
+        return ""
+    _cy = (elem["bbox"][1] + elem["bbox"][3]) / 2
+    best = ""
+    best_top = None
+    for p in state.get("elements", []) or []:
+        if (p.get("type") or "").lower() not in ("panecontrol", "pane"):
+            continue
+        if p.get("window_role") == "background" or not p.get("bbox"):
+            continue
+        _pl = (p.get("label") or p.get("text") or "").strip().lower()
+        if not _pl.startswith(_SECTION_PANE_PREFIX):
+            continue
+        if p["bbox"][1] <= _cy and (best_top is None or p["bbox"][1] > best_top):
+            best, best_top = _pl, p["bbox"][1]
+    return best
+
+
+def _attempt_key(elem: dict, state: Optional[dict] = None):
     """
     Session-stable identity for the 'attempted' feature. Label-primary so it
-    survives scroll (positions shift, labels don't); falls back to a coarse
-    bbox-center bucket for unlabeled elements. Must match between train-time
-    derivation and the agent's inference-time tracking.
+    survives scroll (positions shift, labels don't); SECTION-QUALIFIED when the
+    form has repeated sections ('First Name' exists 3x on a Drivers tab —
+    Driver 1/2/3 — and a bare-label key marks all three attempted after one is
+    acted on). The section pane scrolls WITH the field, so (section, label)
+    stays scroll-stable. Falls back to a coarse bbox-center bucket for
+    unlabeled elements. Must PARTITION the same way as the agent's
+    inference-time tracking (agent uses its ScopeConfig-formatted section name;
+    the raw pane label used here yields the identical partition).
     """
     lbl = (elem.get("label") or elem.get("text") or "").strip().lower()
     if lbl:
+        sec = _section_of(elem, state)
+        if sec:
+            return (sec, lbl)
         return lbl
     b = elem.get("bbox") or [0, 0, 0, 0]
     return ("@", round((b[0] + b[2]) / 2 / 20) * 20, round((b[1] + b[3]) / 2 / 20) * 20)
@@ -505,7 +541,7 @@ class TrajectoryDataset(Dataset):
         _cache_path = root / ".dataset_cache.pkl"
         # ELEM_FEATURES in the key → a change in the feature layout invalidates
         # any stale cache built with a different one.
-        _cache_key  = (max_elements, hist_len, aug_drop_prob, ELEM_FEATURES, "v5_attempted", action_space)
+        _cache_key  = (max_elements, hist_len, aug_drop_prob, ELEM_FEATURES, "v6_section_attempted", action_space)
 
         def _cache_valid() -> bool:
             if not _cache_path.exists():
@@ -678,7 +714,7 @@ class TrajectoryDataset(Dataset):
                     elif action[0] == ACTION_KEYBOARD and 0 <= src_idx < len(elems):
                         _tgt_elem = elems[src_idx]
                 if _tgt_elem is not None:
-                    g_acted.add(_attempt_key(_tgt_elem))
+                    g_acted.add(_attempt_key(_tgt_elem, state))
                 valid_files.append(fpath)
                 g_actions.append(action)
                 g_src_idx.append(src_idx)
@@ -820,7 +856,7 @@ class TrajectoryDataset(Dataset):
         if not keys:
             return
         for e in state.get("elements", []):
-            if _attempt_key(e) in keys:
+            if _attempt_key(e, state) in keys:
                 e["attempted"] = 1.0
 
     def _get_tensor(self, fpath: "Path") -> torch.Tensor:

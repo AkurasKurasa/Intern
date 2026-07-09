@@ -2019,7 +2019,7 @@ class LLMAgent:
                             if _vt_tv <= _cy_tv <= _vb_tv:
                                 _vis_tv += 1
                         if _vis_tv <= 2:
-                            _jmp_tv = self._optimal_viewport_jump(state)
+                            _jmp_tv = self._optimal_viewport_jump(state, t_pred)
                             if isinstance(_jmp_tv, dict):
                                 logger.info("[NAV] thin view (%d visible empties) — jumped to denser window.", _vis_tv)
                                 state = _jmp_tv
@@ -2038,7 +2038,7 @@ class LLMAgent:
                         # empty fields; fall back to the missing-field reveal, then
                         # to the pointer-invalid Tab fallback if the tab is done.
                         logger.info("[RANKED] all candidates masked — optimal-viewport jump.")
-                        _jmp = self._optimal_viewport_jump(state)
+                        _jmp = self._optimal_viewport_jump(state, t_pred)
                         if isinstance(_jmp, dict):
                             state = _jmp
                             time.sleep(self.step_delay * 0.5)
@@ -5346,7 +5346,11 @@ class LLMAgent:
                 continue
             sec = self._detect_section(state, e)
             key = (f"{sec} {lbl}" if sec else lbl).lower()
-            if key in _filled_l or lbl.lower() in _filled_l or self._attempt_key(e) in self._attempted_keys:
+            # NOTE: no bare-label fallback match — `key` already IS the bare
+            # label for non-sectioned fields, and matching bare labels for
+            # SECTIONED fields is exactly the Driver 2/3 collision (Driver 1's
+            # 'First Name' hid the other two).
+            if key in _filled_l or self._attempt_key(e) in self._attempted_keys:
                 continue
             empties.append(lbl)
         _tab_elems = [e for e in state.get("elements", [])
@@ -5426,6 +5430,14 @@ class LLMAgent:
                 continue
             if self._attempt_key(e) in self._dead_fill_keys:
                 continue   # widget rejects fill (e.g. SpinCtrl) — don't keep proposing it
+            # An ATTEMPTED checkbox is DONE: unchecked reads value='' forever, so
+            # a verified correct-NO box otherwise stays in the "empty" list and
+            # gets re-proposed until dead-marked (~3 wasted LLM calls per box,
+            # observed live 2026-07-09 on SR-22/Excluded Driver).
+            if ((e.get("type") or "").lower() in ("checkboxcontrol", "checkbox")
+                    and self._attempt_key(e) in self._attempted_keys):
+                _filled += 1
+                continue
             _v = (e.get("value") or "").strip()
             page.append((lbl, _v))
             if _v:
@@ -5669,19 +5681,21 @@ class LLMAgent:
                 best = e
         return best
 
-    def _optimal_viewport_jump(self, state: Dict[str, Any]):
+    def _optimal_viewport_jump(self, state: Dict[str, Any],
+                               t_pred: Optional[Dict[str, Any]] = None):
         """NAVIGATION PROTOCOL core rule (user spec 2026-07-08):
           1. fill the current viewport first (enforced by visible-first ranking);
           2. when NO empty target is left on screen, jump the scroll position to
-             the window holding the MOST empty fields — ideally a whole screen
-             of them — so the transformer always works dense batches.
+             where the work is.
 
-        Pure geometry: slide a viewport-height window over the y-centers of
-        every still-actionable empty fillable (UIA lists off-screen elements
-        with virtual coords), take the densest window, scroll its topmost
-        field to the top of the pane. Returns fresh state after the jump, or
-        None when there is nothing to jump to (tab done) or the current view
-        already IS optimal."""
+        MODEL-ANCHORED (2026-07-09): when the transformer's ranked pointer
+        (`t_pred['click_topk']`) contains an actionable EMPTY field that is
+        off-screen, THAT is the anchor — the viewport goes where the learned
+        policy wants to work next (WHERE stays with the model, per the
+        division-of-labor rule). The densest-window geometry sweep is the
+        FALLBACK for when the model's ranking offers no off-screen target.
+        Returns fresh state after the jump, or None when there is nothing to
+        jump to (tab done) or the current view already IS optimal."""
         vt = self._form_viewport_top(state)
         vb = self._form_viewport_bottom(state) - 8
         H  = max(vb - vt, 100)
@@ -5707,22 +5721,49 @@ class LLMAgent:
             return None
         empties.sort(key=lambda e: (e["bbox"][1] + e["bbox"][3]) / 2)
         ys = [(e["bbox"][1] + e["bbox"][3]) / 2 for e in empties]
-        # densest window of height H over the y-centers (two-pointer)
-        best_j, best_cnt = 0, 0
-        i = 0
-        for j in range(len(ys)):
-            if i < j:
-                i = j
-            while i < len(ys) and ys[i] <= ys[j] + (H - 60):
-                i += 1
-            if i - j > best_cnt:
-                best_cnt, best_j = i - j, j
-        # already optimal? (as many empties fully visible as the best window holds)
-        vis_now = sum(1 for e in empties if e["bbox"][1] >= vt and e["bbox"][3] <= vb)
-        if vis_now >= best_cnt:
-            return None
-        anchor = empties[best_j]
-        albl   = (anchor.get("label") or anchor.get("text") or "").strip()
+
+        # ── MODEL ANCHOR: highest-ranked off-screen actionable empty ─────────
+        anchor = None
+        best_cnt = 0
+        if t_pred:
+            _empty_ids = {id(e) for e in empties}
+            for _entry in t_pred.get("click_topk", []) or []:
+                try:
+                    _mi = int(_entry[0])
+                except (TypeError, ValueError, IndexError):
+                    continue
+                _elems_all = state.get("elements", [])
+                if not (0 <= _mi < len(_elems_all)):
+                    continue
+                _me = _elems_all[_mi]
+                if id(_me) not in _empty_ids:
+                    continue                       # not an actionable empty
+                _mcy = (_me["bbox"][1] + _me["bbox"][3]) / 2
+                if vt <= _mcy <= vb:
+                    continue                       # on-screen → not jump territory
+                anchor = _me
+                best_cnt = sum(1 for y in ys if _mcy <= y <= _mcy + (H - 60))
+                logger.info("[NAV] jump anchored on MODEL's pick %r (rank hit, %d empties ride along).",
+                            (_me.get("label") or _me.get("text") or "?")[:28], best_cnt)
+                break
+
+        # ── FALLBACK: densest window of height H (two-pointer sweep) ─────────
+        if anchor is None:
+            best_j = 0
+            i = 0
+            for j in range(len(ys)):
+                if i < j:
+                    i = j
+                while i < len(ys) and ys[i] <= ys[j] + (H - 60):
+                    i += 1
+                if i - j > best_cnt:
+                    best_cnt, best_j = i - j, j
+            # already optimal? (as many empties visible as the best window holds)
+            vis_now = sum(1 for e in empties if e["bbox"][1] >= vt and e["bbox"][3] <= vb)
+            if vis_now >= best_cnt:
+                return None
+            anchor = empties[best_j]
+        albl = (anchor.get("label") or anchor.get("text") or "").strip()
         # LOOP-BREAKER: the same anchor twice in a row means the last jump
         # produced no progress (anchor focused but nothing filled — e.g. a
         # widget type the fill path can't act on). Mark it attempted so the
@@ -5742,7 +5783,8 @@ class LLMAgent:
             return None
         time.sleep(self.step_delay * 0.4)
         # park the anchor at the top edge so the whole dense window is on screen
-        self._maximize_reveal(went_down=ys[best_j] >= vt)
+        _acy = (anchor["bbox"][1] + anchor["bbox"][3]) / 2
+        self._maximize_reveal(went_down=_acy >= vt)
         return self._observe()
 
     def _maximize_reveal(self, went_down: bool = True, max_pages: int = 3) -> None:
@@ -6010,10 +6052,21 @@ class LLMAgent:
             if _act == "fill" and (_nav.get("field") or "").strip():
                 _nf = _nav["field"].strip()
                 _nv = _nav.get("value") or ""
-                _tk = _nf.lower()
-                _fx = next((e for e in state.get("elements", [])
-                            if (e.get("label") or e.get("text") or "").strip().lower() == _tk
-                            and e.get("bbox")), None)
+                # Resolve to a SPECIFIC element: among same-labeled candidates
+                # (three 'Date of Birth' fields on a Drivers tab), prefer the
+                # first EMPTY one that is not already dead — "first bare-label
+                # match" kept dead-marking the same section's field while the
+                # protocol re-proposed another section's, looping forever
+                # (observed live 2026-07-09: ~15 dead-marks on 'Date of Birth').
+                _cands = [e for e in state.get("elements", [])
+                          if (e.get("label") or e.get("text") or "").strip().lower() == _nf.lower()
+                          and e.get("bbox")
+                          and e.get("window_role") != "background"
+                          and (e.get("type") or "").lower() in self._FILLABLE_TYPES]
+                _fx = (next((e for e in _cands
+                             if not (e.get("value") or "").strip()
+                             and self._attempt_key(e, state) not in self._dead_fill_keys), None)
+                       or (next(iter(_cands), None)))
                 # Protocol re-proposing an ALREADY-FILLED field = it can't see any
                 # remaining empties (they're below the fold). Scroll down to reveal
                 # the next batch instead of re-filling. Two dead scrolls = bottom.
@@ -6026,15 +6079,35 @@ class LLMAgent:
                             logger.info("[NAV] sweep: bottom reached, only filled fields left → page clean.")
                             break
                     continue
+                # Per-ELEMENT try counter (section-qualified) — one bare-label
+                # counter shared by all three same-named fields hit the dead
+                # threshold after the FIRST section's tries.
+                _tk = self._attempt_key(_fx, state) if _fx is not None else _nf.lower()
                 _tried[_tk] = _tried.get(_tk, 0) + 1
                 if _tried[_tk] > 2:
                     if _fx is not None:
-                        self._dead_fill_keys.add(self._attempt_key(_fx))
+                        self._dead_fill_keys.add(_tk)
+                        self._mark_attempted(_fx)
                     logger.warning("[NAV] sweep: %r unfillable after 3 tries — marking dead.", _nf[:28])
                     state = self._observe()
                     continue
+                # SECTION-CORRECT VALUE: the protocol LLM proposes values by bare
+                # field name and grabs the wrong section's line (typed the
+                # policyholder's DOB into Driver 3). When the resolved element
+                # sits in a section, re-look-up the value section-aware and
+                # prefer it over the LLM's proposal.
+                if _fx is not None:
+                    _sec_sw = self._detect_section(state, _fx)
+                    if _sec_sw:
+                        _sv = self._lookup_field(_nf, section=_sec_sw)
+                        if _sv:
+                            if _sv != _nv:
+                                logger.info("[NAV] sweep: section-corrected %r value %r → %r (%s).",
+                                            _nf[:24], str(_nv)[:20], str(_sv)[:20], _sec_sw)
+                            _nv = _sv
                 logger.info("[NAV] sweep fill/verify %r → %r", _nf[:28], str(_nv)[:30])
-                self._nav_fill_field(state, _nf, _nv)
+                self._nav_fill_field(state, _nf, _nv,
+                                     prefer_key=(_tk if _fx is not None else None))
                 _noscroll = 0
                 state = self._observe()
                 continue
@@ -6080,20 +6153,193 @@ class LLMAgent:
             return state, False
         return state, False
 
-    def _nav_fill_field(self, state: Dict[str, Any], field_label: str, value: str) -> bool:
+    # ════════════════════════════════════════════════════════════════════════
+    #  IDENTITY EXECUTOR — act on ELEMENTS, not labels or pixels.
+    #  The element (its own label + control type + geometry) is the address;
+    #  resolution to a live UIA control happens at EXECUTION time, and the
+    #  action is a UIA pattern (Value/Toggle/Selection), not a coordinate
+    #  click. Kills the stale-coordinate bug class and the paste-reject /
+    #  fold-edge-dropdown dead-marks. No field names, no app names.
+    # ════════════════════════════════════════════════════════════════════════
+
+    _UIA_TYPE_FINDERS = {
+        "editcontrol": "EditControl", "input": "EditControl",
+        "comboboxcontrol": "ComboBoxControl", "combobox": "ComboBoxControl",
+        "checkboxcontrol": "CheckBoxControl", "checkbox": "CheckBoxControl",
+        "spincontrolcontrol": "SpinnerControl", "spincontrol": "SpinnerControl",
+        "spinnercontrol": "SpinnerControl", "spinner": "SpinnerControl",
+    }
+
+    def _resolve_live_control(self, elem: Dict[str, Any]):
+        """Observed element dict -> live UIA control, disambiguated by geometry.
+        Same-named twins (three 'Date of Birth' fields) are told apart by
+        nearest bounding-rect center to the observed element's bbox — the
+        rects come fresh from UIA at call time, so a scroll between observe
+        and act shifts BOTH the same way for on-screen controls."""
+        try:
+            import uiautomation as _uia
+            import win32gui as _w32
+        except ImportError:
+            return None
+        _name = (elem.get("label") or elem.get("text") or "").strip()
+        if not _name or not elem.get("bbox"):
+            return None
+        _finder_name = self._UIA_TYPE_FINDERS.get((elem.get("type") or "").lower())
+        if _finder_name is None:
+            return None
+        try:
+            _root = _uia.ControlFromHandle(self._locked_hwnd or _w32.GetForegroundWindow())
+            if _root is None:
+                return None
+            _b = elem["bbox"]
+            _ecx, _ecy = (_b[0] + _b[2]) / 2, (_b[1] + _b[3]) / 2
+            # enumerate ALL same-named controls of this type; nearest rect wins
+            _matches = []
+            def _walk(node, depth=0):
+                if node is None or depth > 25:
+                    return
+                try:
+                    if (getattr(node, "Name", "") or "").strip() == _name \
+                            and node.ControlTypeName == _finder_name.replace("Control", "") + "Control":
+                        _matches.append(node)
+                except Exception:
+                    pass
+                try:
+                    for _ch in node.GetChildren():
+                        _walk(_ch, depth + 1)
+                except Exception:
+                    pass
+            _walk(_root)
+            if not _matches:
+                return None
+            def _dist(c):
+                try:
+                    r = c.BoundingRectangle
+                    return ((r.left + r.right) / 2 - _ecx) ** 2 + ((r.top + r.bottom) / 2 - _ecy) ** 2
+                except Exception:
+                    return float("inf")
+            return min(_matches, key=_dist)
+        except Exception as exc:
+            logger.debug("resolve_live_control %r failed: %s", _name[:24], exc)
+            return None
+
+    def _act_on_element(self, elem: Dict[str, Any], value: str) -> bool:
+        """Fill/toggle/select the OBSERVED element via UIA patterns. Returns
+        True when the action verifiably landed. Falls through to False so the
+        caller can use the legacy click/paste path as backup."""
+        ctrl = self._resolve_live_control(elem)
+        if ctrl is None:
+            return False
+        ety = (elem.get("type") or "").lower()
+        try:
+            import uiautomation as _uia
+            if ety in ("checkboxcontrol", "checkbox"):
+                _want = value.strip().lower() in ("yes", "yes (check)", "true", "checked", "x", "1")
+                _tp = ctrl.GetTogglePattern()
+                if _tp is None:
+                    return False
+                if (_tp.ToggleState == 1) != _want:
+                    _tp.Toggle()
+                    time.sleep(0.15)
+                return (ctrl.GetTogglePattern().ToggleState == 1) == _want
+            if ety in ("comboboxcontrol", "combobox"):
+                # expand, select the matching item by ITS name, collapse
+                try:
+                    _ec = ctrl.GetExpandCollapsePattern()
+                    _ec.Expand()
+                    time.sleep(0.3)
+                except Exception:
+                    pass
+                _vlc = value.strip().lower()
+                _item = None
+                for _ch in ctrl.GetChildren():
+                    _nm = (getattr(_ch, "Name", "") or "").strip().lower()
+                    if _nm == _vlc or _nm.startswith(_vlc) or _vlc.startswith(_nm):
+                        _item = _ch
+                        break
+                if _item is None:
+                    # wx renders the dropdown as a separate list window — search desktop
+                    try:
+                        _lst = _uia.ListControl(searchDepth=3)
+                        if _lst.Exists(maxSearchSeconds=0.5):
+                            for _ch in _lst.GetChildren():
+                                _nm = (getattr(_ch, "Name", "") or "").strip().lower()
+                                if _nm == _vlc or _nm.startswith(_vlc):
+                                    _item = _ch
+                                    break
+                    except Exception:
+                        pass
+                if _item is not None:
+                    try:
+                        _sp = _item.GetSelectionItemPattern()
+                        _sp.Select()
+                    except Exception:
+                        _item.Click(simulateMove=False)
+                    time.sleep(0.2)
+                    try:
+                        ctrl.GetExpandCollapsePattern().Collapse()
+                    except Exception:
+                        pass
+                    _now = (getattr(ctrl, "GetValuePattern", lambda: None)() or None)
+                    return True
+                try:
+                    ctrl.GetExpandCollapsePattern().Collapse()
+                except Exception:
+                    pass
+                return False
+            # edits + spins: ValuePattern first (immune to paste-reject), then
+            # SetFocus + keystrokes
+            try:
+                _vp = ctrl.GetValuePattern()
+                if _vp is not None and not _vp.IsReadOnly:
+                    _vp.SetValue(value)
+                    time.sleep(0.15)
+                    if (_vp.Value or "").strip() == value.strip():
+                        return True
+            except Exception:
+                pass
+            try:
+                ctrl.SetFocus()
+                time.sleep(0.15)
+                ctrl.SendKeys("{Ctrl}a", waitTime=0.05)
+                ctrl.SendKeys(value, interval=0.02, waitTime=0.1)
+                _vp2 = ctrl.GetValuePattern()
+                return (_vp2 is not None
+                        and (_vp2.Value or "").strip() == value.strip())
+            except Exception:
+                return False
+        except Exception as exc:
+            logger.debug("act_on_element %r failed: %s",
+                         (elem.get('label') or '?')[:24], exc)
+            return False
+
+    def _nav_fill_field(self, state: Dict[str, Any], field_label: str, value: str,
+                        prefer_key=None) -> bool:
         """Locate a field by its own label, scroll it into view if needed, and fill
         it directly (combobox open+select · checkbox set · edit idempotent paste).
         Used by the Navigation Protocol to fix a specific empty/wrong field. Returns
-        True if it acted. Generic: widget type + label + geometry."""
+        True if it acted. Generic: widget type + label + geometry.
+        `prefer_key`: section-qualified _attempt_key of the SPECIFIC element to
+        act on — on repeated-section forms three fields share the same label and
+        exact-first-match hits the wrong section's."""
         value = "" if value is None else str(value)   # LLM may return an int (e.g. 4) → coerce
         _ll = field_label.strip().lower()
         def _find(st):
             _cands = [e for e in st.get("elements", [])
                       if (e.get("type") or "").lower() in ("editcontrol", "comboboxcontrol", "checkboxcontrol")
                       and e.get("bbox") and (e.get("label") or e.get("text"))]
-            # 1) exact label match
-            _exact = next((e for e in _cands
-                           if (e.get("label") or e.get("text") or "").strip().lower() == _ll), None)
+            # 0) caller pinned a specific element (section-qualified key)
+            if prefer_key is not None:
+                _pin = next((e for e in _cands
+                             if self._attempt_key(e, st) == prefer_key), None)
+                if _pin is not None:
+                    return _pin
+            # 1) exact label match — prefer an EMPTY one (repeated sections:
+            # the filled twin must not shadow the empty one)
+            _exacts = [e for e in _cands
+                       if (e.get("label") or e.get("text") or "").strip().lower() == _ll]
+            _exact = (next((e for e in _exacts if not (e.get("value") or "").strip()), None)
+                      or next(iter(_exacts), None))
             if _exact is not None:
                 return _exact
             # 2) fuzzy: the LLM's label rarely matches the field's exactly ("ZIP" vs
@@ -6146,6 +6392,16 @@ class LLMAgent:
         typ = (el.get("type") or "").lower()
         x1, y1, x2, y2 = el["bbox"]
         cx, cy = (x1 + x2) / 2, (y1 + y2) / 2
+        # IDENTITY EXECUTOR FIRST: resolve the live control for THIS element and
+        # act via UIA patterns (Value/Toggle/Selection) — no coordinates, no
+        # paste-reject, twins disambiguated by geometry. Legacy click/paste
+        # paths below remain as fallback when pattern support is missing.
+        if value and self._act_on_element(el, value):
+            logger.info("[NAV] fill %r via identity executor (UIA pattern).", _real[:28])
+            self._mark_attempted(el)
+            _sec_ne = self._detect_section(state, el)
+            self._filled_this_tab.add(f"{_sec_ne} {_real}" if _sec_ne else _real)
+            return True
         if typ == "checkboxcontrol":
             # Interpret the source value: truthy → should be CHECKED, falsy/NO/blank →
             # should be UNCHECKED (the default). Mark attempted either way so it stops
@@ -6363,6 +6619,10 @@ class LLMAgent:
                             state["elements"] = state["elements"] + ocr_elems
                             logger.info("OCR overlay: injected %d element(s) from background window",
                                         len(ocr_elems))
+                # Cache the freshest observation for section-qualified identity
+                # keys (_attempt_key) — every consumer of an element processes
+                # elements from the most recent observe in its code path.
+                self._cur_state = state
                 return state
         except Exception as exc:
             logger.warning("Observer error: %s", exc)
@@ -6390,13 +6650,52 @@ class LLMAgent:
         out["elements"] = slim
         return out
 
-    def _attempt_key(self, elem: Dict[str, Any]):
-        """Match transformer._attempt_key exactly (label-primary, scroll-stable)."""
+    def _attempt_key(self, elem: Dict[str, Any], state: Optional[Dict[str, Any]] = None):
+        """Scroll-stable identity for a field. SECTION-QUALIFIED: label-primary
+        keys collide on repeated-section forms — 'First Name' exists 3× on the
+        Drivers tab (Driver 1/2/3), so filling Driver 1's masked 2/3's across
+        the ENTIRE mask stack (arbitration, topmost-missing, viewport jump,
+        sweep dead-list) and whole sections were skipped (observed live
+        2026-07-09). The section pane scrolls WITH the field, so
+        (section, label) stays scroll-stable. Falls back to the bare label for
+        non-sectioned fields/scopes — identical to the old key there.
+        `state` defaults to the freshest observation (set by _observe)."""
         lbl = (elem.get("label") or elem.get("text") or "").strip().lower()
         if lbl:
+            st = state if state is not None else getattr(self, "_cur_state", None)
+            # Section = raw pane label (prefix 'section_'), NOT the ScopeConfig-
+            # formatted name from _detect_section — the key must not silently
+            # degrade to the colliding bare label when a scope has no
+            # section_pattern configured, and the raw label partitions
+            # identically to transformer._attempt_key (train/inference must
+            # agree on the 'attempted' feature).
+            sec = self._section_pane_of(elem, st) if st is not None else ""
+            if sec:
+                return (sec, lbl)
             return lbl
         b = elem.get("bbox") or [0, 0, 0, 0]
         return ("@", round((b[0] + b[2]) / 2 / 20) * 20, round((b[1] + b[3]) / 2 / 20) * 20)
+
+    @staticmethod
+    def _section_pane_of(elem: Dict[str, Any], state: Dict[str, Any]) -> str:
+        """Raw label of the lowest 'section_*' pane whose top edge is at/above
+        the element's vertical center. Mirrors transformer._section_of exactly
+        (same partition for the train-time 'attempted' feature)."""
+        if not elem.get("bbox"):
+            return ""
+        _cy = (elem["bbox"][1] + elem["bbox"][3]) / 2
+        best, best_top = "", None
+        for p in state.get("elements", []) or []:
+            if (p.get("type") or "").lower() not in ("panecontrol", "pane"):
+                continue
+            if p.get("window_role") == "background" or not p.get("bbox"):
+                continue
+            _pl = (p.get("label") or p.get("text") or "").strip().lower()
+            if not _pl.startswith("section_"):
+                continue
+            if p["bbox"][1] <= _cy and (best_top is None or p["bbox"][1] > best_top):
+                best, best_top = _pl, p["bbox"][1]
+        return best
 
     def _mark_attempted(self, elem: Dict[str, Any]) -> None:
         """Record that a field has been acted on this session (attempted feature)."""
@@ -6473,17 +6772,22 @@ class LLMAgent:
                 _cy = (e["bbox"][1] + e["bbox"][3]) / 2
                 if not (_vt <= _cy <= _vb):
                     continue
-                k = self._attempt_key(e)
+                k = self._attempt_key(e, state)
                 if k in self._dead_fill_keys or k in self._attempted_keys:
                     continue
                 lbl = (e.get("label") or e.get("text") or "").strip()
-                if lbl and lbl.lower() in _filled_l:
+                # Filled-this-tab check is SECTION-QUALIFIED — a bare-label
+                # match here was the Driver 2/3 collision (Driver 1's filled
+                # 'First Name' masked the empty ones in the other sections).
+                _sec_pk = self._detect_section(state, e)
+                _fkey_pk = (f"{_sec_pk} {lbl}" if _sec_pk else lbl).lower()
+                if lbl and _fkey_pk in _filled_l:
                     continue
                 if (e.get("value") or "").strip() and ety not in ("checkboxcontrol", "checkbox"):
                     # Field already holds a value — done, not a target. Record
-                    # it so every later ranking pass skips it instantly.
+                    # it (section-qualified) so later ranking passes skip fast.
                     if lbl:
-                        self._filled_this_tab.add(lbl)
+                        self._filled_this_tab.add(f"{_sec_pk} {lbl}" if _sec_pk else lbl)
                     continue
             else:
                 # Buttons/tabs: only while NO fill work remains on this tab.
