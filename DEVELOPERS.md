@@ -81,15 +81,31 @@ Two P1-scale pieces landed early (uncommitted work from 07-07/08 sessions, commi
   clicked in the tab-strip zone (`_form_viewport_top`, applied in `_nav_fill_field` /
   `_reveal_missing_by_scroll` / `_reveal_target`; `_nav_fill_field` refuses stale-coord clicks).
 
-**Honest gaps remaining (2026-07-09):** the *flow* works and navigation waste is down;
-what's left is **field-level accuracy** and **scale**, not the core loop. Current problems:
-- **Transformer↔LLM balance** — LLM still ~50% of decisions (target <5%). Ranked arbitration
-  reduces guard-noise but the agent loop still consumes legacy dicts — the full verb-driven
-  loop (executor dispatch by predicted verb) is the remaining architecture step.
-- **A few widgets don't fill** — 50-state dropdowns + spin fields get skipped; combobox
-  dropdown sometimes fails to render at fold edges.
-- **Value quality (WHAT)** — LLM occasionally grabs the wrong intake line / wrong
-  Driver 2/3 section / false leave-blank; nondeterministic on repeat queries.
+**MILESTONE (2026-07-09 15:54): FIRST FULLY AUTONOMOUS SUBMIT on Navigation Protocol v2.**
+Complete unattended run — model-driven fills across tabs, ranked arbitration steering,
+stall-rescue jump-before-sweep, sweep terminating with dead-marks, deterministic
+verification pass, **self-pressed Submit** via the verify convergence gate. The end-to-end
+loop is closed on the semantic v2 model.
+
+**Honest gaps remaining (2026-07-09, post-milestone run review):**
+- **KEY BUG — label-collision blindness (Driver 2/3 MISSED ENTIRELY).** `_attempt_key` is
+  label-primary; 'First Name' exists 3× on the Drivers tab (Driver 1/2/3 sections). Filling
+  Driver 1's marks the bare-label key done → ranked arbitration, `_topmost_missing`, the
+  viewport jump AND the sweep dead-list all mask Driver 2/3's same-named fields as
+  already-attempted. The whole NAV mask stack is structurally blind to repeated-section
+  forms. Fix: section-qualified identity keys `(section, label)` via `_detect_section`
+  (verify's read-back is already section-aware; the masks never got it). **[NEXT]**
+- **Filling sequence fidelity** — order is noisy vs the demos (Behavioral Match 0%);
+  corpus still contains footer-button noise (clean_demos fix committed, corpus NOT
+  re-cleaned, model NOT retrained on it). Root fix = re-clean + retrain, not more logic.
+- **Viewport choice is a geometry heuristic** — densest-window jump is agent-side WHERE
+  (a crutch by the division-of-labor rule). Principled fix: anchor the jump on the model's
+  top-ranked off-screen candidate from `click_topk`, density as tiebreak.
+- **Hard widgets dead-mark instead of filling** — SpinCtrls, some checkboxes ('Homeowner'),
+  fold-edge comboboxes ('DL Issuing State'). Fix = identity-based executor (live UIA
+  resolve; ValuePattern/TogglePattern/type-to-filter; kills the stale-pixel bug class too).
+- **Transformer↔LLM balance** — LLM ~45-50% of decisions (target <5%); sweep still drove
+  Policyholder's below-fold section. Verb-driven agent loop remains open.
 - **Scale** — single record only; no automated scoring harness yet.
 See [Task List and Priority List](#task-list-and-priority-list). The scope-agnostic engine (foundation) is built;
 finishing scope #1 *correctly* builds the general muscle the other scopes reuse.
@@ -372,6 +388,10 @@ the CoT lines in `_call_openai_compat()`.
 - [x] **Real panel scrolling** — Implement UIA `ScrollPattern.Scroll` rather than mouse scrolling.
 - [x] **Checkbox TogglePattern** — Query and set checkbox state deterministically.
 - [x] **Verification pass** — Perform automated verification pass over all tabs before final Submit.
+- [ ] **Section-qualified identity keys [NEXT]** — `_attempt_key`/`_filled_this_tab`/dead-lists key on bare label → Driver 2/3 same-named fields masked as done after Driver 1 fills (whole sections missed). Qualify with `_detect_section` output; keep train-time `attempted`-feature derivation consistent.
+- [ ] **Identity-based executor** — resolve targets live by (label, control-type) via UIA; act via ValuePattern/TogglePattern/SetFocus/type-to-filter; click fresh center only as fallback. Kills SpinCtrl/checkbox/fold-combobox dead-marks AND the stale-pixel-coordinate bug class. Retires snap + stale-coord guard.
+- [ ] **Re-clean corpus + retrain semantic model** — clean_demos footer-drop fix is committed but `eight_Tabs_clean` was never regenerated; sequence noise + Print-Preview wandering trace back to the dirty corpus.
+- [ ] **Model-anchored viewport jump** — replace densest-window anchor with the model's top off-screen `click_topk` candidate (density as tiebreak) so WHERE stays with the transformer.
 - [ ] **Scroll no-ops on tabs** — Fix `ScrollPattern.Scroll` failure on Claims/History/Drivers so all below-fold fields are reached, then remove the verification "accept-after-2-tries" band-aid. *(2026-07-09: optimal-viewport jump + viewport-top fix improve reach; deep-tab scroll still unverified end-to-end.)*
 - [ ] **Hard-to-fill widgets** — Implement type-to-filter select for 50-state dropdowns and digit keystrokes/read-back for numeric SpinCtrl widgets.
 - [ ] **Value quality (LLM mapping)** — Improve label-to-record mapping and inject section keys so LLM doesn't grab incorrect intake lines or wrong sections.
