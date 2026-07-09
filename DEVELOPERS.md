@@ -87,14 +87,11 @@ stall-rescue jump-before-sweep, sweep terminating with dead-marks, deterministic
 verification pass, **self-pressed Submit** via the verify convergence gate. The end-to-end
 loop is closed on the semantic v2 model.
 
-**Honest gaps remaining (2026-07-09, post-milestone run review):**
-- **KEY BUG — label-collision blindness (Driver 2/3 MISSED ENTIRELY).** `_attempt_key` is
-  label-primary; 'First Name' exists 3× on the Drivers tab (Driver 1/2/3 sections). Filling
-  Driver 1's marks the bare-label key done → ranked arbitration, `_topmost_missing`, the
-  viewport jump AND the sweep dead-list all mask Driver 2/3's same-named fields as
-  already-attempted. The whole NAV mask stack is structurally blind to repeated-section
-  forms. Fix: section-qualified identity keys `(section, label)` via `_detect_section`
-  (verify's read-back is already section-aware; the masks never got it). **[NEXT]**
+**Honest gaps remaining (2026-07-09 evening, post label-collision fix):**
+- **Label-collision blindness — FIXED (f88d4fc), pending full-run confirmation.** Section-
+  qualified keys landed across the mask stack + transformer train-time derivation; Drivers
+  tab live-test showed D2/D3 filling with section-correct values via the new identity
+  executor. End-to-end acceptance run on v3 is the remaining gate.
 - **Filling sequence fidelity** — order is noisy vs the demos (Behavioral Match 0%);
   corpus still contains footer-button noise (clean_demos fix committed, corpus NOT
   re-cleaned, model NOT retrained on it). Root fix = re-clean + retrain, not more logic.
@@ -388,10 +385,12 @@ the CoT lines in `_call_openai_compat()`.
 - [x] **Real panel scrolling** — Implement UIA `ScrollPattern.Scroll` rather than mouse scrolling.
 - [x] **Checkbox TogglePattern** — Query and set checkbox state deterministically.
 - [x] **Verification pass** — Perform automated verification pass over all tabs before final Submit.
-- [ ] **Section-qualified identity keys [NEXT]** — `_attempt_key`/`_filled_this_tab`/dead-lists key on bare label → Driver 2/3 same-named fields masked as done after Driver 1 fills (whole sections missed). Qualify with `_detect_section` output; keep train-time `attempted`-feature derivation consistent.
-- [ ] **Identity-based executor** — resolve targets live by (label, control-type) via UIA; act via ValuePattern/TogglePattern/SetFocus/type-to-filter; click fresh center only as fallback. Kills SpinCtrl/checkbox/fold-combobox dead-marks AND the stale-pixel-coordinate bug class. Retires snap + stale-coord guard.
-- [ ] **Re-clean corpus + retrain semantic model** — clean_demos footer-drop fix is committed but `eight_Tabs_clean` was never regenerated; sequence noise + Print-Preview wandering trace back to the dirty corpus.
-- [ ] **Model-anchored viewport jump** — replace densest-window anchor with the model's top off-screen `click_topk` candidate (density as tiebreak) so WHERE stays with the transformer.
+- [x] **Section-qualified identity keys** *(2026-07-09, f88d4fc — live-verified on Drivers tab: D2/D3 sections fill; sweep section-corrects wrong-section values; per-element fail counters killed the 15× dead-mark loop. Keys use raw `section_*` pane labels (geometry), NOT ScopeConfig — must not silently degrade to the colliding bare label.)*
+- [~] **Identity-based executor** *(2026-07-09, f88d4fc — `_resolve_live_control` + `_act_on_element` built, routed through `_nav_fill_field`, live-verified: a dozen ValuePattern fills on Drivers. REMAINING: route the OPT2 fill path + verify-fixes through it; then retire snap/stale-coord guard + pixel visibility checks.)*
+- [x] **Re-clean corpus + retrain semantic model** *(2026-07-09 — `eight_Tabs_clean2`, v3: click_acc 0.945, src_acc ~0.85, val_acc 0.758, section-aware `attempted`.)*
+- [x] **Model-anchored viewport jump** *(2026-07-09, f88d4fc — anchor = model's top off-screen `click_topk` candidate, density fallback; unit-verified all three cases.)*
+- [ ] **FULL ACCEPTANCE RUN on v3 [NEXT — gate for the above]** — one uninterrupted run, tab 0 → Submit, judged against the five 2026-07-09 complaints. Every fix above is live-verified only in fragments; the end-to-end claim is open until this passes.
+- [ ] **Section-aware eval scorer** — `eval_metrics`/`bc_fidelity` compare typed values against bare-label expectations → Driver 2/3 correct fills scored as wrong (F8821047 vs D1's DL). Measurement-only bug, misleading reports.
 - [ ] **Scroll no-ops on tabs** — Fix `ScrollPattern.Scroll` failure on Claims/History/Drivers so all below-fold fields are reached, then remove the verification "accept-after-2-tries" band-aid. *(2026-07-09: optimal-viewport jump + viewport-top fix improve reach; deep-tab scroll still unverified end-to-end.)*
 - [ ] **Hard-to-fill widgets** — Implement type-to-filter select for 50-state dropdowns and digit keystrokes/read-back for numeric SpinCtrl widgets.
 - [ ] **Value quality (LLM mapping)** — Improve label-to-record mapping and inject section keys so LLM doesn't grab incorrect intake lines or wrong sections.
