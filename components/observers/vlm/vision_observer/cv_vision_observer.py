@@ -113,12 +113,66 @@ class CVVisionObserver(Observer):
             if ox or oy:
                 x1, y1, x2, y2 = e["bbox"]
                 e["bbox"] = [x1 + ox, y1 + oy, x2 + ox, y2 + oy]
+        # IDENTITY TRACKING: detection order shifts frame-to-frame, so raw
+        # cvNNNN ids name DIFFERENT physical fields in consecutive frames —
+        # the validator's before/after value compare, focus inference and
+        # is_filled continuity all silently break (live 2026-07-10: typed
+        # into 'Agent Name', validator compared the box that inherited the
+        # id and reported '' → 'Active'). Match each element to the previous
+        # frame by label + geometry and carry the id over.
+        self._track_ids(elements)
         return {
             "elements":           elements,
             "screen_resolution":  [W, H],
             "focused_element_id": None,    # pixels don't expose focus; agent infers
             "source":             self.source_name,
         }
+
+    _TRACK_MAX_DIST = 80.0        # px: max center drift to still be "the same field"
+
+    def _track_ids(self, elements) -> None:
+        """Stable element identity across frames: same (type, label) + nearest
+        bbox center inherits the previous frame's element_id. Unmatched
+        elements keep their fresh detector id (made globally unique). Parser-
+        agnostic — works on top of any detector that emits label+bbox."""
+        prev = getattr(self, "_prev_elements", None)
+        self._id_seq = getattr(self, "_id_seq", 0)
+        if prev:
+            # index previous frame by (type, label)
+            buckets: Dict[Tuple[str, str], list] = {}
+            for p in prev:
+                key = ((p.get("type") or "").lower(),
+                       (p.get("label") or p.get("text") or "").strip().lower())
+                buckets.setdefault(key, []).append(p)
+            claimed = set()
+            for e in elements:
+                key = ((e.get("type") or "").lower(),
+                       (e.get("label") or e.get("text") or "").strip().lower())
+                cands = buckets.get(key)
+                if not cands:
+                    continue
+                eb = e["bbox"]
+                ecx, ecy = (eb[0] + eb[2]) / 2, (eb[1] + eb[3]) / 2
+                best, best_d = None, self._TRACK_MAX_DIST ** 2
+                for p in cands:
+                    if id(p) in claimed:
+                        continue
+                    pb = p["bbox"]
+                    d = ((pb[0] + pb[2]) / 2 - ecx) ** 2 + ((pb[1] + pb[3]) / 2 - ecy) ** 2
+                    if d < best_d:
+                        best, best_d = p, d
+                if best is not None:
+                    claimed.add(id(best))
+                    e["element_id"] = best["element_id"]
+        # Any element that did NOT inherit a previous id gets a fresh
+        # run-unique one — raw detector ids (cvNNNN) restart every frame and
+        # would collide across frames while naming different fields.
+        inherited = ({p["element_id"] for p in prev} if prev else set())
+        for e in elements:
+            if e["element_id"] not in inherited:
+                self._id_seq += 1
+                e["element_id"] = f"v{self._id_seq:05d}"
+        self._prev_elements = [dict(e, bbox=list(e["bbox"])) for e in elements]
 
     _TYPE_TINT = {
         "editcontrol": (80, 200, 255), "comboboxcontrol": (255, 200, 90),
