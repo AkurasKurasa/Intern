@@ -426,9 +426,20 @@ this list on every guardianship sweep. The priority-table overlay in the tree ma
   - [ ] **Vision: window-chrome phantoms** — caption-bar buttons detected as checkboxes; agent
     clicked (1890,20) next to the CLOSE button. Fix: exclude the captured window's caption band
     from detection (generic: title-bar height, not pixels).
-  - [ ] **Vision: no combobox typing** — dropdowns detected as edits (0 comboboxcontrol on a
-    tab with 3); per-type fill mechanics pick the wrong path. Fix: detect the dropdown arrow
-    glyph / right-edge button in cv_detector.
+  - [~] **Vision: no combobox typing** — dropdowns detected as edits (0 comboboxcontrol on a
+    tab with 3); per-type fill mechanics pick the wrong path. Arrow-glyph heuristic added
+    2026-07-10 (unverified live — arrows were outside the test capture).
+  - [x] **Vision: focus inference** *(2026-07-10, 424beea — agent stamps last clicked fillable
+    as focus when the observer reports none; first pixel-driven fill live-verified.)*
+  - [x] **Vision: label fragmentation** *(2026-07-10, 424beea — whole-line label assembly via
+    Tesseract line structure + punctuation cleanup; all 10 Tab-1 labels read whole/exact.)*
+  - [x] **Vision: window-chrome phantoms** *(2026-07-10, 424beea — client-area capture.)*
+  - [ ] **Vision REAL FIX: learned screen parser** — the classical detector needs a heuristic
+    per widget style and will never generalize. Replace cv_detector's core with a pretrained
+    screen-parsing model (OmniParser-class, local ONNX; evaluate ShowUI/UGround) behind the
+    same `detect_elements()` seam; Tesseract stays for values; acceptance = `perception_eval`
+    beats the classical baseline. Remaining classical gaps meanwhile: value read-back
+    association at capture edges, occlusion detection.
   - [ ] Research grounding stacks: Compare OS-World, ShowUI, Microsoft Computer Use, or custom-trained VLM models for grounding.
   - [ ] Modularize Observer input: Ensure screenshot capturing and OCR fallback are decoupled from the accessibility tree, producing identical canonical element representations.
   - [ ] VLM Prompt Engineering: Construct prompt templates that map coordinate grids to semantic labels for the target application.

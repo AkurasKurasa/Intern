@@ -111,6 +111,8 @@ const TREE = {
           note: "Caption-bar buttons detected as checkboxes — the agent clicked 2px from CLOSE. DO: exclude the captured window's title-bar band from detection (by caption height, not pixels)." },
         { title: "It tells dropdowns from text fields", status: "pending",
           note: "0 comboboxes detected on a tab with 3 → wrong fill mechanics chosen. DO: detect the dropdown arrow glyph at the right edge of the box." },
+        { id: "vision-parser", title: "Real fix: learned screen parser replaces hand-rolled CV", status: "pending",
+          note: "The classical detector needs a new heuristic per widget style — it will never generalize (guard-pile anti-pattern, perception edition). DO: swap cv_detector's core for a pretrained screen-parsing model (OmniParser-class, local ONNX; evaluate ShowUI/UGround) behind the SAME detect_elements() seam; keep Tesseract for values; accept when perception_eval beats the classical baseline on precision/recall + label accuracy." },
         { title: "Vision demos recorded + vision model trained", status: "pending",
           deps: ["vision-focus", "vision-labels"],
           note: "DO (after the two blockers): record with --perception vision, clean, train — the model that needs no accessibility tree at all." },
