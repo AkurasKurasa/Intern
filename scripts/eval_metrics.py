@@ -502,8 +502,32 @@ def evaluate_run(results: list[dict], goal: str = "", heuristic_steps: int = 0) 
     apa = on_target / total_clicks if total_clicks else 0.0
     esr = succeeded / actionable   if actionable   else 0.0
 
-    # Value accuracy — compare typed values against source record
-    typed_values: list[tuple[str, str]] = []  # (label, typed_text)
+    # Value accuracy — compare typed values against source record.
+    # SECTION-AWARE: 'DL Number' exists once per driver section; matching by
+    # bare label scored Driver 2/3's CORRECT fills against Driver 1's values
+    # (observed 2026-07-09/10 — every D2/D3 fill reported ✗ while the form
+    # held the right value). Capture the field's section (lowest 'section_*'
+    # pane whose top is above the field's center — same geometry as the
+    # agent's identity keys) and prefer a section-qualified source match.
+    def _section_words(state: dict, elem: dict) -> list[str]:
+        if not elem.get("bbox"):
+            return []
+        cy = (elem["bbox"][1] + elem["bbox"][3]) / 2
+        best, best_top = "", None
+        for p in state.get("elements", []):
+            if (p.get("type") or "").lower() not in ("panecontrol", "pane"):
+                continue
+            if p.get("window_role") == "background" or not p.get("bbox"):
+                continue
+            pl = (p.get("label") or p.get("text") or "").strip().lower()
+            if not pl.startswith("section_"):
+                continue
+            if p["bbox"][1] <= cy and (best_top is None or p["bbox"][1] > best_top):
+                best, best_top = pl, p["bbox"][1]
+        # 'section_driver_2' -> ['driver', '2']
+        return [w for w in best.removeprefix("section_").replace("_", " ").split() if w]
+
+    typed_values: list[tuple[str, str, list[str]]] = []  # (label, typed_text, section_words)
     for r in results:
         action = r.get("action", {})
         if action.get("action_type") != "keyboard":
@@ -517,7 +541,7 @@ def evaluate_run(results: list[dict], goal: str = "", heuristic_steps: int = 0) 
             if e.get("element_id") == fid:
                 label = (e.get("label") or e.get("text") or "").strip()
                 if label:
-                    typed_values.append((label, text))
+                    typed_values.append((label, text, _section_words(state, e)))
                 break
 
     source_record: dict[str, str] = {}
@@ -528,7 +552,7 @@ def evaluate_run(results: list[dict], goal: str = "", heuristic_steps: int = 0) 
         if records:
             # Infer which record was being filled by finding the best-matching record
             # (most typed values present in that record's values).
-            typed_set = {v.strip().lower() for _, v in typed_values}
+            typed_set = {v.strip().lower() for _, v, _sw in typed_values}
             best_idx, best_hits = min(records), -1
             for rec_num, rec in records.items():
                 hits = sum(
@@ -545,11 +569,23 @@ def evaluate_run(results: list[dict], goal: str = "", heuristic_steps: int = 0) 
     correct_values = 0
     wrong_values   = 0
     value_rows: list[str] = []
-    for label, typed in typed_values:
-        expected = source_record.get(label.lower(), "")
+    for label, typed, sec_words in typed_values:
+        words = label.lower().split()
+        expected = ""
+        # 1) SECTION-QUALIFIED match first: a source key containing both the
+        #    section words ('driver 2') and the label words ('dl number').
+        if sec_words:
+            for k, v in source_record.items():
+                if all(w in k for w in sec_words) and all(w in k for w in words):
+                    expected = v
+                    break
+        # 2) bare-label fallback. Safe even for sectioned fields: repeated
+        #    labels (the dangerous case) are resolved by rule 1 first; unique
+        #    labels under generic sections ('section_policy_information')
+        #    NEED this path — their source keys carry no section prefix.
         if not expected:
-            # fuzzy: check if any source key contains the label words
-            words = label.lower().split()
+            expected = source_record.get(label.lower(), "")
+        if not expected:
             for k, v in source_record.items():
                 if all(w in k for w in words):
                     expected = v
