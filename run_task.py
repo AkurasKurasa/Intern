@@ -53,8 +53,9 @@ if os.path.exists(_env_path):
                 os.environ.setdefault(_k.strip(), _v.strip())
 
 # Enable ANSI colour on the Windows console (VT processing), so logs aren't the
-# default red-on-stderr. Then send logs to STDOUT (PowerShell paints stderr red)
-# and colour them green.
+# default red-on-stderr. Then send logs to STDOUT (PowerShell paints stderr red):
+# white text, with a green divider line before every "── Step N/M" header so
+# steps read as visually separate blocks.
 try:
     import ctypes as _ct
     _k = _ct.windll.kernel32
@@ -62,12 +63,29 @@ try:
 except Exception:
     pass
 
+
+class _RunFormatter(logging.Formatter):
+    _DIV = "\x1b[32m" + "─" * 78 + "\x1b[0m"
+
+    def format(self, record):
+        line = "\x1b[97m" + super().format(record) + "\x1b[0m"
+        try:
+            if "── Step " in record.getMessage():
+                line = f"{self._DIV}\n{line}"
+        except Exception:
+            pass
+        return line
+
+
 logging.basicConfig(
-    format="\x1b[32m[%(asctime)s] [%(levelname)s] %(name)s — %(message)s\x1b[0m",
+    format="[%(asctime)s] [%(levelname)s] %(name)s — %(message)s",
     datefmt="%H:%M:%S",
     level=logging.INFO,
     stream=_sys_enc.stdout,      # stdout, not stderr → no red
 )
+for _h in logging.getLogger().handlers:
+    _h.setFormatter(_RunFormatter("[%(asctime)s] [%(levelname)s] %(name)s — %(message)s",
+                                  datefmt="%H:%M:%S"))
 logger = logging.getLogger("run_task")
 
 # ── config ────────────────────────────────────────────────────────────────────

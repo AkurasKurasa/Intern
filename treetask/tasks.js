@@ -20,10 +20,9 @@ const TREE = {
         {
           id: "acceptance-run",
           title: "One record, end to end, hands off",
-          status: "next",
-          priority: 1,
+          status: "done",
           deps: ["v3-model", "sections-work", "widgets-fill"],
-          note: "THE GATE. One uninterrupted run: tab 0 → all 8 tabs → verify → Submit, zero human touches. Everything below is 'probably works' until this passes. (First autonomous Submit happened 2026-07-09 on v2; v3 + this week's fixes have never run to the finish line together.)",
+          note: "THE GATE — PASSED 2026-07-10 evening. One uninterrupted run on v3: tab 0 → all 8 tabs → verify → autonomous Submit, zero human touches, whole week's stack live together. Earlier same-evening attempt wedged in the jump ping-pong (~step 180, Drivers); density gate + viewport lock + far-field reveal landed, rerun submitted. Caveat: metrics block not archived — capture the scorecard on the next run.",
         },
         {
           id: "trust-numbers",
@@ -60,7 +59,7 @@ const TREE = {
           note: "Today the LLM assists ~45-50% of steps. The thesis claim needs the TRAINED policy driving nearly everything; LLM = values only.",
           children: [
             { title: "Navigation: fill batch → jump to densest work → repeat", status: "done",
-              note: "Navigation Protocol v2: model's own ranked targets, visible-first; viewport jumps anchored on the model's next pick. Replaced the guard pile." },
+              note: "Navigation Protocol v2: model's own ranked targets, visible-first; viewport jumps anchored on the model's next pick. Replaced the guard pile.\n\nPing-pong regression (2026-07-10, two anchors alternating 14 jumps / zero fills) fixed same day and CONFIRMED by the passing acceptance run: density gate + viewport lock (no re-jump since last progress) + far-field reveal (focus the window's far-side field — whole window on screen in one SetFocus, no ScrollPattern). Offline probe: scratch/probe_jump_pingpong.py (5/5)." },
             { title: "Model speaks in intents, not raw clicks", status: "done",
               note: "Universal Semantic Action Space: verbs (set-value/toggle/select/…) + split pointer heads. v2 beat baseline 0.957 vs 0.878." },
             { id: "verb-loop", title: "Agent acts on the model's intents directly", status: "pending",

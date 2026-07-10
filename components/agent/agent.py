@@ -5735,6 +5735,7 @@ class LLMAgent:
             return None
         empties.sort(key=lambda e: (e["bbox"][1] + e["bbox"][3]) / 2)
         ys = [(e["bbox"][1] + e["bbox"][3]) / 2 for e in empties]
+        vis_now = sum(1 for e in empties if e["bbox"][1] >= vt and e["bbox"][3] <= vb)
 
         # ── MODEL ANCHOR: highest-ranked off-screen actionable empty ─────────
         anchor = None
@@ -5755,8 +5756,17 @@ class LLMAgent:
                 _mcy = (_me["bbox"][1] + _me["bbox"][3]) / 2
                 if vt <= _mcy <= vb:
                     continue                       # on-screen → not jump territory
+                # DENSITY GATE: the jump's contract ("no-op when the current
+                # view is already the densest available") must hold on THIS
+                # branch too, not just the geometry fallback — a model pick
+                # whose window is no denser than what's on screen produced the
+                # live ping-pong (jumped to a 1-empty window while 2 empties
+                # were visible, then back, forever).
+                _cnt = sum(1 for y in ys if _mcy <= y <= _mcy + (H - 60))
+                if _cnt <= vis_now:
+                    continue
                 anchor = _me
-                best_cnt = sum(1 for y in ys if _mcy <= y <= _mcy + (H - 60))
+                best_cnt = _cnt
                 logger.info("[NAV] jump anchored on MODEL's pick %r (rank hit, %d empties ride along).",
                             (_me.get("label") or _me.get("text") or "?")[:28], best_cnt)
                 break
@@ -5773,32 +5783,50 @@ class LLMAgent:
                 if i - j > best_cnt:
                     best_cnt, best_j = i - j, j
             # already optimal? (as many empties visible as the best window holds)
-            vis_now = sum(1 for e in empties if e["bbox"][1] >= vt and e["bbox"][3] <= vb)
             if vis_now >= best_cnt:
                 return None
             anchor = empties[best_j]
         albl = (anchor.get("label") or anchor.get("text") or "").strip()
-        # LOOP-BREAKER: the same anchor twice in a row means the last jump
-        # produced no progress (anchor focused but nothing filled — e.g. a
-        # widget type the fill path can't act on). Mark it attempted so the
-        # window recomputes without it, instead of jumping forever (observed
-        # live: 'Cylinders' anchored 6 identical jumps).
+        # LOOP-BREAKER (viewport lock): EVERY anchor jumped-to since the last
+        # real progress is remembered, not just the previous one — a single-
+        # slot memory catches A→A→A but is blind to the A→B→A→B ping-pong
+        # (observed live 2026-07-10: 'DL Issuing State' ↔ 'Accidents (3 yr)',
+        # 14 alternating jumps, zero fills). Re-jumping to ANY window already
+        # visited without a fill in between = no progress → burn that anchor
+        # and re-pick. The set is cleared the moment the ranked picker finds
+        # actionable work, so legitimate revisits after progress stay allowed.
         _ak = self._attempt_key(anchor)
-        if getattr(self, "_last_jump_anchor", None) == _ak:
-            logger.warning("[NAV] jump anchor %r repeated with no progress — marking attempted, re-picking.",
+        _seen = getattr(self, "_jump_anchors_since_progress", None)
+        if _seen is None:
+            _seen = self._jump_anchors_since_progress = set()
+        if _ak in _seen:
+            logger.warning("[NAV] jump anchor %r already visited with no progress since — marking attempted, re-picking.",
                            albl[:28])
             self._mark_attempted(anchor)
-            self._last_jump_anchor = None
             return self._optimal_viewport_jump(self._observe())
-        self._last_jump_anchor = _ak
+        _seen.add(_ak)
         logger.info("[NAV] optimal-viewport jump → window with %d empty fields, anchor %r.",
                     best_cnt, albl[:28])
-        if not self._scroll_into_view(albl):
+        # FAR-FIELD REVEAL: wx SetFocus auto-scroll parks the focused field at
+        # the NEAR edge, so focusing the anchor exposes the anchor ALONE — and
+        # when ScrollPattern paging no-ops (deep tabs, known P0), the promised
+        # window never comes on screen: jump lands → "all candidates masked" →
+        # re-jump → the lock burns real fields (live 2026-07-10 22:43/22:49).
+        # Instead focus the field on the FAR side of the travel direction:
+        # jumping DOWN → the window's bottom-most empty (lands at the bottom
+        # edge, the whole window above rides in with it); jumping UP → the
+        # anchor itself (lands at the top edge, window below rides in). Pure
+        # geometry + SetFocus — no ScrollPattern dependency at all.
+        _acy = (anchor["bbox"][1] + anchor["bbox"][3]) / 2
+        _wnd = [e for e in empties
+                if _acy <= (e["bbox"][1] + e["bbox"][3]) / 2 <= _acy + (H - 60)]
+        reveal = anchor
+        if _acy >= vt and _wnd:                    # travelling down → far = bottom
+            reveal = max(_wnd, key=lambda e: (e["bbox"][1] + e["bbox"][3]) / 2)
+        rlbl = (reveal.get("label") or reveal.get("text") or "").strip()
+        if not self._scroll_into_view(rlbl or albl):
             return None
         time.sleep(self.step_delay * 0.4)
-        # park the anchor at the top edge so the whole dense window is on screen
-        _acy = (anchor["bbox"][1] + anchor["bbox"][3]) / 2
-        self._maximize_reveal(went_down=_acy >= vt)
         return self._observe()
 
     def _maximize_reveal(self, went_down: bool = True, max_pages: int = 3) -> None:
@@ -6823,9 +6851,9 @@ class LLMAgent:
                 # Fill first; press buttons / advance tabs when the page is done.
                 if self._topmost_missing(state) is not None:
                     continue
-            # actionable work found → any later jump re-using the previous
-            # anchor is legitimate again (progress happened in between)
-            self._last_jump_anchor = None
+            # actionable work found → the viewport lock releases: anchors
+            # visited before this progress become legitimate jump targets again
+            self._jump_anchors_since_progress = set()
             return e, [float(pos[0]), float(pos[1])], conf
         return None
 

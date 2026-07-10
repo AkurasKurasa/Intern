@@ -87,11 +87,22 @@ stall-rescue jump-before-sweep, sweep terminating with dead-marks, deterministic
 verification pass, **self-pressed Submit** via the verify convergence gate. The end-to-end
 loop is closed on the semantic v2 model.
 
-**Honest gaps remaining (2026-07-09 evening, post label-collision fix):**
-- **Label-collision blindness — FIXED (f88d4fc), pending full-run confirmation.** Section-
-  qualified keys landed across the mask stack + transformer train-time derivation; Drivers
-  tab live-test showed D2/D3 filling with section-correct values via the new identity
-  executor. End-to-end acceptance run on v3 is the remaining gate.
+**MILESTONE (2026-07-10 evening): THE GATE PASSED — full uninterrupted acceptance run on
+v3 submits end-to-end.** One hands-off run: tab 0 → all tabs → verify → autonomous Submit,
+zero human touches, on `model_eight_tabs_semantic_v3.pt` with the whole week's stack live
+together for the first time (section-qualified keys, identity executor, ranked arbitration,
+model-anchored jump + the same-day ping-pong fixes: density gate, viewport lock,
+far-field reveal). The run earlier the same evening wedged in a two-anchor jump ping-pong
+at ~step 180 (Drivers); the fixes landed and the rerun went to Submit. CAVEATS (honest):
+the run's metrics block was not archived — capture the scorecard on the next run; the five
+2026-07-09 complaints are validated wholesale (run completed) but not itemized against the
+per-complaint numbers yet.
+
+**Honest gaps remaining (2026-07-10 evening, post acceptance run):**
+- **Acceptance-run scorecard not archived** — the passing run's metrics block wasn't saved;
+  next run must capture Task Completion / Field Match / LLM% so the milestone has numbers.
+- **Label-collision blindness — FIXED (f88d4fc) and now full-run confirmed** (acceptance
+  run submitted end-to-end with section-qualified keys live).
 - **Filling sequence fidelity** — order is noisy vs the demos (Behavioral Match 0%);
   corpus still contains footer-button noise (clean_demos fix committed, corpus NOT
   re-cleaned, model NOT retrained on it). Root fix = re-clean + retrain, not more logic.
@@ -397,7 +408,8 @@ this list on every guardianship sweep. The priority-table overlay in the tree ma
 - [~] **Identity-based executor** *(2026-07-09, f88d4fc — `_resolve_live_control` + `_act_on_element` built, routed through `_nav_fill_field`, live-verified: a dozen ValuePattern fills on Drivers. REMAINING: route the OPT2 fill path + verify-fixes through it; then retire snap/stale-coord guard + pixel visibility checks.)*
 - [x] **Re-clean corpus + retrain semantic model** *(2026-07-09 — `eight_Tabs_clean2`, v3: click_acc 0.945, src_acc ~0.85, val_acc 0.758, section-aware `attempted`.)*
 - [x] **Model-anchored viewport jump** *(2026-07-09, f88d4fc — anchor = model's top off-screen `click_topk` candidate, density fallback; unit-verified all three cases.)*
-- [ ] **FULL ACCEPTANCE RUN on v3 [NEXT — gate for the above]** — one uninterrupted run, tab 0 → Submit, judged against the five 2026-07-09 complaints. Every fix above is live-verified only in fragments; the end-to-end claim is open until this passes.
+- [x] **Viewport-jump ping-pong (lock until progress + far-field reveal)** *(FOUND 2026-07-10 acceptance attempt, step ~180 Drivers: two anchors — 'DL Issuing State' ↔ 'Accidents (3 yr)' — alternated 14 jumps, zero fills, run wedged. THREE holes, fixed in two passes same day: (1) model-anchor branch skipped the "already densest" gate the fallback has — jumped to a 1-empty window with 2 empties visible → density gate added; (2) loop-breaker was single-slot (`_last_jump_anchor`) — caught A→A, blind to A→B→A → viewport lock `_jump_anchors_since_progress` set (no re-jump to ANY anchor visited since last progress; clears when the ranked picker finds work); (3) ROOT of the blind landings: wx SetFocus reveals the anchor at the NEAR edge and `_maximize_reveal`'s ScrollPattern paging no-ops on deep tabs (the known P0 scroll bug) → promised window never comes on screen → "all candidates masked" → re-jump, lock burning REAL fields as collateral. FIX: far-field reveal — jump focuses the window's far-side field (down → bottom-most empty; up → the anchor), wx exposes the whole window in ONE SetFocus, ScrollPattern dependency removed from the jump entirely. Offline probe `scratch/probe_jump_pingpong.py` passes all 5 cases; CONFIRMED by the passing acceptance run same evening.)*
+- [x] **FULL ACCEPTANCE RUN on v3 [PASSED 2026-07-10 evening]** — one uninterrupted run, tab 0 → all tabs → verify → autonomous Submit, zero touches, whole week's stack live together. The end-to-end claim on v3 is closed. *(Caveat: metrics block not archived — capture the scorecard next run. NEXT gate = Multi-record ×5.)*
 - [~] **Section-aware eval scorer** — `eval_metrics` FIXED 2026-07-10 (41cff4c): section-first
   value matching via pane geometry (same partition as agent identity keys); D2/D3 fills now
   scored against their own values. REMAINING: audit `bc_fidelity`'s gold-key matching for the
@@ -406,7 +418,7 @@ this list on every guardianship sweep. The priority-table overlay in the tree ma
 - [ ] **Hard-to-fill widgets** — Implement type-to-filter select for 50-state dropdowns and digit keystrokes/read-back for numeric SpinCtrl widgets.
 - [ ] **Value quality (LLM mapping)** — Improve label-to-record mapping and inject section keys so LLM doesn't grab incorrect intake lines or wrong sections.
 - [ ] **Deterministic verification polish** — Remove verification band-aids, cut per-field LLM reasoning calls, and speed up the validation pass.
-- [ ] **Multi-record scaling (×5)** — Implement automated record advance, per-record data refresh, and reset loops for all 5 records.
+- [ ] **Multi-record scaling (×5) [NEXT — the scope's Definition of Done]** — Implement automated record advance, per-record data refresh, and reset loops for all 5 records. Unblocked by the passed acceptance run; pair the first ×5 attempt with an archived scorecard per record.
 - [ ] **Automate scoring harness** — Extend `scripts/bc_fidelity.py` to report blank fields, print full breakdowns, save scorecards, and fix Unicode print issues (do before fixing correctness).
 - [ ] **Strip WHERE-crutches** (Stage 2.5) — Remove agent-side navigation helpers (`_try_advance_tab`, `_focus_first_empty_field`, auto-advance-at-bottom) to let the transformer navigate fully. *(2026-07-09: ranked arbitration replaces several crutches at the source — WHERE stays the model's own ranking, agent only legality-filters; M2 + stranding guard deleted rather than added-to.)*
 - [ ] **Close ruleset-inference loop** — Fix `_compress_session` to decode new trace format and capture notepad/source values to infer skip/leave-blank rules.
@@ -616,6 +628,25 @@ aggregate → retrain → repeat. Labeling is the only real choice:
 ## Finished Tasks
 
 Completed work and solved problems, preserved for reference.
+
+### THE GATE: v3 Acceptance Run Passed (2026-07-10 evening)
+- **Full uninterrupted acceptance run on v3 SUBMITTED end-to-end** — tab 0 → all tabs →
+  verify → autonomous Submit, zero human touches. First time the whole week's stack ran
+  to the finish line together: section-qualified identity keys, identity executor, ranked
+  arbitration, model-anchored viewport jump, verify convergence gate.
+- **Viewport-jump ping-pong killed same day** (the run earlier that evening wedged ~step 180,
+  Drivers, two anchors alternating 14 jumps / zero fills). Three-layer fix, offline-probed
+  (`scratch/probe_jump_pingpong.py`, 5/5) then confirmed by the passing run:
+  density gate on the model-anchor branch; viewport lock (`_jump_anchors_since_progress` —
+  no re-jump to any anchor visited since last progress); **far-field reveal** (jump focuses
+  the chosen window's far-side field, wx exposes the whole window in one SetFocus —
+  ScrollPattern dependency deleted from the jump; it was silently no-oping on deep tabs and
+  causing every blind landing).
+- **Console log readability** — white log text, green divider between steps (run_task
+  `_RunFormatter`).
+- LESSON: "jump promised N fields, landed on none" = the reveal mechanic, not the picker —
+  wx SetFocus reveals at the NEAR edge, so whoever scrolls must aim at the FAR side of the
+  window they want on screen.
 
 ### Universal Semantic Action Space + Navigation Protocol v2 (2026-07-07 → 07-09)
 - **Semantic Action Space core.** Verb vocabulary + `SemanticAction` dataclass with legacy
