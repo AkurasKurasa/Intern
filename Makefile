@@ -4,11 +4,11 @@
 PYTHON     ?= python
 TRACE_DIR  ?= data/demos/eight_Tabs_clean
 MODEL      ?= tasks/form_filling/model_eight_tabs.pt
-SEM_MODEL  ?= tasks/form_filling/model_eight_tabs_semantic_v2.pt
+SEM_MODEL  ?= tasks/form_filling/model_eight_tabs_semantic_v3.pt
 EPOCHS     ?= 80
 START_TAB  ?= 0
 
-.PHONY: help record clean-demos train train-semantic run run-semantic form test tree
+.PHONY: help record clean-demos train train-semantic run run-semantic run-vision form test tree see
 
 help:               ## show this list
 	@grep -E "^[a-zA-Z_-]+:.*?## " Makefile | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  make %-16s %s\n", $$1, $$2}'
@@ -39,3 +39,9 @@ test:               ## run the test suite
 
 tree:               ## open the treetask project-management tree in the browser
 	start "" treetask/index.html
+
+see:                ## live monitor of what the vision observer sees (run beside a --perception vision run)
+	$(PYTHON) scripts/vision_live_view.py
+
+run-vision:         ## run the agent on VISION perception with the live-frame dump on
+	cmd /c "set VISION_DEBUG_DIR=scratch\vision_frames&& $(PYTHON) run_task.py --model $(SEM_MODEL) --perception vision --start_tab $(START_TAB)"

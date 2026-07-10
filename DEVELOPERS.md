@@ -411,7 +411,24 @@ this list on every guardianship sweep. The priority-table overlay in the tree ma
 ---
 
 ### 🟢 P1 — Generalize (Post Scope #1 Completion)
-- [ ] **Perception: Accessibility Tree → Vision**
+- [~] **Perception: Accessibility Tree → Vision** *(component landed via PR #8: CV+OCR observer,
+  drop-in via the observer seam, works across all 8 tabs; `--perception vision` wired into
+  record/run; debug flipbook + live viewer (`make see`) added 2026-07-10. First live agent probe
+  (2026-07-10): navigation works from pixels, 0 fields filled — gaps below.)*
+  - [ ] **Vision: focus inference [BLOCKER for vision fills]** — pixels expose no keyboard focus →
+    `focused_element_id` is always None → the OPT2 fill trigger ("focused empty field") never
+    fires → agent navigates but never types. Fix: agent-side inferred focus (last clicked
+    fillable) when the observer reports None, or visual caret/highlight detection.
+  - [ ] **Vision: label fragmentation** — OCR splits/mangles labels ('Policy Number' → 'Number',
+    '| (Renewal Policy ()Paperles'); record lookup + sweep proposals + UIA name cross-check all
+    miss. One clean label ('Underwriter') filled fine via the identity executor — label quality
+    IS the fill rate. Fix: merge adjacent word boxes per row in cv_detector; strip punct noise.
+  - [ ] **Vision: window-chrome phantoms** — caption-bar buttons detected as checkboxes; agent
+    clicked (1890,20) next to the CLOSE button. Fix: exclude the captured window's caption band
+    from detection (generic: title-bar height, not pixels).
+  - [ ] **Vision: no combobox typing** — dropdowns detected as edits (0 comboboxcontrol on a
+    tab with 3); per-type fill mechanics pick the wrong path. Fix: detect the dropdown arrow
+    glyph / right-edge button in cv_detector.
   - [ ] Research grounding stacks: Compare OS-World, ShowUI, Microsoft Computer Use, or custom-trained VLM models for grounding.
   - [ ] Modularize Observer input: Ensure screenshot capturing and OCR fallback are decoupled from the accessibility tree, producing identical canonical element representations.
   - [ ] VLM Prompt Engineering: Construct prompt templates that map coordinate grids to semantic labels for the target application.

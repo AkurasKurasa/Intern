@@ -125,10 +125,16 @@ if __name__ == "__main__":
         import win32gui
         from observers.vlm.vision_observer.cv_vision_observer import CVVisionObserver
         _hwnd = win32gui.GetForegroundWindow()
-        _l, _t, _r, _b = win32gui.GetWindowRect(_hwnd)
-        _observer = CVVisionObserver(region=(_l, _t, _r - _l, _b - _t), origin=(_l, _t))
-        logger.info("Perception: VISION (CV+OCR) — window %r rect=%s",
-                    win32gui.GetWindowText(_hwnd), (_l, _t, _r, _b))
+        # Capture the CLIENT AREA, not the window rect: the rect includes the
+        # title bar/frame, and the CV detector boxed the caption buttons as
+        # "checkboxes" — the agent clicked 2px from CLOSE (live, 2026-07-10).
+        # Client-area capture is generic (no pixel constants) and excludes all
+        # window chrome by definition.
+        _cl, _ct = win32gui.ClientToScreen(_hwnd, (0, 0))
+        _, _, _cw, _ch = win32gui.GetClientRect(_hwnd)
+        _observer = CVVisionObserver(region=(_cl, _ct, _cw, _ch), origin=(_cl, _ct))
+        logger.info("Perception: VISION (CV+OCR) — window %r client=%s",
+                    win32gui.GetWindowText(_hwnd), (_cl, _ct, _cw, _ch))
         logger.info("Backends: %s", CVVisionObserver.backend_status())
     else:
         logger.info("Perception: UIA (accessibility tree)")

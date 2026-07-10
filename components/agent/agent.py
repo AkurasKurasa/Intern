@@ -2753,6 +2753,20 @@ class LLMAgent:
             result = self._executor.execute(prediction)
             logger.info("%s", result)
 
+            # FOCUS INFERENCE (vision perception): pixels expose no keyboard
+            # focus, so focused_element_id is always None and the fill trigger
+            # ("focused empty field") never fires — the agent navigates forever
+            # and types nothing (live, 2026-07-10). The agent KNOWS where it
+            # just clicked: remember the clicked fillable's identity; _observe
+            # stamps it as focus when the observer can't provide one.
+            if prediction.get("action_type") == "click":
+                _fc_el = self._elem_at(state, prediction.get("click_position") or [])
+                if (_fc_el is not None
+                        and (_fc_el.get("type") or "").lower() in self._FILLABLE_TYPES):
+                    self._inferred_focus_key = self._attempt_key(_fc_el, state)
+                else:
+                    self._inferred_focus_key = None
+
             # Detect tab click: if the executed click landed on a tab element, mark a tab switch
             # so the next step scrolls to top and focuses the first empty field.
             if prediction.get("action_type") == "click":
@@ -6623,6 +6637,17 @@ class LLMAgent:
                 # keys (_attempt_key) — every consumer of an element processes
                 # elements from the most recent observe in its code path.
                 self._cur_state = state
+                # FOCUS INFERENCE (vision): the pixel observer can't report
+                # focus. If it didn't, stamp the last CLICKED fillable as the
+                # focused element (matched by identity key in THIS observation)
+                # so the fill path works identically under vision perception.
+                if (not state.get("focused_element_id")
+                        and getattr(self, "_inferred_focus_key", None)):
+                    for _e in state.get("elements", []):
+                        if ((_e.get("type") or "").lower() in self._FILLABLE_TYPES
+                                and self._attempt_key(_e, state) == self._inferred_focus_key):
+                            state["focused_element_id"] = _e.get("element_id")
+                            break
                 return state
         except Exception as exc:
             logger.warning("Observer error: %s", exc)

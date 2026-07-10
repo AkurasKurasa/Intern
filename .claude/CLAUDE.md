@@ -81,9 +81,16 @@ truth for this project. This means:
 ### Problem & solution tracking
 - **During every task**, keep a running log of problems encountered, the solutions
   considered/attempted, and the final fix that resolved each problem.
+- **Every problem that surfaces or SPAWNS mid-work gets added to DEVELOPERS.md
+  CONCURRENTLY — at the moment it's found, not at session end** — filed under its
+  proper subtype (the matching P-level checklist, `Open Technical Questions`,
+  `Risks & Technical Debt`, or `Current Status → honest gaps`), so problems never
+  pile up disorganized and the next step is always visible. **Mirror the same
+  problem into `treetask/tasks.js`** (right branch, status, a DO-note saying what
+  fixing it means, `deps` if blocked).
 - When a problem is solved, record it clearly: what broke, why, and what fixed it.
   This feeds into `Solved Problems`, `Lessons`, and the task-list annotations in
-  DEVELOPERS.md so nothing is forgotten.
+  DEVELOPERS.md so nothing is forgotten — and flips the matching treetask node.
 
 ### Consistent, complete updates after each accomplished task
 - **After completing a task**, review DEVELOPERS.md and update **every section the

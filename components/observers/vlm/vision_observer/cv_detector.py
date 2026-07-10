@@ -222,6 +222,11 @@ def _ocr_words(bgr: "np.ndarray", cfg: CVConfig) -> List[Dict[str, Any]]:
             "text": txt, "conf": conf,
             "cx": x + w / 2.0, "cy": y + h / 2.0,
             "box": (x, y, x + w, y + h),
+            # Tesseract's own layout: words sharing this id are ONE text line.
+            # Label assembly must use it — geometric same-row guessing splits
+            # multi-word labels ('Agent ID' → 'ID'), and a fragmented label
+            # poisons value lookup, focus verify and fill read-back downstream.
+            "line": (data["block_num"][i], data["par_num"][i], data["line_num"][i]),
         })
     return words
 
@@ -276,18 +281,43 @@ def _checkbox_with_label(square: Tuple[int, int, int, int],
     rx = max(wd["box"][2] for _, wd in taken)
     ry1 = min(y1, min(wd["box"][1] for _, wd in taken))
     ry2 = max(y2, max(wd["box"][3] for _, wd in taken))
-    label = " ".join(wd["text"] for _, wd in taken).strip()
+    label = _clean_label(" ".join(wd["text"] for _, wd in taken))
     return (x1, ry1, rx, ry2), label
 
 
-def _classify(box: Tuple[int, int, int, int], inside_text: str, cfg: CVConfig) -> str:
-    """Heuristic control-type from box geometry + interior text."""
+def _has_dropdown_arrow(bgr: "np.ndarray", box: Tuple[int, int, int, int]) -> bool:
+    """True if the box's right-edge strip contains a compact dark glyph — the
+    dropdown arrow that visually distinguishes a combobox from a text field.
+    Pure geometry/contrast, no theme colours."""
+    x1, y1, x2, y2 = box
+    h = y2 - y1
+    if h < 12 or (x2 - x1) < 3 * h:
+        return False
+    gh, gw = bgr.shape[:2]
+    sx1, sx2 = max(0, x2 - h), min(gw, x2 - 2)
+    sy1, sy2 = max(0, y1 + 2), min(gh, y2 - 2)
+    if sx2 <= sx1 or sy2 <= sy1:
+        return False
+    strip = cv2.cvtColor(bgr[sy1:sy2, sx1:sx2], cv2.COLOR_BGR2GRAY)
+    dark = (strip < 128).mean()
+    # an arrow glyph is a small dark cluster: some dark pixels, but the strip
+    # is not mostly dark (that would be a border/scrollbar)
+    return 0.02 < dark < 0.45
+
+
+def _classify(box: Tuple[int, int, int, int], inside_text: str, cfg: CVConfig,
+              bgr: Optional["np.ndarray"] = None) -> str:
+    """Heuristic control-type from box geometry + interior text + arrow glyph."""
     w, h = box[2] - box[0], box[3] - box[1]
     if max(w, h) <= cfg.checkbox_max and min(w, h) / max(w, h) > 0.7:
         return "checkboxcontrol"
     # A short, filled, roughly button-shaped box.
     if inside_text and w < 240 and 0.25 < h / max(w, 1) < 1.2 and len(inside_text) <= 20:
         return "buttoncontrol"
+    # Dropdown arrow at the right edge → combobox (0 were detected before this,
+    # so combobox fill mechanics never triggered under vision).
+    if bgr is not None and _has_dropdown_arrow(bgr, box):
+        return "comboboxcontrol"
     return "editcontrol"
 
 
@@ -316,19 +346,39 @@ def _nearest_label(box: Tuple[int, int, int, int],
         elif abs(wcx - (x1 + x2) / 2.0) <= (x2 - x1) and 0 < (y1 - wcy) <= cfg.label_gap_y:
             above_cands.append((y1 - wcy, wd))
     if ctype in ("checkboxcontrol", "radiobuttoncontrol"):
-        pool = right_cands or left_cands or above_cands
+        pool, side = (right_cands or left_cands or above_cands), "right"
     else:
-        pool = left_cands or above_cands or right_cands
+        pool, side = (left_cands or above_cands or right_cands), "left"
     if not pool:
         return ""
-    # Collect the closest word + any words on the same line near it (a label is
-    # often several words). Sort the chosen side by distance, take the nearest
-    # line's words left-to-right.
+    # WHOLE-LINE assembly: take the nearest word as anchor, then join EVERY
+    # word that shares its Tesseract line id AND sits on the label's side of
+    # the box. The old distance-anchored subset split multi-word labels
+    # ('Agent ID' → 'ID', 'Policy Number' → 'Number') — and a fragmented label
+    # mis-binds to boxes, breaking lookup/verify/read-back (live 2026-07-10).
     pool.sort(key=lambda t: t[0])
     anchor = pool[0][1]
-    line = [w for _, w in pool if abs(w["cy"] - anchor["cy"]) <= anchor["box"][3] - anchor["box"][1]]
+    a_line = anchor.get("line")
+    def _same_line(w):
+        if a_line is not None and w.get("line") is not None:
+            return w["line"] == a_line
+        return abs(w["cy"] - anchor["cy"]) <= (anchor["box"][3] - anchor["box"][1])
+    if side == "left":
+        line = [w for w in words if _same_line(w) and w["cx"] < x1]
+    else:
+        line = [w for w in words if _same_line(w) and w["cx"] > x2]
+    if not line:
+        line = [anchor]
     line.sort(key=lambda w: w["cx"])
-    return " ".join(w["text"] for w in line).strip()
+    return _clean_label(" ".join(w["text"] for w in line))
+
+
+def _clean_label(s: str) -> str:
+    """Strip OCR punctuation noise from a label's edges ('| (Renewal Policy ('
+    → 'Renewal Policy'); collapse inner whitespace. Keeps interior slashes and
+    hyphens ('Paperless / e-Delivery') intact."""
+    s = " ".join(s.split())
+    return s.strip(" |()[]{}—-–·:;,.'\"`").strip()
 
 
 # ── public API ──────────────────────────────────────────────────────────────────
@@ -424,7 +474,7 @@ def detect_elements(image: Any, cfg: Optional[CVConfig] = None) -> List[Dict[str
     # Pass 2: build elements. CHECKBOXES FIRST so they claim their captions;
     # then suppress any text fragment that falls inside a checkbox row (those
     # are the stray label boxes that would otherwise be false-positive fields).
-    ctypes = [_classify(box, interior[i], cfg) for i, box in enumerate(boxes)]
+    ctypes = [_classify(box, interior[i], cfg, bgr) for i, box in enumerate(boxes)]
 
     cb_rows: List[Tuple[int, int, int, int]] = []
     for i, box in enumerate(boxes):

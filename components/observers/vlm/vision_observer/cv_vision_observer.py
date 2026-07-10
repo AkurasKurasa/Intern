@@ -87,6 +87,25 @@ class CVVisionObserver(Observer):
     def _raw_snapshot(self) -> Dict[str, Any]:
         img, W, H = self._load_image()
         elements = detect_elements(img, self._cfg)
+        # DEBUG FLIPBOOK: VISION_DEBUG_DIR=<dir> → save an annotated frame for
+        # EVERY observation (one per agent step) — boxes + OCR labels drawn on
+        # the exact pixels the model decided on. "What did it see?" made literal.
+        _dbg = os.environ.get("VISION_DEBUG_DIR")
+        if _dbg:
+            try:
+                # Trigger only when the SIGHT CHANGED: identical element sets
+                # (same boxes, labels, values) mean an identical frame — a stall
+                # loop would otherwise spam dozens of duplicate PNGs. One frame
+                # per distinct observation carries all the information.
+                _sig = hash(tuple(sorted(
+                    (e.get("label") or e.get("text") or "", tuple(e.get("bbox") or ()),
+                     e.get("value") or "", e.get("type") or "")
+                    for e in elements)))
+                if _sig != getattr(self, "_last_sig", None):
+                    self._last_sig = _sig
+                    self._dump_debug_frame(img, elements, _dbg)
+            except Exception as exc:                   # never break perception
+                logger.debug("vision debug dump failed: %s", exc)
         ox, oy = self._origin if self._origin else (0, 0)
         for e in elements:
             # Vision is single-window: everything seen is the active foreground.
@@ -100,6 +119,29 @@ class CVVisionObserver(Observer):
             "focused_element_id": None,    # pixels don't expose focus; agent infers
             "source":             self.source_name,
         }
+
+    _TYPE_TINT = {
+        "editcontrol": (80, 200, 255), "comboboxcontrol": (255, 200, 90),
+        "checkboxcontrol": (100, 255, 150), "buttoncontrol": (120, 120, 255),
+        "tabitemcontrol": (255, 120, 255), "textcontrol": (150, 150, 150),
+    }
+
+    def _dump_debug_frame(self, img, elements, out_dir: str) -> None:
+        """Annotated copy of this observation (region-relative coords)."""
+        import numpy as _np
+        import cv2 as _cv2
+        os.makedirs(out_dir, exist_ok=True)
+        frame = _np.array(img)[:, :, ::-1].copy()      # PIL RGB → BGR
+        for e in elements:
+            x1, y1, x2, y2 = [int(v) for v in e["bbox"]]
+            c = self._TYPE_TINT.get((e.get("type") or ""), (128, 128, 128))
+            _cv2.rectangle(frame, (x1, y1), (x2, y2), c, 2)
+            lab = (e.get("label") or e.get("text") or e.get("value") or "")[:24]
+            if lab:
+                _cv2.putText(frame, lab, (x1, max(10, y1 - 4)),
+                             _cv2.FONT_HERSHEY_SIMPLEX, 0.38, c, 1, _cv2.LINE_AA)
+        self._frame_no = getattr(self, "_frame_no", 0) + 1
+        _cv2.imwrite(os.path.join(out_dir, f"see_{self._frame_no:04d}.png"), frame)
 
     # ── image acquisition ───────────────────────────────────────────────────────
     def _load_image(self) -> Tuple[Any, int, int]:
