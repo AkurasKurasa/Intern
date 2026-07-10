@@ -8,7 +8,7 @@ SEM_MODEL  ?= tasks/form_filling/model_eight_tabs_semantic_v2.pt
 EPOCHS     ?= 80
 START_TAB  ?= 0
 
-.PHONY: help record clean-demos train train-semantic run run-semantic form test
+.PHONY: help record clean-demos train train-semantic run run-semantic form test tree
 
 help:               ## show this list
 	@grep -E "^[a-zA-Z_-]+:.*?## " Makefile | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  make %-16s %s\n", $$1, $$2}'
@@ -36,3 +36,6 @@ form:               ## open the wx car-insurance test form
 
 test:               ## run the test suite
 	$(PYTHON) -m pytest tests/ -q
+
+tree:               ## open the treetask project-management tree in the browser
+	start "" treetask/index.html

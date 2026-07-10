@@ -363,6 +363,14 @@ the CoT lines in `_call_openai_compat()`.
 
 ## Task List and Priority List
 
+**Visual mirror: [`treetask/`](treetask/index.html) (`make tree`)** — an interactive 3D
+tree of this list. Apex = "Complete Intern"; branches are OUTCOMES you can verify
+("the form fills itself", "the score can be trusted"), not mechanisms — jargon lives
+in each node's note, every node states what DOING it means. Statuses, priorities and
+dependencies (⛓ = blocked) are maintained in `treetask/tasks.js`; keep it in sync with
+this list on every guardianship sweep. The priority-table overlay in the tree matches
+⭐ PRIORITY ORDER below.
+
 **Goal: COMPLETE SCOPE #1 (the form) first — then generalize.**
 
 **MILESTONE (2026-06-18): Scope #1 runs END-TO-END.** One unattended run (~124 steps) fills all 8 tabs, runs a self-verification pass over every tab, and presses Submit. Roles: transformer=WHERE, LLM=WHAT, agent=HOW.

@@ -1,0 +1,147 @@
+// treetask data — edit this file, refresh index.html (`make tree`).
+// PRINCIPLE: every node is an OUTCOME you can check ("the form fills itself"),
+// not a mechanism ("ranked arbitration"). Mechanisms live in notes/children.
+// Node: { id?, title, status, note?, priority?, deps?: [ids], children? }
+//   status:   "done" | "partial" | "next" | "pending" | "risk"
+//   priority: integer — shows in the priority table, lower = higher
+//   deps:     ids that must be DONE before this can start (⛓ = blocked)
+const TREE = {
+  id: "root",
+  title: "Complete Intern",
+  status: "partial",
+  note: "An agent that learns GUI work by WATCHING a person do it — then does it alone, their way. No hardcoded rules anywhere. Done = all three proof-scopes pass + thesis written.\n\nWhy it beats the alternatives: scripted RPA breaks on any change and knows no user; generic computer-use agents (incl. Codex Record & Replay) generalize a procedure but clone nobody. Intern's claims: personalization, local execution, judgment cloning.",
+  children: [
+    {
+      id: "scope1",
+      title: "1 · The form fills itself",
+      status: "partial",
+      note: "Proof scope #1 (car-insurance form, 8 tabs). DONE means: all 5 intake records entered and submitted in the demonstrated order, unattended, with numbers to prove it.",
+      children: [
+        {
+          id: "acceptance-run",
+          title: "One record, end to end, hands off",
+          status: "next",
+          priority: 1,
+          deps: ["v3-model", "sections-work", "widgets-fill"],
+          note: "THE GATE. One uninterrupted run: tab 0 → all 8 tabs → verify → Submit, zero human touches. Everything below is 'probably works' until this passes. (First autonomous Submit happened 2026-07-09 on v2; v3 + this week's fixes have never run to the finish line together.)",
+        },
+        {
+          id: "trust-numbers",
+          title: "The score can be trusted",
+          status: "next",
+          priority: 2,
+          note: "The scorer compares values by bare field name — Driver 2/3 correct entries get marked WRONG (checked against Driver 1's values). Every run report is corrupted until this is fixed. Fix: section-aware comparison in eval_metrics/bc_fidelity.",
+        },
+        {
+          id: "sections-work",
+          title: "Repeated sections fill correctly (Driver 2/3)",
+          status: "done",
+          note: "Was: whole sections silently skipped — same-named fields ('First Name' ×3) collided in every skip-list. Fixed 07-09: identities are (section, label); sweep looks up section-correct values. Live-verified on the Drivers tab.",
+        },
+        {
+          id: "widgets-fill",
+          title: "Every widget type can be filled",
+          status: "partial",
+          note: "No more dead fields. Backbone = the identity executor: command controls directly through Windows' accessibility API (set value / toggle / select) instead of clicking coordinates and pasting.",
+          children: [
+            { id: "identity-core", title: "Direct control API built + proven (edits, spins, checkboxes, combos)", status: "done",
+              note: "_act_on_element: ValuePattern/TogglePattern/SelectionItem. Live-verified on Drivers." },
+            { id: "identity-everywhere", title: "ALL fill paths use it (then delete the pixel-math guards)",
+              status: "pending", priority: 4, deps: ["identity-core", "acceptance-run"],
+              note: "OPT2 fill + verify-fixes still use click+paste. Routing them through the identity executor retires the stale-coordinate bug class for good." },
+            { title: "Stubborn cases: 50-option dropdowns at fold edges", status: "partial",
+              note: "Type-to-filter fallback exists; dropdown render at pane edges still flaky." },
+          ],
+        },
+        {
+          id: "model-drives",
+          title: "The learned model does the driving (LLM < 5%)",
+          status: "partial",
+          note: "Today the LLM assists ~45-50% of steps. The thesis claim needs the TRAINED policy driving nearly everything; LLM = values only.",
+          children: [
+            { title: "Navigation: fill batch → jump to densest work → repeat", status: "done",
+              note: "Navigation Protocol v2: model's own ranked targets, visible-first; viewport jumps anchored on the model's next pick. Replaced the guard pile." },
+            { title: "Model speaks in intents, not raw clicks", status: "done",
+              note: "Universal Semantic Action Space: verbs (set-value/toggle/select/…) + split pointer heads. v2 beat baseline 0.957 vs 0.878." },
+            { id: "verb-loop", title: "Agent acts on the model's intents directly", status: "pending",
+              priority: 3, deps: ["acceptance-run"],
+              note: "predict() already outputs verbs; the agent still converts to legacy click/type dicts. Wiring verbs → identity executor is what collapses LLM dependency and retires the remaining navigation crutches." },
+          ],
+        },
+        {
+          id: "good-data",
+          title: "Clean demos → faithful model",
+          status: "partial",
+          note: "The model can only be as orderly as its training data. Sequence fidelity (Behavioral Match) is a thesis metric.",
+          children: [
+            { id: "v3-model", title: "v3 model on scrubbed demos (footer clicks removed)", status: "done",
+              note: "click_acc 0.945, typing-target 0.85. Section-aware 'attempted' feature baked in." },
+            { title: "More demos where the model is weakest (deep tabs, rare moves)", status: "pending",
+              note: "Project rule: root fix for mis-prediction = more demos, not more guards." },
+          ],
+        },
+        {
+          id: "five-records",
+          title: "Five records in a row",
+          status: "pending",
+          priority: 5,
+          deps: ["acceptance-run", "trust-numbers"],
+          note: "Record advance, per-record data refresh, reset between records. The scope's Definition of Done.",
+        },
+        {
+          id: "self-improving",
+          title: "It learns its own rules from runs",
+          status: "pending",
+          priority: 6,
+          note: "Ruleset-inference loop is OPEN: inferred rules (e.g. 'leave blank means skip') never reach the LLM. Close extract() → ruleset.md → prompt.",
+        },
+      ],
+    },
+    {
+      id: "scope2",
+      title: "2 · It moves data between apps",
+      status: "pending",
+      deps: ["acceptance-run", "five-records"],
+      note: "Proof scope #2: web form → Excel. Same engine, different eyes and hands. Perception swap already PROVEN (ExcelObserver speaks the same schema).",
+      children: [
+        { title: "Excel eyes: read live sheets reliably", status: "partial",
+          note: "DO: run ExcelObserver against real workbooks; verify cell text, formulas, coordinates and sheet names land in the canonical element schema. The swap was proven once in isolation (2026-06-09) — needs endurance testing, not design." },
+        { title: "Excel hands: target cells, enter values", status: "pending",
+          note: "DO: implement cell targeting (click or arrow-key navigation to the active cell) + value entry, as identity-executor-style actions. Decide click-per-cell vs keyboard navigation by recording how the human actually does it." },
+        { title: "15-20 recorded transfer demos", status: "pending",
+          note: "DO: record with app/main.py — one pass = read a web-form record, enter it into the Excel template. Same recorder, new out_dir (e.g. data/demos/excel_transfer). NO duplicate button; clean with clean_demos.py after." },
+        { title: "Trained + fidelity measured", status: "pending",
+          note: "DO: train a task-specific checkpoint on the transfer demos (make train-semantic TRACE_DIR=...), then a live run scored against the source records. Pass = same bar as Scope #1: unattended, correct values, demonstrated order." },
+      ],
+    },
+    {
+      id: "scope3",
+      title: "3 · It clones judgment, not just steps",
+      status: "pending",
+      deps: ["scope2"],
+      note: "Proof scope #3: email/ticket triage — two users triage DIFFERENTLY, and the agent reproduces its user's calls. The claim no record-and-replay tool can make.",
+      children: [
+        { title: "Demos with decisions in them (varied inputs → varied responses)", status: "pending",
+          note: "DO: design + record a triage task where the INPUT varies and the demonstrated RESPONSE varies with it (e.g. active policy → reply A, lapsed → warning, missing fields → inquiry). Keep every decision inferable from VISIBLE content — no hidden intent. This dataset design is the hard part; do it before any code." },
+        { title: "Learn the branching (what condition drives which action)", status: "pending",
+          note: "DO: build the workflow-induction pass — compare traces across cases, find the state features that predict which action branch was taken, emit an explicit branching spec (JSON/MD). Then measure: does the trained agent take the USER'S branch on held-out cases?" },
+        { id: "dagger", title: "Learn from corrections (DAgger)", status: "risk",
+          note: "CorrectionHandler currently captures 0 steps in live runs — the correction loop is wired but dead. Blocks cold-start improvement." },
+      ],
+    },
+    {
+      id: "thesis",
+      title: "4 · The proof is written down",
+      status: "pending",
+      note: "The academic deliverable: the three scopes turned into chapters, metrics and benchmark comparisons. Nothing here starts producing text until Scope #1 has trustworthy numbers.",
+      children: [
+        { title: "Methodology + evaluation chapters", status: "pending", deps: ["scope1"],
+          note: "DO: write thesis ch.3 (architecture: perception adapter → transformer WHERE → LLM WHAT → identity-executor HOW; BC training recipe) and ch.4 (metrics + runs). Blocked on Scope #1 numbers being real — which needs the trusted scorer first." },
+        { title: "Benchmarks vs generic agents (OS-World)", status: "pending",
+          note: "DO: pick 2-3 comparable form/transfer tasks from OS-World (or equivalent), run a generic agent and Intern on both, compare completion + fidelity + cost-per-run. The claim to support: personalization + local execution beat generic agents on repeated personal workflows." },
+        { id: "behavioral-match", title: "Sequence-fidelity metric actually measures", status: "risk",
+          note: "Behavioral Match reads 0% no matter what — no reference sequences are wired in. A thesis metric that can't move is a silent liability." },
+      ],
+    },
+  ],
+};

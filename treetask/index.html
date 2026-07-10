@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>treetask — Intern</title>
+<style>
+  :root {
+    --bg0: #0b0d11; --bg1: #10131a; --panel: #141821e6; --edge: #2b3140; --text: #c9ceda; --dim: #6f7789;
+    --done: #4f7d62; --partial: #94793e; --next: #5b7fa6; --pending: #4a505e; --risk: #9c5454;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  html, body { height: 100%; }
+  :root { --sans: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+          --mono: "Cascadia Mono", Consolas, monospace; }
+  body { background: radial-gradient(ellipse at 50% 30%, var(--bg1), var(--bg0) 72%);
+         color: var(--text); font: 14px/1.5 var(--sans); overflow: hidden;
+         -webkit-font-smoothing: antialiased; }
+  #c { display: block; width: 100vw; height: 100vh; cursor: grab; }
+  #c.dragging { cursor: grabbing; }
+
+  #hud { position: fixed; top: 16px; left: 18px; user-select: none; pointer-events: none; }
+  #hud h1 { font-size: 17px; font-weight: 650; letter-spacing: .2px; color: #dfe3ec; }
+  #hud h1 .app { color: var(--dim); font-weight: 400; }
+  #hud p  { color: var(--dim); font-size: 11.5px; margin-top: 3px; letter-spacing: .3px; }
+  #hud p b { color: #9aa3b8; font-weight: 600; }
+
+  #legend { position: fixed; bottom: 14px; left: 16px; display: flex; gap: 13px;
+            font-size: 12px; color: var(--dim); user-select: none; }
+  #legend span::before { content: "●"; margin-right: 5px; }
+  #legend .l-done::before { color: var(--done); } #legend .l-partial::before { color: var(--partial); }
+  #legend .l-next::before { color: var(--next); } #legend .l-pending::before { color: var(--pending); }
+  #legend .l-risk::before { color: var(--risk); }
+  #legend .l-dep::before  { content: "⤍"; color: #7a6a9e; }
+
+  /* ── priority table ─────────────────────────────────────────────────── */
+  #prio { position: fixed; top: 74px; left: 16px; width: 296px; background: var(--panel);
+          backdrop-filter: blur(8px); border: 1px solid var(--edge); border-radius: 10px;
+          font-size: 12.5px; user-select: none; overflow: hidden; }
+  #prio header { padding: 10px 13px; font-weight: 700; font-size: 11px; letter-spacing: 1.4px;
+                 color: var(--dim); cursor: pointer; display: flex; justify-content: space-between;
+                 text-transform: uppercase; }
+  #prio table { width: 100%; border-collapse: collapse; }
+  #prio tr { cursor: pointer; }
+  #prio tr:hover { background: #ffffff0d; }
+  #prio td { padding: 6px 10px; border-top: 1px solid var(--edge); font-size: 12.5px; }
+  #prio td.p { color: var(--dim); width: 26px; text-align: right; font: 600 11.5px var(--mono); }
+  #prio td.s { width: 18px; }
+  #prio td.locked { color: var(--dim); width: 20px; }
+  #prio.folded table { display: none; }
+
+  #detail { position: fixed; top: 0; right: 0; width: 330px; height: 100vh; background: var(--panel);
+            backdrop-filter: blur(8px); border-left: 1px solid var(--edge); padding: 22px;
+            transform: translateX(100%); transition: transform .18s ease; overflow-y: auto; }
+  #detail.open { transform: none; }
+  #detail h2 { font-size: 16px; font-weight: 650; line-height: 1.35; margin-bottom: 7px;
+               padding-right: 20px; color: #e4e8f1; letter-spacing: .1px; }
+  #detail .status { font: 700 10.5px var(--mono); letter-spacing: 1.2px; text-transform: uppercase; }
+  #detail .note { margin-top: 13px; color: #99a1b3; font-size: 13px; line-height: 1.55; white-space: pre-wrap; }
+  #detail .sec { margin-top: 18px; font-size: 10.5px; font-weight: 700; letter-spacing: 1.4px;
+                 color: var(--dim); text-transform: uppercase;
+                 border-bottom: 1px solid var(--edge); padding-bottom: 4px; }
+  #detail ul { margin-top: 6px; font-size: 12.5px; list-style: none; }
+  #detail ul li { margin: 6px 0; }
+  #detail ul li.nav { cursor: pointer; } #detail ul li.nav:hover { color: #fff; }
+  #detail .close { position: absolute; top: 10px; right: 14px; color: var(--dim); cursor: pointer; font-size: 18px; }
+
+  #controls { position: fixed; bottom: 14px; right: 16px; display: flex; gap: 8px; }
+  #controls button { background: var(--panel); color: var(--text); border: 1px solid var(--edge);
+                     border-radius: 7px; padding: 5px 12px; cursor: pointer; font-size: 12.5px; }
+  #controls button:hover { border-color: var(--dim); }
+  #controls button.on { border-color: #7a6a9e; color: #b3a6d4; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="hud">
+  <h1>treetask <span class="app">/ Intern</span></h1>
+  <p><b>click</b> expand + details · <b>drag</b> orbit · <b>wheel</b> zoom · <b>R</b> auto-spin</p>
+</div>
+<div id="prio">
+  <header onclick="document.getElementById('prio').classList.toggle('folded')">
+    <span>PRIORITY LIST</span><span>⇕</span>
+  </header>
+  <table id="prio-body"></table>
+</div>
+<div id="legend">
+  <span class="l-done">done</span><span class="l-partial">partial</span>
+  <span class="l-next">next</span><span class="l-pending">pending</span>
+  <span class="l-risk">risk</span><span class="l-dep">dependency</span>
+</div>
+<div id="detail"><span class="close" onclick="closeDetail()">✕</span><div id="detail-body"></div></div>
+<div id="controls">
+  <button id="depbtn" onclick="toggleDeps()">deps: off</button>
+  <button onclick="expandAll(true)">expand all</button>
+  <button onclick="expandAll(false)">goals only</button>
+  <button onclick="resetView()">reset view</button>
+</div>
+
+<script src="tasks.js"></script>
+<script>
+(function () {
+  const canvas = document.getElementById("c");
+  const ctx = canvas.getContext("2d");
+  let W, H, DPR;
+  function resize() {
+    DPR = window.devicePixelRatio || 1;
+    W = canvas.clientWidth; H = canvas.clientHeight;
+    canvas.width = W * DPR; canvas.height = H * DPR;
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  }
+  window.addEventListener("resize", resize); resize();
+
+  const COLORS = { done: "#4f7d62", partial: "#94793e", next: "#5b7fa6", pending: "#4a505e", risk: "#9c5454" };
+  const DEP_COL = "#7a6a9e";
+
+  // ── model prep ───────────────────────────────────────────────────────────
+  let uid = 0;
+  const byId = {};
+  (function prep(n, depth, parent) {
+    n._id = uid++; n._depth = depth; n._parent = parent;
+    n._open = depth < 1;
+    if (n.id) byId[n.id] = n;
+    (n.children || []).forEach(c => prep(c, depth + 1, n));
+  })(TREE, 0, null);
+
+  function progress(n) {
+    let done = 0, total = 0;
+    (function walk(m) {
+      if (!m.children || !m.children.length) { total++; if (m.status === "done") done++; return; }
+      m.children.forEach(walk);
+    })(n);
+    return [done, total];
+  }
+  // dependency helpers
+  function depsOf(n)   { return (n.deps || []).map(id => byId[id]).filter(Boolean); }
+  function blockersOf(n){ return depsOf(n).filter(d => d.status !== "done"); }
+  function dependentsOf(n) {
+    if (!n.id) return [];
+    const out = [];
+    (function walk(m) { if ((m.deps || []).includes(n.id)) out.push(m); (m.children || []).forEach(walk); })(TREE);
+    return out;
+  }
+
+  // ── 3D layout ────────────────────────────────────────────────────────────
+  // Anti-crowding: (1) a child's angular sector is proportional to its
+  // VISIBLE leaf count, not an equal split — a 30-node branch gets 7× the
+  // room of a 4-node one; (2) each ring's radius grows as needed to keep a
+  // minimum arc length between nodes on that ring.
+  const LEVEL_DY = 160, BASE_R = 230, LEVEL_DR = 160, MIN_ARC = 140;
+  function layout() {
+    const visible = [];
+
+    // pass 1: visible-leaf weights + node count per depth ring
+    const ringCount = [];
+    (function weigh(n) {
+      ringCount[n._depth] = (ringCount[n._depth] || 0) + 1;
+      if (!n._open || !n.children || !n.children.length) { n._w = 1; return 1; }
+      n._w = n.children.map(weigh).reduce((a, b) => a + b, 0);
+      return n._w;
+    })(TREE);
+
+    // ring radii: progression, widened when a ring is crowded
+    const radii = [0];
+    for (let d = 1; d < ringCount.length; d++) {
+      const needed = (ringCount[d] * MIN_ARC) / (2 * Math.PI);
+      radii[d] = Math.max(BASE_R + (d - 1) * LEVEL_DR, needed, (radii[d - 1] || 0) + 90);
+    }
+
+    // pass 2: place, sectors ∝ weight
+    (function place(n, a0, a1) {
+      n._a = (a0 + a1) / 2;
+      const r = radii[n._depth] || 0;
+      n._pos = [r * Math.cos(n._a), n._depth * LEVEL_DY, r * Math.sin(n._a)];
+      visible.push(n);
+      if (n._open && n.children && n.children.length) {
+        const span = a1 - a0;
+        let a = a0;
+        for (const c of n.children) {
+          const cw = span * (c._w / n._w);
+          place(c, a, a + cw);
+          a += cw;
+        }
+      }
+    })(TREE, -Math.PI, Math.PI);
+    return visible;
+  }
+
+  // ── camera ───────────────────────────────────────────────────────────────
+  let yaw = 0.6, pitch = 0.32, dist = 1050, cy = 200;
+  let yawTarget = null;
+  let autoSpin = false, showDeps = false;
+  function project(p) {
+    const [x, y, z] = p;
+    const c1 = Math.cos(yaw), s1 = Math.sin(yaw);
+    let X = x * c1 - z * s1, Z = x * s1 + z * c1, Y = y - cy;
+    const cp = Math.cos(pitch), sp = Math.sin(pitch);
+    let Y2 = Y * cp - Z * sp, Z2 = Y * sp + Z * cp;
+    Z2 += dist;
+    if (Z2 < 60) Z2 = 60;
+    const f = 900 / Z2;
+    return [W / 2 + X * f, H / 2 + Y2 * f, Z2, f];
+  }
+
+  // ── draw ─────────────────────────────────────────────────────────────────
+  let hover = null, selected = null;
+  function draw() {
+    ctx.clearRect(0, 0, W, H);
+    const nodes = layout();
+    const vis = new Set(nodes);
+    for (const n of nodes) n._s = project(n._pos);
+
+    // tree edges
+    const edges = nodes.filter(n => n._parent && vis.has(n._parent));
+    edges.sort((a, b) => (b._s[2] + b._parent._s[2]) - (a._s[2] + a._parent._s[2]));
+    for (const n of edges) {
+      const p = n._parent._s, q = n._s;
+      const fade = Math.max(0.08, Math.min(0.38, 340 / q[2]));
+      ctx.strokeStyle = `rgba(80,90,115,${fade})`;
+      ctx.lineWidth = Math.max(0.5, 1.4 * q[3]);
+      ctx.beginPath();
+      ctx.moveTo(p[0], p[1]);
+      const my = (p[1] + q[1]) / 2;
+      ctx.bezierCurveTo(p[0], my, q[0], my, q[0], q[1]);
+      ctx.stroke();
+    }
+
+    // dependency edges — all (faint) when toggled on; selected node's always
+    for (const n of nodes) {
+      if (!n.deps) continue;
+      const emph = (n === selected || n === hover);
+      if (!showDeps && !emph) continue;
+      for (const d of depsOf(n)) {
+        if (!vis.has(d)) continue;
+        const a = d._s, b = n._s;
+        ctx.strokeStyle = DEP_COL;
+        ctx.globalAlpha = emph ? 0.85 : 0.22;
+        ctx.lineWidth = emph ? 1.6 : 1;
+        ctx.setLineDash([6, 5]);
+        ctx.beginPath();
+        const mx = (a[0] + b[0]) / 2, my2 = Math.min(a[1], b[1]) - 40;
+        ctx.moveTo(a[0], a[1]);
+        ctx.quadraticCurveTo(mx, my2, b[0], b[1]);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        // arrowhead at the dependent end
+        const ang = Math.atan2(b[1] - my2, b[0] - mx);
+        ctx.beginPath();
+        ctx.moveTo(b[0], b[1]);
+        ctx.lineTo(b[0] - 8 * Math.cos(ang - 0.4), b[1] - 8 * Math.sin(ang - 0.4));
+        ctx.lineTo(b[0] - 8 * Math.cos(ang + 0.4), b[1] - 8 * Math.sin(ang + 0.4));
+        ctx.closePath(); ctx.fillStyle = DEP_COL; ctx.fill();
+        ctx.globalAlpha = 1;
+      }
+    }
+
+    // nodes back-to-front
+    const order = [...nodes].sort((a, b) => b._s[2] - a._s[2]);
+    for (const n of order) {
+      const [sx, sy, sz, f] = n._s;
+      const col = COLORS[n.status || "pending"];
+      const hasKids = n.children && n.children.length;
+      const base = n._depth === 0 ? 26 : hasKids ? 15 : 9;
+      const r = Math.max(3, base * f);
+      const alpha = Math.max(0.22, Math.min(1, 600 / sz));
+
+      // soft glow (muted)
+      const g = ctx.createRadialGradient(sx, sy, 0, sx, sy, r * 2.2);
+      g.addColorStop(0, col + "30"); g.addColorStop(1, col + "00");
+      ctx.fillStyle = g;
+      ctx.beginPath(); ctx.arc(sx, sy, r * 2.2, 0, 7); ctx.fill();
+
+      const sg = ctx.createRadialGradient(sx - r * .35, sy - r * .35, r * .1, sx, sy, r);
+      sg.addColorStop(0, "#ffffff40"); sg.addColorStop(.3, col); sg.addColorStop(1, shade(col, -.5));
+      ctx.globalAlpha = alpha;
+      ctx.fillStyle = sg;
+      ctx.beginPath(); ctx.arc(sx, sy, r, 0, 7); ctx.fill();
+
+      if (n.status === "next") {
+        const t = (Date.now() % 1800) / 1800;
+        ctx.strokeStyle = col; ctx.globalAlpha = alpha * (1 - t) * 0.8;
+        ctx.lineWidth = 1.6;
+        ctx.beginPath(); ctx.arc(sx, sy, r + 4 + t * 9, 0, 7); ctx.stroke();
+      }
+      if (hasKids && !n._open) {
+        ctx.setLineDash([4, 3]);
+        ctx.strokeStyle = col; ctx.globalAlpha = alpha * .8; ctx.lineWidth = 1.3;
+        ctx.beginPath(); ctx.arc(sx, sy, r + 5, 0, 7); ctx.stroke();
+        ctx.setLineDash([]);
+      }
+      // blocked marker: unmet deps
+      if (blockersOf(n).length) {
+        ctx.globalAlpha = alpha;
+        ctx.font = `${Math.max(9, 10 * f)}px Segoe UI`;
+        ctx.fillStyle = DEP_COL;
+        ctx.textAlign = "center";
+        ctx.fillText("⛓", sx + r + 7, sy + 4);
+      }
+      if (n === hover || n === selected) {
+        ctx.strokeStyle = "#c9ceda"; ctx.globalAlpha = .85; ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.arc(sx, sy, r + 3, 0, 7); ctx.stroke();
+      }
+      ctx.globalAlpha = 1;
+
+      const la = (n === hover || n._depth === 0) ? 0.95 : Math.max(0, Math.min(0.8, (700 - sz + 400) / 620));
+      if (la > 0.05) {
+        const SANS = '"Segoe UI Variable Text","Segoe UI",sans-serif';
+        const MONO = '"Cascadia Mono",Consolas,monospace';
+        ctx.textAlign = "center";
+        if (n._depth === 0) {
+          // apex heading: uppercase, tracked, brightest
+          const fs = Math.max(12, 16 * Math.min(1.2, f * 1.1));
+          ctx.font = `650 ${fs}px ${SANS}`;
+          try { ctx.letterSpacing = "2px"; } catch (_) {}
+          ctx.fillStyle = `rgba(228,232,241,${la})`;
+          ctx.fillText(n.title.toUpperCase(), sx, sy - r - 10);
+          try { ctx.letterSpacing = "0px"; } catch (_) {}
+        } else {
+          const weight = n._depth === 1 ? 650 : hasKids ? 600 : 400;
+          const size = n._depth === 1 ? 13 : hasKids ? 12 : 11;
+          const fs = Math.max(9, size * Math.min(1.15, f * 1.1));
+          ctx.font = `${weight} ${fs}px ${SANS}`;
+          const label = n.title.length > 30 && n !== hover ? n.title.slice(0, 29) + "…" : n.title;
+          ctx.fillStyle = n._depth === 1 ? `rgba(216,221,232,${la})` : `rgba(190,196,210,${la * 0.95})`;
+          ctx.fillText(label, sx, sy - r - 7);
+        }
+        if (hasKids) {
+          const [d, t] = progress(n);
+          const cfs = Math.max(8, 10 * Math.min(1.1, f));
+          ctx.font = `600 ${cfs}px ${MONO}`;
+          ctx.fillStyle = `rgba(111,119,137,${la})`;
+          ctx.fillText(`${d}/${t}${n._open ? "" : " ▸"}`, sx, sy + r + 14);
+        }
+      }
+      n._hit = [sx, sy, Math.max(r + 6, 13)];
+    }
+  }
+  function shade(hex, k) {
+    const v = parseInt(hex.slice(1), 16);
+    const r = Math.round(((v >> 16) & 255) * (1 + k)),
+          g = Math.round(((v >> 8) & 255) * (1 + k)),
+          b = Math.round((v & 255) * (1 + k));
+    return `rgb(${r},${g},${b})`;
+  }
+
+  // ── interaction ──────────────────────────────────────────────────────────
+  let dragging = false, moved = false, px = 0, py = 0;
+  canvas.addEventListener("mousedown", e => { dragging = true; moved = false; px = e.clientX; py = e.clientY; canvas.classList.add("dragging"); yawTarget = null; });
+  window.addEventListener("mousemove", e => {
+    if (dragging) {
+      const dx = e.clientX - px, dy = e.clientY - py;
+      if (Math.abs(dx) + Math.abs(dy) > 3) moved = true;
+      yaw += dx * 0.005; pitch = Math.max(-0.1, Math.min(1.2, pitch + dy * 0.004));
+      px = e.clientX; py = e.clientY;
+    } else {
+      hover = pick(e.clientX, e.clientY);
+      canvas.style.cursor = hover ? "pointer" : "grab";
+    }
+  });
+  window.addEventListener("mouseup", () => { dragging = false; canvas.classList.remove("dragging"); });
+  canvas.addEventListener("wheel", e => {
+    e.preventDefault();
+    dist = Math.max(320, Math.min(3200, dist * (e.deltaY > 0 ? 1.1 : 1 / 1.1)));
+  }, { passive: false });
+  canvas.addEventListener("click", e => {
+    if (moved) return;
+    const n = pick(e.clientX, e.clientY);
+    if (!n) { closeDetail(); selected = null; return; }
+    selected = n;
+    if (n.children && n.children.length) n._open = !n._open;
+    showDetail(n);
+  });
+  window.addEventListener("keydown", e => { if (e.key.toLowerCase() === "r") autoSpin = !autoSpin; });
+
+  function pick(mx, my) {
+    let best = null;
+    (function collect(n) {
+      if (n._hit) {
+        const [x, y, r] = n._hit;
+        if ((mx - x) ** 2 + (my - y) ** 2 <= r * r)
+          if (!best || n._s[2] < best._s[2]) best = n;
+      }
+      if (n._open) (n.children || []).forEach(collect);
+    })(TREE);
+    return best;
+  }
+
+  // ── navigate to a node: open ancestors, swing camera to its sector ──────
+  function focusNode(n) {
+    let p = n._parent;
+    while (p) { p._open = true; p = p._parent; }
+    layout();                                  // recompute _a with ancestors open
+    selected = n;
+    yawTarget = -Math.PI / 2 - n._a;           // rotate node's azimuth to face camera
+    showDetail(n);
+  }
+  window._focusId = id => { const n = byId[id]; if (n) focusNode(n); };
+
+  // ── priority table ───────────────────────────────────────────────────────
+  function buildPrio() {
+    const rows = [];
+    (function walk(n) { if (n.priority != null) rows.push(n); (n.children || []).forEach(walk); })(TREE);
+    rows.sort((a, b) => a.priority - b.priority);
+    const tb = document.getElementById("prio-body");
+    tb.innerHTML = rows.map(n => {
+      const locked = blockersOf(n).length ? "⛓" : "";
+      return `<tr onclick="_focusId('${n.id}')">` +
+        `<td class="p">${n.priority}</td>` +
+        `<td class="s" style="color:${COLORS[n.status || "pending"]}">●</td>` +
+        `<td>${n.title.length > 30 ? n.title.slice(0, 29) + "…" : n.title}</td>` +
+        `<td class="locked" title="blocked by unmet dependencies">${locked}</td></tr>`;
+    }).join("");
+  }
+
+  // ── detail panel ─────────────────────────────────────────────────────────
+  const detail = document.getElementById("detail");
+  const body = document.getElementById("detail-body");
+  function li(m, nav) {
+    const dot = `<span style="color:${COLORS[m.status || "pending"]}">●</span>`;
+    return nav && m.id
+      ? `<li class="nav" onclick="_focusId('${m.id}')">${dot} ${m.title}</li>`
+      : `<li>${dot} ${m.title}</li>`;
+  }
+  function showDetail(n) {
+    const [d, t] = progress(n);
+    const deps = depsOf(n), blocked = blockersOf(n), dependents = dependentsOf(n);
+    body.innerHTML =
+      `<h2>${n.title}</h2>` +
+      `<div class="status" style="color:${COLORS[n.status || "pending"]}">${n.status || "pending"}` +
+      ((n.children && n.children.length) ? ` — ${d}/${t} leaves done` : "") +
+      (blocked.length ? ` · <span style="color:${DEP_COL}">⛓ blocked</span>` : "") + `</div>` +
+      (n.note ? `<div class="note">${n.note}</div>` : "") +
+      (deps.length ? `<div class="sec">depends on</div><ul>${deps.map(m => li(m, true)).join("")}</ul>` : "") +
+      (dependents.length ? `<div class="sec">unblocks</div><ul>${dependents.map(m => li(m, true)).join("")}</ul>` : "") +
+      ((n.children || []).length ? `<div class="sec">steps</div><ul>${n.children.map(m => li(m, false)).join("")}</ul>` : "");
+    detail.classList.add("open");
+  }
+  window.closeDetail = () => detail.classList.remove("open");
+
+  window.toggleDeps = () => {
+    showDeps = !showDeps;
+    const b = document.getElementById("depbtn");
+    b.textContent = `deps: ${showDeps ? "on" : "off"}`;
+    b.classList.toggle("on", showDeps);
+  };
+  window.expandAll = open => {
+    (function walk(n) { if (n.children && n.children.length) { n._open = open || n._depth < 1; n.children.forEach(walk); } })(TREE);
+  };
+  window.resetView = () => { yaw = 0.6; pitch = 0.32; dist = 1050; cy = 200; yawTarget = null; };
+
+  // ── loop ─────────────────────────────────────────────────────────────────
+  (function tick() {
+    if (yawTarget !== null) {
+      let d = ((yawTarget - yaw + Math.PI) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI) - Math.PI;
+      if (Math.abs(d) < 0.01) { yaw = yawTarget; yawTarget = null; }
+      else yaw += d * 0.12;
+    } else if (autoSpin && !dragging) yaw += 0.0025;
+    draw();
+    requestAnimationFrame(tick);
+  })();
+
+  buildPrio();
+})();
+</script>
+</body>
+</html>
