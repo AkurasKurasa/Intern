@@ -28,9 +28,9 @@ const TREE = {
         {
           id: "trust-numbers",
           title: "The score can be trusted",
-          status: "next",
+          status: "partial",
           priority: 2,
-          note: "The scorer compares values by bare field name — Driver 2/3 correct entries get marked WRONG (checked against Driver 1's values). Every run report is corrupted until this is fixed. Fix: section-aware comparison in eval_metrics/bc_fidelity.",
+          note: "Run scorer (eval_metrics) FIXED 2026-07-10 (41cff4c): section-aware value matching — D2/D3 fills now scored against their own values. REMAINING: bc_fidelity (the BC SCORE block) unverified for the same class of bug — audit its gold-key matching before trusting Behavioral/Fidelity numbers.",
         },
         {
           id: "sections-work",

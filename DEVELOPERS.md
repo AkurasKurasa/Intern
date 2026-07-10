@@ -398,7 +398,10 @@ this list on every guardianship sweep. The priority-table overlay in the tree ma
 - [x] **Re-clean corpus + retrain semantic model** *(2026-07-09 — `eight_Tabs_clean2`, v3: click_acc 0.945, src_acc ~0.85, val_acc 0.758, section-aware `attempted`.)*
 - [x] **Model-anchored viewport jump** *(2026-07-09, f88d4fc — anchor = model's top off-screen `click_topk` candidate, density fallback; unit-verified all three cases.)*
 - [ ] **FULL ACCEPTANCE RUN on v3 [NEXT — gate for the above]** — one uninterrupted run, tab 0 → Submit, judged against the five 2026-07-09 complaints. Every fix above is live-verified only in fragments; the end-to-end claim is open until this passes.
-- [ ] **Section-aware eval scorer** — `eval_metrics`/`bc_fidelity` compare typed values against bare-label expectations → Driver 2/3 correct fills scored as wrong (F8821047 vs D1's DL). Measurement-only bug, misleading reports.
+- [~] **Section-aware eval scorer** — `eval_metrics` FIXED 2026-07-10 (41cff4c): section-first
+  value matching via pane geometry (same partition as agent identity keys); D2/D3 fills now
+  scored against their own values. REMAINING: audit `bc_fidelity`'s gold-key matching for the
+  same bug class before trusting BC SCORE numbers.
 - [ ] **Scroll no-ops on tabs** — Fix `ScrollPattern.Scroll` failure on Claims/History/Drivers so all below-fold fields are reached, then remove the verification "accept-after-2-tries" band-aid. *(2026-07-09: optimal-viewport jump + viewport-top fix improve reach; deep-tab scroll still unverified end-to-end.)*
 - [ ] **Hard-to-fill widgets** — Implement type-to-filter select for 50-state dropdowns and digit keystrokes/read-back for numeric SpinCtrl widgets.
 - [ ] **Value quality (LLM mapping)** — Improve label-to-record mapping and inject section keys so LLM doesn't grab incorrect intake lines or wrong sections.
