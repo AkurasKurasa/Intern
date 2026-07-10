@@ -105,8 +105,10 @@ const TREE = {
       children: [
         { id: "vision-focus", title: "It knows which field it's in (focus inference)", status: "risk",
           note: "THE BLOCKER: pixels expose no keyboard focus → the fill trigger ('focused empty field') never fires → navigates forever, types nothing (live-observed). DO: agent-side inferred focus = last clicked fillable when observer reports None; later, visual caret detection." },
-        { id: "vision-labels", title: "It reads labels whole, not in pieces", status: "risk",
-          note: "OCR fragments ('Policy Number' → 'Number') break value lookup, sweep proposals and the UIA safety cross-check. The one cleanly-read label ('Underwriter') filled fine — label quality IS the fill rate. DO: merge same-row word boxes in cv_detector, strip punctuation noise." },
+        { id: "vision-labels", title: "It reads labels whole, not in pieces", status: "done",
+          note: "FIXED (424beea): whole-line assembly via Tesseract line ids + punctuation cleanup — all 10 Tab-1 labels whole/exact; identity-executor fills landed on clean labels. Residual: label/value bleed on filled fields (goes away with the learned parser)." },
+        { id: "vision-identity", title: "It knows a field is the SAME field across frames", status: "done",
+          note: "FIXED (819a4a7): detector ids were per-frame detection order — consecutive frames named different fields with the same id, so fills were verified against the WRONG element and dead-marked. Frame-to-frame tracker (label + nearest center) carries ids; parser-agnostic. Unit-verified; needs one live probe to confirm read-back." },
         { title: "It ignores window chrome", status: "pending",
           note: "Caption-bar buttons detected as checkboxes — the agent clicked 2px from CLOSE. DO: exclude the captured window's title-bar band from detection (by caption height, not pixels)." },
         { title: "It tells dropdowns from text fields", status: "pending",
