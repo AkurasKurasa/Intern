@@ -91,6 +91,12 @@ def parse_args():
         help="BC demo mode: action-triggered UIA capture (F9=toggle, F10=save+quit). "
              "Output goes to data/demos/human/. Use for training data collection."
     )
+    parser.add_argument(
+        "--perception", default="auto", choices=["auto", "vision"],
+        help="State source: 'auto' (Excel/UIA accessibility tree, default) or "
+             "'vision' (screenshot + CV/OCR — records demos as the agent SEES them, "
+             "for training a vision model)."
+    )
     return parser.parse_args()
 
 
@@ -107,6 +113,7 @@ def main():
         output_dir=args.output,
         trace_type=args.trace_type,
         application=args.app,
+        perception=args.perception,
     )
 
     if args.duration:

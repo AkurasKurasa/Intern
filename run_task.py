@@ -73,6 +73,9 @@ if __name__ == "__main__":
     _parser.add_argument("--model", default="tasks/form_filling/model.pt",
                          help="Transformer checkpoint to load (default = Policy model). "
                               "e.g. tasks/form_filling/model_three_tabs.pt")
+    _parser.add_argument("--perception", choices=["uia", "vision"], default="uia",
+                         help="Perception source: 'uia' (accessibility tree, default) or "
+                              "'vision' (screenshot + CV/OCR — sees the form from pixels).")
     _args = _parser.parse_args()
 
     _active_key = API_KEY if PROVIDER == "anthropic" else GROQ_API_KEY if PROVIDER == "groq" else API_KEY
@@ -91,6 +94,25 @@ if __name__ == "__main__":
         time.sleep(1)
     print("  GO!                 ")
 
+    # ── Perception source ──────────────────────────────────────────────────────
+    # UIA (default) reads the accessibility tree. VISION sees the form from pixels:
+    # a screenshot + CV/OCR observer, locked to the form window the user just
+    # clicked (captured here, while it is the foreground window). Coords are
+    # offset to absolute screen pixels so clicks land. Drop-in via the observer
+    # seam — the agent calls snapshot() identically either way.
+    _observer = None
+    if _args.perception == "vision":
+        import win32gui
+        from observers.vlm.vision_observer.cv_vision_observer import CVVisionObserver
+        _hwnd = win32gui.GetForegroundWindow()
+        _l, _t, _r, _b = win32gui.GetWindowRect(_hwnd)
+        _observer = CVVisionObserver(region=(_l, _t, _r - _l, _b - _t), origin=(_l, _t))
+        logger.info("Perception: VISION (CV+OCR) — window %r rect=%s",
+                    win32gui.GetWindowText(_hwnd), (_l, _t, _r, _b))
+        logger.info("Backends: %s", CVVisionObserver.backend_status())
+    else:
+        logger.info("Perception: UIA (accessibility tree)")
+
     from agent.scope import INSURANCE_SCOPE   # app-specific tabs/sections/records
 
     agent = LLMAgent(
@@ -100,6 +122,7 @@ if __name__ == "__main__":
         task_plugin      = None,
         pure_transformer = False,
         disable_auto_handlers = True,   # kill legacy heuristics — transformer(WHERE)+LLM(WHAT) merge drives
+        observer         = _observer,   # None → agent defaults to UIA; else vision
         visual_reader    = visual_reader,
         visual_cache     = visual_cache,
         source_window    = SOURCE_WINDOW,

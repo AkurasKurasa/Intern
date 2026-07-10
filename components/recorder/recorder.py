@@ -86,6 +86,16 @@ except ImportError:
     except ImportError:
         _UIA_OBSERVER_AVAILABLE = False
 
+try:
+    from observers.vlm.vision_observer.cv_vision_observer import CVVisionObserver as _CVVisionObserver
+    _VISION_OBSERVER_AVAILABLE = True
+except ImportError:
+    try:
+        from components.observers.vlm.vision_observer.cv_vision_observer import CVVisionObserver as _CVVisionObserver
+        _VISION_OBSERVER_AVAILABLE = True
+    except ImportError:
+        _VISION_OBSERVER_AVAILABLE = False
+
 
 # =============================================================================
 # MOUSE INPUT
@@ -423,6 +433,7 @@ class ScreenObserver:
         application: Optional[str] = None,
         monitor: int = 1,
         continual_learner: Optional[Any] = None,
+        perception: str = "auto",
     ):
         if not _MSS_AVAILABLE:
             raise ImportError(
@@ -443,9 +454,23 @@ class ScreenObserver:
         self.mouse    = MouseInput()
         self.keyboard = KeyboardInput(clipboard=self.clipboard)
 
+        # Priority 0: VISION (screenshot + CV/OCR) when perception="vision".
+        # Records demos as the agent will SEE them at run time — pixels, not the
+        # accessibility tree. Run on the full-screen frame the capture loop already
+        # grabs, so element bboxes are absolute screen coords matching the recorded
+        # (also absolute) mouse clicks — which is exactly what training needs to map
+        # a click to the element it landed on. Skips Excel/UIA when active.
+        self._vision_observer: Optional[Any] = None
+        if perception == "vision":
+            if not _VISION_OBSERVER_AVAILABLE:
+                raise ImportError("perception='vision' needs the CV vision observer "
+                                  "(opencv-python, pytesseract, mss, Pillow).")
+            self._vision_observer = _CVVisionObserver()   # image set per frame
+            print("[ScreenObserver] VISION perception active — recording demos from pixels (CV+OCR).")
+
         # Priority 1: ExcelObserver (semantic COM state) when trace_type="excel"
         self._excel_observer: Optional[Any] = None
-        if trace_type == "excel" and _EXCEL_OBSERVER_AVAILABLE:
+        if self._vision_observer is None and trace_type == "excel" and _EXCEL_OBSERVER_AVAILABLE:
             self._excel_observer = _ExcelObserver()
             if self._excel_observer.connect():
                 print("[ScreenObserver] ExcelObserver connected — Excel semantic mode active.")
@@ -455,7 +480,8 @@ class ScreenObserver:
 
         # Priority 2: UIAutomationObserver — works for all apps, no OCR needed
         self._uia_observer: Optional[Any] = None
-        if self._excel_observer is None and _UIA_OBSERVER_AVAILABLE:
+        if (self._vision_observer is None and self._excel_observer is None
+                and _UIA_OBSERVER_AVAILABLE):
             obs = _UIAObserver()
             if obs.available:
                 self._uia_observer = obs
@@ -801,7 +827,13 @@ class ScreenObserver:
                 shot = sct.grab(monitor)
                 img  = _PILImage.frombytes("RGB", shot.size, shot.bgra, "raw", "BGRX")
 
-                if self._excel_observer is not None:
+                if self._vision_observer is not None:
+                    # Run CV/OCR on the frame we just grabbed (full primary monitor
+                    # → bboxes are absolute screen coords, matching mouse clicks).
+                    self._vision_observer._image = img
+                    semantic_state = self._vision_observer.snapshot()
+                    self._frames.append((ts, img, semantic_state))
+                elif self._excel_observer is not None:
                     semantic_state = self._excel_observer.snapshot()
                     self._frames.append((ts, img, semantic_state))
                 elif self._uia_observer is not None:
