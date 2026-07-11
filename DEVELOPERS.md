@@ -423,24 +423,48 @@ this list on every guardianship sweep. The priority-table overlay in the tree ma
 - [x] **Model-anchored viewport jump** *(2026-07-09, f88d4fc — anchor = model's top off-screen `click_topk` candidate, density fallback; unit-verified all three cases.)*
 - [x] **Viewport-jump ping-pong (lock until progress + far-field reveal)** *(FOUND 2026-07-10 acceptance attempt, step ~180 Drivers: two anchors — 'DL Issuing State' ↔ 'Accidents (3 yr)' — alternated 14 jumps, zero fills, run wedged. THREE holes, fixed in two passes same day: (1) model-anchor branch skipped the "already densest" gate the fallback has — jumped to a 1-empty window with 2 empties visible → density gate added; (2) loop-breaker was single-slot (`_last_jump_anchor`) — caught A→A, blind to A→B→A → viewport lock `_jump_anchors_since_progress` set (no re-jump to ANY anchor visited since last progress; clears when the ranked picker finds work); (3) ROOT of the blind landings: wx SetFocus reveals the anchor at the NEAR edge and `_maximize_reveal`'s ScrollPattern paging no-ops on deep tabs (the known P0 scroll bug) → promised window never comes on screen → "all candidates masked" → re-jump, lock burning REAL fields as collateral. FIX: far-field reveal — jump focuses the window's far-side field (down → bottom-most empty; up → the anchor), wx exposes the whole window in ONE SetFocus, ScrollPattern dependency removed from the jump entirely. Offline probe `scratch/probe_jump_pingpong.py` passes all 5 cases; CONFIRMED by the passing acceptance run same evening.)*
 - [x] **FULL ACCEPTANCE RUN on v3 [PASSED 2026-07-10 evening]** — one uninterrupted run, tab 0 → all tabs → verify → autonomous Submit, zero touches, whole week's stack live together. The end-to-end claim on v3 is closed. *(Caveat: metrics block not archived — capture the scorecard next run. NEXT gate = Multi-record ×5.)*
-- [~] **Section-aware eval scorer** — `eval_metrics` FIXED 2026-07-10 (41cff4c): section-first
-  value matching via pane geometry (same partition as agent identity keys); D2/D3 fills now
-  scored against their own values. `bc_fidelity` CONFIRMED broken by the ×2 probe (2026-07-11),
-  two subtasks:
-  - [ ] **bc_fidelity: record-blind gold** — scored record 2 against record 1's answers
-    (`policy_number: expected 'PAI-2026-00441', got 'PAI-2026-00442'` — grading the wrong
-    record; record 2's BC 15.5% is fiction). Fix: pick gold per record — the submission JSON
-    filename carries the policy number.
-  - [ ] **bc_fidelity: section-blind gold keys** — record 1 block claims `ph_first: expected
-    'Tyler', got 'James'` when the policyholder IS James (Tyler = a Driver section). Fix:
-    section-aware key mapping, same repair eval_metrics got.
-  - [ ] **Run scorer (eval_metrics) record-blind too** *(found in the --start_record 2 probe)* —
-    `evaluate_run` compares typed values against the source with NO record number: record 2's
-    correct 'Underwriter' ('Sylvia Okafor') scored ✗ "expected 'Marcus D. Chen'" (record 1's),
-    while record-1 contamination values scored ✓. Fix: pass the run's record_num into
-    evaluate_run and bound its source parse the same way.
+- [x] **Trusted scorers (section-aware + record-aware) [DONE 2026-07-11 — one residual subtask]** —
+  `eval_metrics` section-fix 2026-07-10 (41cff4c) + record-aware 2026-07-11; `bc_fidelity`
+  record-aware + section-aware + annotation-stripping 2026-07-11. Honest rescore of the ×2 run:
+  record 1 = 89.3% field / 100% value / 0 mismatches; record 2 = 63.5% / 100% (old 20%/32.6%
+  was grader fiction). All verified offline (archived submissions + reconstructed failure
+  cases). Subtask history + the open coverage gap:
+  - [x] **bc_fidelity: record-blind gold [FIXED 2026-07-11]** — `_detect_record_num` matches
+    the submission's policy number against each intake record (data-driven) and rebuilds gold
+    for THAT record on the fly; static reference is the flagged fallback. Report prints which
+    gold was used. Verified on archived submissions: 00441→record 1, 00442→record 2.
+  - [x] **bc_fidelity: section-blind gold keys [FIXED 2026-07-11]** — `_parse_intake_record`
+    now tracks `[Section]` headers: bare labels inside `[Driver N]` / `[Vehicle 2+]` never map
+    to ph_*/v_* keys (Driver 3's 'Tyler' had overwritten ph_first); first-occurrence-wins as
+    belt. Also strips intake annotations from gold values ('← NOTE …', '[VERIFY — …]').
+    RESULT (×2 run rescored honestly): record 1 = 89.3% field match / 100% value acc /
+    0 mismatches; record 2 = 63.5% / **100%** (was 20% / 32.6% fiction).
+  - [ ] **bc_fidelity: gold key-space is partial** — `_LABEL_TO_KEY` covers Policy/
+    Policyholder/Vehicle only (~75 fields); Drivers/Coverage/Claims/Payment fills are
+    invisible to the BC score (the record-2 claim contamination never showed in it). Extend
+    the mapping before quoting BC numbers as whole-form fidelity.
+  - [x] **Run scorer (eval_metrics) record-aware [FIXED 2026-07-11]** — `evaluate_run` now
+    takes `record_num` from run_task (which knows which record ran); the old majority-vote
+    inference mis-picked record 1 (shared generic values + record 1's larger field count
+    biased the vote, ties defaulted to record 1) — kept only as fallback for callers without
+    the number. Offline-verified against the exact live failure: contamination-biased run
+    scored ✗ "expected 'Marcus D. Chen'" via inference, ✓ via `record_num=2`.
 - [ ] **Scroll no-ops on tabs** — Fix `ScrollPattern.Scroll` failure on Claims/History/Drivers so all below-fold fields are reached, then remove the verification "accept-after-2-tries" band-aid. *(2026-07-09: optimal-viewport jump + viewport-top fix improve reach; deep-tab scroll still unverified end-to-end.)*
-- [ ] **Hard-to-fill widgets** — Implement type-to-filter select for 50-state dropdowns and digit keystrokes/read-back for numeric SpinCtrl widgets. *(Fresh evidence 2026-07-11 probe: 'State' → 'Texas' loop — the dropdown options READ truncates at 12 visible items ('Alabama'…'Idaho'), so 'Texas' reports "not in options" though it exists; escape-retry loop. Type-to-filter or SelectionItem via identity executor fixes it.)*
+- [~] **Hard-to-fill widgets [mechanics probe-verified; run-hooks in all 3 combobox paths, live retest pending]** —
+  LIVE RUN 19:09 (user-insisted, rightly): the probe validated `_act_on_element`, but the run
+  used the CLICK-FILL combobox path which had NO rescue — 'Texas' failed 2× and skipped. All
+  THREE combobox paths (type-path, click-fill, reveal-focus) now escalate to the identity
+  executor. Retest live on a FRESH form. Details:
+  `scratch/probe_dead_widgets.py` drives the REAL fix path (`_act_on_element`) on exactly the
+  two chronic dead widgets: **PASS 'Years Continuously Insured' '' → '3'** (direct UIA
+  ValuePattern write — the widget rejects both paste and synthetic keystrokes; RangeValue
+  added for spins that need it) and **PASS 'State' '' → 'Texas'** (below-the-fold item in a
+  50-option wx.Choice). Combobox strategy ladder, each probed live: ValuePattern write →
+  expand+child walk → desktop list walk → full-string type-to-filter (landed on 'South
+  Carolina': wx.Choice matches SINGLE chars, not prefixes — the trailing 's') → **first-letter
+  cycling with read-back** (press 'T' until Texas; the human move — this one won). Run-loop
+  escalation hooks (dead-mark rescue + combobox "not in visible options" rescue) route into
+  the same code — exercised in the next full run (grep 'Dead-widget rescue').
 - [ ] **Value quality (LLM mapping)** — Improve label-to-record mapping and inject section keys so LLM doesn't grab incorrect intake lines or wrong sections. *(×2 probe 2026-07-11 evidence: D2/D3 'DL Expiration' both got D1's date in record 1 — some lookup path still resolves that label bare; 'Middle Name' got the last name; 'Third Party Name' got a policy number. Real fix = the deterministic-lookup short-circuit [see verb-loop attack plan] with section-qualified keys — kills the wrong-line class wholesale.)*
 - [x] **Verify-at-fill (kill the redundant end-pass)** *(filed + implemented 2026-07-10, live-exercised 2026-07-11)* — Too much run time went to re-checking fields AFTER they were already filled. Diagnosis: the verify pass's cost was NOT the deterministic read-back (cheap UIA reads) but the LLM completeness call firing on EVERY scroll-view — even views where every field already held a confirmed value (LLM latency × ~8 views × 9 tabs). FIX: symptom gate — the LLM branch fires only when the view shows an EMPTY live fillable (non-dead, labeled) that the deterministic branch couldn't settle; filled fields were either source-matched by branch 1 or are settled. Branch 1 (deterministic clobber-catch) still reads every view; convergence gate unchanged. LIVE-EXERCISED in the ×2 probe (2026-07-11): both records ran the gated verify and submitted — no wedge, no missed-fill regression. Caveat: wall-time saving not explicitly measured.
 - [ ] **Deterministic verification polish** — Remove verification band-aids, cut per-field LLM reasoning calls, and speed up the validation pass.

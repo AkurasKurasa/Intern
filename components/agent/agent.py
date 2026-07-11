@@ -2150,6 +2150,23 @@ class LLMAgent:
                                     logger.warning("Combobox(click-fill): dropdown for %r did not render", _cb_label)
                                 self._executor.execute({"action_type": "keyboard",
                                                         "key_count": 1, "keystrokes": ["escape"]})
+                                time.sleep(0.2)
+                                # LONG-LIST RESCUE (2026-07-11): the visible-items read
+                                # only sees the on-screen rows — 'Texas' below the fold
+                                # failed here TWICE and got skipped (live 19:09). This is
+                                # the click-fill path; the type-path and reveal-focus
+                                # path carry the same rescue. Identity executor ladder
+                                # (probe-verified): ValuePattern → full UIA item walk →
+                                # type-to-filter → first-letter cycling.
+                                if self._act_on_element(_cbox, _cb_val):
+                                    logger.info("Combobox(click-fill): %r → %r via identity executor rescue.",
+                                                _cb_label, _cb_val)
+                                    self._filled_this_tab.add(
+                                        f"{_cb_sec} {_cb_label}" if _cb_sec else _cb_label)
+                                    self._executor.execute({"action_type": "keyboard",
+                                                            "key_count": 1, "keystrokes": ["tab"]})
+                                    time.sleep(self.step_delay * 0.5)
+                                    continue
                                 # Anti-loop: a combobox that fails to fill must not be
                                 # re-targeted forever. Tab past; after 2 fails mark it
                                 # attempted so the transformer stops pointing at it.
@@ -2623,10 +2640,61 @@ class LLMAgent:
                     _action_history.append(("combobox_done", _flabel_full))
                     self._filled_this_tab.add(_flabel_full)
                 else:
-                    logger.warning("Combobox: %r not in dropdown — pressing Escape", _combo_value)
+                    # LONG-LIST RESCUE (2026-07-11): _listitems holds only the
+                    # ON-SCREEN portion of the dropdown (~a dozen rows) — in a
+                    # 50-state combobox 'Texas' sits below the fold and the
+                    # open→"not in options"→Escape cycle looped forever (live
+                    # 17:55, six times). Close the dropdown, then:
+                    #   1. identity executor — UIA child-walk sees ALL items,
+                    #      visible or not, and selects via SelectionItemPattern;
+                    #   2. type-to-filter — native combobox prefix selection,
+                    #      exactly what a human does on a long dropdown.
                     self._executor.execute({"action_type": "keyboard", "key_count": 1,
                                             "keystrokes": ["escape"]})
-                    _action_history.append(("combobox_fail", _flabel))
+                    time.sleep(0.2)
+                    _rescued = False
+                    if self._act_on_element(_fel, _combo_value):
+                        logger.info("Combobox: %r selected via identity executor (off-screen item).",
+                                    _combo_value)
+                        _rescued = True
+                    else:
+                        # type-to-filter: focus the combo, type the value, Enter
+                        self._executor.execute({"action_type": "click",
+                                                "click_position": [_ccx, _ccy]})
+                        time.sleep(0.3)
+                        self._executor.execute({"action_type": "keyboard",
+                                                "key_count": len(_combo_value),
+                                                "keystrokes": list(_combo_value)})
+                        time.sleep(0.25)
+                        self._executor.execute({"action_type": "keyboard", "key_count": 1,
+                                                "keystrokes": ["enter"]})
+                        time.sleep(0.3)
+                        _post = self._observe()
+                        _fel_now = min((e for e in _post.get("elements", [])
+                                        if (e.get("label") or e.get("text") or "").strip().lower()
+                                        == _flabel.strip().lower()
+                                        and (e.get("type") or "").lower() in ("comboboxcontrol", "combobox")
+                                        and e.get("bbox")),
+                                       key=lambda e: abs(e["bbox"][1] - _by1),
+                                       default=None)
+                        _now_val = (_fel_now.get("value") or "").strip().lower() if _fel_now else ""
+                        if _now_val and (_now_val == _cv_lc or _now_val.startswith(_cv_lc)
+                                         or _cv_lc.startswith(_now_val)):
+                            logger.info("Combobox: %r selected via type-to-filter.", _combo_value)
+                            _rescued = True
+                    if _rescued:
+                        _no_change_streak = 0
+                        _last_auto_step   = step_idx
+                        self._executor.execute({"action_type": "keyboard", "key_count": 1,
+                                                "keystrokes": ["tab"]})
+                        _action_history.append(("combobox_done", _flabel_full))
+                        self._filled_this_tab.add(_flabel_full)
+                    else:
+                        logger.warning("Combobox: %r not in dropdown — Escape (identity + type-to-filter failed).",
+                                       _combo_value)
+                        self._executor.execute({"action_type": "keyboard", "key_count": 1,
+                                                "keystrokes": ["escape"]})
+                        _action_history.append(("combobox_fail", _flabel))
                 time.sleep(self.step_delay * 0.5)
                 continue
 
@@ -2888,6 +2956,24 @@ class LLMAgent:
                             continue   # re-observe next step; if it took, field is now filled
                         self._fill_fail_count[_ffk] = self._fill_fail_count.get(_ffk, 0) + 1
                         if self._fill_fail_count[_ffk] >= 2:
+                            # LAST RESORT before declaring dead (2026-07-11): a
+                            # direct UIA pattern write (ValuePattern/RangeValue)
+                            # bypasses the input queue entirely — wx SpinCtrls
+                            # that reject BOTH clipboard paste and synthetic
+                            # keystrokes ('Years Continuously Insured',
+                            # 'Accidents (3 yr)' — dead-marked EVERY run) take
+                            # a SetValue. Only if that fails too is the field
+                            # genuinely dead.
+                            if _ffv and self._act_on_element(_ff, _ffv):
+                                logger.info("Dead-widget rescue: %r filled via identity executor (UIA pattern).",
+                                            (_ff.get('label') or _ff.get('text') or '?')[:28])
+                                self._fill_fail_count[_ffk] = 0
+                                _lbl_dw = (_ff.get('label') or _ff.get('text') or '').strip()
+                                _sec_dw = self._detect_section(state, _ff)
+                                self._filled_this_tab.add(f"{_sec_dw} {_lbl_dw}" if _sec_dw else _lbl_dw)
+                                _no_change_streak = 0
+                                time.sleep(self.step_delay * 0.5)
+                                continue
                             self._dead_fill_keys.add(_ffk)
                             self._mark_attempted(_ff)
                             logger.warning("Dead-field: %r rejected fill %dx — HARD-skip from now on.",
@@ -4563,6 +4649,15 @@ class LLMAgent:
                                    [_rf_opt(e) for e in _rf_items][:10])
                     self._executor.execute({"action_type": "keyboard",
                                             "key_count": 1, "keystrokes": ["escape"]})
+                    time.sleep(0.2)
+                    # LONG-LIST RESCUE (2026-07-11) — same ladder as the other
+                    # two combobox paths: visible-items read misses below-fold
+                    # options; the identity executor sees them all.
+                    if self._act_on_element(miss, _miss_val):
+                        logger.info("Reveal-focus: combobox %r → %r via identity executor rescue.",
+                                    field_name, _miss_val)
+                        self._filled_this_tab.add(
+                            f"{_miss_sec} {_miss_label}" if _miss_sec else _miss_label)
                     self._executor.execute({"action_type": "keyboard",
                                             "key_count": 1, "keystrokes": ["tab"]})
                 time.sleep(0.3)
@@ -6413,7 +6508,21 @@ class LLMAgent:
                     time.sleep(0.15)
                 return (ctrl.GetTogglePattern().ToggleState == 1) == _want
             if ety in ("comboboxcontrol", "combobox"):
-                # expand, select the matching item by ITS name, collapse
+                _vlc0 = value.strip().lower()
+                # 0) direct ValuePattern write — many comboboxes accept it and
+                #    it needs no dropdown at all ('State' probe: expand+walk
+                #    found nothing because wx renders the list as a separate
+                #    top-level window).
+                try:
+                    _cvp = ctrl.GetValuePattern()
+                    if _cvp is not None and not _cvp.IsReadOnly:
+                        _cvp.SetValue(value)
+                        time.sleep(0.2)
+                        if (ctrl.GetValuePattern().Value or "").strip().lower() == _vlc0:
+                            return True
+                except Exception:
+                    pass
+                # 1) expand, select the matching item by ITS name, collapse
                 try:
                     _ec = ctrl.GetExpandCollapsePattern()
                     _ec.Expand()
@@ -6428,15 +6537,28 @@ class LLMAgent:
                         _item = _ch
                         break
                 if _item is None:
-                    # wx renders the dropdown as a separate list window — search desktop
+                    # wx renders the dropdown as a separate top-level list
+                    # window — walk the DESKTOP's direct children for a list
+                    # that contains the wanted item (searchDepth=3 from root
+                    # missed it live: 'State' probe found nothing).
                     try:
-                        _lst = _uia.ListControl(searchDepth=3)
-                        if _lst.Exists(maxSearchSeconds=0.5):
-                            for _ch in _lst.GetChildren():
-                                _nm = (getattr(_ch, "Name", "") or "").strip().lower()
-                                if _nm == _vlc or _nm.startswith(_vlc):
-                                    _item = _ch
+                        for _top in _uia.GetRootControl().GetChildren():
+                            try:
+                                _cands = ([_top] if _top.ControlTypeName == "ListControl"
+                                          else [c for c in _top.GetChildren()
+                                                if c.ControlTypeName == "ListControl"])
+                            except Exception:
+                                continue
+                            for _lst in _cands:
+                                for _ch in _lst.GetChildren():
+                                    _nm = (getattr(_ch, "Name", "") or "").strip().lower()
+                                    if _nm == _vlc or _nm.startswith(_vlc):
+                                        _item = _ch
+                                        break
+                                if _item is not None:
                                     break
+                            if _item is not None:
+                                break
                     except Exception:
                         pass
                 if _item is not None:
@@ -6456,9 +6578,44 @@ class LLMAgent:
                     ctrl.GetExpandCollapsePattern().Collapse()
                 except Exception:
                     pass
+                # 3) native type-to-filter: focus the combo, type the value —
+                #    prefix-matching combos select it — Enter, verify.
+                try:
+                    ctrl.SetFocus()
+                    time.sleep(0.15)
+                    ctrl.SendKeys(value, interval=0.03, waitTime=0.15)
+                    ctrl.SendKeys("{Enter}", waitTime=0.15)
+                    _now = (ctrl.GetValuePattern().Value or "").strip().lower()
+                    if _now == _vlc0 or _now.startswith(_vlc0) or _vlc0.startswith(_now):
+                        return True
+                except Exception:
+                    pass
+                # 4) first-letter cycling: wx.Choice matches SINGLE characters —
+                #    each keystroke jumps to the next item with that initial
+                #    (typing 'Texas' landed on 'South Carolina' via the trailing
+                #    's', live probe 19:03). The human move on such widgets:
+                #    press the first letter repeatedly and stop when the wanted
+                #    item shows. Read back after every press; a repeated value
+                #    means we cycled the full ring without a hit.
+                try:
+                    _first = value.strip()[0]
+                    ctrl.SetFocus()
+                    time.sleep(0.1)
+                    _seen = set()
+                    for _ in range(60):
+                        ctrl.SendKeys(_first, waitTime=0.08)
+                        _now = (ctrl.GetValuePattern().Value or "").strip().lower()
+                        if _now == _vlc0 or _now.startswith(_vlc0):
+                            return True
+                        if _now in _seen:
+                            break                     # full circle — not there
+                        _seen.add(_now)
+                except Exception:
+                    pass
                 return False
             # edits + spins: ValuePattern first (immune to paste-reject), then
-            # SetFocus + keystrokes
+            # RangeValuePattern (numeric spins expose it when ValuePattern is
+            # read-only/absent), then SetFocus + keystrokes
             try:
                 _vp = ctrl.GetValuePattern()
                 if _vp is not None and not _vp.IsReadOnly:
@@ -6466,6 +6623,18 @@ class LLMAgent:
                     time.sleep(0.15)
                     if (_vp.Value or "").strip() == value.strip():
                         return True
+            except Exception:
+                pass
+            try:
+                _num = float(str(value).strip())
+                _rvp = ctrl.GetRangeValuePattern()
+                if _rvp is not None:
+                    _rvp.SetValue(_num)
+                    time.sleep(0.15)
+                    if abs(float(ctrl.GetRangeValuePattern().Value) - _num) < 1e-6:
+                        return True
+            except (ValueError, TypeError):
+                pass          # non-numeric value — RangeValue not applicable
             except Exception:
                 pass
             try:

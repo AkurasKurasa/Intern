@@ -421,10 +421,17 @@ def report(session_dir: Path | None, aggregate_all: bool) -> None:
 
 # ─── per-run evaluator (works on agent.run() results, no trace files needed) ──
 
-def evaluate_run(results: list[dict], goal: str = "", heuristic_steps: int = 0) -> dict:
+def evaluate_run(results: list[dict], goal: str = "", heuristic_steps: int = 0,
+                 record_num: int | None = None) -> dict:
     """
     Compute the three core metrics from agent.run() results list.
     Works on complete AND early-terminated runs.
+
+    record_num: which intake record the run entered (multi-record). When given,
+    typed values are scored against THAT record — the best-match inference
+    below mis-picked record 1 for a record-2 run (shared generic values +
+    record 1 having more fields biased the vote), so record 2's CORRECT
+    'Underwriter' scored ✗ while record-1 contamination scored ✓.
 
     Returns a dict with keys: task_completion_rate, action_prediction_accuracy,
     execution_success_rate, and a formatted summary string.
@@ -550,17 +557,21 @@ def evaluate_run(results: list[dict], goal: str = "", heuristic_steps: int = 0) 
         src_text = SOURCE_FILE.read_text(encoding="utf-8", errors="ignore")
         records  = _parse_records(src_text)
         if records:
-            # Infer which record was being filled by finding the best-matching record
-            # (most typed values present in that record's values).
-            typed_set = {v.strip().lower() for _, v, _sw in typed_values}
-            best_idx, best_hits = min(records), -1
-            for rec_num, rec in records.items():
-                hits = sum(
-                    1 for v in rec.values()
-                    if str(v).strip().lower() in typed_set
-                )
-                if hits > best_hits:
-                    best_hits, best_idx = hits, rec_num
+            if record_num is not None and record_num in records:
+                # Caller (run_task) KNOWS which record ran — no guessing.
+                best_idx = record_num
+            else:
+                # Infer which record was being filled by finding the best-matching record
+                # (most typed values present in that record's values).
+                typed_set = {v.strip().lower() for _, v, _sw in typed_values}
+                best_idx, best_hits = min(records), -1
+                for rec_num, rec in records.items():
+                    hits = sum(
+                        1 for v in rec.values()
+                        if str(v).strip().lower() in typed_set
+                    )
+                    if hits > best_hits:
+                        best_hits, best_idx = hits, rec_num
             source_record = {k.strip().lower(): str(v).strip()
                              for k, v in records[best_idx].items()}
     except Exception:

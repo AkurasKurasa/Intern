@@ -191,16 +191,35 @@ def _parse_intake_record(text: str, record_num: int = 1) -> dict:
         return {}
 
     result = {}
+    section = ""
     for line in target_body.splitlines():
         line = line.strip()
-        if ":" not in line or line.startswith("=") or line.startswith("-") or line.startswith("["):
+        # SECTION TRACKING (2026-07-11): bare labels ('First Name', 'DL
+        # Expiration') repeat inside [Driver N] sub-sections. Unguarded
+        # mapping let the LAST occurrence overwrite the policyholder's —
+        # gold claimed ph_first='Tyler' (Driver 3) when the policyholder is
+        # James, so CORRECT fills scored as mismatches.
+        sec_m = re.match(r"^\[\s*(.+?)\s*\]$", line)
+        if sec_m:
+            section = sec_m.group(1)
+            continue
+        if ":" not in line or line.startswith("=") or line.startswith("-"):
+            continue
+        # ph_*/v_* keys belong to the base sections — never map bare labels
+        # found inside a Driver section or a second-plus Vehicle section.
+        _mv = re.match(r"(?i)vehicle\s+(\d+)\s*$", section)
+        if re.match(r"(?i)driver\s+\d+\s*$", section) or (_mv and _mv.group(1) != "1"):
             continue
         label_raw, _, value_raw = line.partition(":")
         label = label_raw.strip().rstrip(".").lower()
         value = value_raw.strip()
 
-        # Strip [VERIFY] annotations
-        value = re.sub(r"\[VERIFY\]", "", value).strip()
+        # Strip intake ANNOTATIONS from gold values — they are notes to the
+        # human, not part of the value ('12 Month  ← NOTE: Annual term…',
+        # '651  [VERIFY — borderline…]'). The agent correctly types the bare
+        # value; gold keeping the annotation scored those as mismatches.
+        value = re.sub(r"\[[^\]]*\]", "", value).strip()   # any [bracketed note]
+        value = re.split(r"\s*←", value)[0].strip()        # trailing '← NOTE' arrows
 
         # Skip empty or placeholder values
         if not value or value.lower() in ("(none)", "n/a", ""):
@@ -217,10 +236,10 @@ def _parse_intake_record(text: str, record_num: int = 1) -> dict:
             "v_daytime_lights", "v_backup_camera", "v_gps",
             "v_parking_sensors", "v_lane_assist", "v_adaptive_cruise",
         }
-        if key in bool_keys:
-            result[key] = _parse_bool(value)
-        else:
-            result[key] = value
+        # First occurrence wins (belt on top of the section guard) — repeats
+        # of a label must never silently replace an earlier, correct mapping.
+        if key not in result:
+            result[key] = _parse_bool(value) if key in bool_keys else value
 
     return result
 
@@ -450,6 +469,40 @@ def score_behavior(agent_results: list[dict], reference_sequence: list) -> dict:
 
 # ── score ──────────────────────────────────────────────────────────────────────
 
+def _find_source_text(ref: dict) -> str:
+    """Locate and read the intake source the gold standard was built from."""
+    name = ref.get("source", "")
+    if not name.endswith(".txt"):
+        return ""
+    cands = [ROOT / "data_entry_tasks" / name]
+    if not cands[0].exists():
+        cands = list(ROOT.rglob(name))
+    for p in cands:
+        for enc in ("utf-8", "utf-8-sig", "cp1252", "latin-1"):
+            try:
+                return p.read_text(encoding=enc)
+            except (UnicodeDecodeError, OSError):
+                continue
+    return ""
+
+
+def _detect_record_num(agent_submission: dict, text: str):
+    """Which intake record did this submission enter? Match the submission's
+    policy number against each record's own — data-driven, no assumptions.
+    Returns the record number, or None when nothing matches."""
+    import re
+    sub_pn = _normalize(agent_submission.get("policy_number"))
+    if not sub_pn or not text:
+        return None
+    parts = re.split(r"RECORD\s+(\d+)\s+OF\s+\d+", text)
+    for i in range(1, len(parts) - 1, 2):
+        rn = int(parts[i])
+        rec = _parse_intake_record(text, rn)
+        if rec and _normalize(rec.get("policy_number")) == sub_pn:
+            return rn
+    return None
+
+
 def score_submission(agent_submission: dict, results: list[dict] | None = None) -> dict:
     """
     Score an agent submission dict against the gold standard.
@@ -465,6 +518,23 @@ def score_submission(agent_submission: dict, results: list[dict] | None = None) 
     gold_fields: dict = ref["fields"]
     gold_tabs:   list = ref["tab_order"]
     total_gold        = len(gold_fields)
+
+    # RECORD-AWARE GOLD (2026-07-11): the static reference is RECORD 1's answer
+    # sheet — record-N runs were graded against it (record 2 scored 15.5% with
+    # "expected 'PAI-2026-00441', got '...442'" reported as a mismatch: the
+    # grader held the wrong answers). Detect which record THIS submission
+    # entered and rebuild gold from the source for that record. No match →
+    # static reference, flagged in the report.
+    gold_record = f"static (record {ref.get('record_num', '?')})"
+    _src_text = _find_source_text(ref)
+    _rn = _detect_record_num(agent_submission, _src_text)
+    if _rn is not None:
+        _dyn = _parse_intake_record(_src_text, _rn)
+        if _dyn:
+            gold_fields = _dyn
+            gold_tabs   = sorted({_tab_of(k) for k in _dyn})
+            total_gold  = len(_dyn)
+            gold_record = f"record {_rn} (detected via policy number)"
 
     if total_gold == 0:
         return {"error": "Gold standard has no scorable fields."}
@@ -529,6 +599,7 @@ def score_submission(agent_submission: dict, results: list[dict] | None = None) 
         "tabs_gold":         gold_tabs,
         "mismatches":        mismatches[:10],  # cap for readability
         "completed":         completed,
+        "gold_record":       gold_record,
     }
 
 
@@ -581,6 +652,8 @@ def _print_report(s: dict, goal: str, submission_name: str) -> None:
     print(f"  Goal: {goal[:52]}")
     print(border)
     print(f"  Task Fidelity          {s['fidelity']*100:>6.1f}%   (correct values vs intake)")
+    if s.get("gold_record"):
+        print(f"    Gold standard:       {s['gold_record']}")
     print(f"    Field Match Rate     {s['field_match_rate']*100:>6.1f}%"
           f"   ({s['fields_matched']}/{s['fields_total']} fields correct)")
     print(f"    Value Accuracy       {s['value_accuracy']*100:>6.1f}%"
