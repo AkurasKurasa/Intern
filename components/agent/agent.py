@@ -2102,71 +2102,28 @@ class LLMAgent:
                             logger.info("[OPT2] CLICK on empty combobox %r → treat as FILL", _cb_label[:30])
                             _cb_sec = self._detect_section(state, _cbox)
                             _cb_val = self._lookup_field(_cb_label, section=_cb_sec)
-                            # ONE click opens the dropdown; select inline + continue.
-                            # (Don't route to the type-handler — its own open-click would
-                            #  TOGGLE the dropdown shut → no options → Escape loop.)
-                            self._executor.execute({"action_type": "click", "click_position": _snap2})
                             if not _cb_val:
-                                # Optional field with no record value (e.g. Suffix).
-                                # Escape + Tab past it, and MARK it attempted so the
-                                # transformer stops re-targeting it (the real fix is the
-                                # 'attempted' state-feature; this just records the hit).
+                                # Optional field with no record value (e.g. Suffix):
+                                # MARK it attempted so the transformer stops
+                                # re-targeting it, Tab past. (No dropdown was opened —
+                                # the pipeline owns all combobox mechanics now.)
                                 logger.info("[OPT2] combobox %r — no value, Tab", _cb_label)
-                                self._executor.execute({"action_type": "keyboard",
-                                                        "key_count": 1, "keystrokes": ["escape"]})
                                 self._mark_attempted(_cbox)
                                 self._executor.execute({"action_type": "keyboard",
                                                         "key_count": 1, "keystrokes": ["tab"]})
                                 time.sleep(self.step_delay * 0.5)
                                 continue
-                            _items = []
-                            for _try in range(4):
-                                time.sleep(0.35)
-                                _cs = self._observe()
-                                _items = [e for e in _cs.get("elements", [])
-                                          if e.get("type") == "listitemcontrol"
-                                          and e.get("window_role") != "background" and e.get("bbox")]
-                                if _items:
-                                    break
-                            _vlc = _cb_val.strip().lower()
-                            _o = lambda e: (e.get("text") or e.get("label") or "").strip()
-                            _hit = next((e for e in _items if _o(e).lower() == _vlc), None) \
-                                or next((e for e in _items if _o(e).lower().startswith(_vlc)
-                                         or _vlc.startswith(_o(e).lower())), None)
-                            if _hit:
-                                _b = _hit["bbox"]
-                                self._executor.execute({"action_type": "click",
-                                                        "click_position": [(_b[0]+_b[2])/2, (_b[1]+_b[3])/2]})
+                            # SINGLE FILL PIPELINE (identity-everywhere, 2026-07-11):
+                            # reliable mechanics first, pixels last, read-back verified.
+                            if self._fill_element(_cbox, _cb_val, state):
                                 logger.info("Combobox(click-fill): %r → selected %r", _cb_label, _cb_val)
-                                time.sleep(0.25)
+                                self._filled_this_tab.add(
+                                    f"{_cb_sec} {_cb_label}" if _cb_sec else _cb_label)
                                 self._executor.execute({"action_type": "keyboard",
                                                         "key_count": 1, "keystrokes": ["tab"]})
-                                self._filled_this_tab.add(_cb_label)
                             else:
-                                if _items:
-                                    logger.warning("Combobox(click-fill): %r not in options %s",
-                                                   _cb_val, [_o(e) for e in _items][:12])
-                                else:
-                                    logger.warning("Combobox(click-fill): dropdown for %r did not render", _cb_label)
-                                self._executor.execute({"action_type": "keyboard",
-                                                        "key_count": 1, "keystrokes": ["escape"]})
-                                time.sleep(0.2)
-                                # LONG-LIST RESCUE (2026-07-11): the visible-items read
-                                # only sees the on-screen rows — 'Texas' below the fold
-                                # failed here TWICE and got skipped (live 19:09). This is
-                                # the click-fill path; the type-path and reveal-focus
-                                # path carry the same rescue. Identity executor ladder
-                                # (probe-verified): ValuePattern → full UIA item walk →
-                                # type-to-filter → first-letter cycling.
-                                if self._act_on_element(_cbox, _cb_val):
-                                    logger.info("Combobox(click-fill): %r → %r via identity executor rescue.",
-                                                _cb_label, _cb_val)
-                                    self._filled_this_tab.add(
-                                        f"{_cb_sec} {_cb_label}" if _cb_sec else _cb_label)
-                                    self._executor.execute({"action_type": "keyboard",
-                                                            "key_count": 1, "keystrokes": ["tab"]})
-                                    time.sleep(self.step_delay * 0.5)
-                                    continue
+                                logger.warning("Combobox(click-fill): %r → %r failed in the fill pipeline.",
+                                               _cb_label[:24], _cb_val[:24])
                                 # Anti-loop: a combobox that fails to fill must not be
                                 # re-targeted forever. Tab past; after 2 fails mark it
                                 # attempted so the transformer stops pointing at it.
@@ -2595,40 +2552,12 @@ class LLMAgent:
                     and _fel and _fel.get("type") == "comboboxcontrol"
                     and _fel.get("bbox")):
                 _combo_value = prediction["text"]
-                _bx1, _by1, _bx2, _by2 = _fel["bbox"]
-                _ccx, _ccy = (_bx1 + _bx2) / 2, (_by1 + _by2) / 2
-                logger.info("Combobox: clicking to open dropdown for %r → %r", _flabel, _combo_value)
-                self._executor.execute({"action_type": "click", "click_position": [_ccx, _ccy]})
-                # The dropdown can take a moment to render. Poll a few times before
-                # giving up — otherwise we Escape on an empty observe and waste a
-                # whole open→escape→reopen cycle (the #1 combobox time-sink).
-                _listitems = []
-                for _try in range(4):
-                    time.sleep(0.35)
-                    _combo_state = self._observe()
-                    _listitems = [e for e in _combo_state.get("elements", [])
-                                  if e.get("type") == "listitemcontrol"
-                                  and e.get("window_role") != "background"
-                                  and e.get("bbox")]
-                    if _listitems:
-                        break
-                _cv_lc = _combo_value.strip().lower()
-                def _opt(e): return (e.get("text") or e.get("label") or "").strip()
-                # exact first, then prefix-fuzzy (handles 'Full Coverage' vs
-                # 'Full Coverage (Comprehensive)'); avoid loose substring so
-                # 'Active' never matches 'Inactive'.
-                _match = next((e for e in _listitems if _opt(e).lower() == _cv_lc), None)
-                if not _match:
-                    _match = next((e for e in _listitems
-                                   if _opt(e).lower().startswith(_cv_lc)
-                                   or _cv_lc.startswith(_opt(e).lower())), None)
-                if not _match and _listitems:
-                    logger.warning("Combobox: %r not in options %s",
-                                   _combo_value, [_opt(e) for e in _listitems][:12])
-                if _match:
-                    _lx1, _ly1, _lx2, _ly2 = _match["bbox"]
-                    self._executor.execute({"action_type": "click",
-                                            "click_position": [(_lx1+_lx2)/2, (_ly1+_ly2)/2]})
+                # SINGLE FILL PIPELINE (identity-everywhere, 2026-07-11): the
+                # old open→read-visible-items→click dance lived here with an
+                # identity rescue bolted on after failure; the pipeline runs
+                # reliable mechanics first and pixels last, read-back verified.
+                logger.info("Combobox: fill %r → %r via pipeline", _flabel, _combo_value)
+                if self._fill_element(_fel, _combo_value, state):
                     logger.info("Combobox: selected %r", _combo_value)
                     _no_change_streak = 0
                     _last_auto_step   = step_idx
@@ -2640,61 +2569,9 @@ class LLMAgent:
                     _action_history.append(("combobox_done", _flabel_full))
                     self._filled_this_tab.add(_flabel_full)
                 else:
-                    # LONG-LIST RESCUE (2026-07-11): _listitems holds only the
-                    # ON-SCREEN portion of the dropdown (~a dozen rows) — in a
-                    # 50-state combobox 'Texas' sits below the fold and the
-                    # open→"not in options"→Escape cycle looped forever (live
-                    # 17:55, six times). Close the dropdown, then:
-                    #   1. identity executor — UIA child-walk sees ALL items,
-                    #      visible or not, and selects via SelectionItemPattern;
-                    #   2. type-to-filter — native combobox prefix selection,
-                    #      exactly what a human does on a long dropdown.
-                    self._executor.execute({"action_type": "keyboard", "key_count": 1,
-                                            "keystrokes": ["escape"]})
-                    time.sleep(0.2)
-                    _rescued = False
-                    if self._act_on_element(_fel, _combo_value):
-                        logger.info("Combobox: %r selected via identity executor (off-screen item).",
-                                    _combo_value)
-                        _rescued = True
-                    else:
-                        # type-to-filter: focus the combo, type the value, Enter
-                        self._executor.execute({"action_type": "click",
-                                                "click_position": [_ccx, _ccy]})
-                        time.sleep(0.3)
-                        self._executor.execute({"action_type": "keyboard",
-                                                "key_count": len(_combo_value),
-                                                "keystrokes": list(_combo_value)})
-                        time.sleep(0.25)
-                        self._executor.execute({"action_type": "keyboard", "key_count": 1,
-                                                "keystrokes": ["enter"]})
-                        time.sleep(0.3)
-                        _post = self._observe()
-                        _fel_now = min((e for e in _post.get("elements", [])
-                                        if (e.get("label") or e.get("text") or "").strip().lower()
-                                        == _flabel.strip().lower()
-                                        and (e.get("type") or "").lower() in ("comboboxcontrol", "combobox")
-                                        and e.get("bbox")),
-                                       key=lambda e: abs(e["bbox"][1] - _by1),
-                                       default=None)
-                        _now_val = (_fel_now.get("value") or "").strip().lower() if _fel_now else ""
-                        if _now_val and (_now_val == _cv_lc or _now_val.startswith(_cv_lc)
-                                         or _cv_lc.startswith(_now_val)):
-                            logger.info("Combobox: %r selected via type-to-filter.", _combo_value)
-                            _rescued = True
-                    if _rescued:
-                        _no_change_streak = 0
-                        _last_auto_step   = step_idx
-                        self._executor.execute({"action_type": "keyboard", "key_count": 1,
-                                                "keystrokes": ["tab"]})
-                        _action_history.append(("combobox_done", _flabel_full))
-                        self._filled_this_tab.add(_flabel_full)
-                    else:
-                        logger.warning("Combobox: %r not in dropdown — Escape (identity + type-to-filter failed).",
-                                       _combo_value)
-                        self._executor.execute({"action_type": "keyboard", "key_count": 1,
-                                                "keystrokes": ["escape"]})
-                        _action_history.append(("combobox_fail", _flabel))
+                    logger.warning("Combobox: %r → %r failed in the fill pipeline.",
+                                   _flabel[:24], _combo_value[:24])
+                    _action_history.append(("combobox_fail", _flabel))
                 time.sleep(self.step_delay * 0.5)
                 continue
 
@@ -4603,63 +4480,25 @@ class LLMAgent:
                 _miss_label = (miss.get("label") or miss.get("text") or "").strip()
                 _miss_sec   = self._detect_section(state, miss)
                 _miss_val   = self._lookup_field(_miss_label, section=_miss_sec)
-                logger.info("Reveal-focus: combobox %r → open+select %r [attempt %d].",
-                            field_name, _miss_val, count)
-                self._executor.execute({"action_type": "click", "click_position": [cx, cy]})
                 if not _miss_val:
-                    # No record value → escape dropdown + Tab (optional field)
-                    time.sleep(0.25)
-                    self._executor.execute({"action_type": "keyboard",
-                                            "key_count": 1, "keystrokes": ["escape"]})
+                    # No record value → optional field: mark attempted + Tab
                     self._mark_attempted(miss)
                     self._executor.execute({"action_type": "keyboard",
                                             "key_count": 1, "keystrokes": ["tab"]})
                     time.sleep(0.3)
                     return self._observe()
-                # Wait for the dropdown to render its listitems (up to 4 × 0.35s)
-                _rf_items = []
-                for _rf_try in range(4):
-                    time.sleep(0.35)
-                    _rf_st = self._observe()
-                    _rf_items = [e for e in _rf_st.get("elements", [])
-                                 if e.get("type") == "listitemcontrol"
-                                 and e.get("window_role") != "background"
-                                 and e.get("bbox")]
-                    if _rf_items:
-                        break
-                _rf_vlc = _miss_val.strip().lower()
-                _rf_opt = lambda e: (e.get("text") or e.get("label") or "").strip()
-                _rf_hit = (next((e for e in _rf_items
-                                 if _rf_opt(e).lower() == _rf_vlc), None)
-                           or next((e for e in _rf_items
-                                    if _rf_opt(e).lower().startswith(_rf_vlc)
-                                    or _rf_vlc.startswith(_rf_opt(e).lower())), None))
-                if _rf_hit:
-                    _rfb = _rf_hit["bbox"]
-                    self._executor.execute({"action_type": "click",
-                                            "click_position": [(_rfb[0]+_rfb[2])/2,
-                                                               (_rfb[1]+_rfb[3])/2]})
+                # SINGLE FILL PIPELINE (identity-everywhere, 2026-07-11)
+                logger.info("Reveal-focus: combobox %r → %r via pipeline [attempt %d].",
+                            field_name, _miss_val, count)
+                if self._fill_element(miss, _miss_val, state):
                     logger.info("Reveal-focus: combobox %r → selected %r.", field_name, _miss_val)
-                    time.sleep(0.25)
-                    self._executor.execute({"action_type": "keyboard",
-                                            "key_count": 1, "keystrokes": ["tab"]})
+                    self._filled_this_tab.add(
+                        f"{_miss_sec} {_miss_label}" if _miss_sec else _miss_label)
                 else:
-                    logger.warning("Reveal-focus: combobox %r — %r not in options %s.",
-                                   field_name, _miss_val,
-                                   [_rf_opt(e) for e in _rf_items][:10])
-                    self._executor.execute({"action_type": "keyboard",
-                                            "key_count": 1, "keystrokes": ["escape"]})
-                    time.sleep(0.2)
-                    # LONG-LIST RESCUE (2026-07-11) — same ladder as the other
-                    # two combobox paths: visible-items read misses below-fold
-                    # options; the identity executor sees them all.
-                    if self._act_on_element(miss, _miss_val):
-                        logger.info("Reveal-focus: combobox %r → %r via identity executor rescue.",
-                                    field_name, _miss_val)
-                        self._filled_this_tab.add(
-                            f"{_miss_sec} {_miss_label}" if _miss_sec else _miss_label)
-                    self._executor.execute({"action_type": "keyboard",
-                                            "key_count": 1, "keystrokes": ["tab"]})
+                    logger.warning("Reveal-focus: combobox %r → %r failed in the fill pipeline.",
+                                   field_name, _miss_val)
+                self._executor.execute({"action_type": "keyboard",
+                                        "key_count": 1, "keystrokes": ["tab"]})
                 time.sleep(0.3)
                 return self._observe()
             else:
@@ -6487,6 +6326,86 @@ class LLMAgent:
         except Exception as exc:
             logger.debug("resolve_live_control %r failed: %s", _name[:24], exc)
             return None
+
+    def _fill_element(self, elem: Dict[str, Any], value: str,
+                      state: Optional[Dict[str, Any]] = None) -> bool:
+        """THE fill pipeline (identity-everywhere inversion, 2026-07-11).
+        Reliable mechanics FIRST (UIA patterns / keyboard select, read-back
+        verified — _act_on_element), legacy pixel/paste mechanics LAST.
+        Callers must not implement their own fill choreography: the old
+        arrangement (each call site doing its own pixel dance, with identity
+        rescues bolted on after failures in three copies) was a guard-pile.
+        Returns True only when the fill verifiably landed."""
+        value = "" if value is None else str(value)
+        if not elem or not value:
+            return False
+        if self._act_on_element(elem, value):
+            return True
+        # ── legacy fallbacks, per widget type ─────────────────────────────────
+        ety = (elem.get("type") or "").lower()
+        b = elem.get("bbox")
+        if not b:
+            return False
+        cx, cy = (b[0] + b[2]) / 2, (b[1] + b[3]) / 2
+        lbl = (elem.get("label") or elem.get("text") or "").strip()
+        try:
+            if ety in ("checkboxcontrol", "checkbox"):
+                # Win32 BM_SETCHECK — pyautogui clicks don't toggle wx checkboxes
+                import win32gui as _wg, win32api as _wa
+                _want = value.strip().lower() in ("yes", "yes (check)", "true", "checked", "x", "1")
+                _hw = _wg.WindowFromPoint((int(cx), int(cy)))
+                if not _hw:
+                    return False
+                BM_GETCHECK, BM_SETCHECK, BST_CHECKED = 0x00F0, 0x00F1, 1
+                if (_wa.SendMessage(_hw, BM_GETCHECK, 0, 0) == BST_CHECKED) != _want:
+                    _wa.SendMessage(_hw, BM_SETCHECK, BST_CHECKED if _want else 0, 0)
+                    time.sleep(0.15)
+                return (_wa.SendMessage(_hw, BM_GETCHECK, 0, 0) == BST_CHECKED) == _want
+            if ety in ("comboboxcontrol", "combobox"):
+                # pixel open → click a VISIBLE matching item (below-fold items
+                # are the identity path's job; if it failed, visible is all
+                # the legacy path can honestly do)
+                self._executor.execute({"action_type": "click", "click_position": [cx, cy]})
+                _items = []
+                for _ in range(4):
+                    time.sleep(0.35)
+                    _st = self._observe()
+                    _items = [e for e in _st.get("elements", [])
+                              if e.get("type") == "listitemcontrol"
+                              and e.get("window_role") != "background" and e.get("bbox")]
+                    if _items:
+                        break
+                _vlc = value.strip().lower()
+                _opt = lambda e: (e.get("text") or e.get("label") or "").strip()
+                _hit = (next((e for e in _items if _opt(e).lower() == _vlc), None)
+                        or next((e for e in _items if _opt(e).lower().startswith(_vlc)
+                                 or _vlc.startswith(_opt(e).lower())), None))
+                if _hit is None:
+                    self._executor.execute({"action_type": "keyboard", "key_count": 1,
+                                            "keystrokes": ["escape"]})
+                    return False
+                _hb = _hit["bbox"]
+                self._executor.execute({"action_type": "click",
+                                        "click_position": [(_hb[0]+_hb[2])/2, (_hb[1]+_hb[3])/2]})
+                time.sleep(0.2)
+                return True
+            # edits / spins: focus click + idempotent paste, verified by read-back
+            self._executor.execute({"action_type": "click", "click_position": [cx, cy]})
+            time.sleep(0.15)
+            self._executor.execute({"action_type": "keyboard", "key_count": len(value),
+                                    "keystrokes": list(value), "text": value})
+            time.sleep(0.25)
+            _st = self._observe()
+            _same = [e for e in _st.get("elements", [])
+                     if (e.get("label") or e.get("text") or "").strip().lower() == lbl.lower()
+                     and e.get("bbox")]
+            if _same:
+                _near = min(_same, key=lambda e: abs(e["bbox"][1] - b[1]))
+                return (_near.get("value") or "").strip() == value.strip()
+            return False
+        except Exception as exc:
+            logger.debug("fill_element %r failed: %s", lbl[:24], exc)
+            return False
 
     def _act_on_element(self, elem: Dict[str, Any], value: str) -> bool:
         """Fill/toggle/select the OBSERVED element via UIA patterns. Returns
