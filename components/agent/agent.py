@@ -313,10 +313,18 @@ def _state_to_text(state: Dict[str, Any], record_num: int = 1, visual_cache: Opt
             logger.debug("_parse_records → %d record(s) found (blob size=%d)", len(records), len(raw_text))
 
             if records:
-                rec = records.get(record_num, records.get(min(records), {}))
-                lines.append(f"\nDATA SOURCES (Record {record_num}):")
-                for field, value in rec.items():
-                    lines.append(f"  {field} : {value}")
+                # STRICT record bound (2026-07-11): the blob is UIA-capped (file's
+                # start = record 1); serving another record's fields here fed the
+                # LLM record-1 values on record-2 runs. Missing = say so honestly.
+                rec = records.get(record_num, {})
+                if rec:
+                    lines.append(f"\nDATA SOURCES (Record {record_num}):")
+                    for field, value in rec.items():
+                        lines.append(f"  {field} : {value}")
+                else:
+                    lines.append(f"\nDATA SOURCES: record {record_num} is NOT visible in the "
+                                 f"source window. Do NOT invent values and do NOT reuse another "
+                                 f"record's values — leave unknown fields blank.")
             else:
                 # Plain text — dump up to 3 000 chars to keep prompt small
                 lines.append(f"\nDATA SOURCES:")
@@ -1351,6 +1359,10 @@ class LLMAgent:
                             self._executor.execute({"action_type": "click", "click_position": [cx, cy]})
                             _submitted = True
                     if _submitted:
+                        # Latch on the instance too — the multi-record loop in
+                        # run_task reads agent._submitted to decide whether the
+                        # form is clean for the next record.
+                        self._submitted = True
                         break
 
             # 1b. Pane-focus escape: if focus is on a section header / container (panecontrol),
@@ -3087,7 +3099,10 @@ class LLMAgent:
             for blob in sorted(bg_blobs, key=len, reverse=True):
                 r = _parse_records(blob)
                 if r:
-                    rec = r.get(self._record_num, r.get(min(r), {}))
+                    # STRICT record bound (see 2026-07-11 contamination fix):
+                    # capped blobs only ever hold the file's start — falling back
+                    # to min(r) silently serves record 1 to every later record.
+                    rec = r.get(self._record_num, {})
                     break
 
         if not rec:
@@ -3208,7 +3223,14 @@ class LLMAgent:
 
         records = _parse_records(full_text)
         if records:
-            rec = records.get(self._record_num, records.get(min(records), {}))
+            # STRICT record bound (2026-07-11): when full_text came from a capped
+            # UIA blob it holds only the file's start — falling back to min(records)
+            # cached RECORD 1 for every later record (the ×2-probe contamination).
+            # Missing record → empty cache (honest) + a loud warning.
+            rec = records.get(self._record_num, {})
+            if not rec:
+                logger.warning("Record cache: record %d NOT in parsed source (%d record(s) visible) — cache left EMPTY, no cross-record fallback.",
+                               self._record_num, len(records))
             self._cached_record = rec
             # New record = new session → clear attempted history so fields on the
             # fresh record aren't pre-marked from the previous one.
@@ -3380,8 +3402,22 @@ class LLMAgent:
                 return
 
             lines = raw_text.splitlines()
-            from data_sources.notepad_source import _find_field_line
-            hit = _find_field_line(lines, field_name)
+            from data_sources.notepad_source import _find_field_line, _record_line_span
+            # RECORD-BOUNDED search (2026-07-11): an unbounded line scan always
+            # hits record 1's line first — this peek cached record 1's whole
+            # claims block into record 2's run (live, --start_record 2 probe).
+            # Search ONLY record N's slice; absent there = absent, full stop.
+            _span = _record_line_span(lines, self._record_num)
+            if _span == (-1, -1):
+                hit = None                # records exist, record N absent → nothing
+            elif _span:
+                _s0, _s1 = _span
+                hit = _find_field_line(lines[_s0:_s1], field_name)
+                if hit:
+                    hit = (hit[0] + _s0, hit[1])      # back to absolute line no.
+            else:
+                # No record headers (single-record source) → whole text is fair.
+                hit = _find_field_line(lines, field_name)
             target_line = hit[0] if hit else 0
             fl = field_name.lower()
 
@@ -3982,7 +4018,11 @@ class LLMAgent:
             for blob in sorted(bg_blobs, key=len, reverse=True):
                 r = _parse_records(blob)
                 if r:
-                    rec = r.get(self._record_num, r.get(min(r), {}))
+                    # STRICT record bound: UIA blobs are capped (~2000 chars = the
+                    # file's start = record 1), so "record N missing → use the
+                    # first record" typed record 1's claim into record 2 live
+                    # (2026-07-11 ×2 probe). Missing = EMPTY, never another record.
+                    rec = r.get(self._record_num, {})
                     fl  = field_name.lower()
                     # Try section-prefixed key first, then bare key
                     if sec_key:
@@ -5147,6 +5187,13 @@ class LLMAgent:
 
         # Type — LLM provides the value; transformer source_elem_idx as backup
         if l_type == "type":
+            # Deterministic absent=skip is FINAL: the record says this field is
+            # blank. The source-resolver backup below reads the visible Notepad
+            # text (top of file = record 1) and typed record 1's claim right
+            # past the first version of this skip (live 2026-07-11 17:53).
+            if llm_action.get("skip_field"):
+                logger.info("[MERGE] deterministic skip honored — Tab past, resolver NOT consulted.")
+                return {"action_type": "keyboard", "key_count": 1, "keystrokes": ["tab"]}
             text = llm_action.get("text", "")
             if not text:
                 src_idx = t_pred.get("source_elem_idx", -1)
@@ -5222,7 +5269,9 @@ class LLMAgent:
                 break
         if not records:
             return ""
-        rec = records.get(self._record_num, records.get(min(records), {}))
+        # STRICT record bound (2026-07-11): missing record = no value, never
+        # another record's line (capped blobs always start at record 1).
+        rec = records.get(self._record_num, {})
         fl = field_name.lower()
         for k, v in rec.items():
             if k.lower() == fl:
@@ -5270,6 +5319,26 @@ class LLMAgent:
                     _expected = self._lookup_field(_fn, section=_fsec)
                 logger.info("LLM focused-field lookup: field=%r  expected=%r  cache_size=%d",
                             _fn, _expected[:40] if _expected else "", len(self._cached_record))
+                # DETERMINISTIC ABSENT=SKIP (2026-07-11): the record IS present
+                # (cache populated) yet says nothing about this field even after
+                # refresh + record-bounded peek → the correct value is BLANK.
+                # Asking a small local LLM anyway made it INVENT (typed the SSN
+                # into 'Claim Amount', looped fantasy combobox options 10 steps —
+                # live --start_record 2 probe). Return the empty type-action
+                # directly — downstream OPT2 already treats it as Tab-past skip.
+                # Checkboxes excluded (unchecked is a valid state, not a skip).
+                _f_ty = (focused_el.get("type") or "").lower()
+                if (not _expected and _fn != "?" and self._cached_record
+                        and not _fv
+                        and _f_ty in ("editcontrol", "input", "comboboxcontrol",
+                                      "combobox", "spincontrolcontrol", "spincontrol")):
+                    logger.info("Deterministic skip: %r absent from record %d — leave blank, no LLM call.",
+                                _fn, self._record_num)
+                    # skip_field: merge must NOT "rescue" the empty text via the
+                    # transformer's source resolver — it reads the visible
+                    # Notepad text (top of file = record 1) and re-injected
+                    # record 1's claim right past this skip (live 17:53 probe).
+                    return {"action_type": "type", "text": "", "skip_field": True}
                 _expect_hint = (
                     f"\n  → EXPECTED VALUE FROM DATA SOURCES: {_expected!r}"
                     f"\n  → Use EXACTLY this string as 'text'. Do NOT modify or invent."
@@ -5591,6 +5660,41 @@ class LLMAgent:
                     continue
                 # 2) LLM fallback — only for ambiguous fields whose label the source
                 #    can't resolve (so _view_mismatches skipped them). Veto if already ok.
+                # VERIFY-AT-FILL GATE (2026-07-10): this call used to fire on EVERY
+                # scroll-view, including views where every field already held a
+                # validator-confirmed value — the dominant time cost of the whole
+                # verify pass (LLM latency × views × tabs, re-checking work already
+                # confirmed at fill time). A view needs the LLM only when it shows
+                # an EMPTY live fillable that branch 1 couldn't resolve: filled
+                # fields were either source-matched above or are settled. The
+                # deterministic clobber-catch (branch 1) still reads every view.
+                _vt_v = self._form_viewport_top(_st)
+                _vb_v = self._form_viewport_bottom(_st) - 8
+                _needs_llm = False
+                for _ve in _st.get("elements", []):
+                    _vty = (_ve.get("type") or "").lower()
+                    if _vty not in ("editcontrol", "input", "comboboxcontrol", "combobox",
+                                    "spincontrolcontrol", "spincontrol"):
+                        continue
+                    if _ve.get("window_role") == "background" or not _ve.get("bbox"):
+                        continue
+                    _vcy = (_ve["bbox"][1] + _ve["bbox"][3]) / 2
+                    if not (_vt_v <= _vcy <= _vb_v):
+                        continue
+                    if (_ve.get("value") or "").strip():
+                        continue                      # holds a value → not LLM's problem
+                    if not (_ve.get("label") or _ve.get("text") or "").strip():
+                        continue
+                    if self._attempt_key(_ve) in self._dead_fill_keys:
+                        continue
+                    _needs_llm = True
+                    break
+                if not _needs_llm:
+                    if not self._scrollbar_drag(_st, 240.0):
+                        break
+                    time.sleep(self.step_delay * 0.5)
+                    _st = self._observe()
+                    continue
                 _nav = self._navigation_protocol(_st)
                 _act = (_nav.get("action") or "").lower()
                 if _act == "fill" and (_nav.get("field") or "").strip():
@@ -6147,6 +6251,30 @@ class LLMAgent:
                                 logger.info("[NAV] sweep: section-corrected %r value %r → %r (%s).",
                                             _nf[:24], str(_nv)[:20], str(_sv)[:20], _sec_sw)
                             _nv = _sv
+                # RECORD IS THE SOURCE OF TRUTH for the sweep (2026-07-11). The
+                # protocol LLM's proposals for fields the record says nothing
+                # about are pure invention — it typed LITERAL '(leave blank)' /
+                # 'N/A' / 'No description provided' into record 2's claim-less
+                # Claims tab via the identity executor. No literal blacklists
+                # (that's the ruleset-inference loop's job): _lookup_field
+                # already resolves explicit '(leave blank)'/none record values
+                # to empty, so ONE rule covers both cases — no record value =
+                # the field STAYS BLANK, settled so it isn't re-proposed. When
+                # the record DOES hold a value, it beats the LLM's proposal.
+                _sw_sec  = self._detect_section(state, _fx) if _fx is not None else ""
+                _rec_val = self._lookup_field(_nf, section=_sw_sec)
+                if self._cached_record and not _rec_val:
+                    logger.info("[NAV] sweep: %r blank/absent from record %d — stays blank (settled, no fill).",
+                                _nf[:28], self._record_num)
+                    self._dead_fill_keys.add(_tk)
+                    if _fx is not None:
+                        self._mark_attempted(_fx)
+                    state = self._observe()
+                    continue
+                if _rec_val and str(_nv).strip().lower() != _rec_val.strip().lower():
+                    logger.info("[NAV] sweep: record value %r beats LLM proposal %r for %r.",
+                                _rec_val[:24], str(_nv)[:24], _nf[:24])
+                    _nv = _rec_val
                 logger.info("[NAV] sweep fill/verify %r → %r", _nf[:28], str(_nv)[:30])
                 self._nav_fill_field(state, _nf, _nv,
                                      prefer_key=(_tk if _fx is not None else None))

@@ -114,6 +114,14 @@ if __name__ == "__main__":
     _parser.add_argument("--perception", choices=["uia", "vision"], default="uia",
                          help="Perception source: 'uia' (accessibility tree, default) or "
                               "'vision' (screenshot + CV/OCR — sees the form from pixels).")
+    _parser.add_argument("--records", type=int, default=1,
+                         help="How many intake records to enter back-to-back (multi-record). "
+                              "Relies on the form clearing itself via 'Submit & New'; a fresh "
+                              "agent is built per record so all per-record state resets.")
+    _parser.add_argument("--start_record", type=int, default=1,
+                         help="Which intake record to start at (default 1). Lets a single "
+                              "record be tested in isolation (e.g. --start_record 2 --records 1 "
+                              "probes record 2 without paying for record 1 first).")
     _args = _parser.parse_args()
 
     _active_key = API_KEY if PROVIDER == "anthropic" else GROQ_API_KEY if PROVIDER == "groq" else API_KEY
@@ -159,81 +167,106 @@ if __name__ == "__main__":
 
     from agent.scope import INSURANCE_SCOPE   # app-specific tabs/sections/records
 
-    agent = LLMAgent(
-        goal             = GOAL,
-        provider         = PROVIDER,
-        api_key          = _active_key,
-        task_plugin      = None,
-        pure_transformer = False,
-        disable_auto_handlers = True,   # kill legacy heuristics — transformer(WHERE)+LLM(WHAT) merge drives
-        observer         = _observer,   # None → agent defaults to UIA; else vision
-        visual_reader    = visual_reader,
-        visual_cache     = visual_cache,
-        source_window    = SOURCE_WINDOW,
-        max_steps        = MAX_STEPS,
-        step_delay       = STEP_DELAY,
-        start_tab_idx    = _args.start_tab,
-        scope            = INSURANCE_SCOPE,   # the only place insurance-specifics live
-        model_path       = _args.model,
-        route_capsule    = False,             # honor --model; don't let the capsule router override
-    )
     logger.info("Model checkpoint: %s", _args.model)
     if _args.start_tab:
         logger.info("Drill mode: starting at tab index %d — manually click that tab first.", _args.start_tab)
 
-    logger.info("Starting — goal=%r  provider=%s  no plugin", GOAL, PROVIDER)
-    results = []
-    try:
-        results = agent.run(max_steps=MAX_STEPS, task_name="form_filling")
-    except KeyboardInterrupt:
-        results = list(agent._results)
-        logger.info("Run interrupted by user at step %d.", len(results))
-    except Exception as exc:
-        results = list(agent._results)
-        logger.error("Run crashed at step %d: %s", len(results), exc)
-    finally:
-        logger.info("Run ended — %d steps", len(results))
+    # ── Multi-record loop ──────────────────────────────────────────────────────
+    # One record per agent.run() (Submit latches and ends the run). A FRESH agent
+    # per record resets all per-record state (attempted keys, dead-marks,
+    # _submitted) by construction; the form clears itself via 'Submit & New'.
+    _rec_first = _args.start_record
+    _rec_last  = _args.start_record + _args.records - 1
+    for _rec in range(_rec_first, _rec_last + 1):
+        if _args.records > 1:
+            logger.info("═══════════ RECORD %d/%d ═══════════", _rec, _rec_last)
+        agent = LLMAgent(
+            goal             = GOAL,
+            provider         = PROVIDER,
+            api_key          = _active_key,
+            task_plugin      = None,
+            pure_transformer = False,
+            disable_auto_handlers = True,   # kill legacy heuristics — transformer(WHERE)+LLM(WHAT) merge drives
+            observer         = _observer,   # None → agent defaults to UIA; else vision
+            visual_reader    = visual_reader,
+            visual_cache     = visual_cache,
+            source_window    = SOURCE_WINDOW,
+            max_steps        = MAX_STEPS,
+            step_delay       = STEP_DELAY,
+            start_tab_idx    = _args.start_tab if _rec == _rec_first else 0,
+            scope            = INSURANCE_SCOPE,   # the only place insurance-specifics live
+            model_path       = _args.model,
+            route_capsule    = False,             # honor --model; don't let the capsule router override
+            record_num       = _rec,
+        )
 
-        # ── Evaluation metrics (always runs, even on early stop or crash) ──────
-        sys.path.insert(0, os.path.join(_ROOT, "scripts"))
-        from eval_metrics import evaluate_run
-        _metrics = evaluate_run(results, goal=GOAL, heuristic_steps=agent._heuristic_steps)
-
-        # ── Persist metrics to JSONL for trend tracking ───────────────────────
+        logger.info("Starting — goal=%r  provider=%s  record=%d", GOAL, PROVIDER, _rec)
+        results  = []
+        _aborted = False
         try:
-            import datetime as _dt
-            _metrics_path = os.path.join(_ROOT, "data", "output", "run_metrics.jsonl")
-            _metrics_row  = {
-                "timestamp": _dt.datetime.now().isoformat(),
-                "goal":      GOAL,
-                "provider":  PROVIDER,
-                **{k: v for k, v in _metrics.items() if k != "summary"},
-            }
-            with open(_metrics_path, "a", encoding="utf-8") as _mf:
-                _mf.write(json.dumps(_metrics_row) + "\n")
-        except Exception as _me:
-            logger.debug("Metrics persist failed: %s", _me)
+            results = agent.run(max_steps=MAX_STEPS, task_name="form_filling")
+        except KeyboardInterrupt:
+            results  = list(agent._results)
+            _aborted = True
+            logger.info("Run interrupted by user at step %d.", len(results))
+        except Exception as exc:
+            results = list(agent._results)
+            logger.error("Run crashed at step %d: %s", len(results), exc)
+        finally:
+            logger.info("Run ended — record %d, %d steps", _rec, len(results))
 
-        # ── BC fidelity score vs gold standard ───────────────────────────────
-        try:
-            from bc_fidelity import score_run
-            score_run(results, goal=GOAL)
-        except Exception as _fe:
-            logger.debug("BC fidelity scorer skipped: %s", _fe)
+            # ── Evaluation metrics (always runs, even on early stop or crash) ──
+            sys.path.insert(0, os.path.join(_ROOT, "scripts"))
+            from eval_metrics import evaluate_run
+            _metrics = evaluate_run(results, goal=GOAL, heuristic_steps=agent._heuristic_steps)
 
-        # ── Per-step log ──────────────────────────────────────────────────────
-        for r in results:
-            step = r.get("step", "?")
-            act  = r.get("action", {}).get("action_type", "?")
-            val  = r.get("validation", "?")
-            logger.info("  step %02d: %-10s  validation=%s", step, act, val)
+            # ── Persist metrics to JSONL for trend tracking ────────────────────
+            try:
+                import datetime as _dt
+                _metrics_path = os.path.join(_ROOT, "data", "output", "run_metrics.jsonl")
+                _metrics_row  = {
+                    "timestamp": _dt.datetime.now().isoformat(),
+                    "goal":      GOAL,
+                    "provider":  PROVIDER,
+                    "record":    _rec,
+                    **{k: v for k, v in _metrics.items() if k != "summary"},
+                }
+                with open(_metrics_path, "a", encoding="utf-8") as _mf:
+                    _mf.write(json.dumps(_metrics_row) + "\n")
+            except Exception as _me:
+                logger.debug("Metrics persist failed: %s", _me)
 
-        # ── Extract generalized rules from the completed run ───────────────────
-        if PROVIDER != "none" and results:
-            from intelligence.rule_extractor import RuleExtractor
-            extractor = RuleExtractor(
-                provider   = PROVIDER,
-                api_key    = API_KEY or os.environ.get("GROQ_API_KEY", ""),
-                output_dir = "tasks/form_filling",
-            )
-            extractor.extract(results, goal=GOAL, task_name="form_filling")
+            # ── BC fidelity score vs gold standard ─────────────────────────────
+            try:
+                from bc_fidelity import score_run
+                score_run(results, goal=GOAL)
+            except Exception as _fe:
+                logger.debug("BC fidelity scorer skipped: %s", _fe)
+
+            # ── Per-step log ────────────────────────────────────────────────────
+            for r in results:
+                step = r.get("step", "?")
+                act  = r.get("action", {}).get("action_type", "?")
+                val  = r.get("validation", "?")
+                logger.info("  step %02d: %-10s  validation=%s", step, act, val)
+
+            # ── Extract generalized rules from the completed run ────────────────
+            if PROVIDER != "none" and results:
+                from intelligence.rule_extractor import RuleExtractor
+                extractor = RuleExtractor(
+                    provider   = PROVIDER,
+                    api_key    = API_KEY or os.environ.get("GROQ_API_KEY", ""),
+                    output_dir = "tasks/form_filling",
+                )
+                extractor.extract(results, goal=GOAL, task_name="form_filling")
+
+        if _aborted:
+            break
+        if _rec < _rec_last:
+            # Did this record actually submit? A run that ended without Submit
+            # (max_steps / crash) leaves the form dirty — entering the next
+            # record on top would corrupt both. Stop instead of pressing on.
+            if not getattr(agent, "_submitted", False):
+                logger.warning("Record %d ended WITHOUT submitting — stopping the multi-record loop.", _rec)
+                break
+            time.sleep(2.0)   # let 'Submit & New' clear the form before re-observing

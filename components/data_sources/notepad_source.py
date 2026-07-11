@@ -72,6 +72,34 @@ def _find_field_line(lines, field_name: str) -> Optional[Tuple[int, str]]:
 # DataSource generalization) without editing this function.
 _DEFAULT_RECORD_RE = r"={3,}[\s\S]*?RECORD\s+(\d+)\s+OF\s+\d+[\s\S]*?={3,}"
 
+# Line-level variant of the record header (same delimiter, applied per line) —
+# used to bound LINE searches to one record. Overridable like _DEFAULT_RECORD_RE.
+_DEFAULT_RECORD_LINE_RE = r"RECORD\s+(\d+)\s+OF\s+\d+"
+
+
+def _record_line_span(lines, record_num: int,
+                      line_re: str = _DEFAULT_RECORD_LINE_RE):
+    """(start, end) line indices of record `record_num`'s slice — header line
+    up to (exclusive) the next record's header, or EOF. Returns None when the
+    record isn't present. Exists so line-based lookups (_find_field_line) can
+    be RECORD-BOUNDED: an unbounded scan always hits record 1 first, which
+    typed record 1's claim into record 2 live (2026-07-11)."""
+    starts = []
+    for i, l in enumerate(lines):
+        m = re.search(line_re, l)
+        if m:
+            try:
+                starts.append((int(m.group(1)), i))
+            except (ValueError, IndexError):
+                continue
+    if not starts:
+        return None                      # headerless source — caller may search all
+    for idx, (rn, li) in enumerate(starts):
+        if rn == record_num:
+            end = starts[idx + 1][1] if idx + 1 < len(starts) else len(lines)
+            return (li, end)
+    return (-1, -1)                      # records EXIST but record_num absent — search NOTHING
+
 
 def _parse_records(raw_text: str, record_re: str = _DEFAULT_RECORD_RE) -> dict:
     """
@@ -167,6 +195,17 @@ class NotepadDataSource(DataSource):
     def get_all(self) -> Dict[str, str]:
         return dict(self._cache)
 
+    def _record_slice(self, lines):
+        """(sub_lines, offset) bounded to self._record_num. Multi-record source
+        with record N absent → ([], 0): search NOTHING rather than leak another
+        record's lines (the 2026-07-11 contamination). Headerless → whole text."""
+        span = _record_line_span(lines, self._record_num)
+        if span == (-1, -1):
+            return [], 0
+        if span:
+            return lines[span[0]:span[1]], span[0]
+        return lines, 0
+
     def refresh(self, record_num: int) -> None:
         """Re-read Notepad and populate the cache for the given record number."""
         self._record_num = record_num
@@ -177,7 +216,12 @@ class NotepadDataSource(DataSource):
 
         records = _parse_records(full_text)
         if records:
-            rec = records.get(record_num, records.get(min(records), {}))
+            # STRICT record bound (2026-07-11): "record N missing → first record"
+            # silently served record 1's data to later records. Missing = empty.
+            rec = records.get(record_num, {})
+            if not rec:
+                logger.warning("NotepadDataSource.refresh: record %d NOT in source (%d record(s)) — cache EMPTY, no fallback.",
+                               record_num, len(records))
             self._cache = rec
             logger.info("NotepadDataSource: refreshed %d field(s) for record %d",
                         len(rec), record_num)
@@ -413,7 +457,11 @@ class NotepadDataSource(DataSource):
                 return None
 
             lines = raw_text.splitlines()
-            hit = _find_field_line(lines, field_name)
+            # RECORD-BOUNDED (2026-07-11): unbounded scan = record 1's line first.
+            _sub, _off = self._record_slice(lines)
+            hit = _find_field_line(_sub, field_name)
+            if hit:
+                hit = (hit[0] + _off, hit[1])
             target_line = hit[0] if hit else 0
 
             np_hwnd   = self._find_notepad_hwnd(state)
@@ -526,6 +574,9 @@ class NotepadDataSource(DataSource):
         if not full_text:
             return None
         lines = full_text.splitlines()
+        # RECORD-BOUNDED (2026-07-11): both the anchor search and the follow-on
+        # scan stay inside the current record's slice.
+        lines, _off = self._record_slice(lines)
         # Locate target line via exact key match first (whole-word fallback inside _find_field_line)
         hit = _find_field_line(lines, field_name)
         if not hit:

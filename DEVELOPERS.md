@@ -98,11 +98,24 @@ the run's metrics block was not archived — capture the scorecard on the next r
 2026-07-09 complaints are validated wholesale (run completed) but not itemized against the
 per-complaint numbers yet.
 
-**Honest gaps remaining (2026-07-10 evening, post acceptance run):**
-- **Acceptance-run scorecard not archived** — the passing run's metrics block wasn't saved;
-  next run must capture Task Completion / Field Match / LLM% so the milestone has numbers.
-- **Label-collision blindness — FIXED (f88d4fc) and now full-run confirmed** (acceptance
-  run submitted end-to-end with section-qualified keys live).
+**MILESTONE (2026-07-11): MULTI-RECORD WORKS + cross-record contamination chain closed.**
+×2 run: both records SUBMITTED (PAI-2026-00441 + 00442), record 2 filled with record-2 data,
+form reset clean, per-record scorecards archived (record-2 mechanics best ever: 3.7% waste,
+1.9 steps/field, 96.3% exec success). The probes then found and killed FOUR value-leak paths
+one at a time (`--start_record` isolation probes, ~3 min each): blob-parse min-fallbacks (5
+sites), unbounded line-search peeks (4 sites, `_record_line_span`), LLM invention on absent
+fields (deterministic absent=skip, no LLM call), merge resolver rescue (`skip_field` final),
+sweep literal-typing (record-is-source-of-truth guard). Verified live: absent fields SKIP,
+zero cross-record values, LLM dependency on a blank tab fell to 16.7%.
+
+**Honest gaps remaining (2026-07-11 evening):**
+- **Both scorers record-blind** — run scorer (eval_metrics) + bc_fidelity grade every run
+  against RECORD 1's answers; record-N runs get fiction scores (correct fills marked ✗,
+  contamination marked ✓). Fix before ×5 — its five scorecards mean nothing otherwise.
+- **Sweep guard live-unwatched** (same lookup logic as the proven skips; exercised next full run).
+- **Annotated blanks** ('(N/A — no collision coverage)') typed literally from the record —
+  ruleset-inference case, filed; extractor currently learns the BACKWARDS rule from raw traces.
+- **Skipped fields re-picked** by the model until STUCK fires — cheap since no LLM call, but loopy.
 - **Filling sequence fidelity** — order is noisy vs the demos (Behavioral Match 0%);
   corpus still contains footer-button noise (clean_demos fix committed, corpus NOT
   re-cleaned, model NOT retrained on it). Root fix = re-clean + retrain, not more logic.
@@ -412,20 +425,38 @@ this list on every guardianship sweep. The priority-table overlay in the tree ma
 - [x] **FULL ACCEPTANCE RUN on v3 [PASSED 2026-07-10 evening]** — one uninterrupted run, tab 0 → all tabs → verify → autonomous Submit, zero touches, whole week's stack live together. The end-to-end claim on v3 is closed. *(Caveat: metrics block not archived — capture the scorecard next run. NEXT gate = Multi-record ×5.)*
 - [~] **Section-aware eval scorer** — `eval_metrics` FIXED 2026-07-10 (41cff4c): section-first
   value matching via pane geometry (same partition as agent identity keys); D2/D3 fills now
-  scored against their own values. REMAINING: audit `bc_fidelity`'s gold-key matching for the
-  same bug class before trusting BC SCORE numbers.
+  scored against their own values. `bc_fidelity` CONFIRMED broken by the ×2 probe (2026-07-11),
+  two subtasks:
+  - [ ] **bc_fidelity: record-blind gold** — scored record 2 against record 1's answers
+    (`policy_number: expected 'PAI-2026-00441', got 'PAI-2026-00442'` — grading the wrong
+    record; record 2's BC 15.5% is fiction). Fix: pick gold per record — the submission JSON
+    filename carries the policy number.
+  - [ ] **bc_fidelity: section-blind gold keys** — record 1 block claims `ph_first: expected
+    'Tyler', got 'James'` when the policyholder IS James (Tyler = a Driver section). Fix:
+    section-aware key mapping, same repair eval_metrics got.
+  - [ ] **Run scorer (eval_metrics) record-blind too** *(found in the --start_record 2 probe)* —
+    `evaluate_run` compares typed values against the source with NO record number: record 2's
+    correct 'Underwriter' ('Sylvia Okafor') scored ✗ "expected 'Marcus D. Chen'" (record 1's),
+    while record-1 contamination values scored ✓. Fix: pass the run's record_num into
+    evaluate_run and bound its source parse the same way.
 - [ ] **Scroll no-ops on tabs** — Fix `ScrollPattern.Scroll` failure on Claims/History/Drivers so all below-fold fields are reached, then remove the verification "accept-after-2-tries" band-aid. *(2026-07-09: optimal-viewport jump + viewport-top fix improve reach; deep-tab scroll still unverified end-to-end.)*
-- [ ] **Hard-to-fill widgets** — Implement type-to-filter select for 50-state dropdowns and digit keystrokes/read-back for numeric SpinCtrl widgets.
-- [ ] **Value quality (LLM mapping)** — Improve label-to-record mapping and inject section keys so LLM doesn't grab incorrect intake lines or wrong sections.
+- [ ] **Hard-to-fill widgets** — Implement type-to-filter select for 50-state dropdowns and digit keystrokes/read-back for numeric SpinCtrl widgets. *(Fresh evidence 2026-07-11 probe: 'State' → 'Texas' loop — the dropdown options READ truncates at 12 visible items ('Alabama'…'Idaho'), so 'Texas' reports "not in options" though it exists; escape-retry loop. Type-to-filter or SelectionItem via identity executor fixes it.)*
+- [ ] **Value quality (LLM mapping)** — Improve label-to-record mapping and inject section keys so LLM doesn't grab incorrect intake lines or wrong sections. *(×2 probe 2026-07-11 evidence: D2/D3 'DL Expiration' both got D1's date in record 1 — some lookup path still resolves that label bare; 'Middle Name' got the last name; 'Third Party Name' got a policy number. Real fix = the deterministic-lookup short-circuit [see verb-loop attack plan] with section-qualified keys — kills the wrong-line class wholesale.)*
+- [x] **Verify-at-fill (kill the redundant end-pass)** *(filed + implemented 2026-07-10, live-exercised 2026-07-11)* — Too much run time went to re-checking fields AFTER they were already filled. Diagnosis: the verify pass's cost was NOT the deterministic read-back (cheap UIA reads) but the LLM completeness call firing on EVERY scroll-view — even views where every field already held a confirmed value (LLM latency × ~8 views × 9 tabs). FIX: symptom gate — the LLM branch fires only when the view shows an EMPTY live fillable (non-dead, labeled) that the deterministic branch couldn't settle; filled fields were either source-matched by branch 1 or are settled. Branch 1 (deterministic clobber-catch) still reads every view; convergence gate unchanged. LIVE-EXERCISED in the ×2 probe (2026-07-11): both records ran the gated verify and submitted — no wedge, no missed-fill regression. Caveat: wall-time saving not explicitly measured.
 - [ ] **Deterministic verification polish** — Remove verification band-aids, cut per-field LLM reasoning calls, and speed up the validation pass.
-- [ ] **Multi-record scaling (×5) [NEXT — the scope's Definition of Done]** — Implement automated record advance, per-record data refresh, and reset loops for all 5 records. Unblocked by the passed acceptance run; pair the first ×5 attempt with an archived scorecard per record.
+- [~] **Multi-record scaling (×5) [NEXT — the scope's Definition of Done]** — Runner LIVE-VERIFIED 2026-07-11 (×2 probe): both records SUBMITTED (PAI-2026-00441 + PAI-2026-00442), record 2 filled with genuine record-2 data, form reset clean, per-record scorecards archived. Record-2 mechanics best yet (3.7% waste, 1.9 steps/field, 96.3% exec success). Subtasks from the ×2 probe findings:
+  - [x] **Cross-record value contamination [CONFIRMED FIXED — second --start_record 2 probe: zero record-1 values, peeks return nothing, cache stays record-2]** — Fields ABSENT from record N got RECORD 1's values. ROUND 1: the `records.get(record_num, min-fallback)` pattern at FIVE blob-parse sites (capped UIA blobs = file start = record 1 only) → strict bound everywhere + honest prompt message. Offline-verified… and the `--start_record 2` live probe STILL contaminated: **round 2 root = the LINE-SEARCH paths** — `_peek_notepad` / `NotepadDataSource.peek/peek_next_after` scan the whole file via `_find_field_line` (first 'Claim Amount' in file = record 1's, line 244, record 1 spans 17-300) and CACHE the hit; `NotepadDataSource.refresh` had the min-fallback too. FIX: `_record_line_span` helper (notepad_source; line-level record delimiter, overridable like the parser's) — all line searches now bounded to record N's slice; record absent from a multi-record file = search NOTHING (sentinel distinguishes headerless sources, which stay whole-text). Offline-verified against the exact live failure: record 2's claim lookups → None (were record 1's lines), record 1 still finds its own, absent/headerless cases correct. LESSON: the offline probe validated the five sites I knew about; the cheap live probe found the sixth path — audit finds what you suspect, probes find what you don't.
+  - [~] **Absent-from-record = leave blank (nobody fills it — LLM, resolver, or sweep)** — three unguarded fillers found and closed one probe at a time: (1) LLM invention on `expected=''` → deterministic absent=skip in `_ask_llm`, no LLM call — VERIFIED live 17:53; (2) merge's `TextResolver` backup "rescued" the empty text from VISIBLE Notepad text (= record 1) → `skip_field: True` honored by merge, resolver not consulted — VERIFIED live 18:00 ('deterministic skip honored' on every absent field, zero inventions in the OPT2 path); (3) the SWEEP typed the LLM's junk LITERALLY via the identity executor ('Claim Number' → '(leave blank)', 'Resolution Date' → 'N/A', 'Description' → 'No description provided' — 18:00 probe, step 17) → sweep guard: **record is the source of truth** — no section-aware record value = field settled stays-blank (dead-marked, not re-proposed); record value present = it BEATS the LLM's proposal. Deliberately NO literal blacklist (user-flagged: that's the ruleset-inference loop's territory per the HARD RULES; `_lookup_field` already resolves explicit '(leave blank)' record values to empty, so one rule covers both). Verify inherits via dead-key exclusion. UNTESTED LIVE (sweep guard). Residual: skipped fields re-picked by the model until STUCK fires (cheap, loopy). Retest = Claims probe: sweep lines must read 'stays blank (settled, no fill)'.
+  - [ ] **Run `--records 5`** — after the two fixes above; archive all 5 scorecards.
 - [ ] **Automate scoring harness** — Extend `scripts/bc_fidelity.py` to report blank fields, print full breakdowns, save scorecards, and fix Unicode print issues (do before fixing correctness).
 - [ ] **Strip WHERE-crutches** (Stage 2.5) — Remove agent-side navigation helpers (`_try_advance_tab`, `_focus_first_empty_field`, auto-advance-at-bottom) to let the transformer navigate fully. *(2026-07-09: ranked arbitration replaces several crutches at the source — WHERE stays the model's own ranking, agent only legality-filters; M2 + stranding guard deleted rather than added-to.)*
-- [ ] **Close ruleset-inference loop** — Fix `_compress_session` to decode new trace format and capture notepad/source values to infer skip/leave-blank rules.
+- [ ] **Close ruleset-inference loop** — Fix `_compress_session` to decode new trace format and capture notepad/source values to infer skip/leave-blank rules. *(Fresh case 2026-07-11 probe: 'Deductible ($)' typed the literal '(N/A — no collision coverage)' — the RECORD holds that string; `_lookup_field`'s blank-resolver catches exact 'n/a' but not annotated variants. Deliberately NOT hardcoded (user-flagged heuristic creep) — "n/a + annotation = leave empty" is exactly the class of rule the inference loop should learn and feed the prompt. WARNING from the same probe: the current extractor inferred the BACKWARDS rule from the raw trace — 'Use "(N/A — no collision coverage)" as a placeholder' — it codified the bug as best practice. Closing the loop requires inferring from CORRECTED/verified behavior, not raw traces, or bad runs poison the ruleset.)*
 
 ---
 
 ### 🟢 P1 — Generalize (Post Scope #1 Completion)
+- [ ] **Find alternative VLM** — Evaluate vision-language / screen-parsing models to replace or augment the current perception stack (classical CV+OCR now; OmniParser-class parser filed as the real fix). Candidates to benchmark behind the same `detect_elements()` seam: OmniParser v2, ShowUI, UGround, Qwen2.5-VL (local ONNX/GGUF preferred — human-like control rule: on-screen observation only). Accept when `perception_eval` beats the current baseline on box precision/recall + label accuracy.
+- [ ] **Find alternative LLM** — Evaluate replacements for the current LM Studio `local-model` as the WHAT-provider (value lookup, sweep proposals). Pain points to beat: 2-5s latency per call, occasional wrong-line grabs, JSON-format drift. Benchmark on the same prompts (value accuracy vs intake, latency, format reliability); candidates: newer local models (Qwen, Llama, Phi families) or the already-wired Groq provider path. Note: the LLM-dependency attack plan (deterministic lookup first) shrinks this component's importance — right-size the effort accordingly.
 - [~] **Perception: Accessibility Tree → Vision** *(component landed via PR #8: CV+OCR observer,
   drop-in via the observer seam, works across all 8 tabs; `--perception vision` wired into
   record/run; debug flipbook + live viewer (`make see`) added 2026-07-10. First live agent probe
