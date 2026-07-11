@@ -422,7 +422,7 @@ def report(session_dir: Path | None, aggregate_all: bool) -> None:
 # ─── per-run evaluator (works on agent.run() results, no trace files needed) ──
 
 def evaluate_run(results: list[dict], goal: str = "", heuristic_steps: int = 0,
-                 record_num: int | None = None) -> dict:
+                 record_num: int | None = None, llm_calls: int | None = None) -> dict:
     """
     Compute the three core metrics from agent.run() results list.
     Works on complete AND early-terminated runs.
@@ -643,6 +643,9 @@ def evaluate_run(results: list[dict], goal: str = "", heuristic_steps: int = 0,
     _tdep_str = (f"{transformer_dep*100:.1f}%" if transformer_dep is not None else "n/a")
     _conf_str = (f"{avg_conf:.3f}"             if avg_conf        is not None else "n/a")
     _spf_str  = f"{steps_per_field:.1f}" if steps_per_field != float("inf") else "∞"
+    _llm_calls_line = (f"  LLM Calls (actual HTTP)    {llm_calls:>7}   "
+                       f"(ALL calls incl. nav/sweep/verify assists — the honest number)\n"
+                       if llm_calls is not None else "")
     summary = (
         f"\n{border}\n"
         f"  RUN METRICS\n"
@@ -661,7 +664,8 @@ def evaluate_run(results: list[dict], goal: str = "", heuristic_steps: int = 0,
         f"  Value Accuracy             {val_acc*100:>6.1f}%   "
         f"({correct_values} correct / {correct_values+wrong_values} typed values)\n"
         f"  LLM Dependency             {_dep_str:>7}   "
-        f"({llm_steps} LLM / {tagged_steps} total)  ← target <5%\n"
+        f"({llm_steps} LLM fill-decisions / {tagged_steps} total)  ← target <5%\n"
+        f"{_llm_calls_line}"
         f"  Transformer Dependency     {_tdep_str:>7}   "
         f"({transformer_steps} transformer / {tagged_steps} total)  ← target >95%\n"
         f"  Deterministic Steps        {det_steps:>7}   "

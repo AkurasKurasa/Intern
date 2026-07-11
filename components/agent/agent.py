@@ -6809,6 +6809,7 @@ class LLMAgent:
         return {"action_type": "no_op"}
 
     def _call_anthropic(self, user_msg: str) -> Dict[str, Any]:
+        self._llm_call_count = getattr(self, "_llm_call_count", 0) + 1
         resp = self._llm_client.messages.create(
             model=self._llm_model,
             max_tokens=256,
@@ -6827,6 +6828,7 @@ class LLMAgent:
             + " Then output ONLY a JSON object on the last line."
             + f"\n[sid:{uuid.uuid4().hex[:12]}]"
         )
+        self._llm_call_count = getattr(self, "_llm_call_count", 0) + 1
         resp = self._llm_client.chat.completions.create(
             model=self._llm_model,
             max_tokens=2048,
@@ -6838,6 +6840,7 @@ class LLMAgent:
         return _parse_llm_response(resp.choices[0].message.content)
 
     def _call_gemini(self, user_msg: str) -> Dict[str, Any]:
+        self._llm_call_count = getattr(self, "_llm_call_count", 0) + 1
         resp = self._llm_client.models.generate_content(
             model=self._llm_model,
             contents=user_msg,
@@ -6851,6 +6854,7 @@ class LLMAgent:
         Returns the parsed JSON dict, or {} on failure. openai-compat providers."""
         import uuid
         try:
+            self._llm_call_count = getattr(self, "_llm_call_count", 0) + 1
             resp = self._llm_client.chat.completions.create(
                 model=self._llm_model,
                 max_tokens=400,

@@ -219,7 +219,8 @@ if __name__ == "__main__":
             sys.path.insert(0, os.path.join(_ROOT, "scripts"))
             from eval_metrics import evaluate_run
             _metrics = evaluate_run(results, goal=GOAL, heuristic_steps=agent._heuristic_steps,
-                                    record_num=_rec)
+                                    record_num=_rec,
+                                    llm_calls=getattr(agent, "_llm_call_count", 0))
 
             # ── Persist metrics to JSONL for trend tracking ────────────────────
             try:
