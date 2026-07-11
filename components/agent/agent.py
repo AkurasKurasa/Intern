@@ -787,7 +787,12 @@ class LLMAgent:
             if not _OPENAI_OK:
                 logger.warning("openai package not installed — falling back to transformer-only.")
                 return
-            self._llm_client = _OpenAI(base_url=lmstudio_url, api_key="lm-studio")
+            # timeout: a hung local server (LM Studio GPU-wedged, live
+            # 2026-07-11 22:36) held the run FOREVER mid-step — no response,
+            # no error. 60s covers slow local generations; a dead server now
+            # fails the step and the run continues instead of freezing.
+            self._llm_client = _OpenAI(base_url=lmstudio_url, api_key="lm-studio",
+                                       timeout=60.0, max_retries=1)
             logger.info("LLMAgent: provider=lmstudio  url=%s  model=%s", lmstudio_url, self._llm_model)
 
         elif p == "none":
