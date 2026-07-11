@@ -1981,7 +1981,10 @@ class LLMAgent:
                     if llm_action.get("action_type") == "done":
                         logger.info("LLM: task complete."); break
                     prediction = self._merge(t_pred, t_conf, llm_action, state)
-                    _decision_maker = "llm"
+                    # deterministic short-circuits answered WITHOUT an LLM call —
+                    # tag them honestly so LLM Dependency measures real calls.
+                    _decision_maker = ("deterministic" if llm_action.get("deterministic")
+                                       else "llm")
                     _flabel = ((_fe2.get("label") or _fe2.get("text") or "?")[:30]
                                if _fe2 else "(no focus)")
                     logger.info("[OPT2] TRANSFORMER chose TYPE → LLM value for '%s' → %r",
@@ -5277,7 +5280,22 @@ class LLMAgent:
                     # transformer's source resolver — it reads the visible
                     # Notepad text (top of file = record 1) and re-injected
                     # record 1's claim right past this skip (live 17:53 probe).
-                    return {"action_type": "type", "text": "", "skip_field": True}
+                    return {"action_type": "type", "text": "", "skip_field": True,
+                            "deterministic": True}
+                # DETERMINISTIC VALUE SHORT-CIRCUIT (2026-07-11, the LLM-45%
+                # fix, bucket 1): _expected was already resolved exactly —
+                # section-aware lookup + refresh + record-bounded peek. The
+                # prompt below would only instruct the LLM to ECHO it back
+                # ("Use EXACTLY this string") at 2-5s per call — the echo calls
+                # were the bulk of LLM dependency (~200/run). Type it directly;
+                # the LLM is consulted only when the record can't resolve the
+                # field (ambiguous label ↔ record-key mapping — its real job).
+                if (_expected and _fn != "?" and not _fv
+                        and _f_ty in ("editcontrol", "input", "comboboxcontrol",
+                                      "combobox", "spincontrolcontrol", "spincontrol")):
+                    logger.info("Deterministic value: %r → %r from record %d — no LLM call.",
+                                _fn, _expected[:32], self._record_num)
+                    return {"action_type": "type", "text": _expected, "deterministic": True}
                 _expect_hint = (
                     f"\n  → EXPECTED VALUE FROM DATA SOURCES: {_expected!r}"
                     f"\n  → Use EXACTLY this string as 'text'. Do NOT modify or invent."

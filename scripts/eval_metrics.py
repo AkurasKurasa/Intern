@@ -618,7 +618,9 @@ def evaluate_run(results: list[dict], goal: str = "", heuristic_steps: int = 0,
     # LLM Dependency — exact, using per-step decision_by tag logged by agent
     llm_steps         = sum(1 for r in results if r.get("decision_by") == "llm")
     transformer_steps = sum(1 for r in results if r.get("decision_by") == "transformer")
-    tagged_steps      = llm_steps + transformer_steps + heuristic_steps
+    # deterministic = record-resolved values / skips, NO LLM call made
+    det_steps         = sum(1 for r in results if r.get("decision_by") == "deterministic")
+    tagged_steps      = llm_steps + transformer_steps + heuristic_steps + det_steps
     llm_dep         = llm_steps         / tagged_steps if tagged_steps else None
     transformer_dep = transformer_steps / tagged_steps if tagged_steps else None
     avg_conf = (
@@ -662,6 +664,8 @@ def evaluate_run(results: list[dict], goal: str = "", heuristic_steps: int = 0,
         f"({llm_steps} LLM / {tagged_steps} total)  ← target <5%\n"
         f"  Transformer Dependency     {_tdep_str:>7}   "
         f"({transformer_steps} transformer / {tagged_steps} total)  ← target >95%\n"
+        f"  Deterministic Steps        {det_steps:>7}   "
+        f"(record-resolved, no LLM call)\n"
         f"  Heuristic Steps            {heuristic_steps:>7}   "
         f"(auto-handlers)  avg transformer conf={_conf_str}\n"
         f"  Total steps: {total_steps}  |  Terminated: {'naturally' if done else 'early/max_steps'}\n"
