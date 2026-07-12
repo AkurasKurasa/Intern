@@ -1,20 +1,21 @@
 // treetask data — edit this file, refresh index.html (`make tree`).
 // PRINCIPLE: every node is an OUTCOME you can check ("the form fills itself"),
 // not a mechanism ("ranked arbitration"). Mechanisms live in notes/children.
-// Node: { id?, title, status, note?, priority?, deps?: [ids], children? }
+// Team (owner values): Andrei | Ralph | Daniel | Kevin | unassigned
+// Node: { id?, title, status, note?, owner?, priority?, deps?: [ids], children? }
 //   status:   "done" | "partial" | "next" | "pending" | "risk"
 //   priority: integer — shows in the priority table, lower = higher
 //   deps:     ids that must be DONE before this can start (⛓ = blocked)
 const TREE = {
   id: "root",
-      owner: "Paula",
+      owner: "Ralph",
   title: "Complete Intern",
   status: "partial",
   note: "An agent that learns GUI work by WATCHING a person do it — then does it alone, their way. No hardcoded rules anywhere. Done = all three proof-scopes pass + thesis written.\n\nWhy it beats the alternatives: scripted RPA breaks on any change and knows no user; generic computer-use agents (incl. Codex Record & Replay) generalize a procedure but clone nobody. Intern's claims: personalization, local execution, judgment cloning.",
   children: [
     {
       id: "scope1",
-      owner: "Paula",
+      owner: "Ralph",
       title: "SCOPE 1 · Form Filling (the form fills itself)",
       status: "partial",
       note: "Proof scope #1 (car-insurance form, 8 tabs). DONE means: all 5 intake records entered and submitted in the demonstrated order, unattended, with numbers to prove it.",
@@ -28,7 +29,7 @@ const TREE = {
         },
         {
           id: "trust-numbers",
-          owner: "Paula",
+          owner: "Ralph",
           title: "The score can be trusted",
           status: "partial",
           priority: 2,
@@ -58,7 +59,7 @@ const TREE = {
           children: [
             { id: "identity-core", title: "Direct control API built + proven (edits, spins, checkboxes, combos)", status: "done",
               note: "_act_on_element: ValuePattern/TogglePattern/SelectionItem. Live-verified on Drivers." },
-            { id: "identity-everywhere", owner: "Paula", title: "ALL fill paths use ONE pipeline (pixels last)",
+            { id: "identity-everywhere", owner: "Ralph", title: "ALL fill paths use ONE pipeline (pixels last)",
               status: "partial", priority: 4, deps: ["identity-core", "acceptance-run"],
               note: "INVERSION LANDED 2026-07-11 (user-driven: the three bolted-on combobox rescues were a band-aid): new _fill_element = THE fill pipeline — reliable mechanics first (_act_on_element: patterns + keyboard select, read-back verified), legacy pixel/paste LAST. All three combobox paths (click-fill, type-path, reveal-focus) now call it; the three rescue copies and per-site dropdown dances are DELETED. _nav_fill_field already identity-first. OPT2 edit typing keeps its paste→keystroke→pattern-write ladder deliberately (paste is the correct cheap tier for plain edits; spins escalate to pattern write before dead-mark). DRILL PASSED 2026-07-11 22:44: 'State'→'Texas' AND 'DL Issuing State'→'Texas' each in ~1s, one log line, zero rescues/Escapes (the second 50-state widget was never explicitly fixed — the general mechanic covered it); all combobox flavors through the pipeline; 15/15 values, 3.6% waste. REMAINING: full acceptance on this architecture; verify-fix read-back unification; then retire snap/stale-coord guards." },
             { id: "dead-widgets", title: "Stubborn cases: long dropdowns + paste-reject spins", status: "done",
@@ -79,7 +80,7 @@ const TREE = {
               note: "Universal Semantic Action Space: verbs (set-value/toggle/select/…) + split pointer heads. v2 beat baseline 0.957 vs 0.878." },
             { id: "alt-llm", title: "Find alternative LLM", status: "pending",
               note: "Evaluate replacements for LM Studio 'local-model' as the WHAT-provider. Pain: 2-5s/call latency, wrong-line grabs, JSON drift. DO: benchmark candidates (newer Qwen/Llama/Phi locals, or the wired Groq path) on the same prompts — value accuracy vs intake, latency, format reliability. Right-size: the deterministic-lookup fix shrinks how much this matters." },
-            { id: "verb-loop", owner: "Paula", title: "Agent acts on the model's intents directly", status: "pending",
+            { id: "verb-loop", owner: "Ralph", title: "Agent acts on the model's intents directly", status: "pending",
               priority: 3, deps: ["acceptance-run"],
               note: "predict() already outputs verbs; the agent still converts to legacy click/type dicts. Wiring verbs → identity executor is what collapses LLM dependency and retires the remaining navigation crutches.\n\nLLM-45% ATTACK PLAN:\n1. [DONE — LIVE-VERIFIED 23:08 drill] Deterministic value short-circuit: every value 'no LLM call', fields landing ~2s apart (was ~7s), ONE HTTP call in the whole stretch (the GAP tab-advance). Design rule settled with user: look up what's look-up-able, think only about what isn't — LLM's jobs = ambiguity, judgment (Scope 3), rule inference.\n2. [NEXT] Deterministic next-tab — the GAP tab-advance is now the dominant remaining LLM consumer.\n3. Verb-loop (this node) — verbs+pointer straight into the identity executor; makes <5% structural.\nHonest accounting (398d30c): 'LLM Calls (actual HTTP)' metrics line counts ALL calls incl. nav/sweep/verify — the tag-based 0.0% only covered fill-decisions." },
           ],
@@ -98,14 +99,14 @@ const TREE = {
         },
         {
           id: "verify-at-fill",
-          owner: "Paula",
+          owner: "Ralph",
           title: "Verification doesn't re-check what's already confirmed",
           status: "done",
           note: "IMPLEMENTED 2026-07-10, live-exercised in the ×2 probe 2026-07-11: both records ran the gated verify and submitted — no wedge, no missed-fill regression. Mechanism: LLM completeness call fires only when a view shows an EMPTY live fillable the deterministic branch couldn't settle; filled views skip straight to the next scroll. Deterministic clobber-catch + convergence gate unchanged. Caveat: wall-time saving not explicitly measured.",
         },
         {
           id: "five-records",
-          owner: "Paula",
+          owner: "Ralph",
           title: "Five records in a row",
           status: "partial",
           priority: 5,
@@ -133,7 +134,7 @@ const TREE = {
     },
     {
       id: "generalization",
-      owner: "Paula",
+      owner: "Ralph",
       title: "GENERALIZATION · One engine, any app",
       status: "partial",
       note: "The organ that makes Intern travel beyond this form: swap the EYES (perception seam: UIA today, vision/Excel adapters proven at the same seam), swap the SOURCE (DataSource seam: Notepad today, any key:value provider), keep the same learned WHERE + WHAT-resolver stack (deterministic lookup → inferred rules → LLM judgment) + fill pipeline. Scope 2 tests that the stack travels; Scope 3 tests the judgment resolver. Windows-wide today; beyond Windows = the vision branch below.",
@@ -201,8 +202,8 @@ const TREE = {
     },
     {
       id: "thesis",
-      owner: "Paula",
-      title: "THESIS · The proof is written down",
+      owner: "Daniel",
+      title: "THESIS PAPER",
       status: "pending",
       note: "The academic deliverable: the three scopes turned into chapters, metrics and benchmark comparisons. Nothing here starts producing text until Scope #1 has trustworthy numbers.",
       children: [

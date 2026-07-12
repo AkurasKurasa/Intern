@@ -387,7 +387,7 @@ the CoT lines in `_call_openai_compat()`.
 
 ## Task List and Priority List
 
-**Visual mirror: [`treetask/`](treetask/index.html) (`make tree`)** — an interactive 3D
+**Visual mirror: [`treetask/`](treetask/index.html) (`make tree`; deployed on Cloudflare Pages 2026-07-12)** — an interactive 3D
 tree of this list. Apex = "Complete Intern"; branches are OUTCOMES you can verify
 ("the form fills itself", "the score can be trusted"), not mechanisms — jargon lives
 in each node's note, every node states what DOING it means. Statuses, priorities and

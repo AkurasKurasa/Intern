@@ -435,7 +435,10 @@
       (n.note ? `<div class="note">${n.note}</div>` : "") +
       (deps.length ? `<div class="sec">depends on</div><ul>${deps.map(m => li(m, true)).join("")}</ul>` : "") +
       (dependents.length ? `<div class="sec">unblocks</div><ul>${dependents.map(m => li(m, true)).join("")}</ul>` : "") +
-      ((n.children || []).length ? `<div class="sec">steps</div><ul>${n.children.map(m => li(m, false)).join("")}</ul>` : "");
+      ((n.children || []).length ? `<div class="sec">steps</div><ul>${n.children.map(m => li(m, false)).join("")}</ul>` : "") +
+      `<div class="sec"><a href="https://github.com/AkurasKurasa/Intern/edit/master/treetask/tasks.js"` +
+      ` target="_blank" rel="noopener" style="color:#8a93a8">✏ cross off / edit on GitHub</a>` +
+      ` <span style="color:#5b6272;font-size:11px">(commit → auto-redeploys for everyone)</span></div>`;
     detail.classList.add("open");
   }
   window.closeDetail = () => detail.classList.remove("open");
