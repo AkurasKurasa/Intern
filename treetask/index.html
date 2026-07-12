@@ -71,6 +71,9 @@
                      border-radius: 7px; padding: 5px 12px; cursor: pointer; font-size: 12.5px; }
   #controls button:hover { border-color: var(--dim); }
   #controls button.on { border-color: #7a6a9e; color: #b3a6d4; }
+  #controls select { background: var(--panel); color: var(--text); border: 1px solid var(--edge);
+                     border-radius: 7px; padding: 5px 9px; cursor: pointer; font-size: 12.5px; }
+  #controls select.on { border-color: #7a6a9e; color: #b3a6d4; }
 </style>
 </head>
 <body>
@@ -92,6 +95,7 @@
 </div>
 <div id="detail"><span class="close" onclick="closeDetail()">✕</span><div id="detail-body"></div></div>
 <div id="controls">
+  <select id="ownersel" onchange="setOwner(this.value)" title="show one member's tasks"></select>
   <button id="depbtn" onclick="toggleDeps()">deps: off</button>
   <button onclick="expandAll(true)">expand all</button>
   <button onclick="expandAll(false)">goals only</button>
@@ -124,6 +128,27 @@
     if (n.id) byId[n.id] = n;
     (n.children || []).forEach(c => prep(c, depth + 1, n));
   })(TREE, 0, null);
+
+  // ── owner filter (each member can view THEIR tasks) ─────────────────────
+  // effective owner = own `owner:` or nearest ancestor's (a branch owner owns
+  // its unassigned leaves). Choice persists per-browser in localStorage.
+  (function own(n, inh) {
+    n._owner = n.owner || inh || "unassigned";
+    (n.children || []).forEach(c => own(c, n._owner));
+  })(TREE, null);
+  let ownerFilter = localStorage.getItem("tt_owner") || "";
+  const ROSTER = ["", "Andrei", "Ralph", "Daniel", "Kevin", "unassigned"];
+  const ownersel = document.getElementById("ownersel");
+  ownersel.innerHTML = ROSTER.map(o =>
+    `<option value="${o}" ${o === ownerFilter ? "selected" : ""}>${o ? "👤 " + o : "👥 everyone"}</option>`).join("");
+  ownersel.classList.toggle("on", !!ownerFilter);
+  window.setOwner = v => {
+    ownerFilter = v;
+    localStorage.setItem("tt_owner", v);
+    ownersel.classList.toggle("on", !!v);
+    buildPrio();
+  };
+  const ownDim = n => ownerFilter && n._owner !== ownerFilter;
 
   function progress(n) {
     let done = 0, total = 0;
@@ -263,7 +288,8 @@
       const hasKids = n.children && n.children.length;
       const base = n._depth === 0 ? 26 : hasKids ? 15 : 9;
       const r = Math.max(3, base * f);
-      const alpha = Math.max(0.22, Math.min(1, 600 / sz));
+      // owner filter: nodes not owned by the selected member fade to ghosts
+      const alpha = Math.max(0.22, Math.min(1, 600 / sz)) * (ownDim(n) ? 0.12 : 1);
 
       // soft glow (muted)
       const g = ctx.createRadialGradient(sx, sy, 0, sx, sy, r * 2.2);
@@ -303,7 +329,8 @@
       }
       ctx.globalAlpha = 1;
 
-      const la = (n === hover || n._depth === 0) ? 0.95 : Math.max(0, Math.min(0.8, (700 - sz + 400) / 620));
+      const la = ((n === hover || n._depth === 0) ? 0.95 : Math.max(0, Math.min(0.8, (700 - sz + 400) / 620)))
+                 * (ownDim(n) ? 0.15 : 1);   // labels ghost with their nodes under the owner filter
       if (la > 0.05) {
         const SANS = '"Segoe UI Variable Text","Segoe UI",sans-serif';
         const MONO = '"Cascadia Mono",Consolas,monospace';
@@ -400,7 +427,10 @@
   // ── priority table ───────────────────────────────────────────────────────
   function buildPrio() {
     const rows = [];
-    (function walk(n) { if (n.priority != null) rows.push(n); (n.children || []).forEach(walk); })(TREE);
+    (function walk(n) {
+      if (n.priority != null && !(ownerFilter && n._owner !== ownerFilter)) rows.push(n);
+      (n.children || []).forEach(walk);
+    })(TREE);
     rows.sort((a, b) => a.priority - b.priority);
     const tb = document.getElementById("prio-body");
     tb.innerHTML = rows.map(n => {
