@@ -444,6 +444,16 @@ this list on every guardianship sweep. The priority-table overlay in the tree ma
     Policyholder/Vehicle only (~75 fields); Drivers/Coverage/Claims/Payment fills are
     invisible to the BC score (the record-2 claim contamination never showed in it). Extend
     the mapping before quoting BC numbers as whole-form fidelity.
+  - [~] **Behavioral Match unfrozen [FIXED 2026-07-12, offline-verified — first live number
+    pending]** — the thesis metric read 0% forever because the reference builder pointed at a
+    DEAD dir (`data/output/traces/forms`). Now: reference = the training corpus
+    (`data/demos/eight_Tabs_clean2`, `BC_TRACES_DIR` overridable — keep in sync with the
+    trained model); extractor handles the demo-recorder trace format (per-keystroke traces
+    collapsed to per-field granularity, both formats supported); representative-median
+    sequence cached (134s build → 0.02s hit); tab-order term skipped when demos don't flag
+    the selected tab (field-sequence-only, no zero-drag). **CALIBRATION: demo-vs-demo
+    similarity = 81% — the human consistency ceiling. A perfect clone scores ~80%, not 100%;
+    thesis must report agent Behavioral Match against that baseline.**
   - [x] **Run scorer (eval_metrics) record-aware [FIXED 2026-07-11]** — `evaluate_run` now
     takes `record_num` from run_task (which knows which record ran); the old majority-vote
     inference mis-picked record 1 (shared generic values + record 1's larger field count

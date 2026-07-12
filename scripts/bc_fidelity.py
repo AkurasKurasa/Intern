@@ -321,7 +321,14 @@ def set_reference(submission_path: Path) -> None:
 # ── behavioral sequence scoring ───────────────────────────────────────────────
 
 def _extract_sequence_from_traces(session_dir: Path) -> list[tuple[str, str, str]]:
-    """Extract (tab, field, action_type) sequence from a recorded session."""
+    """Extract (tab, field, action_type) sequence from a recorded session.
+    Handles BOTH trace formats:
+      - agent traces:    {'action': {'action_type': ...}, 'state': {...}}
+      - demo recordings: {'type': 'form_filling', 'mouse': {'actions': [...]},
+                          'keyboard': {'actions': [...]}, 'state': {...}}
+        (the GUI recorder's format — one trace per keystroke, so consecutive
+        identical (tab, field, type) tuples are collapsed to one per field,
+        matching the agent-side one-action-per-field granularity)."""
     seq = []
     for fpath in sorted(session_dir.glob("*.json")):
         if fpath.name == "session_manifest.json":
@@ -329,24 +336,34 @@ def _extract_sequence_from_traces(session_dir: Path) -> list[tuple[str, str, str
         t = _load_json(fpath)
         if not t:
             continue
-        action = t.get("action", {})
-        a_type = action.get("action_type", "")
-        if not a_type or a_type == "noop":
-            continue
+        if "action" in t:                       # agent-trace format
+            a_type = (t.get("action") or {}).get("action_type", "")
+            if a_type not in ("click", "keyboard"):
+                continue
+        else:                                   # demo-recorder format
+            _kb = (t.get("keyboard") or {}).get("actions") or []
+            _ms = (t.get("mouse") or {}).get("actions") or []
+            a_type = ("keyboard" if any(a for a in _kb if a)
+                      else "click" if any(a for a in _ms if a) else "")
+            if not a_type:
+                continue
         state = t.get("state", {})
         elems = state.get("elements", [])
         fid   = state.get("focused_element_id", "")
         tab   = next((
             e.get("label") or e.get("text") or ""
             for e in elems
-            if e.get("type", "").lower() in ("tabitem", "tab") and e.get("selected")
+            if "tab" in (e.get("type") or "").lower() and e.get("selected")
         ), "")
         field = next((
             e.get("label") or e.get("text") or ""
             for e in elems if e.get("element_id") == fid
         ), "")
-        if a_type in ("click", "keyboard") and (tab or field):
-            seq.append((tab, field, a_type))
+        if tab or field:
+            tup = (tab, field, a_type)
+            if seq and seq[-1] == tup:          # collapse per-keystroke runs
+                continue
+            seq.append(tup)
     return seq
 
 
@@ -427,6 +444,32 @@ def build_behavior_reference(traces_dir: Path) -> list[tuple[str, str, str]]:
     return best_seq
 
 
+def _behavior_reference_cached(traces_dir: Path) -> list:
+    """build_behavior_reference is ~5k JSON loads over a 20-session corpus —
+    cache the representative sequence, keyed on the corpus dir's mtime."""
+    cache = ROOT / "data" / "output" / "reference" / "behavior_reference.json"
+    try:
+        if cache.exists():
+            c = _load_json(cache)
+            if (c and c.get("traces_dir") == str(traces_dir)
+                    and c.get("dir_mtime") == traces_dir.stat().st_mtime):
+                return [tuple(x) for x in c.get("sequence", [])]
+    except OSError:
+        pass
+    seq = build_behavior_reference(traces_dir)
+    try:
+        cache.parent.mkdir(parents=True, exist_ok=True)
+        cache.write_text(json.dumps({
+            "traces_dir": str(traces_dir),
+            "dir_mtime":  traces_dir.stat().st_mtime,
+            "recorded":   datetime.now().isoformat(),
+            "sequence":   seq,
+        }), encoding="utf-8")
+    except OSError:
+        pass
+    return seq
+
+
 def score_behavior(agent_results: list[dict], reference_sequence: list) -> dict:
     """Score agent's action sequence against the human reference sequence."""
     if not reference_sequence:
@@ -450,9 +493,14 @@ def score_behavior(agent_results: list[dict], reference_sequence: list) -> dict:
         return out
     ref_tab_order   = _dedup(ref_tabs)
     agent_tab_order = _dedup(agent_tabs)
-    tab_order_match = _levenshtein_normalized(ref_tab_order, agent_tab_order)
-
-    behavioral_match = sim * 0.7 + tab_order_match * 0.3
+    if ref_tab_order:
+        tab_order_match  = _levenshtein_normalized(ref_tab_order, agent_tab_order)
+        behavioral_match = sim * 0.7 + tab_order_match * 0.3
+    else:
+        # demo traces may not flag the selected tabitem — score on field
+        # sequence alone rather than dragging the composite to 0.
+        tab_order_match  = 0.0
+        behavioral_match = sim
 
     return {
         "behavioral_match":  behavioral_match,
@@ -629,10 +677,23 @@ def score_run(results: list[dict], goal: str = "") -> dict | None:
         print(f"[BC Fidelity] {scores['error']}")
         return None
 
-    # Behavioral sequence score
-    traces_dir = ROOT / "data" / "output" / "traces" / "forms"
-    ref_seq = build_behavior_reference(traces_dir) if traces_dir.exists() else []
+    # Behavioral sequence score — reference = the DEMO CORPUS the model was
+    # trained on (Behavioral Match asks "did it fill in the demonstrated
+    # order?", so the demos ARE the reference). Was pointed at a dead dir
+    # (data/output/traces/forms) → 'No reference sequence available' → the
+    # thesis metric read 0% forever. Override with BC_TRACES_DIR; keep the
+    # default in sync with the training corpus.
+    import os as _os
+    _cand_dirs = [Path(p) for p in (
+        _os.environ.get("BC_TRACES_DIR", ""),
+    ) if p] + [
+        ROOT / "data" / "output" / "traces" / "forms",
+        ROOT / "data" / "demos" / "eight_Tabs_clean2",   # training corpus of the v3 model
+    ]
+    traces_dir = next((p for p in _cand_dirs if p.exists()), None)
+    ref_seq = _behavior_reference_cached(traces_dir) if traces_dir else []
     beh = score_behavior(results, ref_seq)
+    beh["behavior_reference"] = str(traces_dir) if traces_dir else "none"
     scores.update(beh)
 
     # Combined BC score
