@@ -207,6 +207,12 @@ const TREE = {
       status: "pending",
       note: "The academic deliverable: the three scopes turned into chapters, metrics and benchmark comparisons. Nothing here starts producing text until Scope #1 has trustworthy numbers.",
       children: [
+        { id: "revise-ch1", title: "Revise Chapter 1", status: "pending", owner: "Daniel",
+          note: "DO: pass over Chapter 1 (introduction/problem statement) for clarity, structure, and consistency with the current project framing." },
+        { id: "revise-ch2", title: "Revise Chapter 2", status: "pending", owner: "Daniel",
+          note: "DO: pass over Chapter 2 (background/related work) for clarity, structure, and consistency with the current project framing." },
+        { id: "revise-ch3", title: "Revise Chapter 3", status: "pending", owner: "Daniel",
+          note: "DO: pass over Chapter 3 (methodology/architecture) for clarity, structure, and consistency with the current project framing — this is the chapter most affected by the recent architecture work (fill pipeline, deterministic short-circuit, scorer fixes)." },
         { title: "Methodology + evaluation chapters", status: "pending", deps: ["scope1"],
           note: "DO: write thesis ch.3 (architecture: perception adapter → transformer WHERE → LLM WHAT → identity-executor HOW; BC training recipe) and ch.4 (metrics + runs). Blocked on Scope #1 numbers being real — which needs the trusted scorer first." },
         { title: "Benchmarks vs generic agents (OS-World)", status: "pending",
