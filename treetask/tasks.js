@@ -201,6 +201,12 @@ const TREE = {
       ],
     },
     {
+      id: "cleanup",
+      title: "Clean up Intern codebase",
+      status: "pending",
+      note: "General maintenance pass — not tied to one scope. Candidates: retire the pixel/paste fallbacks now that the fill pipeline (_fill_element) exists as the primary path; prune stale scratch/ probes and superseded demo dirs; consolidate the value-lookup fallback chain (5 sites touched during the contamination fix — verify none are now dead code); remove old guard-pile leftovers replaced by the identity-executor + verify-at-fill work. DO: scope this properly before starting — audit first, then decide what's actually safe to delete vs what's load-bearing.",
+    },
+    {
       id: "thesis",
       owner: "Daniel",
       title: "THESIS PAPER",
