@@ -46,6 +46,8 @@
   #prio td.p { color: var(--dim); width: 26px; text-align: right; font: 600 11.5px var(--mono); }
   #prio td.s { width: 18px; }
   #prio td.locked { color: var(--dim); width: 20px; }
+  #prio td.owner { color: var(--dim); width: 62px; font-size: 11px; white-space: nowrap;
+                   overflow: hidden; text-overflow: ellipsis; }
   #prio.folded table { display: none; }
 
   #detail { position: fixed; top: 0; right: 0; width: 330px; height: 100vh; background: var(--panel);
@@ -407,6 +409,7 @@
         `<td class="p">${n.priority}</td>` +
         `<td class="s" style="color:${COLORS[n.status || "pending"]}">●</td>` +
         `<td>${n.title.length > 30 ? n.title.slice(0, 29) + "…" : n.title}</td>` +
+        `<td class="owner" title="assignee">${n.owner || "—"}</td>` +
         `<td class="locked" title="blocked by unmet dependencies">${locked}</td></tr>`;
     }).join("");
   }
@@ -427,7 +430,8 @@
       `<h2>${n.title}</h2>` +
       `<div class="status" style="color:${COLORS[n.status || "pending"]}">${n.status || "pending"}` +
       ((n.children && n.children.length) ? ` — ${d}/${t} leaves done` : "") +
-      (blocked.length ? ` · <span style="color:${DEP_COL}">⛓ blocked</span>` : "") + `</div>` +
+      (blocked.length ? ` · <span style="color:${DEP_COL}">⛓ blocked</span>` : "") +
+      (n.owner ? ` · <span style="color:#9aa3b5">👤 ${n.owner}</span>` : "") + `</div>` +
       (n.note ? `<div class="note">${n.note}</div>` : "") +
       (deps.length ? `<div class="sec">depends on</div><ul>${deps.map(m => li(m, true)).join("")}</ul>` : "") +
       (dependents.length ? `<div class="sec">unblocks</div><ul>${dependents.map(m => li(m, true)).join("")}</ul>` : "") +

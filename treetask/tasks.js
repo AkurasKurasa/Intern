@@ -7,13 +7,15 @@
 //   deps:     ids that must be DONE before this can start (⛓ = blocked)
 const TREE = {
   id: "root",
+      owner: "Paula",
   title: "Complete Intern",
   status: "partial",
   note: "An agent that learns GUI work by WATCHING a person do it — then does it alone, their way. No hardcoded rules anywhere. Done = all three proof-scopes pass + thesis written.\n\nWhy it beats the alternatives: scripted RPA breaks on any change and knows no user; generic computer-use agents (incl. Codex Record & Replay) generalize a procedure but clone nobody. Intern's claims: personalization, local execution, judgment cloning.",
   children: [
     {
       id: "scope1",
-      title: "1 · The form fills itself",
+      owner: "Paula",
+      title: "SCOPE 1 · Form Filling (the form fills itself)",
       status: "partial",
       note: "Proof scope #1 (car-insurance form, 8 tabs). DONE means: all 5 intake records entered and submitted in the demonstrated order, unattended, with numbers to prove it.",
       children: [
@@ -26,6 +28,7 @@ const TREE = {
         },
         {
           id: "trust-numbers",
+          owner: "Paula",
           title: "The score can be trusted",
           status: "partial",
           priority: 2,
@@ -35,7 +38,7 @@ const TREE = {
               note: "FIXED 2026-07-11: _detect_record_num matches the submission's policy number against each intake record (data-driven), rebuilds gold for that record on the fly; static ref = flagged fallback; report prints which gold was used. Verified: 00441→record 1, 00442→record 2." },
             { id: "bc-section-gold", title: "bc_fidelity gold keys are section-aware", status: "done",
               note: "FIXED 2026-07-11: _parse_intake_record tracks [Section] headers — bare labels inside [Driver N]/[Vehicle 2+] never map to ph_*/v_* keys (Driver 3's 'Tyler' had overwritten ph_first); first-occurrence-wins belt; intake annotations ('← NOTE', '[VERIFY —…]') stripped from gold values." },
-            { id: "bc-gold-coverage", title: "BC gold covers the whole form, not 3 tabs", status: "pending",
+            { id: "bc-gold-coverage", owner: "unassigned", title: "BC gold covers the whole form, not 3 tabs", status: "pending",
               note: "_LABEL_TO_KEY maps Policy/Policyholder/Vehicle only (~75 fields) — Drivers/Coverage/Claims/Payment fills are INVISIBLE to the BC score (record 2's claim contamination never showed in it). DO: extend the label→key mapping to all tabs before quoting BC numbers as whole-form fidelity." },
             { id: "eval-record-gold", title: "Run scorer knows which record it's grading", status: "done",
               note: "FIXED 2026-07-11: evaluate_run takes record_num from run_task (which KNOWS which record ran) — no more majority-vote inference mis-picking record 1 (shared generic values + record 1's larger field count biased the vote; ties defaulted to record 1). Inference kept as fallback for callers without the number. Offline-verified against the exact live failure: contamination-biased run scored ✗ 'expected Marcus D. Chen' via inference, ✓ via record_num=2." },
@@ -55,12 +58,12 @@ const TREE = {
           children: [
             { id: "identity-core", title: "Direct control API built + proven (edits, spins, checkboxes, combos)", status: "done",
               note: "_act_on_element: ValuePattern/TogglePattern/SelectionItem. Live-verified on Drivers." },
-            { id: "identity-everywhere", title: "ALL fill paths use ONE pipeline (pixels last)",
+            { id: "identity-everywhere", owner: "Paula", title: "ALL fill paths use ONE pipeline (pixels last)",
               status: "partial", priority: 4, deps: ["identity-core", "acceptance-run"],
               note: "INVERSION LANDED 2026-07-11 (user-driven: the three bolted-on combobox rescues were a band-aid): new _fill_element = THE fill pipeline — reliable mechanics first (_act_on_element: patterns + keyboard select, read-back verified), legacy pixel/paste LAST. All three combobox paths (click-fill, type-path, reveal-focus) now call it; the three rescue copies and per-site dropdown dances are DELETED. _nav_fill_field already identity-first. OPT2 edit typing keeps its paste→keystroke→pattern-write ladder deliberately (paste is the correct cheap tier for plain edits; spins escalate to pattern write before dead-mark). DRILL PASSED 2026-07-11 22:44: 'State'→'Texas' AND 'DL Issuing State'→'Texas' each in ~1s, one log line, zero rescues/Escapes (the second 50-state widget was never explicitly fixed — the general mechanic covered it); all combobox flavors through the pipeline; 15/15 values, 3.6% waste. REMAINING: full acceptance on this architecture; verify-fix read-back unification; then retire snap/stale-coord guards." },
             { id: "dead-widgets", title: "Stubborn cases: long dropdowns + paste-reject spins", status: "done",
               note: "DONE 2026-07-11, verified three ways: probe (scratch/probe_dead_widgets.py — spin ''→'3' via ValuePattern/RangeValue; 'State' ''→'Texas' below-fold, winner = FIRST-LETTER CYCLING with read-back, wx.Choice matches single chars); drills 22:44 + 23:08 (both 50-state widgets ~1s each, all three combobox paths through the pipeline); spin rescue live 22:49. User caught mid-way that a drill alone wasn't proof AND that rescues-after-pixel-failure were a band-aid — both led to the pipeline inversion. Residual split out → spin-visibility." },
-            { id: "spin-visibility", title: "Filled spin values visible to the observer", status: "pending",
+            { id: "spin-visibility", owner: "unassigned", title: "Filled spin values visible to the observer", status: "pending",
               note: "Found 22:49: the identity-executor write LANDS, but the OBSERVED element's value stays '' → model re-targets the already-filled field (~15 wasted steps) → wrongly dead-marked. (23:08 drill: same field took its value first try — intermittent.) DO: read back via the same _resolve_live_control identity the writer used, or mask rescue-filled keys as attempted+filled regardless of observed value." },
           ],
         },
@@ -76,7 +79,7 @@ const TREE = {
               note: "Universal Semantic Action Space: verbs (set-value/toggle/select/…) + split pointer heads. v2 beat baseline 0.957 vs 0.878." },
             { id: "alt-llm", title: "Find alternative LLM", status: "pending",
               note: "Evaluate replacements for LM Studio 'local-model' as the WHAT-provider. Pain: 2-5s/call latency, wrong-line grabs, JSON drift. DO: benchmark candidates (newer Qwen/Llama/Phi locals, or the wired Groq path) on the same prompts — value accuracy vs intake, latency, format reliability. Right-size: the deterministic-lookup fix shrinks how much this matters." },
-            { id: "verb-loop", title: "Agent acts on the model's intents directly", status: "pending",
+            { id: "verb-loop", owner: "Paula", title: "Agent acts on the model's intents directly", status: "pending",
               priority: 3, deps: ["acceptance-run"],
               note: "predict() already outputs verbs; the agent still converts to legacy click/type dicts. Wiring verbs → identity executor is what collapses LLM dependency and retires the remaining navigation crutches.\n\nLLM-45% ATTACK PLAN:\n1. [DONE — LIVE-VERIFIED 23:08 drill] Deterministic value short-circuit: every value 'no LLM call', fields landing ~2s apart (was ~7s), ONE HTTP call in the whole stretch (the GAP tab-advance). Design rule settled with user: look up what's look-up-able, think only about what isn't — LLM's jobs = ambiguity, judgment (Scope 3), rule inference.\n2. [NEXT] Deterministic next-tab — the GAP tab-advance is now the dominant remaining LLM consumer.\n3. Verb-loop (this node) — verbs+pointer straight into the identity executor; makes <5% structural.\nHonest accounting (398d30c): 'LLM Calls (actual HTTP)' metrics line counts ALL calls incl. nav/sweep/verify — the tag-based 0.0% only covered fill-decisions." },
           ],
@@ -95,12 +98,14 @@ const TREE = {
         },
         {
           id: "verify-at-fill",
+          owner: "Paula",
           title: "Verification doesn't re-check what's already confirmed",
           status: "done",
           note: "IMPLEMENTED 2026-07-10, live-exercised in the ×2 probe 2026-07-11: both records ran the gated verify and submitted — no wedge, no missed-fill regression. Mechanism: LLM completeness call fires only when a view shows an EMPTY live fillable the deterministic branch couldn't settle; filled views skip straight to the next scroll. Deterministic clobber-catch + convergence gate unchanged. Caveat: wall-time saving not explicitly measured.",
         },
         {
           id: "five-records",
+          owner: "Paula",
           title: "Five records in a row",
           status: "partial",
           priority: 5,
@@ -118,6 +123,7 @@ const TREE = {
         },
         {
           id: "self-improving",
+          owner: "unassigned",
           title: "It learns its own rules from runs",
           status: "pending",
           priority: 6,
@@ -126,8 +132,15 @@ const TREE = {
       ],
     },
     {
+      id: "generalization",
+      owner: "Paula",
+      title: "GENERALIZATION · One engine, any app",
+      status: "partial",
+      note: "The organ that makes Intern travel beyond this form: swap the EYES (perception seam: UIA today, vision/Excel adapters proven at the same seam), swap the SOURCE (DataSource seam: Notepad today, any key:value provider), keep the same learned WHERE + WHAT-resolver stack (deterministic lookup → inferred rules → LLM judgment) + fill pipeline. Scope 2 tests that the stack travels; Scope 3 tests the judgment resolver. Windows-wide today; beyond Windows = the vision branch below.",
+      children: [
+    {
       id: "vision",
-      title: "It can see (pixels, not APIs)",
+      title: "Vision (pixels, not APIs)",
       status: "partial",
       note: "Big Three #1 — CV+OCR observer (PR #8): screenshot → boxes + text → same element schema. Proven: agent NAVIGATES from pixels (2026-07-10 probe, 7/7 on-target clicks); tooling: per-observation flipbook + live viewer (make see). Not yet: filling. This is the generalization organ — Scope #2+ needs it; Scope #1 stays on UIA.",
       children: [
@@ -150,9 +163,12 @@ const TREE = {
           note: "DO (after the two blockers): record with --perception vision, clean, train — the model that needs no accessibility tree at all." },
       ],
     },
+      ],
+    },
     {
       id: "scope2",
-      title: "2 · It moves data between apps",
+      owner: "unassigned",
+      title: "SCOPE 2 · Cross-App Transfer (web form → Excel)",
       status: "pending",
       deps: ["acceptance-run", "five-records", "vision"],
       note: "Proof scope #2: web form → Excel. Same engine, different eyes and hands. Perception swap already PROVEN (ExcelObserver speaks the same schema).",
@@ -169,7 +185,8 @@ const TREE = {
     },
     {
       id: "scope3",
-      title: "3 · It clones judgment, not just steps",
+      owner: "unassigned",
+      title: "SCOPE 3 · Judgment Cloning (email/ticket triage)",
       status: "pending",
       deps: ["scope2"],
       note: "Proof scope #3: email/ticket triage — two users triage DIFFERENTLY, and the agent reproduces its user's calls. The claim no record-and-replay tool can make.",
@@ -184,7 +201,8 @@ const TREE = {
     },
     {
       id: "thesis",
-      title: "4 · The proof is written down",
+      owner: "Paula",
+      title: "THESIS · The proof is written down",
       status: "pending",
       note: "The academic deliverable: the three scopes turned into chapters, metrics and benchmark comparisons. Nothing here starts producing text until Scope #1 has trustworthy numbers.",
       children: [
