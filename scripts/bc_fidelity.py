@@ -36,7 +36,9 @@ SUBMISSIONS_DIR = ROOT / "data" / "output" / "submissions"
 # Fields to skip when scoring (metadata, not filled by agent)
 _SKIP_FIELDS = {"_timestamp", "policy_number", "policy_status"}
 
-# Tab prefix → tab name mapping
+# Tab prefix → tab name mapping (2026-07-12: added hist_/disc_ — the History
+# and Discounts tabs had no prefix at all, so their fields fell through to
+# "Other" even when the label map below was extended to cover them).
 _TAB_PREFIXES = {
     "policy_": "Policy",
     "ph_":     "Policyholder",
@@ -47,6 +49,8 @@ _TAB_PREFIXES = {
     "d3_":     "Driver 3",
     "claim_":  "Claims",
     "pay_":    "Payment",
+    "hist_":   "History",
+    "disc_":   "Discounts",
 }
 
 
@@ -159,6 +163,114 @@ _LABEL_TO_KEY: dict[str, str] = {
     "parking sensors":            "v_parking_sensors",
     "lane departure warning":     "v_lane_assist",
     "adaptive cruise control":    "v_adaptive_cruise",
+    # Coverage tab
+    "bodily injury (k$/k$)":      "cov_bodily_limit",
+    "property damage ($)":        "cov_property",
+    "collision deductible":       "cov_collision_ded",
+    "comprehensive deductible":   "cov_comp_ded",
+    "uninsured/underinsured motorist": "cov_um_uim",
+    "personal injury protection (pip)": "cov_pip",
+    "medical payments":           "cov_medpay",
+    "rental reimbursement":       "cov_rental",
+    "roadside assistance":        "cov_roadside",
+    "gap insurance":              "cov_gap",
+    "rideshare coverage":         "cov_rideshare",
+    "new car replacement":        "cov_new_car",
+    "accident forgiveness":       "cov_acc_forgive",
+    "diminishing deductible":     "cov_disappear_ded",
+    "um/uim limit":               "cov_um_limit",
+    "pip limit ($)":              "cov_pip_limit",
+    "medpay limit ($)":           "cov_medpay_limit",
+    "rental limit":               "cov_rental_limit",
+    "total premium ($)":          "cov_premium_total",
+    "payment frequency":          "cov_premium_period",
+    # History tab
+    "total accidents":            "hist_accidents_3yr",
+    "at-fault accidents":         "hist_at_fault",
+    "not-at-fault accidents":     "hist_not_at_fault",
+    "total claims filed":         "hist_claims_3yr",
+    "comprehensive claims":       "hist_comp_claims",
+    "moving violations":          "hist_violations_3yr",
+    "dui / dwi on record":        "hist_dui",
+    "license suspended or revoked": "hist_license_susp",
+    "sr-22 / fr-44 filed":        "hist_sr22",
+    # Discounts tab
+    "multi-policy / bundle":      "disc_multi_policy",
+    "multi-car":                  "disc_multi_car",
+    "good driver (5+ yr clean)":  "disc_good_driver",
+    "good student":               "disc_good_student",
+    "defensive driving course":   "disc_defensive_drv",
+    "loyalty discount":           "disc_loyalty",
+    "military":                   "disc_military",
+    "affinity group":             "disc_affinity",
+    # Claims tab
+    "claim number":                "claim_number",
+    "claim type":                  "claim_type",
+    "claim status":                "claim_status",
+    "date of loss":                "claim_date",
+    "deductible ($)":              "claim_deductible",
+    "claim amount ($)":            "claim_amount",
+    "claim description":           "claim_desc",
+    "resolution date":             "claim_resolve_date",
+    "settlement amount ($)":       "claim_settlement",
+    "adjuster name":               "claim_adjuster",
+    "policyholder at fault":       "claim_at_fault",
+    "injury involved":             "claim_injury",
+    "police report filed":         "claim_police_rpt",
+    "third party involved":        "claim_third_party",
+    "police report no":            "claim_report_no",
+    "third party name":            "claim_tp_name",
+    "third party policy":          "claim_tp_policy",
+    # Payment tab
+    "method":                      "pay_method",
+    "bank name":                   "pay_bank_name",
+    "account type":                "pay_account_type",
+    "account number":              "pay_account",
+    "routing number":              "pay_routing",
+    "cardholder name":             "pay_cc_name",
+    "card number":                 "pay_cc_number",
+    "expiration (mm/yy)":          "pay_cc_exp",
+    "cvv":                         "pay_cc_cvv",
+    "street address":              "pay_billing_addr1",
+    "down payment ($)":            "pay_down_payment",
+    "balance due ($)":             "pay_balance_due",
+    "auto-pay enrolled":           "pay_auto_pay",
+    "payment due date":            "pay_due_date",
+    "last payment date":           "pay_last_paid_date",
+    "last payment amount ($)":     "pay_last_paid_amt",
+}
+
+# Labels that repeat verbatim across sections with a DIFFERENT submission key
+# depending on which section they're in (unlike Driver 2/3, these aren't a
+# uniform prefix swap — e.g. 'City'/'State'/'ZIP Code' appear in both the
+# Policyholder Address block and the Payment Billing Address block; 'Total
+# Premium ($)'/'Payment Frequency' appear in both Coverage's Premium Summary
+# and Payment's Billing Summary). Keyed by (section, label) -> key; checked
+# BEFORE the flat _LABEL_TO_KEY so the section-correct mapping always wins.
+_SECTION_LABEL_TO_KEY: dict[tuple[str, str], str] = {
+    ("Billing Address", "city"):           "pay_billing_city",
+    ("Billing Address", "state"):          "pay_billing_state",
+    ("Billing Address", "zip code"):       "pay_billing_zip",
+    ("Billing Summary", "total premium ($)"): "pay_amount",
+    ("Billing Summary", "payment frequency"): "pay_frequency",
+}
+
+# Driver 2/3: same bare labels as Policyholder ('First Name', 'Date of
+# Birth', ...) but map to d2_*/d3_* instead of ph_* — a uniform suffix swap,
+# unlike the ambiguous-section table above.
+_DRIVER_LABEL_TO_SUFFIX: dict[str, str] = {
+    "first name":        "first",
+    "last name":         "last",
+    "date of birth":     "dob",
+    "gender":            "gender",
+    "relationship":      "relation",
+    "dl number":         "dl",
+    "dl issuing state":  "dl_state",
+    "dl expiration":     "dl_exp",
+    "accidents (3 yr)":  "accidents",
+    "violations (3 yr)": "violations",
+    "sr-22 required":    "sr22",
+    "excluded driver":   "excluded",
 }
 
 
@@ -205,11 +317,6 @@ def _parse_intake_record(text: str, record_num: int = 1) -> dict:
             continue
         if ":" not in line or line.startswith("=") or line.startswith("-"):
             continue
-        # ph_*/v_* keys belong to the base sections — never map bare labels
-        # found inside a Driver section or a second-plus Vehicle section.
-        _mv = re.match(r"(?i)vehicle\s+(\d+)\s*$", section)
-        if re.match(r"(?i)driver\s+\d+\s*$", section) or (_mv and _mv.group(1) != "1"):
-            continue
         label_raw, _, value_raw = line.partition(":")
         label = label_raw.strip().rstrip(".").lower()
         value = value_raw.strip()
@@ -221,11 +328,32 @@ def _parse_intake_record(text: str, record_num: int = 1) -> dict:
         value = re.sub(r"\[[^\]]*\]", "", value).strip()   # any [bracketed note]
         value = re.split(r"\s*←", value)[0].strip()        # trailing '← NOTE' arrows
 
-        # Skip empty or placeholder values
-        if not value or value.lower() in ("(none)", "n/a", ""):
+        # Skip empty or placeholder values. '(leave blank)' was falling
+        # through as LITERAL gold text (found 2026-07-12 while extending
+        # coverage to Payment: pay_bank_name gold = '(leave blank)') —
+        # normalize the same way the agent's own _lookup_field does.
+        _vn = value.lower().strip("()").strip()
+        if not value or _vn in ("none", "n/a", "na", "") or _vn.startswith("leave blank"):
             continue
 
-        key = _LABEL_TO_KEY.get(label)
+        # SECTION-AWARE RESOLUTION (2026-07-12, BC gold-coverage extension):
+        # (1) Driver 2/3 — same bare labels as Policyholder, uniform suffix
+        #     swap onto d2_*/d3_*. A second-plus Vehicle section has no
+        #     distinct submission keys (the form only scores Vehicle 1) so
+        #     it's still skipped, same as before.
+        # (2) Ambiguous-section labels ('City'/'State'/'ZIP' in Billing
+        #     Address vs Policyholder Address; 'Total Premium ($)' in
+        #     Coverage vs Payment) — explicit (section, label) override,
+        #     checked before the flat table so it always wins.
+        _mv = re.match(r"(?i)vehicle\s+(\d+)\s*$", section)
+        _md = re.match(r"(?i)driver\s+(\d+)\s*$", section)
+        if _mv and _mv.group(1) != "1":
+            continue
+        if _md:
+            suffix = _DRIVER_LABEL_TO_SUFFIX.get(label)
+            key = f"d{_md.group(1)}_{suffix}" if suffix else None
+        else:
+            key = _SECTION_LABEL_TO_KEY.get((section, label)) or _LABEL_TO_KEY.get(label)
         if key is None:
             continue
 
@@ -235,6 +363,18 @@ def _parse_intake_record(text: str, record_num: int = 1) -> dict:
             "v_salvage", "v_anti_theft", "v_airbags", "v_abs",
             "v_daytime_lights", "v_backup_camera", "v_gps",
             "v_parking_sensors", "v_lane_assist", "v_adaptive_cruise",
+            # 2026-07-12 extension: Coverage yes/no flags, History flags,
+            # Discounts (all yes/no), Claims circumstance flags, Payment.
+            "cov_um_uim", "cov_pip", "cov_medpay", "cov_rental",
+            "cov_roadside", "cov_gap", "cov_rideshare", "cov_new_car",
+            "cov_acc_forgive", "cov_disappear_ded",
+            "hist_dui", "hist_license_susp", "hist_sr22",
+            "disc_multi_policy", "disc_multi_car", "disc_good_driver",
+            "disc_good_student", "disc_defensive_drv", "disc_loyalty",
+            "disc_military", "disc_affinity",
+            "claim_at_fault", "claim_injury", "claim_police_rpt",
+            "claim_third_party", "d2_excluded", "d3_excluded",
+            "d2_sr22", "d3_sr22", "pay_auto_pay",
         }
         # First occurrence wins (belt on top of the section guard) — repeats
         # of a label must never silently replace an earlier, correct mapping.
