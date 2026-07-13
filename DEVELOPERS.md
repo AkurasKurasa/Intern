@@ -145,7 +145,8 @@ spin hiccup). This closes out most of the 2026-07-11 gap list above — updated 
   0 sessions), so a plain `.exists()` check picked it first and silently shadowed the real
   corpus fallback — the 2026-07-13 acceptance run still printed `No reference sequence
   available`. FIXED same day: check for a directory that actually contains `session_*`
-  subfolders, not just existence. Offline-verified; live number still pending the next run.
+  subfolders, not just existence. Offline-verified AND live-confirmed (2026-07-13 rerun):
+  Behavioral Match printed **13.5%** — a real number, not `No reference sequence available`.
 - **NEW bug this run caught**: Driver 2/3 fields overwritten with Driver 1's values within a
   single submission (not the multi-record contamination class) — see Task List entry.
 - **Still open**: viewport-choice geometry heuristic; spin-value observer-visibility
@@ -454,7 +455,10 @@ this list on every guardianship sweep. The priority-table overlay in the tree ma
   already uses) — an off-screen mismatch gets caught on a later pass once visible, nothing
   skipped, just deferred. Offline-verified: reproduced the exact failure (off-screen Driver-2
   field, stale bbox → excluded) and confirmed no regression (on-screen wrong Driver-2 field →
-  still caught, section-correct expected value). Retest = next full acceptance run.
+  still caught, section-correct expected value). **LIVE-CONFIRMED (2026-07-13 rerun): zero
+  Driver 2/3 cross-contamination** — Driver 1 (D7734821), Driver 2 (F8821047/Maria/Delgado),
+  Driver 3 (D0012938) all read back correct in both the run scorer and the BC top-mismatches
+  (empty — clean run); `[VERIFY] pass complete — 0 field(s) corrected` on the final pass.
 - [ ] **Spin value invisible to the observer after a successful fill** *(found 22:49 acceptance run)* — 'Years at Address': the identity-executor write LANDS (rescue read-back verifies), but the OBSERVED element's value stays '' → model re-targets the filled field (~15 wasted steps) → wrongly dead-marked. Suspect: observer reads a different UIA node than the one written (spin outer vs inner edit). Fix: read back through the same `_resolve_live_control` identity the writer used, or mark rescue-filled keys as filled_this_tab + attempted so the picker masks them regardless of the observed value.
 - [x] **Re-clean corpus + retrain semantic model** *(2026-07-09 — `eight_Tabs_clean2`, v3: click_acc 0.945, src_acc ~0.85, val_acc 0.758, section-aware `attempted`.)*
 - [x] **Model-anchored viewport jump** *(2026-07-09, f88d4fc — anchor = model's top off-screen `click_topk` candidate, density fallback; unit-verified all three cases.)*
