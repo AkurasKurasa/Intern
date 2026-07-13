@@ -31,9 +31,8 @@ const TREE = {
           id: "trust-numbers",
           owner: "Ralph",
           title: "The score can be trusted",
-          status: "partial",
-          priority: 2,
-          note: "Run scorer (eval_metrics) section-fix 2026-07-10 (41cff4c). bc_fidelity FIXED 2026-07-11: honest rescore of the ×2 run = record 1: 89.3% field / 100% value / 0 mismatches; record 2: 63.5% / 100% (was 20%/32.6% fiction). Remaining children below.",
+          status: "done",
+          note: "DONE 2026-07-12 — all four sub-fixes landed and offline-verified: record-aware gold (both scorers), section-aware gold keys, and full 8-tab coverage (bc-gold-coverage, the last piece). Run scorer (eval_metrics) section-fix 2026-07-10 (41cff4c). bc_fidelity FIXED 2026-07-11/12: honest rescore of the ×2 run = record 1: 89.3% field / 100% value / 0 mismatches; record 2: 63.5% / 100% (was 20%/32.6% fiction) — now against the FULL 163-field gold, not 75. Every scorer number quoted from here on is trustworthy.",
           children: [
             { id: "bc-record-gold", title: "bc_fidelity grades each record vs ITS OWN answers", status: "done",
               note: "FIXED 2026-07-11: _detect_record_num matches the submission's policy number against each intake record (data-driven), rebuilds gold for that record on the fly; static ref = flagged fallback; report prints which gold was used. Verified: 00441→record 1, 00442→record 2." },
