@@ -139,6 +139,12 @@ const TREE = {
       note: "The organ that makes Intern travel beyond this form: swap the EYES (perception seam: UIA today, vision/Excel adapters proven at the same seam), swap the SOURCE (DataSource seam: Notepad today, any key:value provider), keep the same learned WHERE + WHAT-resolver stack (deterministic lookup → inferred rules → LLM judgment) + fill pipeline. Scope 2 tests that the stack travels; Scope 3 tests the judgment resolver. Windows-wide today; beyond Windows = the vision branch below.",
       children: [
     {
+      id: "perception",
+      title: "Perception (swappable eyes)",
+      status: "partial",
+      note: "The seam itself: same element schema (bbox/type/label/value) regardless of how the screen is READ. UIA (accessibility tree) is Scope 1's implementation — proven, live. Vision (CV+OCR / learned parser) and the Excel adapter are proven at the same seam. This is what makes Scope 2+ possible without touching the agent's WHERE/WHAT logic.",
+      children: [
+    {
       id: "vision",
       title: "Vision (pixels, not APIs)",
       status: "partial",
@@ -161,6 +167,8 @@ const TREE = {
         { title: "Vision demos recorded + vision model trained", status: "pending",
           deps: ["vision-focus", "vision-labels"],
           note: "DO (after the two blockers): record with --perception vision, clean, train — the model that needs no accessibility tree at all." },
+      ],
+    },
       ],
     },
       ],
