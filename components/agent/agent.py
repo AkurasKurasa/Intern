@@ -3856,11 +3856,28 @@ class LLMAgent:
         expected value by the control's OWN label in the source, normalized-compare.
         Returns a list of (element, expected_value) that are CLEARLY wrong/empty but
         should hold a value. Skips controls the source has no value for (ambiguous /
-        leave-blank → handled by the LLM fallback). Generic: type + label + source."""
+        leave-blank → handled by the LLM fallback). Generic: type + label + source.
+
+        VIEWPORT-ONLY (2026-07-13, found via full acceptance run): this used to
+        walk EVERY element UIA reports, including off-screen ones. When a
+        verify pass never scrolled past a multi-section tab's top (the scroll
+        warnings in the same run: 'no scrollable pane found', 'panel DID NOT
+        MOVE'), Driver 2/3's elements were still in the list with STALE bbox
+        coordinates overlapping Driver 1's area — _detect_section's geometry
+        math picked the wrong section, and the bare-key fallback in
+        _lookup_field did the rest: Driver 2's fields got silently overwritten
+        with Driver 1's values. Restrict to on-screen elements, same viewport
+        bound every fill path already uses — an off-screen field's mismatch
+        gets caught on a LATER pass once it's actually visible."""
         out = []
+        _vt = self._form_viewport_top(state)
+        _vb = self._form_viewport_bottom(state) - 8
         for e in state.get("elements", []):
             if e.get("window_role") == "background" or not e.get("bbox"):
                 continue
+            _ecy = (e["bbox"][1] + e["bbox"][3]) / 2
+            if not (_vt <= _ecy <= _vb):
+                continue   # off-screen — stale bbox, section geometry unreliable
             _typ = (e.get("type") or "").lower()
             if _typ not in ("editcontrol", "comboboxcontrol", "checkboxcontrol"):
                 continue
