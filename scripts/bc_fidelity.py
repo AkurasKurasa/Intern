@@ -821,16 +821,21 @@ def score_run(results: list[dict], goal: str = "") -> dict | None:
     # trained on (Behavioral Match asks "did it fill in the demonstrated
     # order?", so the demos ARE the reference). Was pointed at a dead dir
     # (data/output/traces/forms) → 'No reference sequence available' → the
-    # thesis metric read 0% forever. Override with BC_TRACES_DIR; keep the
-    # default in sync with the training corpus.
+    # thesis metric read 0% forever. FOUND STILL BROKEN 2026-07-13 (live
+    # acceptance run): the dead dir EXISTS (empty, 0 sessions) so `.exists()`
+    # picked it first and silently shadowed the real corpus fallback — the
+    # 2026-07-11 fix never actually fired live. Check for a directory that
+    # actually CONTAINS session_* subfolders, not just existence.
     import os as _os
+    def _has_sessions(p: Path) -> bool:
+        return p.is_dir() and any(p.glob("session_*"))
     _cand_dirs = [Path(p) for p in (
         _os.environ.get("BC_TRACES_DIR", ""),
     ) if p] + [
         ROOT / "data" / "output" / "traces" / "forms",
         ROOT / "data" / "demos" / "eight_Tabs_clean2",   # training corpus of the v3 model
     ]
-    traces_dir = next((p for p in _cand_dirs if p.exists()), None)
+    traces_dir = next((p for p in _cand_dirs if _has_sessions(p)), None)
     ref_seq = _behavior_reference_cached(traces_dir) if traces_dir else []
     beh = score_behavior(results, ref_seq)
     beh["behavior_reference"] = str(traces_dir) if traces_dir else "none"

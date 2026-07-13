@@ -128,6 +128,29 @@ zero cross-record values, LLM dependency on a blank tab fell to 16.7%.
 - **Transformer↔LLM balance** — LLM ~45-50% of decisions (target <5%); sweep still drove
   Policyholder's below-fold section. Verb-driven agent loop remains open.
 - **Scale** — single record only; no automated scoring harness yet.
+
+**MILESTONE (2026-07-13): FULL ACCEPTANCE RUN PASSED on the single-fill-pipeline
+architecture.** One record, all 8 tabs, verify pass, deterministic Submit, 90 steps, zero
+fill-pipeline drama (no dropdown escapes, no rescue loops beyond the known self-resolving
+spin hiccup). This closes out most of the 2026-07-11 gap list above — updated honestly:
+- **Both scorers record-blind** → FIXED (bc-record-gold, eval-record-gold, bc-gold-coverage,
+  all 2026-07-11/12). BC gold now covers the whole form (163 fields, not 75).
+- **Hard widgets dead-mark instead of filling** → FIXED — single fill pipeline
+  (`_fill_element`) proven on a full run; SpinCtrls/fold-edge combos fill via UIA patterns.
+- **Transformer↔LLM balance** → LLM fill-decisions now **2.0%** (was 45-50%) — the
+  deterministic value short-circuit, confirmed structural on a full run, not just a drill.
+  Verb-driven agent loop remains open as the next structural step (see verb-loop node).
+- **Filling sequence fidelity / Behavioral Match** → reference wiring (2026-07-12) shipped
+  with a bug that made it a no-op: the dead dir (`data/output/traces/forms`) EXISTS (empty,
+  0 sessions), so a plain `.exists()` check picked it first and silently shadowed the real
+  corpus fallback — the 2026-07-13 acceptance run still printed `No reference sequence
+  available`. FIXED same day: check for a directory that actually contains `session_*`
+  subfolders, not just existence. Offline-verified; live number still pending the next run.
+- **NEW bug this run caught**: Driver 2/3 fields overwritten with Driver 1's values within a
+  single submission (not the multi-record contamination class) — see Task List entry.
+- **Still open**: viewport-choice geometry heuristic; spin-value observer-visibility
+  (self-resolves via rescue, but wastes steps); scale (×5 not yet run on this architecture).
+
 See [Task List and Priority List](#task-list-and-priority-list). The scope-agnostic engine (foundation) is built;
 finishing scope #1 *correctly* builds the general muscle the other scopes reuse.
 
@@ -418,7 +441,8 @@ this list on every guardianship sweep. The priority-table overlay in the tree ma
 - [x] **Checkbox TogglePattern** — Query and set checkbox state deterministically.
 - [x] **Verification pass** — Perform automated verification pass over all tabs before final Submit.
 - [x] **Section-qualified identity keys** *(2026-07-09, f88d4fc — live-verified on Drivers tab: D2/D3 sections fill; sweep section-corrects wrong-section values; per-element fail counters killed the 15× dead-mark loop. Keys use raw `section_*` pane labels (geometry), NOT ScopeConfig — must not silently degrade to the colliding bare label.)*
-- [~] **Identity-based executor → SINGLE FILL PIPELINE** *(2026-07-09 f88d4fc built `_resolve_live_control`+`_act_on_element`; 2026-07-11 INVERSION landed, user-driven — the three bolted-on combobox rescues were a band-aid: new `_fill_element` = THE pipeline (reliable mechanics first, read-back verified; legacy pixel/paste last). All three combobox paths route through it, rescue copies + per-site dropdown dances DELETED; `_nav_fill_field` already identity-first. OPT2 edit typing keeps paste→keystroke→pattern ladder deliberately (paste = correct cheap tier for plain edits). DRILL PASSED 2026-07-11 22:44: 'State'→'Texas' and 'DL Issuing State'→'Texas' each ~1s, one line, zero rescues (second 50-state widget never explicitly fixed — the general mechanic covered it); all combobox flavors via pipeline; 15/15 values, 3.6% waste. REMAINING: full acceptance on this architecture; verify-fix unification; then retire snap/stale-coord guards.)*
+- [x] **Identity-based executor → SINGLE FILL PIPELINE [FULL ACCEPTANCE PASSED 2026-07-13]** *(2026-07-09 f88d4fc built `_resolve_live_control`+`_act_on_element`; 2026-07-11 INVERSION landed, user-driven — the three bolted-on combobox rescues were a band-aid: new `_fill_element` = THE pipeline (reliable mechanics first, read-back verified; legacy pixel/paste last). All three combobox paths route through it, rescue copies + per-site dropdown dances DELETED; `_nav_fill_field` already identity-first. OPT2 edit typing keeps paste→keystroke→pattern ladder deliberately (paste = correct cheap tier for plain edits). Drill passed 2026-07-11 22:44. **FULL ACCEPTANCE RUN 2026-07-13 (record 1, single-record, all 8 tabs, verify pass, deterministic Submit, 90 steps): zero fill-pipeline drama** — no dropdown escapes, no rescue loops beyond the known self-resolving spin hiccup. LLM fill-decisions 2.0% (was 45-55%) — the deterministic short-circuit confirmed structural on a full run, not just a drill. Value accuracy 100% (run scorer) / 96.2% (163-field BC gold). REMAINING (split out, non-blocking): verify-fix read-back unification, retire snap/stale-coord guards, and a freshly-found bug below.)*
+- [ ] **Driver 2/3 fields overwritten with Driver 1's values [FOUND 2026-07-13, full acceptance run]** — NOT the multi-record contamination bug (this is within ONE submission, across sections). Final BC mismatches: `d2_first`/`d2_dob`/`d2_gender`/`d2_dl`/`d2_dl_exp` all read back as Driver 1's values (James/07-14-1978/Male/D7734821/07-14-2028) instead of Driver 2's (Maria/03-22-1980/Female/F8821047/03-22-2027) — even though the VERIFY log shows Driver 2's correct values were typed earlier in the same run. Suspect: a later pass (verify's second sweep over Drivers, or per-element key resolution) re-resolved a bare label without the section qualifier and overwrote the correct value — the same bug class `sections-work` fixed for the sweep, possibly recurring in verify's own re-scan. DO: check `_attempt_key`/section resolution during the SECOND verify pass over a multi-section tab.
 - [ ] **Spin value invisible to the observer after a successful fill** *(found 22:49 acceptance run)* — 'Years at Address': the identity-executor write LANDS (rescue read-back verifies), but the OBSERVED element's value stays '' → model re-targets the filled field (~15 wasted steps) → wrongly dead-marked. Suspect: observer reads a different UIA node than the one written (spin outer vs inner edit). Fix: read back through the same `_resolve_live_control` identity the writer used, or mark rescue-filled keys as filled_this_tab + attempted so the picker masks them regardless of the observed value.
 - [x] **Re-clean corpus + retrain semantic model** *(2026-07-09 — `eight_Tabs_clean2`, v3: click_acc 0.945, src_acc ~0.85, val_acc 0.758, section-aware `attempted`.)*
 - [x] **Model-anchored viewport jump** *(2026-07-09, f88d4fc — anchor = model's top off-screen `click_topk` candidate, density fallback; unit-verified all three cases.)*
