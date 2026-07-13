@@ -440,10 +440,24 @@ this list on every guardianship sweep. The priority-table overlay in the tree ma
     belt. Also strips intake annotations from gold values ('← NOTE …', '[VERIFY — …]').
     RESULT (×2 run rescored honestly): record 1 = 89.3% field match / 100% value acc /
     0 mismatches; record 2 = 63.5% / **100%** (was 20% / 32.6% fiction).
-  - [ ] **bc_fidelity: gold key-space is partial** — `_LABEL_TO_KEY` covers Policy/
-    Policyholder/Vehicle only (~75 fields); Drivers/Coverage/Claims/Payment fills are
-    invisible to the BC score (the record-2 claim contamination never showed in it). Extend
-    the mapping before quoting BC numbers as whole-form fidelity.
+  - [x] **bc_fidelity: gold key-space extended to the whole form [FIXED 2026-07-12,
+    offline-verified]** — `_LABEL_TO_KEY` covered Policy/Policyholder/Vehicle only
+    (~75 fields); Drivers/Coverage/Claims/Payment fills were invisible to the BC score (the
+    record-2 claim contamination never showed in it — not scored wrong, just never checked).
+    Fix: ~90 new label→key entries sourced from a real submission JSON's actual keys (not
+    guessed) covering Coverage/History/Discounts/Claims/Payment; `_TAB_PREFIXES` gained
+    `hist_`/`disc_` (had no tab name at all before); Driver 2/3 needed section-aware suffix
+    mapping (`_DRIVER_LABEL_TO_SUFFIX` — same bare labels as Policyholder, e.g. 'First Name'
+    → `d2_first`/`d3_first`); genuinely ambiguous labels ('City'/'State'/'ZIP', 'Total Premium
+    ($)' appearing in two sections with DIFFERENT keys) got an explicit `_SECTION_LABEL_TO_KEY`
+    (section, label) override checked first. Bonus fix found mid-verification: `'(leave
+    blank)'` was leaking through as LITERAL gold text (not skipped like `'(none)'`/`'n/a'`) —
+    normalized the same way the agent's own `_lookup_field` does. RESULT: record 1 gold
+    75→163 fields; both real archived submissions rescored at 100% tab coverage (was ~33%);
+    all 10 intake records parse cleanly with Coverage+Payment present; yesterday's
+    policyholder/driver identity-separation fix (James vs Tyler) unaffected. Residual
+    (cosmetic, not chased): a few Policy-tab keys with no `policy_` prefix (`agent_id`,
+    `underwriter`…) display under an 'Other' tab label — doesn't affect scoring correctness.
   - [~] **Behavioral Match unfrozen [FIXED 2026-07-12, offline-verified — first live number
     pending]** — the thesis metric read 0% forever because the reference builder pointed at a
     DEAD dir (`data/output/traces/forms`). Now: reference = the training corpus
