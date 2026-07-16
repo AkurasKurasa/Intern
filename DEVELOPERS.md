@@ -408,6 +408,21 @@ Injects a `<think>…</think>` reasoning step for local models, stripped before 
 parsing. Not used for Anthropic (native reasoning is better). Disable by removing
 the CoT lines in `_call_openai_compat()`.
 
+**LIVE-CONFIRMED 2026-07-16** (`run_20260716_163430.txt`, first uninterrupted run since
+today's fixes — sweep-verify-trusts-write-path, checkbox-verb unification, apostrophe
+match, numeric-substring guard): **zero verify-at-fill retries anywhere in the run** —
+the sweep-re-verify bug is fixed, no more false "didn't stick" flags. Value Accuracy
+100% (59/59 typed values correct). Tab Coverage 100% (all 11 sections including
+Discounts — `bc-fidelity-discounts-tab-detection` also resolved on this run, though
+`scripts/bc_fidelity.py` itself has no relevant diff, so this is one confirming
+observation, not a proven scorer fix — reopen if it regresses). Checkbox verb
+unification held correctly on every checkbox (record-NO left unchecked, record-YES
+checked, zero force-check errors). Zero errors/tracebacks, natural termination via
+deterministic Submit, 8.5 min duration. **Remaining gap, separate from today's
+fixes**: Field Match Rate 65.6% (107/163) — fields left blank that should have a
+value; not a correctness regression (accuracy of what WAS filled is 100%), a
+coverage gap (fields never reached).
+
 ---
 
 ## Task List and Priority List
