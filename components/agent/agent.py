@@ -1843,8 +1843,6 @@ class LLMAgent:
                     _chk_label_bare = (_chk_at_cp.get("label") or _chk_at_cp.get("text") or "").strip()
                     _chk_sec   = self._detect_section(state, _chk_at_cp)
                     _chk_label = f"{_chk_sec} {_chk_label_bare}" if _chk_sec else _chk_label_bare
-                    _chk_cx = (_chk_at_cp["bbox"][0] + _chk_at_cp["bbox"][2]) / 2
-                    _chk_cy = (_chk_at_cp["bbox"][1] + _chk_at_cp["bbox"][3]) / 2
                     # RECORD-AWARE CHECK (2026-07-16): this path used to force
                     # EVERY clicked checkbox to CHECKED, unconditionally, never
                     # consulting the record at all — only guarding against a
@@ -1865,35 +1863,31 @@ class LLMAgent:
                     # does correctly.
                     _chk_exp = self._lookup_field(_chk_label_bare, section=_chk_sec)
                     _chk_want = _chk_exp.strip().lower() in ("yes", "yes (check)", "true", "checked", "x", "1")
-                    # Use Win32 BM_SETCHECK — pyautogui clicks don't toggle wx checkboxes
-                    try:
-                        import win32gui as _wg2; import win32api as _wa2
-                        BM_GETCHECK = 0x00F0; BM_SETCHECK = 0x00F1; BST_CHECKED = 1
-                        _hwnd2 = _wg2.WindowFromPoint((int(_chk_cx), int(_chk_cy)))
-                        if _hwnd2:
-                            _already = (_wa2.SendMessage(_hwnd2, BM_GETCHECK, 0, 0) == BST_CHECKED)
-                            if not _chk_want:
-                                logger.info("Checkbox %r: record says NO/absent — leaving "
-                                           "unchecked, no toggle.", _chk_label)
-                                self._checked_fields.add(_chk_label)
-                                self._filled_this_tab.add(_chk_label)
-                                self._mark_attempted(_chk_at_cp)
-                                prediction = {"action_type": "keyboard", "key_count": 1, "keystrokes": ["tab"]}
-                            elif _chk_label in self._checked_fields or _already:
-                                logger.warning("Checkbox %r already checked — Tab instead.", _chk_label)
-                                self._mark_attempted(_chk_at_cp)   # stop re-targeting it
-                                prediction = {"action_type": "keyboard", "key_count": 1, "keystrokes": ["tab"]}
-                            else:
-                                _wa2.SendMessage(_hwnd2, BM_SETCHECK, BST_CHECKED, 0)
-                                logger.info("Checkbox %r checked via Win32 BM_SETCHECK.", _chk_label)
-                                self._checked_fields.add(_chk_label)
-                                self._filled_this_tab.add(_chk_label)
-                                self._mark_attempted(_chk_at_cp)   # done for this tab — don't loop
-                                _no_change_streak = 0
-                                _last_auto_step   = step_idx
-                                prediction = {"action_type": "keyboard", "key_count": 1, "keystrokes": ["tab"]}
-                    except Exception as _ce:
-                        logger.warning("BM_SETCHECK failed for %r: %s", _chk_label, _ce)
+                    if not _chk_want:
+                        logger.info("Checkbox %r: record says NO/absent — leaving "
+                                   "unchecked, no toggle.", _chk_label)
+                        self._checked_fields.add(_chk_label)
+                        self._filled_this_tab.add(_chk_label)
+                        self._mark_attempted(_chk_at_cp)
+                    else:
+                        # VERB-LOOP REWRITE, first slice (2026-07-16): this path used
+                        # to hand-roll its own Win32 BM_SETCHECK/BM_GETCHECK calls —
+                        # a THIRD independent checkbox-toggle implementation, alongside
+                        # _act_on_element's UIA TogglePattern version and the type-
+                        # intercept path above. Call the ONE canonical checkbox verb
+                        # instead (_act_on_element: resolves via UIA, no-ops if already
+                        # in the wanted state, toggles + self-confirms via read-back
+                        # off the same control) — same verb the sweep already trusts.
+                        if self._act_on_element(_chk_at_cp, "yes"):
+                            logger.info("Checkbox %r checked (canonical verb, already-checked is a no-op).", _chk_label)
+                            self._checked_fields.add(_chk_label)
+                            self._filled_this_tab.add(_chk_label)
+                            self._mark_attempted(_chk_at_cp)
+                            _no_change_streak = 0
+                            _last_auto_step   = step_idx
+                        else:
+                            logger.warning("Checkbox %r: canonical verb failed to confirm check.", _chk_label)
+                    prediction = {"action_type": "keyboard", "key_count": 1, "keystrokes": ["tab"]}
 
                 _SUBMIT_KW = {"submit", "save", "ok", "accept", "done", "finish", "new"}
                 # NOTE: do NOT filter by window_role here — Submit/Submit & New buttons live
