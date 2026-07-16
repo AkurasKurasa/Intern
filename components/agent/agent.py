@@ -1289,6 +1289,14 @@ class LLMAgent:
                         _last_auto_step = step_idx
                         _heuristic_steps += 1
                         self._filled_this_tab.clear(); self._fixation_hits.clear(); self._section_pane_tops = {}
+                        # SCROLL-TO-TOP ON TAB SWITCH (2026-07-16): a fresh tab's
+                        # ScrolledPanel keeps whatever scroll offset it last had —
+                        # nothing resets it, so if it's mid-page the top section
+                        # (e.g. Vehicle's VIN/Year/Make/Model) is never seen this
+                        # visit. Same fix _verify_pass used to apply (now dead code,
+                        # never called) — restored at the one place that's actually
+                        # still live: right after every tab-switch click.
+                        self._scroll_form_to_top(self._observe())
                         self._refresh_record_cache(self._observe())
                         time.sleep(self.step_delay)
                         continue
@@ -1300,6 +1308,7 @@ class LLMAgent:
                     _last_auto_step    = step_idx
                     _heuristic_steps  += 1
                     self._filled_this_tab.clear(); self._fixation_hits.clear(); self._section_pane_tops = {}
+                    self._scroll_form_to_top(self._observe())
                     self._refresh_record_cache(self._observe())
                     time.sleep(self.step_delay)
                     continue
@@ -4682,6 +4691,7 @@ class LLMAgent:
         tab_name = (next_tab.get("text") or next_tab.get("label") or "?").strip()
         logger.info("Stuck guard: advancing to tab %r @ (%.0f, %.0f)", tab_name, cx, cy)
         self._executor.execute({"action_type": "click", "click_position": [cx, cy]})
+        self._scroll_form_to_top(self._observe())   # 2026-07-16: see GAP-path note
         self._current_tab_idx = next_idx
         self._visited_tabs.add(tab_name)
         return True
@@ -6244,6 +6254,7 @@ class LLMAgent:
                 self._executor.execute({"action_type": "click", "click_position": _nav["click_position"]})
                 self._visited_tabs.add((_nav.get("target") or "").strip())
                 self._filled_this_tab.clear(); self._fixation_hits.clear(); self._section_pane_tops = {}
+                self._scroll_form_to_top(self._observe())   # 2026-07-16: see GAP-path note
                 self._refresh_record_cache(self._observe())
                 return self._observe(), False
             if _act == "done":
@@ -6272,6 +6283,7 @@ class LLMAgent:
                                             "click_position": [(_nb[0] + _nb[2]) / 2, (_nb[1] + _nb[3]) / 2]})
                     self._visited_tabs.add(_nm)
                     self._filled_this_tab.clear(); self._fixation_hits.clear(); self._section_pane_tops = {}
+                    self._scroll_form_to_top(self._observe())   # 2026-07-16: see GAP-path note
                     self._refresh_record_cache(self._observe())
                     return self._observe(), False
                 return state, False
