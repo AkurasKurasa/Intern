@@ -1798,24 +1798,24 @@ class LLMAgent:
                 # (or corrupt a pane/tab/button). Replace with Tab to advance focus instead.
                 if _fel and _fel.get("type") not in ("editcontrol", "input", "comboboxcontrol"):
                     if _fel.get("type") == "checkboxcontrol":
-                        # LLM typed a truthy value (e.g. "YES (check)") into a checkbox — check it
+                        # LLM typed a truthy value (e.g. "YES (check)") into a checkbox — check it.
+                        # VERB-LOOP REWRITE, second slice (2026-07-16): this path used to
+                        # hand-roll an unconfirmed Win32 BM_SETCHECK (fire-and-forget, no
+                        # read-back at all) — the second of three duplicate checkbox-toggle
+                        # implementations found in the audit. Now calls the same canonical
+                        # verb (_act_on_element) the per-step click handler and the sweep
+                        # already use — resolves via UIA, no-ops if already correct, toggles
+                        # + self-confirms off the same live control.
                         _chk_text = prediction.get("text", "").lower().strip()
                         _should_chk = _chk_text not in ("", "no", "false", "0", "unchecked")
                         if _should_chk and _flabel not in self._checked_fields:
-                            _chk_bbox = _fel.get("bbox")
-                            if _chk_bbox:
-                                try:
-                                    import win32gui as _wgc; import win32api as _wac
-                                    _cx = (_chk_bbox[0] + _chk_bbox[2]) / 2
-                                    _cy = (_chk_bbox[1] + _chk_bbox[3]) / 2
-                                    _hw = _wgc.WindowFromPoint((int(_cx), int(_cy)))
-                                    if _hw:
-                                        _wac.SendMessage(_hw, 0x00F1, 1, 0)  # BM_SETCHECK, BST_CHECKED
-                                        logger.info("Checkbox %r checked via BM_SETCHECK (type intercept).", _flabel_full)
-                                        self._checked_fields.add(_flabel_full)
-                                        self._filled_this_tab.add(_flabel_full)
-                                except Exception as _cbe:
-                                    logger.warning("Checkbox BM_SETCHECK failed: %s", _cbe)
+                            if self._act_on_element(_fel, "yes"):
+                                logger.info("Checkbox %r checked (canonical verb, type intercept).", _flabel_full)
+                                self._checked_fields.add(_flabel_full)
+                                self._filled_this_tab.add(_flabel_full)
+                            else:
+                                logger.warning("Checkbox %r: canonical verb failed to confirm check (type intercept).",
+                                              _flabel_full)
                         # Checkbox is DONE for this tab whether we checked it or left it
                         # unchecked (NO). Mark attempted so the observer's missing-checkbox
                         # state-feature flips and the transformer stops re-targeting it —
