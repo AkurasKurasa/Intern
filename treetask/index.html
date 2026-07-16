@@ -378,7 +378,7 @@
     if (dragging) {
       const dx = e.clientX - px, dy = e.clientY - py;
       if (Math.abs(dx) + Math.abs(dy) > 3) moved = true;
-      yaw += dx * 0.005; pitch = Math.max(-0.1, Math.min(1.2, pitch + dy * 0.004));
+      yaw += dx * 0.005; pitch = Math.max(-1.5, Math.min(1.5, pitch + dy * 0.004));
       px = e.clientX; py = e.clientY;
     } else {
       hover = pick(e.clientX, e.clientY);

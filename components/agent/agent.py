@@ -534,6 +534,12 @@ class LLMAgent:
         pure_transformer:  bool           = False,  # skip all hardcoded handlers; transformer+LLM only
         disable_auto_handlers: bool       = False,  # skip legacy heuristics but KEEP LLM+transformer merge
         start_tab_idx:     int            = 0,      # start agent at this tab index (drill testing)
+        only_tab:          Optional[int]  = None,   # lock to this tab index — never navigate off it
+                                                     # (drill testing: '--start_tab' only sets the
+                                                     # STARTING tab, the sweep/model still freely
+                                                     # navigates elsewhere once it decides that tab
+                                                     # is done — user-flagged 2026-07-15/16, twice.
+                                                     # This actually confines the whole run to one tab.)
         scope:             Optional[Any]  = None,   # ScopeConfig — app-specific tabs/sections/records
         observer:          Optional[Any]  = None,   # perception adapter (snapshot()→schema); default=UIA
         data_source:       Optional[Any]  = None,   # DataSource for field values; default=Notepad
@@ -649,6 +655,36 @@ class LLMAgent:
         self._verify_fix_count: dict         = {}   # verify: field → times re-corrected (accept as dead after 2)
         self._keystroke_retried: dict        = {}   # field → tried keystroke-typing after a paste no_change
         self._dead_fill_keys:  set           = set()
+        # (tab_name, bare_label) -> dead-marked. Stable counterpart to _dead_fill_keys
+        # (2026-07-15): the latter is keyed by _attempt_key, which depends on the same
+        # geometry-based section detection used for the model's training-time 'attempted'
+        # feature (deliberately never patched — would desync live inference from what the
+        # checkpoint was trained on). That key can flip between verify passes on
+        # unsectioned tabs when a stale off-screen pane briefly contaminates the section
+        # read, so a dead-mark could silently fail to match on a later lookup and the
+        # SAME field would get re-processed ("won't confirm after 2 tries") every fresh
+        # pass instead of staying dead. This key is just (which tab, bare field name) —
+        # no geometry involved, can't flip.
+        self._verify_dead_stable: set         = set()
+        # Tab names that reached 0 mismatches and no LLM-need on their most recent
+        # verify pass (2026-07-15, speed): _verify_pass re-scans every tab on
+        # every convergence pass by default, which is wasted work on tabs already
+        # clean — a live 16.4-min single-record run spent ~6 min of that on 5 full
+        # 8-tab re-walks despite most tabs having reached 0 corrections on pass 1.
+        # Safe to skip: fills are pinned to their own tab's elements (prefer_key),
+        # so a fix elsewhere this pass cannot dirty an already-clean tab, and
+        # dead-marks (_verify_dead_stable) are permanent+global regardless of
+        # whether the tab gets re-walked. Cleared on new-record reset.
+        self._verify_clean_tabs: set          = set()
+        # Fields confirmed correct immediately after their OWN fill (2026-07-16,
+        # "verify-at-fill, done right" — see the sweep fill site). Keyed by
+        # _attempt_key, same identity scheme as _dead_fill_keys/_attempted_keys.
+        # The end-of-run _verify_pass trusts these instead of rediscovering
+        # them cold minutes later across a separate multi-pass tab re-walk.
+        self._verified_at_fill: set           = set()
+        # One-pass verify, no revisits (2026-07-16, user-mandated) — see
+        # _confirm_finished. Cleared per-record alongside its siblings.
+        self._verify_ran_once: bool           = False
         # Fixation-recovery escalation: how many times the SAME spot has triggered
         # the loop-guard's "FIXATED" recovery this tab. First hit tries the normal
         # NAV fill/verify recovery. If that same spot fixates AGAIN, the recovery
@@ -681,6 +717,7 @@ class LLMAgent:
         self._filled_this_tab: set          = set()   # edit fields filled on current tab (prevents re-fill on cycling)
         self._nochange_click_pos: set       = set()   # (rx,ry) click positions that gave no_change this tab
         self._current_tab_idx: int          = start_tab_idx  # tracks which tab we're on
+        self._only_tab_idx: Optional[int]   = only_tab       # drill lock — never navigate off this tab
         self._start_tab_idx: int            = start_tab_idx  # drill: auto-click this tab at step 0
         self._tabs_total: int               = 0     # max tab count ever observed (survives degraded/partial observations)
         self._guidance: str = ""
@@ -849,7 +886,17 @@ class LLMAgent:
         _confirmed_blank_fields: set      = set()  # fields where peek found no value → treat as blank
         _heuristic_steps:        int      = 0      # steps decided by auto-handlers (not LLM/transformer)
         _steps_since_fill:       int      = 0      # steps since a field VALUE actually changed (a real fill)
-        _STALL_LIMIT:            int      = 6      # no real fill for N steps → stuck (oscillation/dead-clicks) → sweep. 6 lets normal multi-step nav (click→type) breathe; M2 handles the routine feed.
+        _STALL_LIMIT:            int      = 6      # no real fill for N steps → stuck (oscillation/dead-clicks) → sweep.
+                                                     # TRIED 3 (2026-07-16, speed): REVERTED same day — live-tested
+                                                     # (run_20260716_115224.txt) and made things WORSE, not better:
+                                                     # 17 STUCK events fired (vs 6 at limit=6) but total duration was
+                                                     # UNCHANGED (10.4min vs 10.2min baseline). Lesson: the per-STUCK-
+                                                     # event recovery cost (jump computation + sweep) is roughly
+                                                     # constant regardless of trigger threshold, so firing sooner-but-
+                                                     # more-often just redistributes waste, it doesn't reduce it. The
+                                                     # real lever is elsewhere (recovery mechanism's own cost, or
+                                                     # per-step overhead independent of stall handling) — not this
+                                                     # threshold. Back to 6 pending a different, evidence-backed lever.
         _prev_filled_labels:     set      = set()  # filled-field fingerprint last step — path-independent progress detector
 
         _record_cache_loaded     = False
@@ -869,20 +916,52 @@ class LLMAgent:
         # the whole task is verified-finished — never as a stray click.
         self._allow_submit = False
         self._submit_bboxes = []
+        # ── ONLY-TAB CHOKEPOINT (2026-07-16) ─────────────────────────────────
+        # only_tab drills kept "navigating away" despite two separate targeted
+        # patches (main-loop tab-click detection, sweep's own tab-advance) —
+        # each fix covered one call site, but grep found 5+ places that can
+        # click a tab (prediction-driven, sweep x2, fixation-recovery, GAP-
+        # driven, _try_advance_tab). Chasing them one at a time as the user
+        # hit each one live is exactly the whack-a-mole this project's own
+        # Submit-chokepoint pattern above already solved once — same fix,
+        # applied the same way: wrap the executor ONCE so EVERY click, from
+        # ANY call site, is checked against the OTHER tabs' bboxes.
+        self._other_tab_bboxes = []
+        # Consecutive blocked-navigation count (2026-07-16): once the locked
+        # tab is genuinely done, the sweep/model has nowhere left to go and
+        # tries every OTHER tab in turn, one per step, each one blocked —
+        # user-observed: 7 blocked attempts in ~22s of pure spin, no progress
+        # possible once here. Reset to 0 on any real (non-blocked) action;
+        # the main loop below stops the run once this crosses a small
+        # threshold, instead of spinning until max_steps or a manual Ctrl+C.
+        self._only_tab_blocked_streak = 0
         if not getattr(self, "_submit_guard_installed", False):
             _raw_execute = self._executor.execute
             def _guarded_execute(prediction, *a, **kw):
-                if prediction.get("action_type") == "click" and not self._allow_submit:
+                if prediction.get("action_type") == "click":
                     _cp = prediction.get("click_position")
-                    if _cp and self._point_on_submit(_cp):
+                    if not self._allow_submit and _cp and self._point_on_submit(_cp):
                         logger.warning("BLOCKED stray Submit click @ %s — job not verified-finished.", _cp)
                         return _raw_execute({"action_type": "blocked"})   # → clean no_op result
+                    if (self._only_tab_idx is not None and _cp
+                            and self._point_on_other_tab(_cp)):
+                        logger.warning("[ONLY-TAB] BLOCKED navigation click @ %s — "
+                                       "locked to tab idx=%d.", _cp, self._only_tab_idx)
+                        self._only_tab_blocked_streak += 1
+                        return _raw_execute({"action_type": "blocked"})
+                if self._only_tab_idx is not None:
+                    self._only_tab_blocked_streak = 0   # real action happened — reset
                 return _raw_execute(prediction, *a, **kw)
             self._executor.execute = _guarded_execute
             self._submit_guard_installed = True
 
         for step_idx in range(n):
           try:
+            if self._only_tab_idx is not None and self._only_tab_blocked_streak >= 3:
+                logger.info("[ONLY-TAB] locked tab has nothing left to do (%d consecutive "
+                            "blocked navigation attempts) — stopping drill instead of "
+                            "spinning through every other tab.", self._only_tab_blocked_streak)
+                break
             # 1. Observe — but first re-assert the locked form as foreground so a
             # stray click last step can't leave us observing/acting on a drifted
             # window. Lock is captured on the first observe (form is in front at GO).
@@ -903,10 +982,29 @@ class LLMAgent:
                     _bb = _e["bbox"]
                     if _bb not in self._submit_bboxes:
                         self._submit_bboxes.append(_bb)
+            # Refresh the OTHER-tabs' bboxes for the only_tab chokepoint guard,
+            # same accumulate-across-steps reasoning as Submit above. Only
+            # bothers when actually locked (skips the work entirely otherwise).
+            if self._only_tab_idx is not None:
+                _all_tabs_now = [e for e in state.get("elements", [])
+                                 if (e.get("type") or "").lower() in ("tabitem", "tabitemcontrol")
+                                 and e.get("window_role") != "background" and e.get("bbox")]
+                for _tii, _tel in enumerate(_all_tabs_now):
+                    if _tii == self._only_tab_idx:
+                        continue
+                    _tbb = _tel["bbox"]
+                    if _tbb not in self._other_tab_bboxes:
+                        self._other_tab_bboxes.append(_tbb)
             llm_action: Dict[str, Any] = {}
             _steps_on_tab += 1
             _cur_elem_count = len(state.get("elements", []))
-            logger.info("── Step %d/%d  (%d elements) ──", step_idx + 1, n, _cur_elem_count)
+            # TEMP INSTRUMENTATION (2026-07-16): observe() calls since the
+            # LAST step header — the previous step's real UIA-snapshot cost.
+            _obs_now = getattr(self, "_observe_calls_total", 0)
+            _obs_delta = _obs_now - getattr(self, "_observe_calls_at_last_step", 0)
+            self._observe_calls_at_last_step = _obs_now
+            logger.info("── Step %d/%d  (%d elements)  [prev step: %d observe() calls] ──",
+                        step_idx + 1, n, _cur_elem_count, _obs_delta)
 
             # Dialog guard: large element-count spike → unexpected dialog opened → Escape
             if _prev_elem_count > 0 and _cur_elem_count - _prev_elem_count > 100:
@@ -1102,722 +1200,16 @@ class LLMAgent:
                     continue
                 # Not handled — fall through to transformer/LLM below
 
-            # When a plugin is active OR pure-transformer mode, skip all legacy
-            # form-specific auto-handlers and fall through to transformer/LLM only.
-            _plugin_active = (self._task_plugin is not None) or self._pure_transformer or self._no_autohandlers
+            # DEAD LEGACY AUTO-HANDLER BLOCK REMOVED (2026-07-14, Strip WHERE-crutches audit).
+            # Was ~716 lines (auto-fill, auto-check, auto-skip, combobox-fix, dup-label-peek,
+            # button-escape, pane-escape, tab-complete-scan, plus _focus_first_empty_field /
+            # _try_advance_tab call sites). Provably dead: gated behind _plugin_active =
+            # (task_plugin is not None) or pure_transformer or no_autohandlers, and
+            # run_task.py hardcodes task_plugin=None, pure_transformer=False,
+            # disable_auto_handlers=True — so _plugin_active is unconditionally True in
+            # every real run; none of this could ever execute. Exact removed code kept
+            # verbatim at scratch/removed_dead_legacy_autohandlers_20260714.py.
 
-            # In pure_transformer mode: scroll to top + click first field on tab switch
-            # (same as the non-plugin handler below, but without auto-fill logic)
-            if self._pure_transformer and _tab_just_switched:
-                _tab_just_switched  = False
-                _steps_on_tab       = 0
-                _tab_scroll_count   = 0
-                _expose_scrolls     = 0
-                _m2_at_bottom       = False
-                _no_change_streak   = 0
-                _last_auto_step     = step_idx
-                if self._visual_reader:
-                    self._scan_tab_visual(state)
-                self._scroll_form_to_top(state)
-                time.sleep(0.6)
-                state = self._observe()
-                # Click the topmost-left interactive field (by bbox Y then X).
-                # Excludes tab-strip elements (tabitemcontrol) which sit at the top
-                # of the window but are not form fields.
-                _candidates = sorted(
-                    [e for e in state.get("elements", [])
-                     if e.get("type") in ("editcontrol", "comboboxcontrol", "checkboxcontrol")
-                     and e.get("window_role") != "background"
-                     and e.get("bbox") and e.get("enabled", True)],
-                    key=lambda e: (e["bbox"][1], e["bbox"][0])
-                )
-                if _candidates:
-                    _fe = _candidates[0]
-                    _fx1, _fy1, _fx2, _fy2 = _fe["bbox"]
-                    self._executor.execute({"action_type": "click",
-                                            "click_position": [(_fx1+_fx2)/2, (_fy1+_fy2)/2]})
-                    time.sleep(self.step_delay * 0.5)
-                continue
-
-            # 1a. After a tab switch: scroll to top, re-observe, then click first empty field
-            if not _plugin_active and _tab_just_switched:
-                _tab_just_switched    = False
-                _steps_on_tab         = 0
-                _tab_scroll_count     = 0
-                _expose_scrolls       = 0
-                _m2_at_bottom         = False
-                _no_change_streak     = 0
-                _last_auto_step       = step_idx  # treat tab switch as an auto step
-                _pane_escape_last_field = ""
-                _pane_escape_streak     = 0
-                self._filled_this_tab.clear(); self._fixation_hits.clear()     # new tab — reset filled-field tracking
-                self._nochange_click_pos.clear()  # new tab — reset failed-click blacklist
-                _confirmed_blank_fields.clear()   # new tab — reset peek-confirmed-blank set
-                _tc_advance_verified = False      # new tab — reset full-scan gate
-                # Visual scan: bring Notepad to foreground, scroll to this tab's section,
-                # capture screenshots with Groq vision to read all field values for this tab.
-                self._scan_tab_visual(state)
-                self._scroll_form_to_top(state)
-                time.sleep(0.6)
-                state = self._observe()   # get updated positions after scroll
-                # Click whichever field is topmost on-screen after scrolling up —
-                # position-based, so it naturally lands on the first visible field.
-                self._focus_first_empty_field(state)
-                time.sleep(self.step_delay)
-                continue   # re-observe so auto-handlers run first before LLM gets a chance
-
-            # 1b. Stuck guard: if no_change repeats OR too many steps on same tab, advance.
-            # DISABLED when disable_auto_handlers — we want to see the pure
-            # transformer with no rescue (honest navigation test).
-            _stuck = ((not self._no_autohandlers)
-                      and (_no_change_streak >= _NO_CHANGE_LIMIT
-                           or (not _plugin_active and _steps_on_tab >= _TAB_STEP_LIMIT)))
-            if _stuck:
-                if _steps_on_tab >= _TAB_STEP_LIMIT:
-                    logger.info("Stuck guard: %d steps on tab — forcing advance.", _steps_on_tab)
-                elif _no_change_streak >= _NO_CHANGE_LIMIT:
-                    # Before escalating to a full tab-advance, Tab past the stuck field.
-                    # This lets multi-section tabs (Driver 1/2/3) continue past a single
-                    # problematic checkbox instead of jumping to the next tab entirely.
-                    _foc_id = state.get("focused_element_id")
-                    _foc_el = next((e for e in state.get("elements", [])
-                                    if e.get("element_id") == _foc_id), None)
-                    _foc_nm_bare = ((_foc_el.get("label") or _foc_el.get("text") or "?")
-                                    if _foc_el else "?")
-                    _foc_nm_sec  = self._detect_section(state, _foc_el) if _foc_el else ""
-                    _foc_nm      = f"{_foc_nm_sec} {_foc_nm_bare}" if _foc_nm_sec else _foc_nm_bare
-                    logger.info("Stuck guard: no_change x%d on %r — Tab past field.",
-                                _no_change_streak, _foc_nm)
-                    if _foc_nm_bare and _foc_nm_bare != "?":
-                        self._filled_this_tab.add(_foc_nm)
-                    self._executor.execute({"action_type": "keyboard",
-                                            "key_count": 1, "keystrokes": ["tab"]})
-                    _no_change_streak = 0
-                    _last_auto_step   = step_idx
-                    time.sleep(self.step_delay * 0.5)
-                    continue
-                if self._try_advance_tab(state):
-                    _no_change_streak  = 0
-                    _tab_just_switched = True
-                    _tab_scroll_count  = 0
-                    _last_auto_step    = step_idx
-                    self._refresh_record_cache(state)
-                    time.sleep(self.step_delay)
-                    continue
-                else:
-                    logger.warning("Stuck guard: no next tab found — resetting streak.")
-                    _no_change_streak = 0
-                    _steps_on_tab     = 0
-
-            # 1c. Universal tab-complete: when visible fields are all handled, do a
-            # full top→bottom scan to confirm nothing is hiding above or below the
-            # current viewport before advancing to the next tab or submitting.
-            # A helper that checks pending edit/combobox fields in a given state.
-            def _tc_key(e, _st=state):
-                _fn  = (e.get("label") or e.get("text") or "").strip()
-                _sec = self._detect_section(_st, e)
-                return f"{_sec} {_fn}" if _sec else _fn
-            def _tc_has_pending(_st):
-                _fl = {s.lower() for s in self._filled_this_tab}
-                _cb_lower = {s.lower() for s in _confirmed_blank_fields}
-                for _e in _st.get("elements", []):
-                    if (_e.get("window_role") == "background"
-                            or _e.get("type") not in ("editcontrol", "comboboxcontrol")
-                            or not _e.get("enabled", True)):
-                        continue
-                    # Inactive tab panels have negative screen coordinates in wxPython.
-                    # Skip off-screen elements — they belong to other tabs, not this one.
-                    if _e.get("bbox") and _e["bbox"][1] < 0:
-                        continue
-                    _fn = (_e.get("label") or _e.get("text") or "").strip()
-                    _sec = self._detect_section(_st, _e)
-                    _fk  = (f"{_sec} {_fn}" if _sec else _fn).lower()
-                    if _fk in _fl or _fn.lower() in _fl:
-                        continue
-                    if _fk in _cb_lower or _fn.lower() in _cb_lower:
-                        continue  # peeked and confirmed blank — skip
-                    # Skip fields in a section that has no data at all (e.g. Driver 3 when
-                    # record has only 2 drivers).  Without this check _lookup_field falls
-                    # back to the bare key and returns the wrong value (e.g. Policyholder's
-                    # First Name instead of Driver 3 First Name), making the section appear
-                    # pending even though it doesn't exist.
-                    if _sec and self._cached_record:
-                        _sec_lower = _sec.lower()
-                        _fn_key_tc = _sec_lower + " first name"
-                        _fn_val_tc = next((rv for rk, rv in self._cached_record.items()
-                                           if rk.lower() == _fn_key_tc), "")
-                        _skip_pl_tc = {"(none)", "none", "(leave blank)", "n/a"}
-                        if not (_fn_val_tc and _fn_val_tc.lower().strip("()") not in _skip_pl_tc):
-                            continue  # section has no real person — not pending
-                    _known = self._lookup_field(_fn, section=_sec)
-                    _val   = (_e.get("value") or "").strip()
-                    if _known:
-                        _skip_vals = {"(none)", "none", "(leave blank)", "n/a"}
-                        if _known.lower().strip("()") in _skip_vals:
-                            continue  # field should be blank — not pending
-                        # Pending only if empty OR value doesn't match expected
-                        if not _val or _val.lower() != _known.lower():
-                            return True
-                        # Current value already matches expected — not pending
-                        continue
-                    # Empty editcontrol/combobox with unknown value — may still need filling via peek
-                    if (not _val and _e.get("type") in ("editcontrol", "comboboxcontrol")):
-                        return True
-                # Also check unchecked checkboxes that should be checked (or are unknown)
-                for _chk in _st.get("elements", []):
-                    if (_chk.get("window_role") == "background"
-                            or _chk.get("type") != "checkboxcontrol"
-                            or not _chk.get("enabled", True)):
-                        continue
-                    if _chk.get("bbox") and _chk["bbox"][1] < 0:
-                        continue
-                    _nm = (_chk.get("label") or _chk.get("text") or "").strip()
-                    if _nm in self._checked_fields:
-                        continue
-                    if _nm.lower() in _cb_lower:
-                        continue  # confirmed blank after peek
-                    _exp = self._lookup_field(_nm)
-                    if _exp and _exp.lower().strip().startswith("yes"):
-                        return True
-                    # Unknown checkbox: no data → not blocking tab advance
-                return False
-
-            if not _plugin_active and self._filled_this_tab and not _tc_has_pending(state):
-                # Visible fields look done — do a full top→bottom scan before acting
-                if not _tc_advance_verified:
-                    _tcav_state = state
-                    _tcav_found = False
-                    # 1. Scroll to top and check for missed fields above viewport
-                    self._scroll_form_to_top(_tcav_state)
-                    time.sleep(0.4)
-                    _tcav_state = self._observe()
-                    for _tcav_i in range(6):   # up to 6 scroll-down passes
-                        if _tc_has_pending(_tcav_state):
-                            _pend_names = [
-                                (e.get("label") or e.get("text") or "?")
-                                for e in _tcav_state.get("elements", [])
-                                if e.get("type") in ("editcontrol", "comboboxcontrol")
-                                and e.get("window_role") != "background"
-                                and e.get("enabled", True)
-                                and self._lookup_field(
-                                    (e.get("label") or e.get("text") or "").strip(),
-                                    section=self._detect_section(_tcav_state, e))
-                                and (e.get("label") or e.get("text") or "").strip().lower()
-                                    not in {s.lower() for s in self._filled_this_tab}
-                            ][:4]
-                            logger.info("Tab-complete scan (pass %d): pending fields found: %s",
-                                        _tcav_i, _pend_names)
-                            state        = _tcav_state
-                            _tcav_found  = True
-                            _tc_advance_verified = False
-                            self._focus_first_empty_field(_tcav_state)
-                            time.sleep(self.step_delay)
-                            break
-                        self._scroll_form_down(_tcav_state)
-                        time.sleep(0.25)
-                        _tcav_state = self._observe()
-                    if _tcav_found:
-                        continue   # back to main loop to fill found fields
-                    _tc_advance_verified = True   # full scan passed — safe to advance/submit
-
-                # Full scan verified — advance tab or submit
-                if self._try_advance_tab(state):
-                    logger.info("Tab complete: all fields done — advancing to next tab.")
-                    _no_change_streak    = 0
-                    _tab_just_switched   = True
-                    _tab_scroll_count    = 0
-                    _last_auto_step      = step_idx
-                    _tc_advance_verified = False
-                    self._filled_this_tab.clear(); self._fixation_hits.clear()
-                    _confirmed_blank_fields.clear()
-                    self._refresh_record_cache(state)
-                    time.sleep(self.step_delay)
-                    continue
-                else:
-                    # Last tab — click Submit via UIA (button may be scrolled off-screen)
-                    _submitted = False
-                    try:
-                        import uiautomation as _uia_sub
-                        for _btn_name in ("Submit  New", "Submit & New", "Submit"):
-                            _btn = _uia_sub.ButtonControl(Name=_btn_name, searchDepth=8)
-                            if _btn.Exists(maxSearchSeconds=0.5):
-                                logger.info("Tab complete: last tab — UIA click Submit %r", _btn_name)
-                                _btn.Click()
-                                _submitted = True
-                                break
-                    except Exception as _sub_exc:
-                        logger.warning("UIA Submit click failed: %s", _sub_exc)
-                    if not _submitted:
-                        # Fallback: coordinate click from element list
-                        _submit_el = next(
-                            (e for e in state.get("elements", [])
-                             if e.get("type") == "buttoncontrol"
-                             and "submit" in (e.get("label") or e.get("text") or "").lower()
-                             and e.get("window_role") != "background"
-                             and e.get("bbox")),
-                            None
-                        )
-                        if _submit_el:
-                            x1, y1, x2, y2 = _submit_el["bbox"]
-                            cx, cy = (x1 + x2) / 2, (y1 + y2) / 2
-                            logger.info("Tab complete: last tab — coord click Submit @ (%.0f, %.0f)", cx, cy)
-                            self._executor.execute({"action_type": "click", "click_position": [cx, cy]})
-                            _submitted = True
-                    if _submitted:
-                        # Latch on the instance too — the multi-record loop in
-                        # run_task reads agent._submitted to decide whether the
-                        # form is clean for the next record.
-                        self._submitted = True
-                        break
-
-            # 1b. Pane-focus escape: if focus is on a section header / container (panecontrol),
-            # Tab will do nothing. Jump directly to the first empty edit field instead.
-            _focused_id  = state.get("focused_element_id")
-            _focused_el  = next((e for e in state.get("elements", []) if e.get("element_id") == _focused_id), None)
-            if not _plugin_active and _focused_el and _focused_el.get("type") == "panecontrol":
-                _pane_label = (_focused_el.get("label") or _focused_el.get("text") or "?")[:40]
-                _pane_y     = _focused_el["bbox"][1] if _focused_el.get("bbox") else 0
-                # If this pane is a section_ with no data in the record (e.g. Driver 3 when
-                # record has only 2 drivers), don't escape into it — advance tab instead.
-                # Read the section directly from the pane's own label rather than calling
-                # _detect_section (which finds panes ABOVE the element, not the element itself).
-                import re as _pre
-                _pane_raw = (_focused_el.get("label") or _focused_el.get("text") or "").lower()
-                _pm = _pre.match(r"section_(driver|vehicle)_(\d+)$", _pane_raw)
-                _pane_sec = f"{_pm.group(1).title()} {_pm.group(2)}" if _pm else ""
-                if _pane_sec and self._cached_record:
-                    _ps_lower = _pane_sec.lower()
-                    # A section exists only if its First Name field has a real value.
-                    # Boolean fields like "SR-22 Required: No" are present for every
-                    # section and must not be used as presence indicators.
-                    _fn_key   = _ps_lower + " first name"
-                    _fn_val   = next((rv for rk, rv in self._cached_record.items()
-                                      if rk.lower() == _fn_key), "")
-                    _skip_pl  = {"(none)", "none", "(leave blank)", "n/a"}
-                    _sec_has_real = bool(_fn_val and _fn_val.lower().strip("()") not in _skip_pl)
-                    if not _sec_has_real:
-                        logger.info("Pane-escape: section %r has no real data — advancing tab.", _pane_sec)
-                        if self._try_advance_tab(state):
-                            _no_change_streak  = 0
-                            _tab_just_switched = True
-                            _tab_scroll_count  = 0
-                            _last_auto_step    = step_idx
-                            self._filled_this_tab.clear(); self._fixation_hits.clear()
-                            _confirmed_blank_fields.clear()
-                            self._refresh_record_cache(state)
-                            time.sleep(self.step_delay)
-                        _heuristic_steps += 1; continue
-                logger.info("Focus on pane %r — clicking first empty field to escape.", _pane_label)
-                # Peek at which field we'd click before actually clicking it.
-                # If we've clicked the same field 3+ times with no escape (loop!), scroll down first.
-                _pane_filled_lower = {s.lower() for s in self._filled_this_tab}
-                def _pane_not_handled(_pe):
-                    _fn  = (_pe.get("label") or _pe.get("text") or "").strip()
-                    _sec = self._detect_section(state, _pe)
-                    _fk  = f"{_sec} {_fn}".lower() if _sec else _fn.lower()
-                    return _fk not in _pane_filled_lower and _fn.lower() not in _pane_filled_lower
-                _pane_candidates = sorted(
-                    [_pe for _pe in state.get("elements", [])
-                     if (_pe.get("window_role") != "background"
-                         and _pe.get("type") == "editcontrol"
-                         and _pe.get("bbox") and _pe.get("enabled", True)
-                         and _pe["bbox"][1] >= max(100, _pane_y)
-                         and _pane_not_handled(_pe))],
-                    key=lambda e: (e["bbox"][1], e["bbox"][0])
-                )
-                _pane_next_el = _pane_candidates[0] if _pane_candidates else None
-                _pane_next_name = (_pane_next_el.get("label") or _pane_next_el.get("text") or "").strip() if _pane_next_el else ""
-                if _pane_next_name and _pane_next_name == _pane_escape_last_field:
-                    _pane_escape_streak += 1
-                else:
-                    _pane_escape_streak = 1
-                    _pane_escape_last_field = _pane_next_name
-                if _pane_escape_streak >= 3:
-                    logger.warning("Pane-escape: stuck on %r for %d tries — scrolling down to reveal it.",
-                                   _pane_next_name, _pane_escape_streak)
-                    self._scroll_form_down(state)
-                    time.sleep(self.step_delay * 0.5)
-                    _pane_escape_streak = 0  # reset after scroll so we try click once fresh
-                    _heuristic_steps += 1; continue
-                # Press Tab instead of UIA SetFocus — the form's own tab order
-                # reliably lands on the first field inside the section pane.
-                # UIA SetFocus can bounce back to the previous section when the
-                # target field hasn't been scrolled into the form's active region.
-                self._executor.execute({"action_type": "keyboard",
-                                        "key_count": 1, "keystrokes": ["tab"]})
-                time.sleep(self.step_delay * 0.5)
-                _heuristic_steps += 1; continue
-                # No unhandled field found in this pane — fall through so the
-                # universal tab-complete check (above) or LLM handles next steps.
-
-            # 1c. Button-focus escape: if focus landed on a button but there are still
-            # pending fields, seek the first unfilled field directly instead of waiting
-            # for the LLM to figure out what to do (avoids 10-step wait-loop).
-            if (not _plugin_active and _focused_el
-                    and _focused_el.get("type") in {
-                        "button", "buttoncontrol", "splitbutton", "splitbuttoncontrol",
-                        "hyperlinkcontrol", "link",
-                        "tabitem", "tabitemcontrol"}
-                    and _tc_has_pending(state)):
-                _btn_lbl = (_focused_el.get("label") or _focused_el.get("text") or "").strip()
-                logger.info("Button-focus escape: focus on non-input %r but fields still pending "
-                            "— seeking first unfilled field.", _btn_lbl)
-                if self._focus_first_empty_field(state):
-                    _no_change_streak = 0
-                    time.sleep(self.step_delay * 0.5)
-                    _heuristic_steps += 1; continue
-                # No empty edit/combobox visible — try unchecked checkboxes directly
-                _chk_pending = [
-                    e for e in state.get("elements", [])
-                    if e.get("type") == "checkboxcontrol"
-                    and e.get("window_role") != "background"
-                    and e.get("enabled", True)
-                    and (e.get("label") or e.get("text") or "").strip() not in self._checked_fields
-                ]
-                _chk_acted = False
-                for _chk_e in _chk_pending:
-                    _chk_nm = (_chk_e.get("label") or _chk_e.get("text") or "").strip()
-                    _exp_v  = self._lookup_field(_chk_nm)
-                    if _exp_v and _exp_v.lower().strip().startswith("yes"):
-                        _bbox = _chk_e.get("bbox")
-                        if _bbox:
-                            try:
-                                import win32gui as _wgb; import win32api as _wab
-                                _cx2 = (_bbox[0] + _bbox[2]) / 2
-                                _cy2 = (_bbox[1] + _bbox[3]) / 2
-                                _hw2 = _wgb.WindowFromPoint((int(_cx2), int(_cy2)))
-                                if _hw2:
-                                    _wab.SendMessage(_hw2, 0x00F1, 1, 0)
-                                    logger.info("Button-escape: checked checkbox %r via BM_SETCHECK.", _chk_nm)
-                                    self._checked_fields.add(_chk_nm)
-                                    self._filled_this_tab.add(_chk_nm)
-                                    _chk_acted = True
-                            except Exception as _bce:
-                                logger.warning("Button-escape checkbox BM_SETCHECK failed: %s", _bce)
-                if _chk_acted:
-                    time.sleep(self.step_delay * 0.5)
-                    _heuristic_steps += 1; continue
-                # Scroll down to reveal hidden fields
-                if self._scroll_form_down(state):
-                    _tab_scroll_count += 1
-                    _last_auto_step    = step_idx
-                    time.sleep(self.step_delay * 0.5)
-                    _heuristic_steps += 1; continue
-                # All seeks exhausted — force Tab past the button, never give it to LLM
-                logger.info("Button-escape: all seeks failed — forcing Tab past %r.", _btn_lbl)
-                self._executor.execute({"action_type": "keyboard", "key_count": 1, "keystrokes": ["tab"]})
-                time.sleep(self.step_delay * 0.5)
-                _heuristic_steps += 1; continue
-
-            # 1z. Already-handled guard: focus bounced back to a field we already filled.
-            #     Tab past without calling LLM — prevents LLM from overwriting correct values.
-            if not _plugin_active:
-                _fid_ah = state.get("focused_element_id")
-                _fe_ah  = next((e for e in state.get("elements", [])
-                                if e.get("element_id") == _fid_ah), None)
-                if _fe_ah and _fe_ah.get("type") in ("editcontrol", "comboboxcontrol"):
-                    _fn_ah  = (_fe_ah.get("label") or _fe_ah.get("text") or "").strip()
-                    _sec_ah = self._detect_section(state, _fe_ah)
-                    _fk_ah  = f"{_sec_ah} {_fn_ah}" if _sec_ah else _fn_ah
-                    if _fk_ah in self._filled_this_tab:
-                        _foc_val_ah = (_fe_ah.get("value") or "").strip()
-                        _exp_ah     = self._lookup_field(_fn_ah, section=_sec_ah)
-                        if not _exp_ah or _foc_val_ah.lower() == _exp_ah.lower():
-                            logger.info("Already-handled guard: %r already filled (%r) — Tab.",
-                                        _fk_ah, _foc_val_ah[:30])
-                            self._executor.execute({"action_type": "keyboard",
-                                                    "key_count": 1, "keystrokes": ["tab"]})
-                            _heuristic_steps += 1; continue
-
-            # 2. Auto-skip: if focused field already has the correct value, Tab past it
-            if not _plugin_active and self._llm_client and self._auto_skip(state):
-                logger.info("Auto-skip: focused field already has correct value — Tab.")
-                self._executor.execute({"action_type": "keyboard", "key_count": 1, "keystrokes": ["tab"]})
-                _no_change_streak = 0
-                _steps_on_tab     = 0
-                # NOTE: _last_auto_step is intentionally NOT reset here.
-                # Resetting on auto-skip would mask LLM back-cycling (clicking already-filled
-                # fields), preventing the drought guard from firing and scrolling down.
-                time.sleep(self.step_delay)
-                _heuristic_steps += 1; continue
-
-            # 2a. Auto-fill: if focused field is empty (or has wrong leftover value), type correct value
-            auto_text = (self._auto_fill(state) if not _plugin_active else None)
-            # 2a-peek: focused empty editcontrol with no cached value — peek Notepad to populate cache.
-            # Gated off when disable_auto_handlers — these are task guards (Notepad
-            # peek + dup-label fill) that fill fields without the transformer.
-            if not auto_text and not self._no_autohandlers:
-                _fid_p = state.get("focused_element_id")
-                _fe_p  = next((e for e in state.get("elements", [])
-                               if e.get("element_id") == _fid_p), None)
-                if (_fe_p and _fe_p.get("type") in ("editcontrol", "comboboxcontrol")
-                        and not (_fe_p.get("value") or "").strip()):
-                    _fn_p      = (_fe_p.get("label") or _fe_p.get("text") or "").strip()
-                    _sec_p     = self._detect_section(state, _fe_p)
-                    _fk_p      = f"{_sec_p} {_fn_p}" if _sec_p else _fn_p
-                    _fn_lower_p = _fn_p.lower()
-                    if (_fn_p
-                            and not self._lookup_field(_fn_p, section=_sec_p)
-                            and _fn_lower_p not in {s.lower() for s in _confirmed_blank_fields}
-                            and _fn_lower_p not in {s.lower() for s in self._filled_this_tab}):
-                        logger.info("Auto-fill: '%s' not in cache — peeking Notepad.", _fn_p)
-                        self._peek_notepad(state, _fn_p)
-                        auto_text = self._auto_fill(state)
-                        if not auto_text:
-                            # Peek exhausted — no value found; treat as blank and tab past
-                            logger.info("Auto-fill: '%s' not found after peek — treating as blank, Tab.",
-                                        _fn_p)
-                            _confirmed_blank_fields.add(_fn_lower_p)
-                            self._filled_this_tab.add(_fk_p)
-                            self._executor.execute({"action_type": "keyboard",
-                                                    "key_count": 1, "keystrokes": ["tab"]})
-                            _no_change_streak = 0
-                            _last_auto_step   = step_idx
-                            time.sleep(self.step_delay)
-                            _heuristic_steps += 1; continue
-            # 2a-dup: duplicate UIA label — field is empty but label already in _filled_this_tab.
-            # Peek Notepad for the next uncached field after that label and fill it.
-            if not auto_text and not self._no_autohandlers:
-                _fid_dup = state.get("focused_element_id")
-                _fe_dup  = next((e for e in state.get("elements", [])
-                                 if e.get("element_id") == _fid_dup), None)
-                if (_fe_dup and _fe_dup.get("type") in ("editcontrol", "comboboxcontrol")
-                        and not (_fe_dup.get("value") or "").strip()):
-                    _fn_dup     = (_fe_dup.get("label") or _fe_dup.get("text") or "").strip()
-                    _fn_dup_low = _fn_dup.lower()
-                    _sec_dup    = self._detect_section(state, _fe_dup)
-                    _fk_dup     = f"{_sec_dup} {_fn_dup}" if _sec_dup else _fn_dup
-                    if (_fn_dup
-                            and _fk_dup in self._filled_this_tab
-                            and _fn_dup_low not in {s.lower() for s in _confirmed_blank_fields}):
-                        logger.info("Dup-label: '%s' already filled this tab — peeking next field.", _fn_dup)
-                        _next = self._peek_next_field_after(state, _fn_dup)
-                        if _next:
-                            _nk, _nv = _next
-                            self._cached_record[_nk] = _nv
-                            self._visual_cache[_nk]  = _nv
-                            logger.info("Dup-label fill: actual field=%r  value=%r  (UIA label=%r)",
-                                        _nk, _nv, _fn_dup)
-                            self._ensure_form_foreground(state)
-                            self._executor.execute({"action_type": "keyboard",
-                                                    "key_count": 1, "keystrokes": ["ctrl+a"]})
-                            self._executor.execute({
-                                "action_type": "keyboard",
-                                "key_count": len(_nv),
-                                "keystrokes": list(_nv),
-                                "text": _nv,
-                            })
-                            self._executor.execute({"action_type": "keyboard",
-                                                    "key_count": 1, "keystrokes": ["tab"]})
-                            self._filled_this_tab.add(_nk)
-                            _no_change_streak = 0
-                            _steps_on_tab     = 0
-                            _last_auto_step   = step_idx
-                            time.sleep(self.step_delay)
-                            _heuristic_steps += 1; continue
-                        else:
-                            logger.info("Dup-label: no next field found — treating as blank, Tab.")
-                            _confirmed_blank_fields.add(_fn_dup_low + "#dup")
-                            self._executor.execute({"action_type": "keyboard",
-                                                    "key_count": 1, "keystrokes": ["tab"]})
-                            _no_change_streak = 0
-                            _last_auto_step   = step_idx
-                            time.sleep(self.step_delay)
-                            _heuristic_steps += 1; continue
-
-            if auto_text:
-                field_name_log, text_val, needs_clear = auto_text
-                self._peek_notepad(state, field_name_log)
-                self._ensure_form_foreground(state)
-                if needs_clear:
-                    logger.info("Auto-fill (overwrite): '%s' → %r", field_name_log, text_val[:40])
-                    self._executor.execute({"action_type": "keyboard", "key_count": 1, "keystrokes": ["ctrl+a"]})
-                else:
-                    logger.info("Auto-fill: '%s' → %r", field_name_log, text_val[:40])
-                self._executor.execute({
-                    "action_type": "keyboard",
-                    "key_count": len(text_val),
-                    "keystrokes": list(text_val),
-                    "text": text_val,
-                })
-                self._executor.execute({"action_type": "keyboard", "key_count": 1, "keystrokes": ["tab"]})
-                logger.info("Auto-Tab after auto-fill.")
-                _no_change_streak = 0
-                _steps_on_tab     = 0
-                _last_auto_step   = step_idx
-                self._filled_this_tab.add(field_name_log)
-                time.sleep(self.step_delay)
-                _heuristic_steps += 1; continue
-
-            # 2a2. Auto-check: if focused checkbox should be checked per background data, click it
-            auto_chk = (self._auto_check(state) if not _plugin_active else None)
-            if auto_chk is not None:
-                field_name_log, should_check = auto_chk
-                _did_new_check = False
-                if should_check:
-                    if field_name_log in self._checked_fields:
-                        # Already checked this run — don't toggle it off
-                        logger.info("Auto-check: '%s' already checked this run — Tab.", field_name_log)
-                    else:
-                        elements   = state.get("elements", [])
-                        focused_id = state.get("focused_element_id")
-                        focused_el = next((e for e in elements if e.get("element_id") == focused_id), None)
-                        if focused_el and focused_el.get("bbox"):
-                            x1, y1, x2, y2 = focused_el["bbox"]
-                            cx, cy = (x1 + x2) / 2, (y1 + y2) / 2
-                            # Check if already checked via Win32 BM_GETCHECK
-                            already_checked = False
-                            try:
-                                import win32gui as _wg
-                                import win32api as _wa
-                                BM_GETCHECK = 0x00F0
-                                _hwnd = _wg.WindowFromPoint((int(cx), int(cy)))
-                                if _hwnd:
-                                    already_checked = (_wa.SendMessage(_hwnd, BM_GETCHECK, 0, 0) == 1)
-                            except Exception:
-                                pass
-                            if already_checked:
-                                logger.info("Auto-check: '%s' already checked — Tab.", field_name_log)
-                                self._checked_fields.add(field_name_log)
-                            else:
-                                self._peek_notepad(state, field_name_log)
-                                logger.info("Auto-check: '%s' → clicking @ (%.0f, %.0f)", field_name_log, cx, cy)
-                                self._executor.execute({"action_type": "click", "click_position": [cx, cy]})
-                                self._checked_fields.add(field_name_log)
-                                _did_new_check = True
-                        else:
-                            logger.warning("Auto-check: '%s' — no bbox, pressing space", field_name_log)
-                            self._executor.execute({"action_type": "keyboard", "key_count": 1, "keystrokes": ["space"]})
-                            self._checked_fields.add(field_name_log)
-                            _did_new_check = True
-                else:
-                    logger.info("Auto-check: '%s' should remain unchecked — Tab.", field_name_log)
-                self._executor.execute({"action_type": "keyboard", "key_count": 1, "keystrokes": ["tab"]})
-                _no_change_streak = 0
-                if _did_new_check:
-                    # Only reset drought/tab counters when a new checkbox was actually clicked.
-                    # Revisits (already checked, should-remain-unchecked) let the guards accumulate
-                    # so the drought and stuck guards eventually advance the tab.
-                    _steps_on_tab   = 0
-                    _last_auto_step = step_idx
-                time.sleep(self.step_delay)
-                _heuristic_steps += 1; continue
-
-            # 2a3. Peek for unknown focused checkbox (not in cache → peek, then re-check)
-            _fid_chk = state.get("focused_element_id")
-            _fe_chk  = next((e for e in state.get("elements", [])
-                             if e.get("element_id") == _fid_chk), None)
-            if (not _plugin_active and _fe_chk and _fe_chk.get("type") == "checkboxcontrol"):
-                _fn_chk      = (_fe_chk.get("label") or _fe_chk.get("text") or "").strip()
-                _fn_chk_low  = _fn_chk.lower()
-                if (_fn_chk
-                        and not self._lookup_field(_fn_chk)
-                        and _fn_chk_low not in {s.lower() for s in _confirmed_blank_fields}
-                        and _fn_chk_low not in {s.lower() for s in self._checked_fields}):
-                    logger.info("Auto-check: '%s' not in cache — peeking Notepad.", _fn_chk)
-                    self._peek_notepad(state, _fn_chk)
-                    auto_chk2 = self._auto_check(state)
-                    if auto_chk2 is not None:
-                        field_name_log2, should_check2 = auto_chk2
-                        if should_check2 and field_name_log2 not in self._checked_fields:
-                            if _fe_chk.get("bbox"):
-                                x1, y1, x2, y2 = _fe_chk["bbox"]
-                                cx2, cy2 = (x1 + x2) / 2, (y1 + y2) / 2
-                                logger.info("Auto-check (post-peek): '%s' → clicking", field_name_log2)
-                                self._executor.execute({"action_type": "click", "click_position": [cx2, cy2]})
-                            else:
-                                self._executor.execute({"action_type": "keyboard", "key_count": 1, "keystrokes": ["space"]})
-                            self._checked_fields.add(field_name_log2)
-                        else:
-                            logger.info("Auto-check (post-peek): '%s' should remain unchecked — Tab.", _fn_chk)
-                        self._executor.execute({"action_type": "keyboard", "key_count": 1, "keystrokes": ["tab"]})
-                        _no_change_streak = 0
-                        _last_auto_step   = step_idx
-                        time.sleep(self.step_delay)
-                        _heuristic_steps += 1; continue
-                    else:
-                        # Peek found nothing — mark confirmed blank, tab past
-                        logger.info("Auto-check: '%s' not found after peek — treating as blank, Tab.", _fn_chk)
-                        _confirmed_blank_fields.add(_fn_chk_low)
-                        self._executor.execute({"action_type": "keyboard", "key_count": 1, "keystrokes": ["tab"]})
-                        _no_change_streak = 0
-                        _last_auto_step   = step_idx
-                        time.sleep(self.step_delay)
-                        _heuristic_steps += 1; continue
-
-            # 2b. Auto-fix combobox: if focused combobox has WRONG value, select correct option
-            fix = (self._combobox_needs_fix(state) if not _plugin_active else None)
-            if fix:
-                field_name, current_val, expected_val = fix
-                elements   = state.get("elements", [])
-                # Check if dropdown is already open (listitemcontrols visible)
-                listitems = [e for e in elements
-                             if e.get("type") == "listitemcontrol"
-                             and e.get("window_role") != "background"]
-                if listitems:
-                    # Find the matching listitem and click it
-                    target = next(
-                        (e for e in listitems
-                         if (e.get("text") or e.get("label") or "").strip().lower()
-                            == expected_val.lower()),
-                        None,
-                    )
-                    if target and target.get("bbox"):
-                        x1, y1, x2, y2 = target["bbox"]
-                        cx, cy = (x1 + x2) / 2, (y1 + y2) / 2
-                        logger.info("Combobox-fix: clicking listitem %r @ (%.0f,%.0f)",
-                                    expected_val, cx, cy)
-                        self._executor.execute({"action_type": "click",
-                                                "click_position": [cx, cy]})
-                        _steps_on_tab   = 0
-                        _last_auto_step = step_idx
-                        time.sleep(self.step_delay)
-                        _heuristic_steps += 1; continue
-                    else:
-                        logger.warning("Combobox-fix: listitem %r not found in open list", expected_val)
-                else:
-                    # Dropdown is closed — open it
-                    focused_id = state.get("focused_element_id")
-                    focused    = next((e for e in elements if e.get("element_id") == focused_id), None)
-                    if focused and focused.get("bbox"):
-                        x1, y1, x2, y2 = focused["bbox"]
-                        cx, cy = (x1 + x2) / 2, (y1 + y2) / 2
-                        self._peek_notepad(state, field_name)
-                        logger.info("Combobox-fix: '%s' = %r → need %r — opening dropdown",
-                                    field_name, current_val, expected_val)
-                        self._executor.execute({"action_type": "click",
-                                                "click_position": [cx, cy]})
-                        _steps_on_tab   = 0
-                        _last_auto_step = step_idx
-                        time.sleep(self.step_delay)
-                        _heuristic_steps += 1; continue
-                        
-            _drought = step_idx - _last_auto_step
-            if not _plugin_active and _drought >= _DROUGHT_LIMIT:
-                if _tab_scroll_count < _MAX_TAB_SCROLLS:
-                    logger.info("Drought guard: %d steps without auto-handler — scrolling form (scroll %d/%d).",
-                                _drought, _tab_scroll_count + 1, _MAX_TAB_SCROLLS)
-                    if self._scroll_form_down(state):
-                        _tab_scroll_count += 1
-                        _last_auto_step    = step_idx   # reset drought so it doesn't fire next step
-                        time.sleep(self.step_delay * 0.75)
-                        state = self._observe()          # re-observe so we see newly revealed fields
-                        self._focus_first_empty_field(state, after_scroll=True)  # skip already-filled
-                        time.sleep(0.3)
-                        _heuristic_steps += 1; continue   # re-observe with scrolled form + focused field
-                else:
-                    # All scroll attempts exhausted — all visible fields are done on this tab.
-                    # Proactively advance to the next tab instead of waiting for the stuck guard.
-                    logger.info("Drought guard: scrolls exhausted (%d/%d) — advancing tab.",
-                                _tab_scroll_count, _MAX_TAB_SCROLLS)
-                    if self._try_advance_tab(state):
-                        _no_change_streak  = 0
-                        _tab_just_switched = True
-                        _tab_scroll_count  = 0
-                        _last_auto_step    = step_idx
-                        self._refresh_record_cache(state)
-                        time.sleep(self.step_delay)
-                        continue
 
             # ── Scroll-to-reveal (universal mechanic — runs in EVERY mode) ────────
             # The transformer can only target RENDERED elements; fields below the
@@ -1896,7 +1288,7 @@ class LLMAgent:
                         _m2_at_bottom = False
                         _last_auto_step = step_idx
                         _heuristic_steps += 1
-                        self._filled_this_tab.clear(); self._fixation_hits.clear()
+                        self._filled_this_tab.clear(); self._fixation_hits.clear(); self._section_pane_tops = {}
                         self._refresh_record_cache(self._observe())
                         time.sleep(self.step_delay)
                         continue
@@ -1907,7 +1299,7 @@ class LLMAgent:
                     _m2_at_bottom      = False       # M2: new tab is not at bottom
                     _last_auto_step    = step_idx
                     _heuristic_steps  += 1
-                    self._filled_this_tab.clear(); self._fixation_hits.clear()
+                    self._filled_this_tab.clear(); self._fixation_hits.clear(); self._section_pane_tops = {}
                     self._refresh_record_cache(self._observe())
                     time.sleep(self.step_delay)
                     continue
@@ -1973,6 +1365,24 @@ class LLMAgent:
                                           "spincontrolcontrol", "spincontrol",
                                           "spinnercontrol", "spinner")
                               and not _fe2_val)
+                # SPIN-VISIBILITY GUARD (2026-07-13): this check trusts the
+                # OBSERVED value alone. A dead-widget rescue writes via UIA
+                # pattern (bypassing the input queue) WITHOUT necessarily
+                # moving focus or updating what the observer reads back next
+                # step — the write lands but _fe2_val still reads '' — so
+                # this branch re-fired on an already-filled field forever
+                # (~15 wasted steps/field, live 2026-07-11 22:49). The rescue
+                # already records the field in _filled_this_tab the moment it
+                # succeeds; trust that over a possibly-stale observed value.
+                if _t_is_type and _fe2 is not None:
+                    _fe2_lbl = (_fe2.get("label") or _fe2.get("text") or "").strip()
+                    _fe2_sec = self._detect_section(state, _fe2)
+                    _fe2_key = (f"{_fe2_sec} {_fe2_lbl}" if _fe2_sec else _fe2_lbl).lower()
+                    if _fe2_lbl and _fe2_key in {f.lower() for f in self._filled_this_tab}:
+                        logger.info("[OPT2] %r already in filled_this_tab despite empty "
+                                    "observed value — trusting the write, not the observer.",
+                                    _fe2_lbl[:28])
+                        _t_is_type = False
 
                 if _t_is_type and self._llm_client:
                     # transformer chose to FILL → LLM supplies the value (the WHAT).
@@ -1993,9 +1403,26 @@ class LLMAgent:
                     # (record said '(leave blank)' / none / n-a, possibly with a note),
                     # DON'T type the placeholder literally — Tab past + mark attempted.
                     # Generic (substring match, no field names).
+                    #
+                    # ACTION-TYPE GUARD (2026-07-16, found live: run_20260716_124336.txt
+                    # — 'Collision Deductible'/'Comprehensive Deductible'/'Bodily Injury
+                    # (k$/k$)'/'Property Damage ($)' all abandoned as "leave-blank" in a
+                    # row despite having real resolved values '500'/'250'/'100/300'/
+                    # '100,000'). Root cause: _merge's combobox-click-override (fixed
+                    # 2026-07-16 to only fire for comboboxcontrol) legitimately returns
+                    # a bare CLICK action with no "text" field at all — that's step one
+                    # of a combobox fill (click to activate), not a decision that the
+                    # value is blank. This check read the absence of "text" on ANY
+                    # merged action as "value resolved to blank," even when merge
+                    # actually returned a click, and abandoned the field on the spot
+                    # instead of letting the click fall through to execute normally.
+                    # Only apply the leave-blank interpretation when merge actually
+                    # returned a text-carrying action — a click never means "blank".
                     _txt  = (prediction.get("text") or "").strip()
                     _norm = _txt.lower().strip().strip("()").strip()
-                    if (not _txt) or _norm in {"none", "n/a", "na"} or _norm.startswith("leave blank"):
+                    if (prediction.get("action_type") != "click"
+                            and ((not _txt) or _norm in {"none", "n/a", "na"}
+                                 or _norm.startswith("leave blank"))):
                         logger.info("[OPT2] %r → leave-blank/empty — Tab past (skip).", _flabel)
                         if _fe2 is not None:
                             self._mark_attempted(_fe2)
@@ -2418,6 +1845,26 @@ class LLMAgent:
                     _chk_label = f"{_chk_sec} {_chk_label_bare}" if _chk_sec else _chk_label_bare
                     _chk_cx = (_chk_at_cp["bbox"][0] + _chk_at_cp["bbox"][2]) / 2
                     _chk_cy = (_chk_at_cp["bbox"][1] + _chk_at_cp["bbox"][3]) / 2
+                    # RECORD-AWARE CHECK (2026-07-16): this path used to force
+                    # EVERY clicked checkbox to CHECKED, unconditionally, never
+                    # consulting the record at all — only guarding against a
+                    # DOUBLE-check (already-checked), never against checking a
+                    # box the record says should stay NO. Found live: 'Multi-
+                    # Car'/'Good Student' (record: NO) both got force-checked
+                    # this way (run_20260716_131631.txt); 'Good Driver'/'Multi-
+                    # Policy' only came out correct by coincidence (record said
+                    # YES anyway). The sweep's OWN checkbox path already does
+                    # this lookup correctly elsewhere (_act_on_element) — this
+                    # separate per-step click path never did. Look up the
+                    # record's actual expected state (section-aware, same
+                    # _lookup_field/_detect_section pattern used everywhere
+                    # else) BEFORE deciding to check it; only check ON when the
+                    # record actually says yes/checked/true/1 — a record value
+                    # of NO/absent leaves the checkbox at its default
+                    # (unchecked), matching what the sweep's own logic already
+                    # does correctly.
+                    _chk_exp = self._lookup_field(_chk_label_bare, section=_chk_sec)
+                    _chk_want = _chk_exp.strip().lower() in ("yes", "yes (check)", "true", "checked", "x", "1")
                     # Use Win32 BM_SETCHECK — pyautogui clicks don't toggle wx checkboxes
                     try:
                         import win32gui as _wg2; import win32api as _wa2
@@ -2425,7 +1872,14 @@ class LLMAgent:
                         _hwnd2 = _wg2.WindowFromPoint((int(_chk_cx), int(_chk_cy)))
                         if _hwnd2:
                             _already = (_wa2.SendMessage(_hwnd2, BM_GETCHECK, 0, 0) == BST_CHECKED)
-                            if _chk_label in self._checked_fields or _already:
+                            if not _chk_want:
+                                logger.info("Checkbox %r: record says NO/absent — leaving "
+                                           "unchecked, no toggle.", _chk_label)
+                                self._checked_fields.add(_chk_label)
+                                self._filled_this_tab.add(_chk_label)
+                                self._mark_attempted(_chk_at_cp)
+                                prediction = {"action_type": "keyboard", "key_count": 1, "keystrokes": ["tab"]}
+                            elif _chk_label in self._checked_fields or _already:
                                 logger.warning("Checkbox %r already checked — Tab instead.", _chk_label)
                                 self._mark_attempted(_chk_at_cp)   # stop re-targeting it
                                 prediction = {"action_type": "keyboard", "key_count": 1, "keystrokes": ["tab"]}
@@ -2536,7 +1990,7 @@ class LLMAgent:
                         _expose_scrolls    = 0          # M2: new tab → fresh scroll budget
                         _m2_at_bottom      = False       # M2: new tab is not at bottom
                         _last_auto_step    = step_idx
-                        self._filled_this_tab.clear(); self._fixation_hits.clear()
+                        self._filled_this_tab.clear(); self._fixation_hits.clear(); self._section_pane_tops = {}
                         _confirmed_blank_fields.clear()
                         self._refresh_record_cache(self._observe())
                         time.sleep(self.step_delay)
@@ -2546,7 +2000,7 @@ class LLMAgent:
                         _tab_just_switched = True
                         _tab_scroll_count  = 0
                         _last_auto_step    = step_idx
-                        self._filled_this_tab.clear(); self._fixation_hits.clear()
+                        self._filled_this_tab.clear(); self._fixation_hits.clear(); self._section_pane_tops = {}
                         _confirmed_blank_fields.clear()
                         self._refresh_record_cache(state)
                         time.sleep(self.step_delay)
@@ -2657,7 +2111,7 @@ class LLMAgent:
                     logger.info("[NAV] (fixation) page done → switch tab %r", (_nav.get("target") or "")[:24])
                     self._executor.execute({"action_type": "click", "click_position": _nav["click_position"]})
                     self._visited_tabs.add((_nav.get("target") or "").strip())
-                    self._filled_this_tab.clear(); self._fixation_hits.clear()
+                    self._filled_this_tab.clear(); self._fixation_hits.clear(); self._section_pane_tops = {}
                     self._refresh_record_cache(self._observe())
                 elif _nav_act == "done" and self._confirm_finished(state):
                     logger.info("[NAV] (fixation) finish confirmed against source — done.")
@@ -2677,7 +2131,7 @@ class LLMAgent:
                         self._executor.execute({"action_type": "click",
                                                 "click_position": [(_tb[0] + _tb[2]) / 2, (_tb[1] + _tb[3]) / 2]})
                         self._visited_tabs.add(_tnm)
-                        self._filled_this_tab.clear(); self._fixation_hits.clear()
+                        self._filled_this_tab.clear(); self._fixation_hits.clear(); self._section_pane_tops = {}
                         self._refresh_record_cache(self._observe())
                     else:
                         # LAST TAB — nowhere to advance. Escalation used to no-op here
@@ -2703,6 +2157,18 @@ class LLMAgent:
                 _nav_keys  = {"tab", "return", "enter", "escape", "Key.tab",
                                "Key.return", "Key.enter", "Key.escape"}
                 _is_nav_only = not _pred_text and all(k in _nav_keys for k in _pred_keys)
+                # RESTORED 2026-07-14: this used to reuse a `_focused_el` computed
+                # earlier in the step by the dead legacy auto-handler block (removed
+                # same day). That computation was unconditional (not itself gated by
+                # _plugin_active) but sat inside the deleted line range, so it
+                # vanished with the rest of the block -- broke with NameError on the
+                # very next live run. Recomputed fresh from the CURRENT `state` here
+                # instead of restoring it earlier in the loop, since `state` may have
+                # been reassigned multiple times by this point (scroll-reveal, GAP
+                # navigation) and a value cached from step-start would be stale.
+                _focused_id_ptc = state.get("focused_element_id")
+                _focused_el = next((e for e in state.get("elements", [])
+                                    if e.get("element_id") == _focused_id_ptc), None)
                 if not _is_nav_only and _focused_el:
                     _foc_val = (_focused_el.get("value") or "").strip()
                     if _foc_val:
@@ -2775,6 +2241,22 @@ class LLMAgent:
             # Record the field acted on this step (attempted feature) — mirrors the
             # train-time derivation (every click/type target becomes 'attempted').
             self._record_attempt(state, prediction)
+
+            # VERIFY-AT-FILL MAIN-LOOP CHOKEPOINT — REMOVED 2026-07-16 (verb-loop
+            # audit, biggest-speed-lever pass): this block existed ONLY to
+            # populate self._verified_at_fill so the end-of-run _verify_pass's
+            # _view_mismatches could skip already-confirmed fields on a later
+            # revisit. Both _verify_pass and _view_mismatches are now 100%
+            # dead code (zero call sites — confirmed by grep) since the
+            # "no revisit, ever" change earlier the same day removed the only
+            # place that ever called _verify_pass. That means this block was
+            # running a FULL UIA tree-walk (_field_matches → _live_field_value
+            # → _resolve_live_control) on every step with a click/focus
+            # resolving to a fillable — real, measurable per-step cost — to
+            # populate a set NOTHING reads anymore. Pure waste, zero behavior
+            # change from removing it. The sweep's OWN separate verify-at-fill
+            # check (different call site, still does a real immediate retry
+            # when a write doesn't stick) is UNRELATED and stays.
 
             if validation.status == "done":
                 # A "Submitted" / completion indicator on screen is NOT enough to end
@@ -3212,6 +2694,10 @@ class LLMAgent:
                 self._keystroke_retried.clear()
                 self._dead_fill_keys.clear()
                 self._reveal_focus_count.clear()
+                self._verify_dead_stable.clear()
+                self._verify_clean_tabs.clear()
+                self._verified_at_fill.clear()
+                self._verify_ran_once = False
                 self._attempted_record_num = self._record_num
             sample = list(rec.items())[:5]
             logger.info("Record cache refreshed: %d fields for record %d  sample=%r",
@@ -3740,16 +3226,49 @@ class LLMAgent:
         except Exception:
             pass
 
-    def _detect_section(self, state: Dict[str, Any], focused_el: Dict) -> str:
+    def _detect_section(self, state: Dict[str, Any], focused_el: Dict) -> Optional[str]:
         """
         Return the repeated-section name (e.g. 'Driver 2') the focused element
-        belongs to, or '' if none / the scope has no sections.
+        belongs to, '' if confirmed above all known sections (or the scope has
+        no sections at all), or None if no section pane has been observed yet
+        this tab-visit — genuinely unknown, not "confirmed unsectioned". Every
+        OTHER caller just feeds this into _lookup_field(section=...), where
+        both '' and None are equally falsy (no behavior change there);
+        _view_mismatches is the one caller that distinguishes them, to avoid
+        guessing on a field it hasn't scrolled far enough to place yet.
 
-        Generic mechanism: the section is the lowest section-pane whose top edge
-        is at/above the focused field's vertical centre. The pane prefix, the
-        name pattern, and the display format all come from the injected
-        ScopeConfig — so a non-sectioned app (default scope, pattern=None) gets
-        '' for free, and no app-specific names live here.
+        GEOMETRY-BASED BY NECESSITY (2026-07-14, reverted from a same-day
+        structural rewrite attempt): this form's actual UIA tree is FLAT — the
+        section-header banner (`_section()` in car_insurance_form_wx.py) and
+        every field in that section are ALL direct siblings under the same
+        tab page, never nested inside each other. There is no parent-child
+        containment fact to read; on-screen Y-position genuinely is the only
+        available signal for "which section is this field in" on this form.
+        (Tried tagging elements with their real UIA ancestor-pane chain at
+        observer walk-time instead of inferring from geometry — verified
+        offline, immediately broke live because the assumption didn't hold:
+        ALL of Driver 2 came back with Driver 1's values, because no field on
+        this form has ANY section pane as a true ancestor. Reverted just this
+        function; the observer's ancestor_panes tagging is harmless/unused
+        infrastructure, left in place for a future scope where sections
+        really are nested containers.)
+
+        History of what broke each geometry-only design and why the current
+        one (remembered per-pane top-Y + fresh-look-only reset) fixes it:
+        (1) walking only CURRENTLY-VISIBLE panes: an off-screen pane's stale
+        bbox picked the wrong section for a straggler field ('Driver 2 DL
+        Expiration' got Driver 1's value). (2) a single scalar "last seen"
+        sticky: order-dependent, got overwritten by a later field processed
+        first in the same scan ('Driver 2 Violations' got Driver 3's value).
+        (3) remembering each pane's own top-Y by label (this function, below)
+        fixed both — UNTIL a tab is revisited (verify pass re-clicks a tab the
+        main pass already visited) without the memory being reset: stale
+        top-Y from the FIRST visit's scroll position no longer matches the
+        SECOND visit's — Driver 3's First Name/DOB/Relationship got
+        Policyholder's/Driver 2's values. ROOT CAUSE of (3): _verify_pass's
+        own tab-switch loop (line ~5617) never reset `_section_pane_tops` —
+        it's a 12th call site that needed the same reset the other 11
+        `_filled_this_tab.clear()` sites already got; now fixed there too.
         """
         import re as _re
         _pat = getattr(self._scope, "section_pattern", None)
@@ -3761,24 +3280,40 @@ class LLMAgent:
         fx1, fy1, fx2, fy2 = focused_el["bbox"]
         fy_center = (fy1 + fy2) / 2
 
-        section_panes = sorted(
-            [e for e in state.get("elements", [])
-             if e.get("type") == "panecontrol"
-             and e.get("window_role") != "background"
-             and e.get("bbox")
-             and (e.get("label") or e.get("text") or "").startswith(_prefix)],
+        section_panes = [e for e in state.get("elements", [])
+                          if e.get("type") == "panecontrol"
+                          and e.get("window_role") != "background"
+                          and e.get("bbox")
+                          and (e.get("label") or e.get("text") or "").startswith(_prefix)]
+
+        if not hasattr(self, "_section_pane_tops"):
+            self._section_pane_tops: Dict[str, float] = {}
+        for _p in section_panes:
+            _pl = (_p.get("label") or _p.get("text") or "")
+            self._section_pane_tops[_pl] = _p["bbox"][1]
+
+        # Effective = remembered top-Y for every pane label ever seen since
+        # the last reset (tab switch OR a verify-pass tab re-visit — see
+        # _verify_pass's tab loop, which now clears this alongside
+        # _filled_this_tab at the top of every tab click).
+        _effective = sorted(
+            [{"label": lbl, "bbox": [0, top, 0, top]}
+             for lbl, top in self._section_pane_tops.items()],
             key=lambda e: e["bbox"][1]
         )
+        if not _effective:
+            return None   # nothing remembered yet this look — unknown, not confirmed-empty
 
         current_label = ""
-        for pane in section_panes:
+        for pane in _effective:
             if pane["bbox"][1] <= fy_center:
-                current_label = pane.get("label") or pane.get("text") or ""
+                current_label = pane.get("label") or ""
             else:
                 break
 
         if not current_label:
             return ""
+
         m = _re.match(_pat, current_label.lower())
         if m:
             return self._scope.section_format(*m.groups())
@@ -3813,10 +3348,33 @@ class LLMAgent:
         return re.sub(r"[^a-z0-9]", "", s)
 
     def _is_checked(self, elem: Dict[str, Any]) -> bool:
-        """Read a checkbox's actual ticked state. PRIMARY: UIA TogglePattern by the
-        checkbox's own name — the reliable, standard way (no pixel guessing, which
-        misreads when the bbox centre lands on the label, not the box). Falls back to
-        BM_GETCHECK via WindowFromPoint. Generic — any checkbox, any tab."""
+        """Read a checkbox's actual ticked state. PRIMARY: UIA TogglePattern via
+        _resolve_live_control — the SAME name+geometry-disambiguated identity
+        resolution _act_on_element uses to WRITE the toggle (2026-07-14: unified
+        read/write identity — see the note below). Falls back to a bare by-name
+        lookup, then BM_GETCHECK via WindowFromPoint. Generic — any checkbox, any tab.
+
+        READ/WRITE IDENTITY MISMATCH (found 2026-07-14, live): this used to do its
+        own by-NAME-ONLY lookup (`root.CheckBoxControl(Name=label)`), with no
+        geometry disambiguation at all — unlike `_resolve_live_control` (the write
+        path's identity resolver), which disambiguates same-named twins by nearest
+        bbox center. If that name-only search ever landed on a different UIA node
+        than the one `_act_on_element` actually wrote to (stale/duplicate node from
+        a hidden tab page, wx re-creating widgets, etc.), verify would read the
+        WRONG toggle state and re-"fix" an already-correct checkbox forever — live-
+        observed: 29 fields corrected in one verify pass (mostly checkboxes across
+        6 tabs), a full fresh 8-tab verify pass immediately re-triggered and found
+        MORE to fix, `_confirm_finished` never converged, run had to be killed.
+        Using the SAME resolver as the write path means read and write always agree
+        on which physical control they mean."""
+        _ctrl = self._resolve_live_control(elem)
+        if _ctrl is not None:
+            try:
+                _tp = _ctrl.GetTogglePattern()
+                if _tp is not None:
+                    return _tp.ToggleState == 1
+            except Exception:
+                pass
         _lbl = (elem.get("label") or elem.get("text") or "").strip()
         if _lbl:
             try:
@@ -3840,6 +3398,40 @@ class LLMAgent:
         except Exception:
             return False
 
+    def _live_field_value(self, elem: Dict[str, Any]) -> str:
+        """Read an edit/combobox control's ACTUAL current value via
+        _resolve_live_control — the SAME name+geometry-disambiguated identity
+        resolution the WRITE path (_act_on_element) uses, and the same pattern
+        _is_checked already uses for checkboxes. Falls back to the observer
+        snapshot's elem['value'] if live resolution fails (control gone
+        off-screen between observe and this call, etc.).
+
+        READ/WRITE IDENTITY MISMATCH, EDIT/COMBO VARIANT (found 2026-07-15,
+        live: run_20260715_161121.txt): _view_mismatches used to trust
+        elem['value'] straight from the state snapshot for non-checkbox
+        controls — that value comes from the GENERAL observer's own by-name
+        element walk, not the identity-disambiguated resolver the write path
+        uses. On a form with same-labeled duplicate/stale nodes (wx keeps
+        hidden tab pages' controls in the tree — the exact mechanism that
+        caused the 2026-07-14 checkbox version of this bug), the snapshot can
+        report a DIFFERENT node's value than the one _act_on_element actually
+        wrote to. Live symptom: 'Title State'/'Garaging Location' — write
+        reported success via the identity executor, but the NEXT verify
+        pass's snapshot-based read still saw a mismatch, forcing 2 wasted
+        re-fix attempts per field before the dead-mark termination guarantee
+        caught it (bounded, not infinite, but still wrong — should settle on
+        the first correct write). Read and write now go through the SAME
+        resolver, same fix shape as _is_checked's 2026-07-14 fix."""
+        _ctrl = self._resolve_live_control(elem)
+        if _ctrl is not None:
+            try:
+                _vp = _ctrl.GetValuePattern()
+                if _vp is not None:
+                    return (_vp.Value or "").strip()
+            except Exception:
+                pass
+        return (elem.get("value") or "").strip()
+
     def _field_matches(self, elem: Dict[str, Any], expected) -> bool:
         """True if the control's REAL value already equals `expected` — checkbox
         ticked-state (read live) or normalized text/combo value. Used to veto a false
@@ -3848,7 +3440,7 @@ class LLMAgent:
         if (elem.get("type") or "").lower() == "checkboxcontrol":
             _want = expected.strip().lower() in ("yes", "yes (check)", "true", "checked", "x", "1")
             return _want == self._is_checked(elem)
-        return self._norm(elem.get("value") or "") == self._norm(expected)
+        return self._norm(self._live_field_value(elem)) == self._norm(expected)
 
     def _view_mismatches(self, state: Dict[str, Any]):
         """DETERMINISTIC check of the current view: for every fillable control, read
@@ -3886,7 +3478,17 @@ class LLMAgent:
                 continue
             if self._attempt_key(e) in self._dead_fill_keys:
                 continue   # proven unfillable (tried+failed) — accept it, don't block submit
-            _exp = self._lookup_field(_lbl, section=self._detect_section(state, e))
+            if self._attempt_key(e) in self._verified_at_fill:
+                continue   # already confirmed correct right when it was filled — trust it
+            _sec = self._detect_section(state, e)
+            if _sec is None:
+                # UNKNOWN, not confirmed-unsectioned: no section pane has been
+                # remembered yet this look. Defer to a later scan instead of
+                # letting _lookup_field's bare/fuzzy fallback guess from the
+                # wrong section (live: Driver 3's fields got Policyholder's/
+                # Driver 2's values from exactly this ambiguity).
+                continue
+            _exp = self._lookup_field(_lbl, section=_sec)
             if not _exp:
                 continue   # source has no value (blank/ambiguous) — leave to LLM fallback
             if _typ == "checkboxcontrol":
@@ -3894,7 +3496,11 @@ class LLMAgent:
                 if _want != self._is_checked(e):
                     out.append((e, _exp))
             else:
-                if self._norm(e.get("value") or "") != self._norm(_exp):
+                # Live-resolved read (2026-07-15, see _live_field_value) instead
+                # of trusting the snapshot's e['value'] straight — the snapshot
+                # can desync from what the write path actually touched on forms
+                # with same-labeled duplicate/stale nodes.
+                if self._norm(self._live_field_value(e)) != self._norm(_exp):
                     out.append((e, _exp))
         return out
 
@@ -5112,11 +4718,31 @@ class LLMAgent:
         # elements are clickable vs typeable (e.g. comboboxes need click).
         # Exception: if transformer's click lands on a tab element, do NOT override —
         # the LLM is still trying to fill fields on the current tab.
+        #
+        # COMBOBOX-ONLY GUARD (2026-07-16): this override used to fire for ANY
+        # focused fillable, not just comboboxes — live-caught fixating on
+        # 'Accidents (3 yr)' for 3m38s / 166 re-anchors (run_20260716_022849.txt).
+        # The field's correct value ('0') resolved fine, but this override
+        # unconditionally discarded it and returned a bare click with NO text
+        # whenever the transformer's own (separately unreliable, see the
+        # OPT2/"Option B" comment above this function) action-type head said
+        # "click" with 92%+ confidence — for a plain numeric edit/spin control,
+        # a click can NEVER supply a value, so the field stayed empty forever
+        # and the model just kept re-targeting the same still-empty field.
+        # A combobox genuinely needs a click-then-select; an edit/spin field
+        # never does — restrict the override to the one case it was actually
+        # designed for.
+        _foc_id_mg  = state.get("focused_element_id")
+        _foc_el_mg  = next((e for e in state.get("elements", [])
+                            if e.get("element_id") == _foc_id_mg), None)
+        _foc_ty_mg  = (_foc_el_mg.get("type") or "").lower() if _foc_el_mg else ""
+        _foc_is_combo = _foc_ty_mg in ("comboboxcontrol", "combobox")
         _TRANSFORMER_TYPE_OVERRIDE_THRESHOLD = 0.92
         if (l_type == "type"
                 and t_pred.get("action_type") == "click"
                 and t_conf >= _TRANSFORMER_TYPE_OVERRIDE_THRESHOLD
-                and t_pred.get("click_position")):
+                and t_pred.get("click_position")
+                and _foc_is_combo):
             pos = t_pred["click_position"]
             _tab_elems = [e for e in state.get("elements", [])
                           if e.get("type") in ("tabitem", "tabitemcontrol")
@@ -5476,6 +5102,7 @@ class LLMAgent:
         _FILL = ("editcontrol", "comboboxcontrol", "checkboxcontrol")
         page = []
         _empty = []        # fields still needing a value (the fill candidates)
+        _empty_elems = []  # same fields, element dicts (for deterministic lookup below)
         _filled = 0
         for e in elements:
             if e.get("window_role") == "background":
@@ -5487,12 +5114,28 @@ class LLMAgent:
                 continue
             if self._attempt_key(e) in self._dead_fill_keys:
                 continue   # widget rejects fill (e.g. SpinCtrl) — don't keep proposing it
-            # An ATTEMPTED checkbox is DONE: unchecked reads value='' forever, so
-            # a verified correct-NO box otherwise stays in the "empty" list and
-            # gets re-proposed until dead-marked (~3 wasted LLM calls per box,
-            # observed live 2026-07-09 on SR-22/Excluded Driver).
-            if ((e.get("type") or "").lower() in ("checkboxcontrol", "checkbox")
-                    and self._attempt_key(e) in self._attempted_keys):
+            # An ATTEMPTED field is SETTLED: originally this guard only covered
+            # checkboxes (unchecked reads value='' forever, so a verified
+            # correct-NO box otherwise stays in the "empty" list and gets
+            # re-proposed until dead-marked — observed live 2026-07-09 on
+            # SR-22/Excluded Driver). The SAME problem hits text/combo fields
+            # correctly SKIPPED as deterministic-absent-from-record (OPT2's
+            # leave-blank guard, agent.py ~2017-2019, DOES call
+            # _mark_attempted) — a skipped field never gets a value written
+            # (that's the point), so it stays in `_empty` FOREVER under the
+            # old checkbox-only check. On a record with many legitimately-
+            # blank fields on one tab (e.g. a claims-free record's Claims
+            # tab, 9-10 fields all correctly skipped), `_empty` could never
+            # shrink to zero — the STUCK→optimal-viewport-jump→STUCK cycle
+            # repeated indefinitely because nothing ever counted as "done",
+            # and the sweep's own deterministic tab-advance short-circuit
+            # (added earlier the same day) never got to fire either, since
+            # it requires `_empty` to be truly empty (user-observed: "it
+            # keeps looping and looping", 2026-07-14, record 10 — the first
+            # record this session with an entirely claims-free record).
+            # FIX: broaden the guard to ALL fillable types, not just
+            # checkboxes — an attempted field of any kind is settled.
+            if self._attempt_key(e) in self._attempted_keys:
                 _filled += 1
                 continue
             _v = (e.get("value") or "").strip()
@@ -5501,6 +5144,61 @@ class LLMAgent:
                 _filled += 1
             else:
                 _empty.append(lbl)
+                _empty_elems.append(e)
+
+        # DETERMINISTIC SWEEP SHORT-CIRCUIT (2026-07-14, LLM-45% bucket 2 —
+        # user-flagged speed problem: 59-121 LLM HTTP calls/record, ~14-21 min
+        # wall-clock/record on the first --records 10 run). This prompt's own
+        # instruction is "fill the FIRST [empty] one" with "<correct source
+        # value>" — but _empty is already built deterministically above, and
+        # the value is resolvable via the SAME section-aware record lookup
+        # bucket-1's OPT2 short-circuit already uses. The LLM call here was
+        # asking a 2-8s-latency model to echo back a decision this function
+        # could already make. Try the first empty field's value via
+        # _lookup_field before ever building the prompt; only fall through to
+        # the LLM for the genuinely ambiguous case (ANY of a small lookahead
+        # window unresolvable — label/record-key mismatch, the LLM's real job
+        # per the project's own design rule). Downstream (the sweep's own
+        # section-correct override + record-beats-LLM-proposal guard) still
+        # runs on whatever this returns, unchanged — this only decides
+        # whether an HTTP round-trip is needed at all.
+        # SECTION-CONFIRMED ONLY (2026-07-14, found same-day live retest):
+        # _detect_section returns None specifically for "ambiguous, no section
+        # pane resolved yet" — distinct from '' ("confirmed" bare/unsectioned,
+        # the correct, common case for most fields on unsectioned tabs like
+        # Policy/Coverage/Payment). Trusting _lookup_field's bare/fuzzy
+        # fallback on a None (unconfirmed) result can grab a DIFFERENT
+        # section's value for a same-labeled field (live: Driver 2's own 'DL
+        # Expiration' got Driver 3's value — this NEW short-circuit skipped
+        # the None-vs-confirmed check every other call site in this file
+        # already does). Skip (try the next lookahead candidate) only on
+        # None; '' is trusted exactly as before.
+        for _de, _dl in zip(_empty_elems[:5], _empty[:5]):
+            _dsec = self._detect_section(state, _de)
+            if _dsec is None:
+                continue   # ambiguous — don't guess, try the next candidate
+            _dval = self._lookup_field(_dl, section=_dsec)
+            if _dval:
+                logger.info("[NAV] sweep: deterministic value %r → %r — no LLM call.",
+                            _dl[:28], _dval[:32])
+                return {"action": "fill", "field": _dl, "value": _dval}
+            # CONFIRMED-ABSENT SHORT-CIRCUIT (2026-07-14, speed lever #2): the
+            # record is present but has nothing for this field (a genuinely
+            # blank field, e.g. Claim Number on a claims-free record) — the
+            # sweep's own inline logic further down already treats this as
+            # "stays blank, settled" once it gets here, but ONLY after this
+            # function falls through to a full LLM round-trip first. User-
+            # measured: 10 of 50 LLM calls in one run (20%) were repeated
+            # 'LLM-fix Claim Number' asks on verify's LLM-fallback branch,
+            # which calls THIS function — an absent field is just as
+            # deterministic an answer as a resolved one. Return blank
+            # directly instead of asking the LLM to confirm the record has
+            # nothing to say.
+            if self._cached_record:
+                logger.info("[NAV] sweep: %r confirmed absent from record — stays blank, no LLM call.",
+                            _dl[:28])
+                return {"action": "fill", "field": _dl, "value": ""}
+
         rec = self._cached_record or {}
         _rec_lines  = "\n".join(f"{k} = {v}" for k, v in rec.items())[:4000]
         _tab_elems = [e for e in elements
@@ -5508,6 +5206,22 @@ class LLMAgent:
                       and e.get("window_role") != "background" and e.get("bbox")]
         all_tabs  = [(e.get("text") or e.get("label") or "").strip() for e in _tab_elems]
         unvisited = [t for t in all_tabs if t and t.lower() not in {v.lower() for v in self._visited_tabs}]
+
+        # DETERMINISTIC TAB-ADVANCE SHORT-CIRCUIT (2026-07-14, LLM-45% bucket 2):
+        # a page with zero empty fillables and an unvisited tab left has only
+        # ONE sensible action — go to the next unvisited tab. No judgment call,
+        # so no need to pay for an LLM round-trip to confirm it. Same
+        # click_position resolution the LLM-driven branch uses below.
+        if not _empty and unvisited:
+            _tgt = unvisited[0]
+            _te = next((e for e in _tab_elems
+                        if (e.get("text") or e.get("label") or "").strip().lower() == _tgt.lower()), None)
+            if _te is not None:
+                _b = _te["bbox"]
+                logger.info("[NAV] sweep: deterministic tab-advance → %r — no LLM call.", _tgt)
+                return {"action": "tab", "target": _tgt,
+                        "click_position": [(_b[0] + _b[2]) / 2, (_b[1] + _b[3]) / 2]}
+
         # Only the EMPTY fields are fill candidates — never re-list filled ones, so
         # the model can't waste turns re-typing fields that already have values.
         _empty_lines = "\n".join(f"- {lbl}" for lbl in _empty) or "(none — every visible field is filled)"
@@ -5566,6 +5280,26 @@ class LLMAgent:
         _r["action"] = _act
         if not _act:
             logger.warning("[NAV] unparseable LLM action — raw keys=%s", list(_r.keys()))
+        # HALLUCINATION GUARD (2026-07-15): the prompt says "pick a field ONLY
+        # from the EMPTY list" but nothing enforced it — a small local model
+        # will confidently name a familiar-sounding field that isn't even ON
+        # this page. Live: verify's LLM-fallback branch (calls this function)
+        # got 'Claim Number' back on the Vehicle tab AND the Payment tab in
+        # the same run — that field only exists on Claims. Each hallucinated
+        # "fix" got written to _dead_fill_keys under a per-tab geometry key
+        # that never matched a real element, so the dead-mark could never
+        # stick and verify re-asked forever (the other half of
+        # verify-never-converges-hallucination; see _verify_dead_stable for
+        # the bookkeeping half). Reject any 'fill' whose field isn't
+        # (case-insensitively) one of the EMPTY candidates actually offered —
+        # this can't fire on a real answer since the prompt only ever lists
+        # real fields, so it costs nothing on the honest path.
+        if _act == "fill":
+            _fld = (_r.get("field") or "").strip()
+            if not _fld or _fld.lower() not in {x.lower() for x in _empty}:
+                logger.warning("[NAV] LLM proposed field %r not in this page's EMPTY list %s — "
+                               "rejecting as hallucination.", _fld[:32], [x[:20] for x in _empty[:8]])
+                return {"action": "wait"}
         if _act == "tab":
             _tgt = (_r.get("target") or "").strip()
             _te = next((e for e in _tab_elems
@@ -5593,11 +5327,57 @@ class LLMAgent:
         logger.info("[VERIFY] deterministic pass over %d tab(s) — reading every field vs source.", len(_tabs))
         for _t in _tabs:
             _nm = (_t.get("text") or _t.get("label") or "?").strip()
+            # SKIP-CLEAN-TABS (2026-07-15, speed): a tab that reached 0 mismatches
+            # AND never needed the LLM-fallback on the PRIOR pass can't have
+            # regressed on its own — nothing writes to a tab except this same loop
+            # visiting it, and fills are pinned to their own tab's elements
+            # (prefer_key), so a fix made elsewhere this pass cannot silently
+            # dirty an already-clean tab. Dead-marks are permanent and globally
+            # filtered (_verify_dead_stable) regardless of whether the tab gets
+            # re-walked, so skipping loses nothing there either. User-flagged
+            # 2026-07-15: a clean single-record run still took ~16.4 min because
+            # every one of 5 convergence passes re-scanned all 8 tabs from
+            # scratch (tab-click + scroll-to-top + full read-back), including
+            # tabs that had already reached 0 corrections on pass 1 — pure
+            # waste, compounding pass over pass. `_verify_clean_tabs` is cleared
+            # on new-record reset (with its siblings) so this never carries
+            # across records.
+            if _nm in self._verify_clean_tabs:
+                continue
+            _tab_had_activity = False
             _b = _t["bbox"]
             self._executor.execute({"action_type": "click",
                                     "click_position": [(_b[0] + _b[2]) / 2, (_b[1] + _b[3]) / 2]})
             time.sleep(self.step_delay * 0.5)
             self._visited_tabs.add(_nm)
+            # 12th reset site (2026-07-14): this tab-switch loop is verify_pass's
+            # OWN, separate from the 11 other _filled_this_tab.clear() sites — it
+            # was never clearing _section_pane_tops, so a tab re-visited by verify
+            # (after the main pass already visited it) kept STALE remembered
+            # section-pane Y-coordinates from the main pass's different scroll
+            # state, misattributing fields (Driver 3's First Name/DOB/Relationship
+            # got Policyholder's/Driver 2's values). Fresh look = fresh memory.
+            self._section_pane_tops = {}
+            # SCROLL TO TOP BEFORE FIRST SCAN (2026-07-14, 6th round of the
+            # driver-crosstalk family): if this tab's scroll position carried
+            # over from an earlier visit (main pass, or verify's own prior
+            # pass on a re-run), the FIRST scan here can land mid-way through
+            # a repeated section's block — e.g. showing Driver 2's LAST field
+            # (its own header already scrolled past) with ONLY Driver 3's
+            # header visible below it. _detect_section's geometry then finds
+            # NO qualifying pane above the field — confirmed-'' by the letter
+            # of the code (nothing above), but semantically wrong: Driver 2's
+            # header exists, it's just not in view yet. This isn't the
+            # ambiguous/None case my earlier fixes catch — it's a case where
+            # the available data is genuinely incomplete at that moment. Live:
+            # 'Driver 2 DL Expiration' kept getting Driver 3's/Policyholder's
+            # value on this exact pattern, 6 separate live reruns the same
+            # day. FIX: force the SAME top-of-form scroll every tab-switch
+            # already uses elsewhere (_scroll_form_to_top) before verify's
+            # first scan of a tab — guarantees every section header that
+            # exists gets observed (and remembered via _section_pane_tops)
+            # before any of ITS fields are ever judged.
+            self._scroll_form_to_top(self._observe())
             self._refresh_record_cache(self._observe())
             _st = self._observe()
             _done_here = set()                           # fields already settled this tab-pass
@@ -5608,8 +5388,11 @@ class LLMAgent:
                 #    not bare DL Expiration). Fix clear mismatches. No LLM → no wrong-
                 #    section guesses, no checkbox loop. This is what makes verify finish.
                 _mm = [(e, x) for (e, x) in self._view_mismatches(_st)
-                       if (e.get("label") or e.get("text") or "").strip().lower() not in _done_here]
+                       if (e.get("label") or e.get("text") or "").strip().lower() not in _done_here
+                       and (_nm, (e.get("label") or e.get("text") or "").strip().lower())
+                           not in self._verify_dead_stable]
                 if _mm:
+                    _tab_had_activity = True
                     for _e, _exp in _mm:
                         _el = (_e.get("label") or _e.get("text") or "").strip()
                         # TERMINATION GUARANTEE: if a box has been "corrected" twice
@@ -5617,16 +5400,44 @@ class LLMAgent:
                         # / checkbox read unreliable), accept it as dead so verify can
                         # reach 0 corrections and Submit — else it re-fixes forever.
                         _vk = self._attempt_key(_e)
+                        # STABLE COUNTING KEY (2026-07-15): _vk is section-qualified via
+                        # _attempt_key's geometry-based section detection (_section_pane_of)
+                        # — the SAME shared function used for the model's own training-time
+                        # 'attempted' feature, which we deliberately never patch (would
+                        # desync a live-inference computation from what the current model
+                        # checkpoint was actually trained on). But that means _vk can flip
+                        # between passes if a stale/off-screen pane briefly contaminates the
+                        # section read for a field on an UNSECTIONED tab (Vehicle, Payment —
+                        # no real Driver-style sections at all) — live-observed: 'Transmission'/
+                        # 'Color'/'Primary Use'/'Payment Frequency' got 're-accepted as dead'
+                        # on EVERY fresh verify pass instead of staying dead once. Track a
+                        # SECOND counter keyed on (tab name, bare label) instead — the tab
+                        # name is just which tab is currently active (already tracked as _nm,
+                        # no geometry involved at all) so this key can't flip. Dead-mark when
+                        # EITHER counter crosses the threshold; _view_mismatches is filtered
+                        # against the stable set up front so a dead-mark actually sticks.
+                        _stable_vk = (_nm, _el.lower())
                         self._verify_fix_count[_vk] = self._verify_fix_count.get(_vk, 0) + 1
-                        if self._verify_fix_count[_vk] > 2:
+                        self._verify_fix_count[_stable_vk] = self._verify_fix_count.get(_stable_vk, 0) + 1
+                        if self._verify_fix_count[_vk] > 2 or self._verify_fix_count[_stable_vk] > 2:
                             self._dead_fill_keys.add(_vk)
+                            self._verify_dead_stable.add(_stable_vk)
                             self._mark_attempted(_e)
                             logger.warning("[VERIFY] %s: %r won't confirm after 2 tries — accepting (dead).",
                                            _nm[:14], _el[:22])
                             _done_here.add(_el.lower())
                             continue
                         logger.info("[VERIFY] %s: fix %r → %r", _nm[:14], _el[:22], str(_exp)[:22])
-                        if self._nav_fill_field(_st, _el, _exp):
+                        # PIN THE EXACT ELEMENT (2026-07-13): _view_mismatches already
+                        # resolved _e as the SPECIFIC repeated-section field that's
+                        # wrong (section-aware read-back). Passing only its bare label
+                        # here let _nav_fill_field's OWN _find() re-resolve from
+                        # scratch — on repeated-section forms (Driver 2/3 share every
+                        # label) it fell back to "first exact-label match" once BOTH
+                        # twins were non-empty, silently writing the fix onto the WRONG
+                        # twin (live: Driver 3's correct '1' Violations value landed on
+                        # Driver 2's combobox instead). prefer_key pins it to _e itself.
+                        if self._nav_fill_field(_st, _el, _exp, prefer_key=_vk):
                             _fixed += 1
                             _fixed_names.add(_el.lower())
                         _done_here.add(_el.lower())
@@ -5645,6 +5456,27 @@ class LLMAgent:
                 _vt_v = self._form_viewport_top(_st)
                 _vb_v = self._form_viewport_bottom(_st) - 8
                 _needs_llm = False
+                _settled_any = False
+                # VERIFY-LLM-FALLBACK SHORT-CIRCUIT (2026-07-15, task-list item
+                # #4, same pattern as sweep-deterministic-nav's bucket-2 fix for
+                # _navigation_protocol — just never applied to THIS scan too).
+                # This loop used to stop at the FIRST empty non-dead candidate
+                # and call the real LLM (_navigation_protocol) for it — but that
+                # function's own OPENING short-circuit (deterministic value /
+                # confirmed-absent) resolves most candidates WITHOUT an LLM
+                # call anyway. Doing the same resolution HERE, before ever
+                # deciding an LLM round-trip is needed, means: (1) a resolvable
+                # field gets filled directly, no LLM; (2) a confirmed-absent
+                # field gets mark_attempted'd and settled permanently, no LLM,
+                # and — critically — it STOPS re-triggering _needs_llm on every
+                # later pass (the prior gap: an absent field with no dead-mark
+                # and no attempted-mark just sat there forever, re-flagging a
+                # real LLM call pass after pass, live-observed on the Claims
+                # tab: 16 separate LLM round-trips across 3 verify passes in
+                # one record, each resolving at most one field before the next
+                # pass rediscovered the same kind of gap). Only genuinely
+                # AMBIGUOUS fields (_detect_section returns None) still reach
+                # the real LLM below.
                 for _ve in _st.get("elements", []):
                     _vty = (_ve.get("type") or "").lower()
                     if _vty not in ("editcontrol", "input", "comboboxcontrol", "combobox",
@@ -5657,18 +5489,64 @@ class LLMAgent:
                         continue
                     if (_ve.get("value") or "").strip():
                         continue                      # holds a value → not LLM's problem
-                    if not (_ve.get("label") or _ve.get("text") or "").strip():
+                    _vlbl = (_ve.get("label") or _ve.get("text") or "").strip()
+                    if not _vlbl:
                         continue
-                    if self._attempt_key(_ve) in self._dead_fill_keys:
+                    _vk2 = self._attempt_key(_ve)
+                    if _vk2 in self._dead_fill_keys or _vk2 in self._attempted_keys:
                         continue
+                    _vsec = self._detect_section(_st, _ve)
+                    if _vsec is None:
+                        _needs_llm = True             # ambiguous — genuine LLM job
+                        break
+                    _vval = self._lookup_field(_vlbl, section=_vsec)
+                    if _vval:
+                        # TERMINATION GUARANTEE (2026-07-16, found live same day
+                        # this branch shipped: 'Years Continuously Insured' fired
+                        # 8 IDENTICAL 'deterministic fix' attempts in under 30s
+                        # because this path had NO retry cap at all — unlike
+                        # branch 1 above (_verify_fix_count/_dead_fill_keys/
+                        # _verify_dead_stable), a write that doesn't stick here
+                        # just kept re-triggering every single scan iteration,
+                        # burning a real self._observe() each time. Same
+                        # dead-mark discipline as branch 1, keyed the same way.
+                        _vk2_stable = (_nm, _vlbl.lower())
+                        self._verify_fix_count[_vk2] = self._verify_fix_count.get(_vk2, 0) + 1
+                        self._verify_fix_count[_vk2_stable] = self._verify_fix_count.get(_vk2_stable, 0) + 1
+                        if self._verify_fix_count[_vk2] > 2 or self._verify_fix_count[_vk2_stable] > 2:
+                            self._dead_fill_keys.add(_vk2)
+                            self._verify_dead_stable.add(_vk2_stable)
+                            self._mark_attempted(_ve)
+                            logger.warning("[VERIFY] %s: %r won't confirm after 2 tries — accepting (dead).",
+                                           _nm[:14], _vlbl[:22])
+                            _settled_any = True
+                            continue
+                        logger.info("[VERIFY] %s: deterministic fix %r → %r — no LLM call.",
+                                    _nm[:14], _vlbl[:22], _vval[:22])
+                        if self._nav_fill_field(_st, _vlbl, _vval, prefer_key=_vk2):
+                            _fixed += 1
+                            _fixed_names.add(_vlbl.lower())
+                        _settled_any = True
+                        _tab_had_activity = True
+                        break
+                    if self._cached_record:
+                        logger.info("[VERIFY] %s: %r confirmed absent from record — settled, no LLM call.",
+                                    _nm[:14], _vlbl[:22])
+                        self._mark_attempted(_ve)
+                        _settled_any = True
+                        continue                       # keep scanning — more may settle this view
                     _needs_llm = True
                     break
+                if _settled_any:
+                    _st = self._observe()
+                    continue
                 if not _needs_llm:
                     if not self._scrollbar_drag(_st, 240.0):
                         break
                     time.sleep(self.step_delay * 0.5)
                     _st = self._observe()
                     continue
+                _tab_had_activity = True
                 _nav = self._navigation_protocol(_st)
                 _act = (_nav.get("action") or "").lower()
                 if _act == "fill" and (_nav.get("field") or "").strip():
@@ -5677,7 +5555,10 @@ class LLMAgent:
                     _fe = next((e for e in _st.get("elements", [])
                                 if (e.get("label") or e.get("text") or "").strip().lower() == _vf.lower()
                                 and e.get("bbox")), None)
-                    if _vf.lower() in _done_here or (_fe is not None and self._field_matches(_fe, _vv)):
+                    _stable_vk_l = (_nm, _vf.strip().lower())
+                    if (_vf.lower() in _done_here
+                            or _stable_vk_l in self._verify_dead_stable
+                            or (_fe is not None and self._field_matches(_fe, _vv))):
                         _done_here.add(_vf.lower())
                         if _fe is not None:
                             self._mark_attempted(_fe)
@@ -5691,18 +5572,38 @@ class LLMAgent:
                     # flip-flopping values ('Auto-Pay Enrolled' YES↔leave-blank) or a
                     # fill that keeps getting refused ('Balance Due ($)') re-fixed
                     # forever and verify never reached 0 → Submit never fired.
+                    #
+                    # STABLE DEAD-MARK (2026-07-15): the COUNTER here (_vk_l) was
+                    # already bare-label — stable across geometry — but the actual
+                    # dead-mark STORED below used self._attempt_key(_fe), the
+                    # geometry-based key, and every later "is this already dead"
+                    # check also queries via that same fragile key. So the counter
+                    # correctly reached >2, but the stored mark could fail to match
+                    # on a later lookup (different tab/context -> different geometry
+                    # key), producing the exact live symptom: 'Claim Number' (a
+                    # field that doesn't even exist on the tab being checked -- the
+                    # LLM hallucinated it) got 'won't settle after 2 tries' on BOTH
+                    # the Vehicle tab's verify AND the Payment tab's verify in the
+                    # same run, instead of staying dead after the first time. Now
+                    # also stored/checked via the SAME (tab, bare-label) stable key
+                    # the deterministic branch above uses.
                     _vk_l = _vf.strip().lower()
                     self._verify_fix_count[_vk_l] = self._verify_fix_count.get(_vk_l, 0) + 1
                     if self._verify_fix_count[_vk_l] > 2:
                         if _fe is not None:
                             self._dead_fill_keys.add(self._attempt_key(_fe))
                             self._mark_attempted(_fe)
+                        self._verify_dead_stable.add(_stable_vk_l)
                         logger.warning("[VERIFY] %s: LLM-fix %r won't settle after 2 tries — accepting (dead).",
                                        _nm[:14], _vf[:22])
                         _done_here.add(_vf.lower())
                         continue
                     logger.info("[VERIFY] %s: LLM-fix %r → %r", _nm[:14], _vf[:24], _vv[:24])
-                    if self._nav_fill_field(_st, _vf, _vv):
+                    # Same wrong-twin risk as the deterministic branch above: pin to
+                    # the SPECIFIC element _fe already resolved, not a fresh bare-
+                    # label re-lookup inside _nav_fill_field.
+                    _vk_pin = self._attempt_key(_fe, _st) if _fe is not None else None
+                    if self._nav_fill_field(_st, _vf, _vv, prefer_key=_vk_pin):
                         _fixed += 1
                         _fixed_names.add(_vf.lower())
                     _done_here.add(_vf.lower())
@@ -5713,6 +5614,10 @@ class LLMAgent:
                     break
                 time.sleep(self.step_delay * 0.5)
                 _st = self._observe()
+            if not _tab_had_activity:
+                self._verify_clean_tabs.add(_nm)
+                logger.info("[VERIFY] %s: 0 mismatches, no LLM need — marking clean, "
+                            "skip on next pass.", _nm[:14])
         logger.info("[VERIFY] pass complete — %d field(s) corrected.", _fixed)
         self._last_verify_fixes = _fixed_names
         return _fixed == 0
@@ -5724,32 +5629,42 @@ class LLMAgent:
           (2) a full DETERMINISTIC verification pass (_verify_pass) over ALL tabs needs
               ZERO corrections — every field read back matches the SOURCE record.
         Returns True only when both agree. Gates every finish/Submit."""
+        if self._only_tab_idx is not None:
+            # Drill mode (only_tab): confirms nothing, never verifies/submits.
+            # Verify's own tab loop visits every tab, which would immediately
+            # defeat the tab-lock — a single-tab drill has no business
+            # reaching Submit anyway, that's not what it's for.
+            return False
         if self._tabs_total > 0 and len(self._visited_tabs) < self._tabs_total:
             logger.warning("[CONFIRM] not finished — only %d/%d tabs visited.",
                            len(self._visited_tabs), self._tabs_total)
             return False
-        _prev_fixes = getattr(self, "_last_verify_fixes", None)
-        if self._verify_pass(state):
-            logger.info("[CONFIRM] verification pass clean — form complete.")
-            # Press Submit HERE so every finish path submits (some callers just
-            # break). Idempotent: _click_submit no-ops if already submitted.
-            self._click_submit(self._observe())
-            return True
-        # CONVERGENCE GATE: a pass that corrects the SAME fields as the previous
-        # pass is making zero progress — flaky reads / nondeterministic LLM values
-        # / refused fills will re-"correct" forever (observed live 2026-07-09:
-        # verify lapped the form twice on the identical field set and Submit
-        # never fired). Stable-but-imperfect = accept honestly: log the dead
-        # list, submit, report. Perfection is the enemy of termination.
-        _cur_fixes = getattr(self, "_last_verify_fixes", set())
-        if _prev_fixes is not None and _cur_fixes and _cur_fixes == _prev_fixes:
-            logger.warning("[CONFIRM] verification STABLE but not clean — same %d field(s) "
-                           "re-corrected with no progress (%s). Accepting state and submitting.",
-                           len(_cur_fixes), sorted(_cur_fixes))
-            self._click_submit(self._observe())
-            return True
-        logger.warning("[CONFIRM] verification corrected field(s) / found gaps — NOT done, continuing.")
-        return False
+        # NO VERIFY-PASS REVISIT AT ALL (2026-07-16, user-mandated, second
+        # escalation): the one-pass-verify attempt (run once, no second pass)
+        # STILL wasn't enough — user, live-watching (run_20260716_123115.txt):
+        # the SINGLE verify pass itself was still clicking back into Policy/
+        # Policyholder/Vehicle — tabs the main fill loop had already finished
+        # — to run its own read-back-and-fix walk. "It still returned after
+        # already filling a certain tab, I don't want it to do that." That's
+        # not a revisit-COUNT problem anymore, it's that ANY tab-walk after
+        # the main fill phase moved past a tab is unwanted, even the first
+        # and only one. FIX: _verify_pass is no longer called here at all —
+        # once every tab has been visited during the main fill, submit
+        # immediately. Whatever the main fill pass produced on each tab is
+        # final; nothing gets a second look, ever, for any reason. This is a
+        # deliberate, explicit, user-mandated trade of correctness-safety-net
+        # for speed and predictable single-pass behavior — a field the main
+        # fill got wrong (or a write that silently failed, e.g. the still-
+        # open combobox-write-readback-desync bug) will now ship wrong, with
+        # no fallback catching it. _verify_pass/_verify_ran_once/
+        # _verified_at_fill are kept in the file (dead code once this path
+        # never calls them) rather than deleted, in case this trade needs to
+        # be reversed once real numbers come back on how much accuracy it
+        # actually costs.
+        logger.info("[CONFIRM] all tabs visited — submitting without a verify pass "
+                    "(user-mandated: no tab gets a second look, missed = missed).")
+        self._click_submit(self._observe())
+        return True
 
     def _topmost_missing(self, state: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """Topmost unfilled fillable on the current tab that is still worth
@@ -6102,6 +6017,21 @@ class LLMAgent:
                 return True
         return False
 
+    def _point_on_other_tab(self, pos) -> bool:
+        """True if a click point falls inside any tab-strip bbox OTHER than the
+        locked only_tab index (refreshed each step). Used by the executor
+        chokepoint (2026-07-16) to block a drill from navigating off its
+        target tab, no matter which code path initiated the click — mirrors
+        _point_on_submit exactly, same reasoning: one guard, every call site,
+        instead of patching each tab-switching site as it's found live."""
+        if not pos or len(pos) < 2:
+            return False
+        _M = 14
+        for b in getattr(self, "_other_tab_bboxes", []):
+            if b and (b[0] - _M) <= pos[0] <= (b[2] + _M) and (b[1] - _M) <= pos[1] <= (b[3] + _M):
+                return True
+        return False
+
     def _click_submit(self, state: Dict[str, Any]) -> bool:
         """DETERMINISTIC FINISH — click the Submit/finish button. Called ONLY after
         the LLM verification (_confirm_finished) passes. The transformer never does
@@ -6250,16 +6180,76 @@ class LLMAgent:
                                 _rec_val[:24], str(_nv)[:24], _nf[:24])
                     _nv = _rec_val
                 logger.info("[NAV] sweep fill/verify %r → %r", _nf[:28], str(_nv)[:30])
-                self._nav_fill_field(state, _nf, _nv,
+                _fill_confirmed = self._nav_fill_field(state, _nf, _nv,
                                      prefer_key=(_tk if _fx is not None else None))
                 _noscroll = 0
+                # SETTLE DELAY BEFORE VERIFY-AT-FILL READ-BACK (2026-07-16):
+                # found live — EVERY 'verify-at-fill retry ... didn't stick
+                # first try' in run_20260716_144654.txt was a short numeric
+                # field ('At-Fault Accidents' -> '0', 'Total Claims Filed' ->
+                # '1', etc. — likely SpinCtrl widgets), while YES/NO and text
+                # fields in the SAME sweep never retried. 100% correlation by
+                # widget/value shape, not random flakiness. Hypothesis: the
+                # write genuinely succeeds, but the immediate self._observe()
+                # right after races wx's own UI update — SpinCtrl-style
+                # widgets may take a beat longer to visually commit than a
+                # plain edit/combobox. The retry attempt naturally has more
+                # elapsed time before ITS check and then succeeds, which fits
+                # a timing race better than a genuinely-flaky write. Cheap
+                # fix to test the theory: give the UI a brief settle window
+                # before the FIRST read-back, same as the write rungs
+                # themselves already sleep after SetValue/RangeValue calls.
+                # TRUST THE WRITE PATH'S OWN CONFIRMATION (2026-07-16, hypothesis
+                # #2): combobox rung-4 cycling and the edit/spin ValuePattern
+                # path each already read back the value off the SAME live ctrl
+                # right after writing it, and only return True on a confirmed
+                # match. The re-observe below queries a FRESH full UIA snapshot
+                # by label — for comboboxes especially, the a11y tree can lag
+                # the just-changed selection, so this second, independent check
+                # was flagging already-correct fields as "didn't stick" (all 8
+                # retries in run_20260716_152340.txt were Coverage-tab combo-
+                # boxes that _nav_fill_field had already confirmed). Skip the
+                # redundant snapshot re-check when the write path itself
+                # already confirmed the value.
+                if _fill_confirmed:
+                    self._verified_at_fill.add(_tk)
+                    state = self._observe()
+                    continue
+                time.sleep(0.15)
                 state = self._observe()
+                # VERIFY-AT-FILL, DONE RIGHT (2026-07-16): user-flagged — fields
+                # filled here ('Garaging Location', 'Title State', 'Collision
+                # Deductible' in run_20260716_025101.txt) went unchecked until
+                # the SEPARATE end-of-run _verify_pass discovered them wrong
+                # minutes later, and because that pass re-walks all 8 tabs per
+                # attempt, fixing 3 fields cost 3 extra full-form passes —
+                # exactly the "navigate back-and-forth" complaint. Check ONCE,
+                # right here, same tab, no navigation needed: if it didn't
+                # stick, retry ONCE immediately (still cheaper than a whole
+                # later pass); either way mark it checked so the end-of-run
+                # verify pass trusts it instead of rediscovering it cold.
+                _sw_check_el = next((e for e in state.get("elements", [])
+                                     if (e.get("label") or e.get("text") or "").strip().lower()
+                                        == _nf.strip().lower() and e.get("bbox")), None)
+                if _sw_check_el is not None:
+                    if self._field_matches(_sw_check_el, _nv):
+                        self._verified_at_fill.add(_tk)
+                    else:
+                        logger.info("[NAV] sweep: verify-at-fill retry for %r (didn't stick first try).",
+                                    _nf[:28])
+                        self._nav_fill_field(state, _nf, _nv, prefer_key=_tk)
+                        state = self._observe()
+                        _sw_recheck_el = next((e for e in state.get("elements", [])
+                                               if (e.get("label") or e.get("text") or "").strip().lower()
+                                                  == _nf.strip().lower() and e.get("bbox")), None)
+                        if _sw_recheck_el is not None and self._field_matches(_sw_recheck_el, _nv):
+                            self._verified_at_fill.add(_tk)
                 continue
             if _act == "tab" and _nav.get("click_position"):
                 logger.info("[NAV] tab swept clean → switch tab %r", (_nav.get("target") or "")[:24])
                 self._executor.execute({"action_type": "click", "click_position": _nav["click_position"]})
                 self._visited_tabs.add((_nav.get("target") or "").strip())
-                self._filled_this_tab.clear(); self._fixation_hits.clear()
+                self._filled_this_tab.clear(); self._fixation_hits.clear(); self._section_pane_tops = {}
                 self._refresh_record_cache(self._observe())
                 return self._observe(), False
             if _act == "done":
@@ -6287,7 +6277,7 @@ class LLMAgent:
                     self._executor.execute({"action_type": "click",
                                             "click_position": [(_nb[0] + _nb[2]) / 2, (_nb[1] + _nb[3]) / 2]})
                     self._visited_tabs.add(_nm)
-                    self._filled_this_tab.clear(); self._fixation_hits.clear()
+                    self._filled_this_tab.clear(); self._fixation_hits.clear(); self._section_pane_tops = {}
                     self._refresh_record_cache(self._observe())
                     return self._observe(), False
                 return state, False
@@ -6537,18 +6527,31 @@ class LLMAgent:
                     ctrl.GetExpandCollapsePattern().Collapse()
                 except Exception:
                     pass
-                # 3) native type-to-filter: focus the combo, type the value —
-                #    prefix-matching combos select it — Enter, verify.
-                try:
-                    ctrl.SetFocus()
-                    time.sleep(0.15)
-                    ctrl.SendKeys(value, interval=0.03, waitTime=0.15)
-                    ctrl.SendKeys("{Enter}", waitTime=0.15)
-                    _now = (ctrl.GetValuePattern().Value or "").strip().lower()
-                    if _now == _vlc0 or _now.startswith(_vlc0) or _vlc0.startswith(_now):
-                        return True
-                except Exception:
-                    pass
+                # 3) native type-to-filter: SKIPPED for multi-char values
+                #    (2026-07-15, probe_setvalue_echo_or_real.py, live-confirmed
+                #    on 'Title State'). This widget class doesn't do prefix
+                #    matching — it's single-KEYSTROKE type-ahead, so SendKeys
+                #    on a full word only responds to the LAST character sent
+                #    (typing 'California' landed on 'Alabama', the first state
+                #    starting with the trailing 'a' — same failure mode already
+                #    documented below for 'Texas'->'South Carolina'). For any
+                #    value longer than one character this rung can NEVER
+                #    legitimately succeed on this control class; it was only
+                #    ever spending ~300-500ms landing on a WRONG value before
+                #    falling through to rung 4 anyway. Kept for genuinely
+                #    single-character values (state abbreviations typed as a
+                #    single letter, etc.) where it's the correct mechanism.
+                if len(value.strip()) <= 1:
+                    try:
+                        ctrl.SetFocus()
+                        time.sleep(0.15)
+                        ctrl.SendKeys(value, interval=0.03, waitTime=0.15)
+                        ctrl.SendKeys("{Enter}", waitTime=0.15)
+                        _now = (ctrl.GetValuePattern().Value or "").strip().lower()
+                        if _now == _vlc0 or _now.startswith(_vlc0) or _vlc0.startswith(_now):
+                            return True
+                    except Exception:
+                        pass
                 # 4) first-letter cycling: wx.Choice matches SINGLE characters —
                 #    each keystroke jumps to the next item with that initial
                 #    (typing 'Texas' landed on 'South Carolina' via the trailing
@@ -6556,21 +6559,96 @@ class LLMAgent:
                 #    press the first letter repeatedly and stop when the wanted
                 #    item shows. Read back after every press; a repeated value
                 #    means we cycled the full ring without a hit.
-                try:
-                    _first = value.strip()[0]
-                    ctrl.SetFocus()
-                    time.sleep(0.1)
-                    _seen = set()
-                    for _ in range(60):
-                        ctrl.SendKeys(_first, waitTime=0.08)
-                        _now = (ctrl.GetValuePattern().Value or "").strip().lower()
-                        if _now == _vlc0 or _now.startswith(_vlc0):
-                            return True
-                        if _now in _seen:
-                            break                     # full circle — not there
-                        _seen.add(_now)
-                except Exception:
-                    pass
+                #
+                #    MULTI-TOKEN + SUBSTRING MATCH (2026-07-15, root-caused
+                #    2026-07-14): cycling on the FULL value's own first letter
+                #    only reaches options starting with THAT letter — useless
+                #    when the record's phrasing and the option's phrasing
+                #    diverge ('Midnight Black' doesn't start with the same
+                #    letter as the real option 'Black'; record 'Pleasure' vs.
+                #    option 'Personal/Pleasure' — a substring, not a prefix,
+                #    of the option). GENERIC fix, no hardcoded option lists
+                #    (NO-HARDCODE rule) — the record's OWN value is split into
+                #    whitespace/slash/dash-separated tokens, tried longest-
+                #    first (more specific = less collision-prone), each as its
+                #    own first-letter-cycling seed; the match check accepts
+                #    substring containment BOTH directions (target-in-option
+                #    OR option-in-target), not just equality/prefix. Every
+                #    physical keystroke sequence is driven purely by the
+                #    record's text and the widget's own observed readback —
+                #    nothing form-specific is baked in.
+                import re as _re
+                _tokens = [value.strip()] + sorted(
+                    {t for t in _re.split(r"[\s/\-]+", value.strip()) if t and t != value.strip()},
+                    key=len, reverse=True)
+                _hit = False
+                for _tok in _tokens:
+                    if _hit:
+                        break
+                    try:
+                        _first = _tok[0]
+                        ctrl.SetFocus()
+                        time.sleep(0.1)
+                        _seen = set()
+                        for _i in range(60):
+                            ctrl.SendKeys(_first, waitTime=0.08)
+                            _now = (ctrl.GetValuePattern().Value or "").strip().lower()
+                            # APOSTROPHE-INSENSITIVE MATCH (2026-07-16, found via
+                            # ph_education: record 'Associate Degree' vs. the
+                            # form's real option "Associate's Degree" — the
+                            # possessive apostrophe-s sitting between 'Associate'
+                            # and 'Degree' broke straight substring containment
+                            # even though cycling landed on the RIGHT option
+                            # ('associate degree' is not a substring of
+                            # "associate's degree"). Every OTHER education value
+                            # happened to already include the apostrophe in both
+                            # the record and the option, so this only ever
+                            # surfaced for this one case — genuinely no-hardcode,
+                            # generic punctuation-insensitive comparison, not a
+                            # baked-in 'Associate' special case.
+                            def _strip_poss(_s):
+                                return (_s.replace("'s", "").replace("’s", "")
+                                          .replace("'", "").replace("’", ""))
+                            _now_np = _strip_poss(_now)
+                            _vlc0_np = _strip_poss(_vlc0)
+                            # NUMERIC EXACT-ONLY GUARD (2026-07-16, found live:
+                            # 'Collision Deductible' expected '500', landed on
+                            # '5000' — cov_collision_ded mismatch,
+                            # run_20260716_141849.txt). The substring-containment
+                            # check (built for TEXT like 'Pleasure' inside
+                            # 'Personal/Pleasure') false-positives on numbers:
+                            # '500' IS literally a substring of '5000' (and of
+                            # '2500', '15000', etc.) — a digit-sequence collision,
+                            # not a real match. For a purely-numeric target value
+                            # (optionally with $/,/. decoration, e.g. '$500' or
+                            # '100,000'), only an EXACT match counts; substring
+                            # containment is skipped entirely so the widget must
+                            # actually cycle to the real number, not just a
+                            # value that happens to start with the same digits.
+                            _vlc0_digits = _vlc0.replace("$", "").replace(",", "").replace(".", "").strip()
+                            _is_numeric = _vlc0_digits.isdigit() and len(_vlc0_digits) > 0
+                            if _is_numeric:
+                                _match = (_now == _vlc0)
+                            else:
+                                _match = (_now == _vlc0 or _vlc0 in _now or _now in _vlc0
+                                          or _now_np == _vlc0_np or _vlc0_np in _now_np or _now_np in _vlc0_np)
+                            if _match:
+                                logger.info("[COMBO] %r: rung-4 cycling (token %r) hit "
+                                            "%r after %d press(es) of %r.",
+                                            (elem.get("label") or "?")[:24], _tok, _now,
+                                            _i + 1, _first)
+                                _hit = True
+                                break
+                            if _now in _seen:
+                                break                 # full circle on this token — try next
+                            _seen.add(_now)
+                    except Exception:
+                        continue
+                if _hit:
+                    return True
+                logger.warning("[COMBO] %r: ALL write rungs failed for value %r — "
+                               "falling through to legacy click/paste path.",
+                               (elem.get("label") or "?")[:24], value[:32])
                 return False
             # edits + spins: ValuePattern first (immune to paste-reject), then
             # RangeValuePattern (numeric spins expose it when ValuePattern is
@@ -6888,6 +6966,13 @@ class LLMAgent:
     # ── observer / transformer helpers ───────────────────────────────────────
 
     def _observe(self) -> Dict[str, Any]:
+        # TEMP INSTRUMENTATION (2026-07-16, speed measurement): count real
+        # UIA snapshot calls per step. 45 call sites exist across the file
+        # (scroll, reveal, validate, record-cache-refresh, sweep, etc.) and
+        # nothing currently measures how many actually fire per step — this
+        # is step 1 of "measure before cutting" for the 9min->5min question.
+        # Remove once the measurement's been read off a live run.
+        self._observe_calls_total = getattr(self, "_observe_calls_total", 0) + 1
         try:
             state = self._observer.snapshot()
             # Validate the perception adapter ONCE against the schema contract.

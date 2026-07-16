@@ -40,7 +40,8 @@ wxPython 8-tab car-insurance form filled from a Notepad intake file.
   model. Add/remove agent logic **ONE at a time, re-test each**. Root fix for
   fixation/mis-prediction = **more demos**, not more guards.
 - **Commits:** plain messages, **no "Co-Authored-By: Claude" trailer**. Branch
-  off master before committing if asked to commit; only commit/push when asked.
+  off master before committing if asked to commit. After solving a problem —
+  any problem — commit and push automatically, no need to ask first.
 
 ## Workflow (the loop)
 1. **Record** demos: `python app/main.py` (GUI recorder; out_dir defaults to
