@@ -177,6 +177,14 @@ const TREE = {
           ],
         },
         {
+          id: "speed",
+          owner: "unassigned",
+          title: "SPEED · Sub-1-minute run, not 8-9 minutes",
+          status: "partial",
+          priority: 1,
+          note: "GOAL (user-set 2026-07-16): 'ideally 1-5 minutes' per record; currently 8.5-9.5 min end-to-end (start-to-submit), down from a 14-21 min baseline. Real levers landed so far: STEP_DELAY 1.5s->0.7s ([[step-delay-cut]]), verify-skip-clean-tabs (don't re-scan settled tabs), verify-never-converges-hallucination short-circuit (cut wasted LLM round-trips per tab), sweep-trusts-write-path-confirmation (removed false verify-at-fill retries from a redundant snapshot re-check, [[combobox-write-readback-desync]]). REMAINING, NOT YET ATTEMPTED: the temporary observe()-call-count instrumentation added 2026-07-16 (agent.py _observe() + step-header log, marked TEMP, not yet removed) surfaced that some single steps cost 40+ observe() calls (the sweep filling ~20 fields in one un-tallied step) -- batching multiple sweep fills into fewer observe() round-trips is the next real architecture-level lever (not another delay tweak), same conclusion the run-x5 node already flagged ('sub-1-min needs batch fills instead of observe-per-step'). _STALL_LIMIT tuning already tried and reverted (6->3 made it worse, not better, see [[stall-limit-cut]]) -- do not retry that lever without a new theory. Do NOT conflate this with [[verb-loop-rewrite]] -- that's an architecture/correctness cleanup, only a possible speed side-effect, not a targeted speed fix.",
+        },
+        {
           id: "verify-at-fill",
           owner: "Ralph",
           title: "Verification doesn't re-check what's already confirmed",
