@@ -2115,6 +2115,7 @@ class LLMAgent:
                     self._executor.execute({"action_type": "click", "click_position": _nav["click_position"]})
                     self._visited_tabs.add((_nav.get("target") or "").strip())
                     self._filled_this_tab.clear(); self._fixation_hits.clear(); self._section_pane_tops = {}
+                    self._scroll_form_to_top(self._observe())   # 2026-07-16: see GAP-path note
                     self._refresh_record_cache(self._observe())
                 elif _nav_act == "done" and self._confirm_finished(state):
                     logger.info("[NAV] (fixation) finish confirmed against source — done.")
@@ -2135,6 +2136,7 @@ class LLMAgent:
                                                 "click_position": [(_tb[0] + _tb[2]) / 2, (_tb[1] + _tb[3]) / 2]})
                         self._visited_tabs.add(_tnm)
                         self._filled_this_tab.clear(); self._fixation_hits.clear(); self._section_pane_tops = {}
+                        self._scroll_form_to_top(self._observe())   # 2026-07-16: see GAP-path note
                         self._refresh_record_cache(self._observe())
                     else:
                         # LAST TAB — nowhere to advance. Escalation used to no-op here
@@ -2220,6 +2222,15 @@ class LLMAgent:
                         logger.info("Tab click detected: switched to tab idx=%d  '%s'",
                                     _ti_idx,
                                     _ti_el.get("text") or _ti_el.get("label") or "?")
+                        # SCROLL-TO-TOP (2026-07-18): the comment above ("so the next
+                        # step scrolls to top") described intended behavior that never
+                        # actually existed -- _tab_just_switched was set but nothing
+                        # ever consumed it to trigger a scroll (confirmed: only read
+                        # inside a debug log line). This is the ONE site that catches
+                        # the transformer's OWN organic tab clicks (GAP/fixation/sweep/
+                        # _try_advance_tab clicks all `continue` before reaching here,
+                        # so this doesn't double up with those already-fixed sites).
+                        self._scroll_form_to_top(self._observe())
                         # Notify plugin so it also resets its tab-switch state
                         if self._task_plugin is not None and hasattr(self._task_plugin, "notify_tab_click"):
                             self._task_plugin.notify_tab_click(_ti_idx, state)
