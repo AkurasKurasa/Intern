@@ -3779,56 +3779,6 @@ class LLMAgent:
                 return False                            # an actionable field is visible
         return True
 
-    def _scroll_form_down(self, state: Dict[str, Any]) -> bool:
-        """
-        Scroll the active form window down to reveal fields hidden below the visible area.
-        Uses pyautogui.scroll over the center of the active window elements.
-        Returns True if scroll was attempted.
-        """
-        try:
-            import pyautogui
-            elements = state.get("elements", [])
-            # Exclude comboboxcontrol — scroll wheel over a combobox changes its value.
-            _SAFE_TYPES = {
-                "editcontrol", "checkboxcontrol",
-                "radiobuttoncontrol", "tabitemcontrol", "buttoncontrol",
-            }
-            active = [e for e in elements
-                      if e.get("type") in _SAFE_TYPES
-                      and e.get("window_role") != "background"
-                      and e.get("bbox")]
-            # Fallback: any non-background, non-combobox element with bbox
-            if not active:
-                active = [e for e in elements
-                          if e.get("type") != "comboboxcontrol"
-                          and e.get("window_role") != "background" and e.get("bbox")]
-            if not active:
-                return False
-            # Use centroid of active form elements, capped to the middle of the
-            # screen so repeated scrolls don't push the target off the bottom edge.
-            xs = [(e["bbox"][0] + e["bbox"][2]) / 2 for e in active]
-            ys = [(e["bbox"][1] + e["bbox"][3]) / 2 for e in active]
-            cx = sum(xs) / len(xs)
-            cy = min(sum(ys) / len(ys), state.get("screen_resolution", [1920, 1080])[1] * 0.55)
-            # Final safety: if the computed point is inside a combobox, shift left
-            _cb_list = [e for e in elements
-                        if e.get("type") == "comboboxcontrol" and e.get("bbox")]
-            for _cb in _cb_list:
-                bx1, by1, bx2, by2 = _cb["bbox"]
-                if bx1 <= cx <= bx2 and by1 <= cy <= by2:
-                    cx = max(bx1 - 40, 10)
-                    logger.debug("Scroll-form: shifted cx=%.0f to avoid combobox", cx)
-                    break
-            orig = pyautogui.position()
-            pyautogui.moveTo(cx, cy, duration=0.15)
-            pyautogui.scroll(-5)   # 5 scroll units down
-            pyautogui.moveTo(orig.x, orig.y, duration=0.1)
-            logger.info("Scroll-form: scrolled down at form center (%.0f, %.0f)", cx, cy)
-            return True
-        except Exception as exc:
-            logger.warning("Scroll-form: failed — %s", exc)
-            return False
-
     # ── NAVIGATION PROTOCOL: find a needed field, scroll to it (no Tab) ───────
     # Rule: a tab is not "done" until every field that needs a value is filled.
     # If a needed field isn't on screen, FIND it by dragging the scrollbar — never
