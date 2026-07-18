@@ -2070,7 +2070,7 @@ class LLMAgent:
                 _fx_key = None
                 if _fx is not None:
                     _fx_key = self._attempt_key(_fx)
-                    self._dead_fill_keys.add(_fx_key)
+                    self._mark_dead(_fx_key)
                     self._mark_attempted(_fx)
                 # Escalation: has THIS EXACT spot already fixated once this tab? If the
                 # dead-mark above didn't stop the model from re-targeting it, or the NAV
@@ -2107,7 +2107,7 @@ class LLMAgent:
                                         if (e.get("label") or e.get("text") or "").strip().lower() == _nk
                                         and e.get("bbox")), None)
                             if _de is not None:
-                                self._dead_fill_keys.add(self._attempt_key(_de))
+                                self._mark_dead(_de)
                                 self._mark_attempted(_de)
                             logger.warning("[NAV] (fixation) %r unfillable 2x — marking dead, skipping.", _nf[:28])
                 elif _nav_act == "tab" and _nav.get("click_position"):
@@ -2355,7 +2355,7 @@ class LLMAgent:
                                 _no_change_streak = 0
                                 time.sleep(self.step_delay * 0.5)
                                 continue
-                            self._dead_fill_keys.add(_ffk)
+                            self._mark_dead(_ffk)
                             self._mark_attempted(_ff)
                             logger.warning("Dead-field: %r rejected fill %dx — HARD-skip from now on.",
                                            (_ff.get('label') or _ff.get('text') or '?'),
@@ -4057,7 +4057,7 @@ class LLMAgent:
                     "Reveal-focus: field %r focused %d× without being filled — marking dead.",
                     (miss.get("label") or miss.get("text") or "?")[:28], count,
                 )
-                self._dead_fill_keys.add(fkey)
+                self._mark_dead(fkey)
                 # Recurse once: maybe there's another missing field we can reach
                 return self._reveal_missing_by_scroll(state)
             # Widget-type-aware focus/fill — geometry-driven, no field-name hardcode.
@@ -6101,7 +6101,7 @@ class LLMAgent:
                 _tried[_tk] = _tried.get(_tk, 0) + 1
                 if _tried[_tk] > 2:
                     if _fx is not None:
-                        self._dead_fill_keys.add(_tk)
+                        self._mark_dead(_tk)
                         self._mark_attempted(_fx)
                     logger.warning("[NAV] sweep: %r unfillable after 3 tries — marking dead.", _nf[:28])
                     state = self._observe()
@@ -6135,7 +6135,7 @@ class LLMAgent:
                 if self._cached_record and not _rec_val:
                     logger.info("[NAV] sweep: %r blank/absent from record %d — stays blank (settled, no fill).",
                                 _nf[:28], self._record_num)
-                    self._dead_fill_keys.add(_tk)
+                    self._mark_dead(_tk)
                     if _fx is not None:
                         self._mark_attempted(_fx)
                     state = self._observe()
@@ -7068,6 +7068,18 @@ class LLMAgent:
         """Record that a field has been acted on this session (attempted feature)."""
         if isinstance(elem, dict):
             self._attempted_keys.add(self._attempt_key(elem))
+
+    def _mark_dead(self, key_or_elem) -> None:
+        """VERB-LOOP REWRITE, state-tracker slice (2026-07-18): record that a
+        field has failed to fill 2+ times and should be permanently skipped.
+        Writes to _dead_fill_keys used to be scattered across 9 independent
+        call sites (each computing its own key and calling .add() directly) --
+        the same duplicate-write pattern already fixed for CHECK and combobox,
+        just for a state write instead of a UI action. One writer now.
+        Accepts either a raw attempt_key string or an element dict (same
+        identity scheme _mark_attempted uses)."""
+        key = key_or_elem if isinstance(key_or_elem, str) else self._attempt_key(key_or_elem)
+        self._dead_fill_keys.add(key)
 
     # Fillable widget types for ranked-target arbitration (universal control
     # types, not field names). Buttons/tabs are deliberately NOT here — they are
