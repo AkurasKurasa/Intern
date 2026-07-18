@@ -7076,9 +7076,17 @@ class LLMAgent:
         call sites (each computing its own key and calling .add() directly) --
         the same duplicate-write pattern already fixed for CHECK and combobox,
         just for a state write instead of a UI action. One writer now.
-        Accepts either a raw attempt_key string or an element dict (same
-        identity scheme _mark_attempted uses)."""
-        key = key_or_elem if isinstance(key_or_elem, str) else self._attempt_key(key_or_elem)
+        Accepts either a raw attempt_key (str, or the (section, label) / ('@', x, y)
+        tuple forms _attempt_key itself returns) or an element dict (same
+        identity scheme _mark_attempted uses) -- only a dict means 'derive the
+        key from this element'; anything else is already a key.
+        BUG FIXED 2026-07-18 (live-crashed, run_20260718_131737.txt): originally
+        checked `isinstance(key_or_elem, str)` and treated anything non-str as
+        an elem needing _attempt_key() re-derivation -- but _attempt_key can
+        itself return a TUPLE (section-qualified or bbox-fallback keys), so a
+        tuple key passed in was wrongly re-fed into _attempt_key, which called
+        .get() on it and crashed: 'tuple' object has no attribute 'get'."""
+        key = self._attempt_key(key_or_elem) if isinstance(key_or_elem, dict) else key_or_elem
         self._dead_fill_keys.add(key)
 
     # Fillable widget types for ranked-target arbitration (universal control
