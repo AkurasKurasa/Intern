@@ -1288,7 +1288,7 @@ class LLMAgent:
                         _m2_at_bottom = False
                         _last_auto_step = step_idx
                         _heuristic_steps += 1
-                        self._filled_this_tab.clear(); self._fixation_hits.clear(); self._section_pane_tops = {}
+                        self._reset_tab_bookkeeping()
                         # SCROLL-TO-TOP ON TAB SWITCH (2026-07-16): a fresh tab's
                         # ScrolledPanel keeps whatever scroll offset it last had —
                         # nothing resets it, so if it's mid-page the top section
@@ -1307,7 +1307,7 @@ class LLMAgent:
                     _m2_at_bottom      = False       # M2: new tab is not at bottom
                     _last_auto_step    = step_idx
                     _heuristic_steps  += 1
-                    self._filled_this_tab.clear(); self._fixation_hits.clear(); self._section_pane_tops = {}
+                    self._reset_tab_bookkeeping()
                     self._scroll_form_to_top(self._observe())
                     self._refresh_record_cache(self._observe())
                     time.sleep(self.step_delay)
@@ -1993,7 +1993,7 @@ class LLMAgent:
                         _expose_scrolls    = 0          # M2: new tab → fresh scroll budget
                         _m2_at_bottom      = False       # M2: new tab is not at bottom
                         _last_auto_step    = step_idx
-                        self._filled_this_tab.clear(); self._fixation_hits.clear(); self._section_pane_tops = {}
+                        self._reset_tab_bookkeeping()
                         _confirmed_blank_fields.clear()
                         self._refresh_record_cache(self._observe())
                         time.sleep(self.step_delay)
@@ -2003,7 +2003,7 @@ class LLMAgent:
                         _tab_just_switched = True
                         _tab_scroll_count  = 0
                         _last_auto_step    = step_idx
-                        self._filled_this_tab.clear(); self._fixation_hits.clear(); self._section_pane_tops = {}
+                        self._reset_tab_bookkeeping()
                         _confirmed_blank_fields.clear()
                         self._refresh_record_cache(state)
                         time.sleep(self.step_delay)
@@ -2114,7 +2114,7 @@ class LLMAgent:
                     logger.info("[NAV] (fixation) page done → switch tab %r", (_nav.get("target") or "")[:24])
                     self._executor.execute({"action_type": "click", "click_position": _nav["click_position"]})
                     self._visited_tabs.add((_nav.get("target") or "").strip())
-                    self._filled_this_tab.clear(); self._fixation_hits.clear(); self._section_pane_tops = {}
+                    self._reset_tab_bookkeeping()
                     self._scroll_form_to_top(self._observe())   # 2026-07-16: see GAP-path note
                     self._refresh_record_cache(self._observe())
                 elif _nav_act == "done" and self._confirm_finished(state):
@@ -2135,7 +2135,7 @@ class LLMAgent:
                         self._executor.execute({"action_type": "click",
                                                 "click_position": [(_tb[0] + _tb[2]) / 2, (_tb[1] + _tb[3]) / 2]})
                         self._visited_tabs.add(_tnm)
-                        self._filled_this_tab.clear(); self._fixation_hits.clear(); self._section_pane_tops = {}
+                        self._reset_tab_bookkeeping()
                         self._scroll_form_to_top(self._observe())   # 2026-07-16: see GAP-path note
                         self._refresh_record_cache(self._observe())
                     else:
@@ -6214,7 +6214,7 @@ class LLMAgent:
                 logger.info("[NAV] tab swept clean → switch tab %r", (_nav.get("target") or "")[:24])
                 self._executor.execute({"action_type": "click", "click_position": _nav["click_position"]})
                 self._visited_tabs.add((_nav.get("target") or "").strip())
-                self._filled_this_tab.clear(); self._fixation_hits.clear(); self._section_pane_tops = {}
+                self._reset_tab_bookkeeping()
                 self._scroll_form_to_top(self._observe())   # 2026-07-16: see GAP-path note
                 self._refresh_record_cache(self._observe())
                 return self._observe(), False
@@ -6243,7 +6243,7 @@ class LLMAgent:
                     self._executor.execute({"action_type": "click",
                                             "click_position": [(_nb[0] + _nb[2]) / 2, (_nb[1] + _nb[3]) / 2]})
                     self._visited_tabs.add(_nm)
-                    self._filled_this_tab.clear(); self._fixation_hits.clear(); self._section_pane_tops = {}
+                    self._reset_tab_bookkeeping()
                     self._scroll_form_to_top(self._observe())   # 2026-07-16: see GAP-path note
                     self._refresh_record_cache(self._observe())
                     return self._observe(), False
@@ -7088,6 +7088,17 @@ class LLMAgent:
         .get() on it and crashed: 'tuple' object has no attribute 'get'."""
         key = self._attempt_key(key_or_elem) if isinstance(key_or_elem, dict) else key_or_elem
         self._dead_fill_keys.add(key)
+
+    def _reset_tab_bookkeeping(self) -> None:
+        """VERB-LOOP REWRITE, state-tracker slice (2026-07-18): the exact same
+        3-statement reset (clear per-tab fill/fixation tracking, drop cached
+        section-pane tops) was duplicated verbatim at all 8 tab-switch sites --
+        the same 'repeated at every call site' pattern already fixed for CHECK/
+        combobox/dead-key writes, here for a per-tab reset instead. One call
+        now. Pure mechanical extraction, no logic change."""
+        self._filled_this_tab.clear()
+        self._fixation_hits.clear()
+        self._section_pane_tops = {}
 
     # Fillable widget types for ranked-target arbitration (universal control
     # types, not field names). Buttons/tabs are deliberately NOT here — they are
