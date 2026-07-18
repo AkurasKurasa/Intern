@@ -6363,6 +6363,46 @@ class LLMAgent:
             logger.debug("resolve_live_control %r failed: %s", _name[:24], exc)
             return None
 
+    def _combobox_legacy_click_fallback(self, elem: Dict[str, Any], value: str) -> bool:
+        """VERB-LOOP REWRITE, combobox slice (2026-07-16): last-resort combobox
+        fill when _act_on_element's UIA write (rung-4 cycling, self-confirmed)
+        couldn't land -- click to open the dropdown, wait for its visible
+        listitem children, click the matching one. Used to be hand-rolled
+        TWICE (once in _fill_element, once in _nav_fill_field) with slightly
+        different matching logic -- meaning only ONE of them ever got the
+        apostrophe-insensitive / numeric-exact-match fixes added earlier
+        today, since they'd drifted into two separate code paths. One
+        implementation now, shared. Returns True only if a matching item was
+        found and clicked."""
+        b = elem.get("bbox")
+        if not b:
+            return False
+        cx, cy = (b[0] + b[2]) / 2, (b[1] + b[3]) / 2
+        self._executor.execute({"action_type": "click", "click_position": [cx, cy]})
+        _items = []
+        for _ in range(4):
+            time.sleep(0.35)
+            _st = self._observe()
+            _items = [e for e in _st.get("elements", [])
+                      if e.get("type") == "listitemcontrol"
+                      and e.get("window_role") != "background" and e.get("bbox")]
+            if _items:
+                break
+        _vlc = value.strip().lower()
+        _opt = lambda e: (e.get("text") or e.get("label") or "").strip()
+        _hit = (next((e for e in _items if _opt(e).lower() == _vlc), None)
+                or next((e for e in _items if _opt(e).lower().startswith(_vlc)
+                         or _vlc.startswith(_opt(e).lower())), None))
+        if _hit is None:
+            self._executor.execute({"action_type": "keyboard", "key_count": 1,
+                                    "keystrokes": ["escape"]})
+            return False
+        _hb = _hit["bbox"]
+        self._executor.execute({"action_type": "click",
+                                "click_position": [(_hb[0] + _hb[2]) / 2, (_hb[1] + _hb[3]) / 2]})
+        time.sleep(0.2)
+        return True
+
     def _fill_element(self, elem: Dict[str, Any], value: str,
                       state: Optional[Dict[str, Any]] = None) -> bool:
         """THE fill pipeline (identity-everywhere inversion, 2026-07-11).
@@ -6398,33 +6438,10 @@ class LLMAgent:
                     time.sleep(0.15)
                 return (_wa.SendMessage(_hw, BM_GETCHECK, 0, 0) == BST_CHECKED) == _want
             if ety in ("comboboxcontrol", "combobox"):
-                # pixel open → click a VISIBLE matching item (below-fold items
-                # are the identity path's job; if it failed, visible is all
-                # the legacy path can honestly do)
-                self._executor.execute({"action_type": "click", "click_position": [cx, cy]})
-                _items = []
-                for _ in range(4):
-                    time.sleep(0.35)
-                    _st = self._observe()
-                    _items = [e for e in _st.get("elements", [])
-                              if e.get("type") == "listitemcontrol"
-                              and e.get("window_role") != "background" and e.get("bbox")]
-                    if _items:
-                        break
-                _vlc = value.strip().lower()
-                _opt = lambda e: (e.get("text") or e.get("label") or "").strip()
-                _hit = (next((e for e in _items if _opt(e).lower() == _vlc), None)
-                        or next((e for e in _items if _opt(e).lower().startswith(_vlc)
-                                 or _vlc.startswith(_opt(e).lower())), None))
-                if _hit is None:
-                    self._executor.execute({"action_type": "keyboard", "key_count": 1,
-                                            "keystrokes": ["escape"]})
-                    return False
-                _hb = _hit["bbox"]
-                self._executor.execute({"action_type": "click",
-                                        "click_position": [(_hb[0]+_hb[2])/2, (_hb[1]+_hb[3])/2]})
-                time.sleep(0.2)
-                return True
+                # VERB-LOOP REWRITE (2026-07-16): was a hand-rolled pixel-open +
+                # visible-listitem-match dance, duplicated (with drifted match
+                # logic) in _nav_fill_field. Now the one shared fallback.
+                return self._combobox_legacy_click_fallback(elem, value)
             # edits / spins: focus click + idempotent paste, verified by read-back
             self._executor.execute({"action_type": "click", "click_position": [cx, cy]})
             time.sleep(0.15)
@@ -6820,29 +6837,14 @@ class LLMAgent:
                 logger.debug("nav_fill checkbox set failed: %s", _ce)
             return True
         if typ == "comboboxcontrol":
-            self._executor.execute({"action_type": "click", "click_position": [cx, cy]})
-            _items = []
-            for _ in range(4):
-                time.sleep(0.35)
-                _cs = self._observe()
-                _items = [e for e in _cs.get("elements", [])
-                          if e.get("type") == "listitemcontrol"
-                          and e.get("window_role") != "background" and e.get("bbox")]
-                if _items:
-                    break
-            _vl = value.strip().lower()
-            _hit = next((e for e in _items
-                         if (e.get("text") or e.get("label") or "").strip().lower() == _vl), None) \
-                or next((e for e in _items
-                         if _vl in (e.get("text") or e.get("label") or "").strip().lower()), None)
-            if _hit:
-                _hb = _hit["bbox"]
-                self._executor.execute({"action_type": "click",
-                                        "click_position": [(_hb[0] + _hb[2]) / 2, (_hb[1] + _hb[3]) / 2]})
+            # VERB-LOOP REWRITE (2026-07-16): was its own hand-rolled pixel-open
+            # + visible-listitem-match dance, independent of and drifted from
+            # _fill_element's copy (only ONE of the two ever got the
+            # apostrophe/numeric-match fixes). Now the one shared fallback.
+            if self._combobox_legacy_click_fallback(el, value):
                 self._filled_this_tab.add(field_label)
                 self._mark_attempted(el)
                 return True
-            self._executor.execute({"action_type": "keyboard", "key_count": 1, "keystrokes": ["escape"]})
             return False
         # editcontrol → focus the EXACT field by UIA identity, then idempotent paste.
         # Focusing the element directly (not clicking a pixel) means the value can
