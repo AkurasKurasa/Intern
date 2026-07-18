@@ -831,6 +831,7 @@ aggregate → retrain → repeat. Labeling is the only real choice:
   to converge.
 
 ## Open Technical Questions
+- **GAP-path LLM sometimes re-picks the CURRENT tab instead of an unvisited one [FOUND 2026-07-18]** — `run_20260718_135838.txt`, steps 130-132: `_ask_llm_next_gap` answered "click Coverage" twice while already on Coverage, self-corrected by the existing 2-strike guard on the 3rd ask ("forcing unvisited tab Drivers"). Not a verify-at-fill issue (that path is fully dead code, can't be the cause of anything live) — a different subsystem, the GAP-path's own tab-choice decision. Costs 2 wasted clicks + 2 LLM round-trips before self-correcting. Not yet investigated why the LLM re-picks its current tab. Low-ish priority, doesn't hang, folds into the Speed investigation next time that's picked up.
 - **How are we different or simply just a worse version of Codex's new Record and Replay?**
 - **Loss-weighting is less plug-and-play — how do we improve it in the future?**
   The 2026-06-12 rare-event fix (up-weight the rare action's frames in the loss so
