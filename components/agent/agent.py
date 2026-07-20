@@ -998,13 +998,7 @@ class LLMAgent:
             llm_action: Dict[str, Any] = {}
             _steps_on_tab += 1
             _cur_elem_count = len(state.get("elements", []))
-            # TEMP INSTRUMENTATION (2026-07-16): observe() calls since the
-            # LAST step header — the previous step's real UIA-snapshot cost.
-            _obs_now = getattr(self, "_observe_calls_total", 0)
-            _obs_delta = _obs_now - getattr(self, "_observe_calls_at_last_step", 0)
-            self._observe_calls_at_last_step = _obs_now
-            logger.info("── Step %d/%d  (%d elements)  [prev step: %d observe() calls] ──",
-                        step_idx + 1, n, _cur_elem_count, _obs_delta)
+            logger.info("── Step %d/%d  (%d elements) ──", step_idx + 1, n, _cur_elem_count)
 
             # Dialog guard: large element-count spike → unexpected dialog opened → Escape
             if _prev_elem_count > 0 and _cur_elem_count - _prev_elem_count > 100:
@@ -6935,13 +6929,6 @@ class LLMAgent:
     # ── observer / transformer helpers ───────────────────────────────────────
 
     def _observe(self) -> Dict[str, Any]:
-        # TEMP INSTRUMENTATION (2026-07-16, speed measurement): count real
-        # UIA snapshot calls per step. 45 call sites exist across the file
-        # (scroll, reveal, validate, record-cache-refresh, sweep, etc.) and
-        # nothing currently measures how many actually fire per step — this
-        # is step 1 of "measure before cutting" for the 9min->5min question.
-        # Remove once the measurement's been read off a live run.
-        self._observe_calls_total = getattr(self, "_observe_calls_total", 0) + 1
         try:
             state = self._observer.snapshot()
             # Validate the perception adapter ONCE against the schema contract.
