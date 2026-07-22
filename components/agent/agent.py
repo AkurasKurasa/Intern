@@ -4998,13 +4998,26 @@ class LLMAgent:
         _FILL = ("editcontrol", "comboboxcontrol", "checkboxcontrol")
         _filled_l = {s.lower() for s in self._filled_this_tab}
         empties = []
+        # DIAGNOSTIC (2026-07-22): a field clicked+focused one step earlier (via
+        # the RANKED-fallback path, low confidence) was excluded from THIS scan
+        # on the very next step with nothing typed in between -- the GAP path
+        # then switched tabs, abandoning it still blank (run_20260722_114412.txt,
+        # steps 17-18, Policy Number). Don't know yet WHICH exclusion branch is
+        # responsible (non-empty value read, already-filled key, or already-
+        # attempted key) -- count each generically (no field names) so the next
+        # run's log tells us directly instead of guessing again.
+        _exc_nolabel = _exc_hasvalue = _exc_filled = _exc_attempted = 0
         for e in state.get("elements", []):
             if e.get("window_role") == "background":
                 continue
             if (e.get("type") or "").lower() not in _FILL:
                 continue
             lbl = (e.get("label") or e.get("text") or "").strip()
-            if not lbl or (e.get("value") or "").strip():
+            if not lbl:
+                _exc_nolabel += 1
+                continue
+            if (e.get("value") or "").strip():
+                _exc_hasvalue += 1
                 continue
             sec = self._detect_section(state, e)
             key = (f"{sec} {lbl}" if sec else lbl).lower()
@@ -5012,9 +5025,16 @@ class LLMAgent:
             # label for non-sectioned fields, and matching bare labels for
             # SECTIONED fields is exactly the Driver 2/3 collision (Driver 1's
             # 'First Name' hid the other two).
-            if key in _filled_l or self._attempt_key(e) in self._attempted_keys:
+            if key in _filled_l:
+                _exc_filled += 1
+                continue
+            if self._attempt_key(e) in self._attempted_keys:
+                _exc_attempted += 1
                 continue
             empties.append(lbl)
+        if _exc_hasvalue or _exc_filled or _exc_attempted:
+            logger.info("[GAP] empties-scan exclusions: has_value=%d filled_this_tab=%d attempted=%d",
+                        _exc_hasvalue, _exc_filled, _exc_attempted)
         _tab_elems = [e for e in state.get("elements", [])
                       if (e.get("type") or "").lower() in ("tabitem", "tabitemcontrol")
                       and e.get("window_role") != "background"
