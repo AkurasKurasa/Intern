@@ -955,6 +955,26 @@ class LLMAgent:
             self._executor.execute = _guarded_execute
             self._submit_guard_installed = True
 
+        # SCROLL-TO-TOP AT RECORD START (2026-07-22): found live in a ×10 pass --
+        # record 2 (and 5 of the other 9) opened with the Policy tab's
+        # ScrolledPanel still scrolled to wherever the PREVIOUS record's run()
+        # left it (Submit & New doesn't reset scroll offset), so Step 1's first
+        # observation never showed Policy Number/Status/Type/Term at all -- they
+        # were off-screen above. The transformer's pointer picked the first
+        # VISIBLE fillable instead ('Expiration Date'), so Policy Number stayed
+        # blank all record, which then made the SCORER unable to detect which
+        # record was submitted (policy_number is the record-identity key) and
+        # grade it against the wrong gold answers -- a single missed top-of-tab
+        # field cascaded into an apparently catastrophic score. Same root cause
+        # as the Vehicle-tab / SWITCH_TAB scroll-to-top fixes, but for a 9th,
+        # previously-unaudited site: the very start of a fresh run() call, not
+        # a mid-run tab switch (which is why yesterday's SWITCH_TAB audit never
+        # found it -- there's no tab-switch CLICK at record start, the Policy
+        # tab is already active). Every run() call scrolls to top before its
+        # first real decision, record 1 included (harmless there, since it's
+        # already at/near top).
+        self._scroll_form_to_top(self._observe())
+
         for step_idx in range(n):
           try:
             if self._only_tab_idx is not None and self._only_tab_blocked_streak >= 3:
