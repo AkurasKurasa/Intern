@@ -5020,6 +5020,18 @@ class LLMAgent:
                       and e.get("window_role") != "background"
                       and e.get("bbox")]
         all_tabs = [(e.get("text") or e.get("label") or "").strip() for e in _tab_elems]
+        # BUG FIX (2026-07-22, live-observed): the CURRENT tab was sometimes
+        # missing from self._visited_tabs at the moment this prompt gets built
+        # (it only gets added by the code paths that SWITCH to a tab, not by
+        # simply being active) -- so the LLM saw its own current tab listed as
+        # 'not yet visited' and correctly-per-the-prompt picked it again,
+        # wasting a click + an LLM round-trip before the stuck-repick guard
+        # caught it (run_20260718_135838.txt, steps 130-132, re-picked
+        # 'Coverage' twice while already on it). Fix: the tab we're standing
+        # on right now is visited by definition -- mark it before building the
+        # unvisited list, regardless of how we got here.
+        if 0 <= self._current_tab_idx < len(all_tabs) and all_tabs[self._current_tab_idx]:
+            self._visited_tabs.add(all_tabs[self._current_tab_idx])
         unvisited = [t for t in all_tabs if t and t.lower() not in {v.lower() for v in self._visited_tabs}]
         msg = (
             "You are completing a multi-tab form. The current tab looks done on screen. "
