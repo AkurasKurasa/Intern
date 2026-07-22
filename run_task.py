@@ -33,9 +33,50 @@ for _stream in (_sys_enc.stdout, _sys_enc.stderr):
     except Exception:
         pass
 
+# ALWAYS mirror the full console output (logging AND raw print() — RUN METRICS/
+# BC SCORE use print(), which a plain logging.FileHandler never sees) to a
+# plain-text file on disk. Console pastes get truncated/dropped; a file never
+# does (2026-07-13, user had to redirect stdout by hand to get a log Claude
+# could read in full — this makes that automatic, every run, no flag needed).
+import datetime as _dt_log
+
+import re as _re_ansi
+_ANSI_RE = _re_ansi.compile(r"\x1b\[[0-9;]*m")
+
+class _Tee:
+    """Mirrors writes to the console verbatim (ANSI intact) and to the log
+    file with ANSI escape codes stripped, so the on-disk copy stays plain
+    text/greppable instead of full of \\x1b[...m noise."""
+    def __init__(self, console, logfile):
+        self._console = console
+        self._logfile = logfile
+    def write(self, data):
+        try:
+            self._console.write(data)
+        except Exception:
+            pass
+        try:
+            self._logfile.write(_ANSI_RE.sub("", data))
+        except Exception:
+            pass
+    def flush(self):
+        for s in (self._console, self._logfile):
+            try:
+                s.flush()
+            except Exception:
+                pass
+
+_LOG_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "output", "run_logs")
+os.makedirs(_LOG_DIR, exist_ok=True)
+_LOG_PATH = os.path.join(_LOG_DIR, f"run_{_dt_log.datetime.now():%Y%m%d_%H%M%S}.txt")
+_log_file = open(_LOG_PATH, "w", encoding="utf-8", errors="replace")
+_sys_enc.stdout = _Tee(_sys_enc.stdout, _log_file)
+_sys_enc.stderr = _Tee(_sys_enc.stderr, _log_file)
+
 import json
 import logging
 import sys
+import time
 
 _ROOT     = os.path.dirname(os.path.abspath(__file__))
 _COMP_DIR = os.path.join(_ROOT, "components")
@@ -87,6 +128,10 @@ for _h in logging.getLogger().handlers:
     _h.setFormatter(_RunFormatter("[%(asctime)s] [%(levelname)s] %(name)s — %(message)s",
                                   datefmt="%H:%M:%S"))
 logger = logging.getLogger("run_task")
+# NOTE: logging's StreamHandler above points at _sys_enc.stdout, which is now
+# the _Tee set up near the top of the file — so every log line (ANSI included)
+# already lands in _LOG_PATH too. No separate FileHandler needed.
+logger.info("Full run log (console + print()s) being written to: %s", _LOG_PATH)
 
 # ── config ────────────────────────────────────────────────────────────────────
 GOAL          = "Fill the car insurance form using data from the open text file"
@@ -95,7 +140,19 @@ API_KEY       = os.environ.get("ANTHROPIC_API_KEY", "")
 GROQ_API_KEY  = os.environ.get("GROQ_API_KEY", "")
 SOURCE_WINDOW = "Notepad"     # title fragment of the data source window
 MAX_STEPS     = 400   # 8 full tabs (~176 fields) + scrolls/tab-switches need headroom to reach Submit
-STEP_DELAY    = 1.5
+STEP_DELAY    = 0.4   # cut from 0.7 (2026-07-22, speed) -- pure wall-clock settle time
+                      # between actions, not an injected action, so it can't perturb the
+                      # transformer's action-history context (the thing the "guards
+                      # perturb the model" rule actually guards against). Step-timing
+                      # audit (2026-07-22) found the "1-2s/step" bucket -- STEP_DELAY +
+                      # observe() + validator overhead, repeated on every one of
+                      # ~100-150 steps/record -- is the single biggest cost by total
+                      # time (36% of a 434s run). Cut 0.7->0.4 as the cheap half of the
+                      # 1-3min speed goal (the other half needs fewer steps overall,
+                      # not just faster ones -- see the Speed treetask node). If this
+                      # run shows no_change/validation-failure regressions vs the 0.7s
+                      # baseline, that's the signal to walk it back up, not go lower.
+                      # Previous cut: 1.5->0.7 (2026-07-15).
 
 # ── run ───────────────────────────────────────────────────────────────────────
 if __name__ == "__main__":
@@ -108,6 +165,12 @@ if __name__ == "__main__":
     _parser.add_argument("--start_tab", type=int, default=0,
                          help="Tab index to start from (0=Policy … 4=Drivers). "
                               "Manually click that tab in the form before running.")
+    _parser.add_argument("--only_tab", action="store_true",
+                         help="Lock the run to --start_tab's index — the sweep/model "
+                              "otherwise freely navigates off it once that tab looks done. "
+                              "Any click that lands on a different tab gets immediately "
+                              "overridden back to the locked one. Drill mode never reaches "
+                              "verify/Submit while locked (that's not what it's for).")
     _parser.add_argument("--model", default="tasks/form_filling/model.pt",
                          help="Transformer checkpoint to load (default = Policy model). "
                               "e.g. tasks/form_filling/model_three_tabs.pt")
@@ -178,6 +241,7 @@ if __name__ == "__main__":
     _rec_first = _args.start_record
     _rec_last  = _args.start_record + _args.records - 1
     for _rec in range(_rec_first, _rec_last + 1):
+        _rec_start_ts = time.time()
         if _args.records > 1:
             logger.info("═══════════ RECORD %d/%d ═══════════", _rec, _rec_last)
         agent = LLMAgent(
@@ -194,6 +258,7 @@ if __name__ == "__main__":
             max_steps        = MAX_STEPS,
             step_delay       = STEP_DELAY,
             start_tab_idx    = _args.start_tab if _rec == _rec_first else 0,
+            only_tab         = (_args.start_tab if (_args.only_tab and _rec == _rec_first) else None),
             scope            = INSURANCE_SCOPE,   # the only place insurance-specifics live
             model_path       = _args.model,
             route_capsule    = False,             # honor --model; don't let the capsule router override
@@ -220,7 +285,8 @@ if __name__ == "__main__":
             from eval_metrics import evaluate_run
             _metrics = evaluate_run(results, goal=GOAL, heuristic_steps=agent._heuristic_steps,
                                     record_num=_rec,
-                                    llm_calls=getattr(agent, "_llm_call_count", 0))
+                                    llm_calls=getattr(agent, "_llm_call_count", 0),
+                                    submitted=getattr(agent, "_submitted", False))
 
             # ── Persist metrics to JSONL for trend tracking ────────────────────
             try:
@@ -241,7 +307,7 @@ if __name__ == "__main__":
             # ── BC fidelity score vs gold standard ─────────────────────────────
             try:
                 from bc_fidelity import score_run
-                score_run(results, goal=GOAL)
+                score_run(results, goal=GOAL, run_start_ts=_rec_start_ts)
             except Exception as _fe:
                 logger.debug("BC fidelity scorer skipped: %s", _fe)
 
