@@ -29,6 +29,19 @@ wxPython 8-tab car-insurance form filled from a Notepad intake file.
   the element's own label, or the record** — so it works on any form. "(leave
   blank)/none" value-skip is the one borderline heuristic; the real fix is to
   **infer it** (ruleset-inference), not code it.
+- **GENERALIZE ACROSS TASKS, NOT JUST FORMS.** "No hardcode" makes the agent
+  work on any *form* — it does not by itself make the agent work on any
+  *task*. Those are different kinds of general. The navigation protocol,
+  completion detection ("all tabs visited"), and action vocabulary
+  (click/type/checkbox/combobox) are currently written in **form vocabulary**
+  (tab, field, record, submit) — concepts that don't exist in a non-form task
+  (organizing files, a browser workflow, a multi-step wizard with no tabs or
+  records at all). That's a real, separate gap from hardcoding — it's what
+  Scope 2/3 (generalization) exists to close, and it isn't closed yet. When
+  writing NEW logic, prefer framing it in task-general terms (region/subtask/
+  goal-state) over form-specific ones (tab/field/record) where the cost is
+  comparable; if a form-specific frame is genuinely easier, say so explicitly
+  instead of silently narrowing the scope.
 - **Division of labor:** transformer = **WHERE** (which field/tab, learned) ·
   LLM = **WHAT** (the value) · agent = **HOW** (universal mechanics: open
   combobox, check box, type, scroll, foreground-lock). Don't let the agent make
