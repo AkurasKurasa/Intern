@@ -1310,8 +1310,13 @@ class LLMAgent:
                         # visit. Same fix _verify_pass used to apply (now dead code,
                         # never called) — restored at the one place that's actually
                         # still live: right after every tab-switch click.
-                        self._scroll_form_to_top(self._observe())
-                        self._refresh_record_cache(self._observe())
+                        # SPEED (2026-07-23): one observe() instead of two -- scroll
+                        # position doesn't affect what _refresh_record_cache reads
+                        # (Notepad/background text, not form field layout), so both
+                        # calls can safely share the same snapshot.
+                        _st_gap1 = self._observe()
+                        self._scroll_form_to_top(_st_gap1)
+                        self._refresh_record_cache(_st_gap1)
                         time.sleep(self.step_delay)
                         continue
                     logger.info("[GAP] tab done → LLM → %s %r", _gtype, _gtgt[:30])
@@ -1322,8 +1327,9 @@ class LLMAgent:
                     _last_auto_step    = step_idx
                     _heuristic_steps  += 1
                     self._reset_tab_bookkeeping()
-                    self._scroll_form_to_top(self._observe())
-                    self._refresh_record_cache(self._observe())
+                    _st_gap2 = self._observe()
+                    self._scroll_form_to_top(_st_gap2)
+                    self._refresh_record_cache(_st_gap2)
                     time.sleep(self.step_delay)
                     continue
                 # LLM gave nothing usable → fall back to plain next-tab advance.
@@ -2129,8 +2135,9 @@ class LLMAgent:
                     self._executor.execute({"action_type": "click", "click_position": _nav["click_position"]})
                     self._visited_tabs.add((_nav.get("target") or "").strip())
                     self._reset_tab_bookkeeping()
-                    self._scroll_form_to_top(self._observe())   # 2026-07-16: see GAP-path note
-                    self._refresh_record_cache(self._observe())
+                    _st_fx1 = self._observe()   # 2026-07-16: see GAP-path note
+                    self._scroll_form_to_top(_st_fx1)
+                    self._refresh_record_cache(_st_fx1)
                 elif _nav_act == "done" and self._confirm_finished(state):
                     logger.info("[NAV] (fixation) finish confirmed against source — done.")
                     break
@@ -2150,8 +2157,9 @@ class LLMAgent:
                                                 "click_position": [(_tb[0] + _tb[2]) / 2, (_tb[1] + _tb[3]) / 2]})
                         self._visited_tabs.add(_tnm)
                         self._reset_tab_bookkeeping()
-                        self._scroll_form_to_top(self._observe())   # 2026-07-16: see GAP-path note
-                        self._refresh_record_cache(self._observe())
+                        _st_fx2 = self._observe()   # 2026-07-16: see GAP-path note
+                        self._scroll_form_to_top(_st_fx2)
+                        self._refresh_record_cache(_st_fx2)
                     else:
                         # LAST TAB — nowhere to advance. Escalation used to no-op here
                         # (click → no_change → guard → escalate → no tab → repeat forever).
@@ -6279,9 +6287,10 @@ class LLMAgent:
                 self._executor.execute({"action_type": "click", "click_position": _nav["click_position"]})
                 self._visited_tabs.add((_nav.get("target") or "").strip())
                 self._reset_tab_bookkeeping()
-                self._scroll_form_to_top(self._observe())   # 2026-07-16: see GAP-path note
-                self._refresh_record_cache(self._observe())
-                return self._observe(), False
+                _st_sw1 = self._observe()   # 2026-07-16: see GAP-path note
+                self._scroll_form_to_top(_st_sw1)
+                self._refresh_record_cache(_st_sw1)
+                return self._observe(), False   # fresh post-scroll state for the caller
             if _act == "done":
                 if self._confirm_finished(state):
                     logger.info("[NAV] sweep + source-check → form complete — deterministic Submit.")
@@ -6308,9 +6317,10 @@ class LLMAgent:
                                             "click_position": [(_nb[0] + _nb[2]) / 2, (_nb[1] + _nb[3]) / 2]})
                     self._visited_tabs.add(_nm)
                     self._reset_tab_bookkeeping()
-                    self._scroll_form_to_top(self._observe())   # 2026-07-16: see GAP-path note
-                    self._refresh_record_cache(self._observe())
-                    return self._observe(), False
+                    _st_sw2 = self._observe()   # 2026-07-16: see GAP-path note
+                    self._scroll_form_to_top(_st_sw2)
+                    self._refresh_record_cache(_st_sw2)
+                    return self._observe(), False   # fresh post-scroll state for the caller
                 return state, False
             # No usable action → try scrolling to reveal more before giving up.
             if _scroll_for_more():
