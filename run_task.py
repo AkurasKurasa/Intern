@@ -140,19 +140,22 @@ API_KEY       = os.environ.get("ANTHROPIC_API_KEY", "")
 GROQ_API_KEY  = os.environ.get("GROQ_API_KEY", "")
 SOURCE_WINDOW = "Notepad"     # title fragment of the data source window
 MAX_STEPS     = 400   # 8 full tabs (~176 fields) + scrolls/tab-switches need headroom to reach Submit
-STEP_DELAY    = 0.4   # cut from 0.7 (2026-07-22, speed) -- pure wall-clock settle time
-                      # between actions, not an injected action, so it can't perturb the
-                      # transformer's action-history context (the thing the "guards
-                      # perturb the model" rule actually guards against). Step-timing
-                      # audit (2026-07-22) found the "1-2s/step" bucket -- STEP_DELAY +
-                      # observe() + validator overhead, repeated on every one of
-                      # ~100-150 steps/record -- is the single biggest cost by total
-                      # time (36% of a 434s run). Cut 0.7->0.4 as the cheap half of the
-                      # 1-3min speed goal (the other half needs fewer steps overall,
-                      # not just faster ones -- see the Speed treetask node). If this
-                      # run shows no_change/validation-failure regressions vs the 0.7s
-                      # baseline, that's the signal to walk it back up, not go lower.
-                      # Previous cut: 1.5->0.7 (2026-07-15).
+STEP_DELAY    = 0.7   # REVERTED 2026-07-23: tried 0.4 (cut from 0.7, 2026-07-22) as the
+                      # cheap half of the 1-3min speed goal -- LIVE-TESTED
+                      # (run_20260723_115802.txt) and made things WORSE, not better:
+                      # Wasted Step Rate 19.6% (27 no_change/138, right at the 20%
+                      # ceiling, vs the usual sub-15% baseline) AND duration went UP to
+                      # 9.0min, not down. 0.4s isn't enough settle time -- more actions
+                      # fail validation and need retries, and each retry costs more than
+                      # the per-step savings gained, net negative. Reverted to 0.7.
+                      # LESSON: same as the _STALL_LIMIT 6->3 lesson -- a delay this low
+                      # in the stack has a floor set by real UI settle time, not just
+                      # arbitrary tunable overhead; don't retry lower without a different
+                      # theory (e.g. a delay that adapts per action-type instead of one
+                      # global constant). Pure wall-clock settle time between actions,
+                      # not an injected action, so it can't perturb the transformer's
+                      # action-history context (the thing the "guards perturb the model"
+                      # rule actually guards against). Previous cut: 1.5->0.7 (2026-07-15).
 
 # ── run ───────────────────────────────────────────────────────────────────────
 if __name__ == "__main__":
