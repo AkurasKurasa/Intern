@@ -6224,7 +6224,25 @@ class LLMAgent:
                 # already confirmed the value.
                 if _fill_confirmed:
                     self._verified_at_fill.add(_tk)
-                    state = self._observe()
+                    # SPEED (2026-07-23): a confirmed write means the fill
+                    # function's OWN read-back off the live control already
+                    # proved the value landed -- calling self._observe() here
+                    # just to refresh `state` was a full UIA tree re-scan for
+                    # information we already have. Patch the just-filled
+                    # element's value in place instead: _fx is a direct
+                    # reference into state["elements"] (not a copy, since it
+                    # came from a plain list comprehension over that same
+                    # list), so mutating it updates `state` with zero extra
+                    # observe() calls. Audit found up to 60 fields/tab can
+                    # pass through this path, each previously costing a full
+                    # re-scan just to see its own confirmed result.
+                    if _fx is not None:
+                        _fx["value"] = _nv
+                    else:
+                        # _fx was None (field wasn't among the observed elements
+                        # to begin with) -- nothing to patch, fall back to a
+                        # real observe() so the next iteration isn't stale.
+                        state = self._observe()
                     continue
                 time.sleep(0.15)
                 state = self._observe()
