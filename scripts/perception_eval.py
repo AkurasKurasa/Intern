@@ -266,6 +266,10 @@ def main(argv: List[str]) -> int:
     ap.add_argument("--iou", type=float, default=0.5, help="IoU match threshold.")
     ap.add_argument("--tag", default="live",
                     help="Label for saved files, e.g. --tag drivers → perception_drivers_overlay.png")
+    ap.add_argument("--env", default="car_insurance_form",
+                    help="Which GUI environment this run targeted, e.g. --env excel_data_entry. "
+                         "Tracked in the progress log so accuracy can be compared ACROSS environments, "
+                         "not just across time on the same one.")
     args = ap.parse_args(argv)
 
     from observers.vlm.vision_observer.cv_vision_observer import CVVisionObserver
@@ -322,7 +326,37 @@ def main(argv: List[str]) -> int:
     report = score_states(candidate, reference, iou_threshold=args.iou)
     print("\n" + report["summary"])
     print(json.dumps({k: v for k, v in report.items() if k != "matches"}, indent=2))
+    _log_progress(report, args)
     return 0
+
+
+def _log_progress(report: Dict[str, Any], args) -> None:
+    """Append this run's scores to a persistent JSONL log, mirroring the same
+    pattern already used for the agent's own bc_progress.jsonl. Without this,
+    every perception_eval.py run was a one-off console print -- no way to
+    track detection accuracy over time or compare it across different GUI
+    environments (the actual evidence a 'works across multiple environments'
+    claim needs). Tagged by --env so entries group by target application."""
+    import datetime as _dt
+    log_path = os.path.join(_ROOT, "data", "output", "perception_progress.jsonl")
+    entry = {
+        "timestamp":   _dt.datetime.now().isoformat(),
+        "env":         args.env,
+        "tag":         args.tag,
+        "iou_threshold": report["iou_threshold"],
+        "counts":      report["counts"],
+        "precision":   report["precision"],
+        "recall":      report["recall"],
+        "f1":          report["f1"],
+        "mean_iou":    report["mean_iou"],
+        "type_match":  report["type_match"],
+        "label_match": report["label_match"],
+        "value_match": report["value_match"],
+    }
+    os.makedirs(os.path.dirname(log_path), exist_ok=True)
+    with open(log_path, "a", encoding="utf-8") as f:
+        f.write(json.dumps(entry) + "\n")
+    print(f"\nLogged to {log_path} (env={args.env!r}, tag={args.tag!r})")
 
 
 if __name__ == "__main__":
