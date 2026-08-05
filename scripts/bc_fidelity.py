@@ -24,6 +24,11 @@ from __future__ import annotations
 import json
 import os
 import sys
+if hasattr(sys.stdout, "reconfigure"):
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -532,10 +537,12 @@ def score_submission(agent_submission: dict, results: list[dict] | None = None) 
     }
 
 
-def score_run(results: list[dict], goal: str = "") -> dict | None:
+def score_run(results: list[dict], goal: str = "", duration_sec: float | None = None) -> dict | None:
     """
     Called from run_task.py after agent.run().
     Finds the latest submission JSON, scores it, logs progress.
+    duration_sec (agent._run_duration_sec) is recorded in the progress log so
+    the trend table shows whether speed is holding as fidelity improves.
     """
     if not REFERENCE_PATH.exists():
         print("[BC Fidelity] No gold standard set — skipping fidelity score.")
@@ -566,6 +573,7 @@ def score_run(results: list[dict], goal: str = "") -> dict | None:
 
     # Combined BC score
     scores["bc_score"] = scores["fidelity"] * 0.5 + scores["behavioral_match"] * 0.5
+    scores["duration_sec"] = duration_sec
 
     _print_report(scores, goal, latest.name)
     _append_progress(scores, goal, latest.name)
@@ -576,8 +584,10 @@ def _print_report(s: dict, goal: str, submission_name: str) -> None:
     border = "=" * 60
     bc     = s.get("bc_score", s["fidelity"])
     star   = "DONE" if bc >= 0.80 else f"{bc*100:.1f}% / 80%"
+    dur    = s.get("duration_sec")
+    dur_str = f"{dur:.1f}s" if dur is not None else "n/a"
     print(f"\n{border}")
-    print(f"  BC SCORE: {bc*100:.1f}%  [{star}]")
+    print(f"  BC SCORE: {bc*100:.1f}%  [{star}]   Duration: {dur_str}")
     print(f"  Goal: {goal[:52]}")
     print(border)
     print(f"  Task Fidelity          {s['fidelity']*100:>6.1f}%   (correct values vs intake)")
@@ -608,6 +618,7 @@ def _append_progress(s: dict, goal: str, submission_name: str) -> None:
         "timestamp":          datetime.now().isoformat(),
         "goal":               goal,
         "submission":         submission_name,
+        "duration_sec":       round(s["duration_sec"], 2) if s.get("duration_sec") is not None else None,
         "bc_score":           round(s.get("bc_score", s["fidelity"]), 4),
         "fidelity":           round(s["fidelity"], 4),
         "behavioral_match":   round(s.get("behavioral_match", 0.0), 4),
@@ -636,16 +647,18 @@ def show_progress() -> None:
     print(f"\n{'='*70}")
     print("  BC FIDELITY PROGRESS")
     print(f"{'='*70}")
-    print(f"  {'#':<4} {'Date':<20} {'BC Score':>9} {'Fidelity':>9} {'Behavior':>9} {'Done':<6}")
-    print(f"  {'-'*64}")
+    print(f"  {'#':<4} {'Date':<20} {'BC Score':>9} {'Fidelity':>9} {'Behavior':>9} {'Done':<6} {'Duration':>9}")
+    print(f"  {'-'*74}")
     for i, e in enumerate(entries, 1):
         ts   = e["timestamp"][:16].replace("T", " ")
         done = "YES" if e["completed"] else "no"
         bc   = e.get("bc_score", e["fidelity"])
         beh  = e.get("behavioral_match", 0.0)
+        dur  = e.get("duration_sec")
+        dur_str = f"{dur:.0f}s" if dur is not None else "n/a"
         print(f"  {i:<4} {ts:<20} {bc*100:>8.1f}%"
               f" {e['fidelity']*100:>8.1f}%"
-              f" {beh*100:>8.1f}%  {done}")
+              f" {beh*100:>8.1f}%  {done:<6}{dur_str:>9}")
     best = max(entries, key=lambda e: e.get("bc_score", e["fidelity"]))
     print(f"\n  Best BC Score: {best.get('bc_score', best['fidelity'])*100:.1f}% on {best['timestamp'][:10]}")
     print(f"  Target: 80.0%  {'REACHED' if best.get('bc_score', best['fidelity']) >= 0.80 else 'not yet'}")

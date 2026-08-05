@@ -777,6 +777,14 @@ class LLMAgent:
             self.goal, self.provider, n, self.dry_run,
         )
 
+        # ── timing: run-level ────────────────────────────────────────────────
+        import datetime as _dt
+        _run_start_ts             = time.time()
+        self._run_start_iso       = _dt.datetime.now().isoformat()
+        self._run_duration_sec    = 0.0
+        self._time_to_first_action_sec: Optional[float] = None
+        self._manual_interventions = 0
+
         # Catch crashes in background threads (OCR, recorder, etc.) so they're visible
         import threading as _threading, traceback as _tb_mod
         def _thread_exc_hook(args):
@@ -808,6 +816,7 @@ class LLMAgent:
         _pane_escape_streak:     int      = 0   # consecutive tries on the same field without escaping
         _confirmed_blank_fields: set      = set()  # fields where peek found no value → treat as blank
         _heuristic_steps:        int      = 0      # steps decided by auto-handlers (not LLM/transformer)
+        _manual_interventions:   int      = 0      # DAgger corrections the human had to make — cognitive-load proxy
 
         _record_cache_loaded     = False
         _tc_advance_verified     = False   # True once the full top→bottom scan passes before advance/submit
@@ -820,11 +829,14 @@ class LLMAgent:
 
         for step_idx in range(n):
           try:
+            _step_t0 = time.time()
             # 1. Observe — but first re-assert the locked form as foreground so a
             # stray click last step can't leave us observing/acting on a drifted
             # window. Lock is captured on the first observe (form is in front at GO).
             self._reassert_form_window()
             state      = self._observe()
+            _t_observed = time.time()
+            observe_time_sec = _t_observed - _step_t0
             if self._locked_hwnd is None:
                 self._lock_form_window(state)
             llm_action: Dict[str, Any] = {}
@@ -2205,7 +2217,11 @@ class LLMAgent:
             # Universal (re-focus the observed active window), not form-specific.
             if prediction.get("action_type") == "keyboard":
                 self._ensure_foreground(state)
+            _t_decided = time.time()
+            decide_time_sec = _t_decided - _t_observed
             result = self._executor.execute(prediction)
+            _t_executed = time.time()
+            execute_time_sec = _t_executed - _t_decided
             logger.info("%s", result)
 
             # Detect tab click: if the executed click landed on a tab element, mark a tab switch
@@ -2309,6 +2325,7 @@ class LLMAgent:
                     saved = self._correction.save(self._task_name, steps)
                     if saved:
                         logger.info("Correction saved → %s", saved)
+                        _manual_interventions += 1
 
             # 7. Record
             pos = prediction.get("click_position", [0.0, 0.0])
@@ -2323,16 +2340,25 @@ class LLMAgent:
                 "target":      llm_action.get("target", "") if self._llm_client and llm_action else "",
                 "validation":  validation.status,
             })
+            _step_time_sec = time.time() - _step_t0
+            if (self._time_to_first_action_sec is None
+                    and prediction.get("action_type") not in (None, "no_op", "noop", "wait")):
+                self._time_to_first_action_sec = time.time() - _run_start_ts
             self._results.append({
-                "step":         step_idx + 1,
-                "state":        state,
-                "action":       prediction,
-                "result":       str(result),
-                "validation":   validation.status,
-                "guidance":     self._guidance,
-                "elements":     len(state.get("elements", [])),
-                "decision_by":  _decision_maker,
-                "t_conf":       t_conf,
+                "step":              step_idx + 1,
+                "state":             state,
+                "action":            prediction,
+                "result":            str(result),
+                "validation":        validation.status,
+                "guidance":          self._guidance,
+                "elements":          len(state.get("elements", [])),
+                "decision_by":       _decision_maker,
+                "t_conf":            t_conf,
+                "timestamp":         _dt.datetime.now().isoformat(),
+                "observe_time_sec":  round(observe_time_sec, 4),
+                "decide_time_sec":   round(decide_time_sec, 4),
+                "execute_time_sec":  round(execute_time_sec, 4),
+                "step_time_sec":     round(_step_time_sec, 4),
             })
 
             if not result.success:
@@ -2357,8 +2383,14 @@ class LLMAgent:
             print(f"\n=== STEP {step_idx+1} CRASHED ===\n{_tb_str}", flush=True)
             break
 
-        self._heuristic_steps = _heuristic_steps
-        logger.info("LLMAgent finished — %d step(s)  (%d heuristic).", len(self._results), _heuristic_steps)
+        self._heuristic_steps       = _heuristic_steps
+        self._manual_interventions  = _manual_interventions
+        self._run_duration_sec = time.time() - _run_start_ts
+        logger.info(
+            "LLMAgent finished — %d step(s)  (%d heuristic)  duration=%.1fs  time_to_first_action=%s",
+            len(self._results), _heuristic_steps, self._run_duration_sec,
+            f"{self._time_to_first_action_sec:.1f}s" if self._time_to_first_action_sec is not None else "n/a",
+        )
         self._export_run_traces(self._results, task_name)
         return list(self._results)
 

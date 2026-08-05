@@ -37,6 +37,11 @@ import json
 import os
 import re
 import sys
+if hasattr(sys.stdout, "reconfigure"):
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
 from typing import Any, Dict, List, Optional, Tuple
 
 _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -90,6 +95,8 @@ def score_states(
     reference: Dict[str, Any],
     iou_threshold: float = 0.5,
     types: Optional[set] = DEFAULT_SCORED_TYPES,
+    environment: str = "",
+    scan_time_ms: Optional[float] = None,
 ) -> Dict[str, Any]:
     """Score candidate elements against reference elements. See module docstring."""
     cand = _filter(candidate.get("elements", []), types)
@@ -142,25 +149,36 @@ def score_states(
         })
 
     n = max(1, tp)
+    # "Detection accuracy" (objective 1's exact term) = F1: penalizes both missed
+    # elements (recall) and hallucinated ones (precision) — a bare hit-rate would
+    # let a noisy detector game the number by over-proposing boxes.
+    detection_accuracy = f1
     report = {
+        "environment":     environment,
         "counts": {"candidate": len(cand), "reference": len(ref),
                    "matched": tp, "false_pos": fp, "false_neg": fn},
-        "precision":       round(precision, 3),
-        "recall":          round(recall, 3),
-        "f1":              round(f1, 3),
+        "precision":          round(precision, 3),
+        "recall":             round(recall, 3),
+        "f1":                 round(f1, 3),
+        "detection_accuracy": round(detection_accuracy, 3),
+        "meets_95pct_target": detection_accuracy >= 0.95,
         "mean_iou":        round(iou_sum / n, 3),
         "type_match":      round(type_hits / n, 3),
         "label_match":     round(label_hits / n, 3),
         "value_match":     round(value_hits / n, 3),
         "iou_threshold":   iou_threshold,
         "scored_types":    sorted(types) if types else "all",
+        "scan_time_ms":    round(scan_time_ms, 1) if scan_time_ms is not None else None,
         "matches":         detail,
     }
     report["summary"] = (
-        f"P={report['precision']:.2f} R={report['recall']:.2f} F1={report['f1']:.2f} | "
+        f"P={report['precision']:.2f} R={report['recall']:.2f} F1={report['f1']:.2f} "
+        f"(detection_accuracy={detection_accuracy*100:.1f}%, target 95%: "
+        f"{'PASS' if report['meets_95pct_target'] else 'FAIL'}) | "
         f"IoU={report['mean_iou']:.2f} type={report['type_match']:.2f} "
         f"label={report['label_match']:.2f} value={report['value_match']:.2f} | "
         f"matched {tp}/{len(ref)} ref (fp={fp}, fn={fn})"
+        + (f" | scan={scan_time_ms:.0f}ms" if scan_time_ms is not None else "")
     )
     return report
 
@@ -266,10 +284,18 @@ def main(argv: List[str]) -> int:
     ap.add_argument("--iou", type=float, default=0.5, help="IoU match threshold.")
     ap.add_argument("--tag", default="live",
                     help="Label for saved files, e.g. --tag drivers → perception_drivers_overlay.png")
+    ap.add_argument("--environment", default="",
+                    help="Name of the GUI/app under test (e.g. 'car_insurance_form', 'excel', "
+                         "'notepad'). Tags the log entry so detection accuracy can be broken out "
+                         "per environment — objective 1 targets 95% ACROSS MULTIPLE environments, "
+                         "not just one.")
+    ap.add_argument("--log", action="store_true",
+                    help="Append this run's scores to data/output/perception_eval_log.jsonl.")
     args = ap.parse_args(argv)
 
     from observers.vlm.vision_observer.cv_vision_observer import CVVisionObserver
 
+    scan_time_ms = None
     if args.live:
         import time
         from observers.ui_observer import UIAutomationObserver
@@ -295,12 +321,16 @@ def main(argv: List[str]) -> int:
                 raw = sct.grab({"left": left, "top": top,
                                 "width": right - left, "height": bottom - top})
                 shot = Image.frombytes("RGB", raw.size, raw.bgra, "raw", "BGRX")
+            _t0 = time.time()
             candidate = CVVisionObserver(image=shot, origin=(left, top)).snapshot()
+            scan_time_ms = (time.time() - _t0) * 1000
             reference = _active_window_only(reference, rect)
             print(f"focused on foreground window {rect} "
                   f"({len(reference['elements'])} UIA form elements)")
         else:
+            _t0 = time.time()
             candidate = CVVisionObserver().snapshot()
+            scan_time_ms = (time.time() - _t0) * 1000
 
         # Save a visual so detection can be inspected (what was found vs missed).
         if shot is not None:
@@ -312,16 +342,32 @@ def main(argv: List[str]) -> int:
         candidate = _load_state(args.candidate)
         reference = _load_state(args.reference)
     elif args.image and args.truth:
+        import time
         from PIL import Image
+        _t0 = time.time()
         candidate = CVVisionObserver(image=Image.open(args.image).convert("RGB")).snapshot()
+        scan_time_ms = (time.time() - _t0) * 1000
         reference = _load_state(args.truth)
     else:
         ap.error("need --live, or --image+--truth, or --candidate+--reference")
         return 2
 
-    report = score_states(candidate, reference, iou_threshold=args.iou)
+    report = score_states(candidate, reference, iou_threshold=args.iou,
+                           environment=args.environment, scan_time_ms=scan_time_ms)
     print("\n" + report["summary"])
     print(json.dumps({k: v for k, v in report.items() if k != "matches"}, indent=2))
+
+    if args.log:
+        import datetime as _dt
+        log_path = os.path.join(_ROOT, "data", "output", "perception_eval_log.jsonl")
+        os.makedirs(os.path.dirname(log_path), exist_ok=True)
+        row = {k: v for k, v in report.items() if k != "matches"}
+        row["timestamp"] = _dt.datetime.now().isoformat()
+        row["tag"] = args.tag
+        with open(log_path, "a", encoding="utf-8") as lf:
+            lf.write(json.dumps(row) + "\n")
+        print(f"\nLogged to {log_path} (environment={args.environment or 'unspecified'!r}) "
+              f"— run scripts/objectives_report.py to see the cross-environment rollup.")
     return 0
 
 

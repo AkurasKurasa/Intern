@@ -166,7 +166,12 @@ if __name__ == "__main__":
         # ── Evaluation metrics (always runs, even on early stop or crash) ──────
         sys.path.insert(0, os.path.join(_ROOT, "scripts"))
         from eval_metrics import evaluate_run
-        _metrics = evaluate_run(results, goal=GOAL, heuristic_steps=agent._heuristic_steps)
+        _metrics = evaluate_run(
+            results, goal=GOAL, heuristic_steps=agent._heuristic_steps,
+            run_duration_sec=getattr(agent, "_run_duration_sec", None),
+            time_to_first_action_sec=getattr(agent, "_time_to_first_action_sec", None),
+            manual_interventions=getattr(agent, "_manual_interventions", 0),
+        )
 
         # ── Persist metrics to JSONL for trend tracking ───────────────────────
         try:
@@ -186,7 +191,7 @@ if __name__ == "__main__":
         # ── BC fidelity score vs gold standard ───────────────────────────────
         try:
             from bc_fidelity import score_run
-            score_run(results, goal=GOAL)
+            score_run(results, goal=GOAL, duration_sec=getattr(agent, "_run_duration_sec", None))
         except Exception as _fe:
             logger.debug("BC fidelity scorer skipped: %s", _fe)
 

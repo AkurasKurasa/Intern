@@ -39,6 +39,7 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import time
 from pathlib import Path
 from typing import Any, Dict, List, NamedTuple, Optional, Tuple
 
@@ -1324,17 +1325,23 @@ def train(
     save_path_p        = Path(save_path)
     save_path_p.parent.mkdir(parents=True, exist_ok=True)
 
+    _train_start   = time.time()
+    _epoch_times: list[float] = []
     for epoch in range(1, epochs + 1):
+        _epoch_t0 = time.time()
         train_m = _run_epoch(model, train_loader, optimizer, device, lambda_click, lambda_key, label_smoothing, _class_weights)
         val_m   = _run_epoch(model, val_loader,   None,      device, lambda_click, lambda_key, label_smoothing, _class_weights)
         scheduler.step()
+        _epoch_time = time.time() - _epoch_t0
+        _epoch_times.append(_epoch_time)
 
         if verbose:
             print(
                 f"Epoch {epoch:>3}/{epochs}  |  "
                 f"train_loss={train_m['loss']:.4f}  acc={train_m['accuracy']:.3f}  click_acc={train_m['click_acc']:.3f}  |  "
                 f"val_loss={val_m['loss']:.4f}  acc={val_m['accuracy']:.3f}  click_acc={val_m['click_acc']:.3f}  "
-                f"[type={train_m['l_type']:.3f} click={train_m['l_click']:.3f} key={train_m['l_key']:.4f}]"
+                f"[type={train_m['l_type']:.3f} click={train_m['l_click']:.3f} key={train_m['l_key']:.4f}]  "
+                f"({_epoch_time:.1f}s)"
             )
 
         # Checkpoint on best COMBINED acc (action-type + click targeting) — the
@@ -1363,23 +1370,31 @@ def train(
             if verbose:
                 print(f"           -> Saved checkpoint (val_acc={best_val_acc:.3f}  click_acc={best_val_click_acc:.3f})")
 
+    _total_train_time = time.time() - _train_start
     if verbose:
         print(f"[train] Done.  Best val_loss={best_val_loss:.4f}  val_acc={best_val_acc:.3f}  click_acc={best_val_click_acc:.3f} -> {save_path_p}")
+        print(f"[train] Total time: {_total_train_time:.1f}s  ({_total_train_time/epochs:.1f}s/epoch avg)")
 
     # Persist training metrics for trend tracking across runs
     try:
         import json as _json, datetime as _dt
         _log_path = Path(save_path_p).parents[2] / "data" / "output" / "transformer_training_log.jsonl"
         _log_path.parent.mkdir(parents=True, exist_ok=True)
+        _n_train = len(train_loader.dataset)
         _row = {
-            "timestamp":         _dt.datetime.now().isoformat(),
-            "trace_dir":         str(data_dir),
-            "n_train":           len(train_loader.dataset),
-            "n_val":             len(val_loader.dataset),
-            "epochs":            epochs,
-            "best_val_loss":     round(best_val_loss, 4),
-            "best_val_acc":      round(best_val_acc, 4),
-            "best_val_click_acc":round(best_val_click_acc, 4),
+            "timestamp":            _dt.datetime.now().isoformat(),
+            "trace_dir":            str(data_dir),
+            "n_train":              _n_train,
+            "n_val":                len(val_loader.dataset),
+            "epochs":               epochs,
+            "best_val_loss":        round(best_val_loss, 4),
+            "best_val_acc":         round(best_val_acc, 4),
+            "best_val_click_acc":   round(best_val_click_acc, 4),
+            # Timing — objectives 3/5 (training pipeline) and 7 (scaling: does
+            # training time grow reasonably with n_train? see scripts/scaling_report.py)
+            "total_train_time_sec": round(_total_train_time, 2),
+            "avg_epoch_time_sec":   round(sum(_epoch_times) / len(_epoch_times), 3) if _epoch_times else None,
+            "samples_per_sec":      round(_n_train * epochs / _total_train_time, 1) if _total_train_time > 0 else None,
         }
         with open(_log_path, "a", encoding="utf-8") as _lf:
             _lf.write(_json.dumps(_row) + "\n")

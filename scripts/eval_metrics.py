@@ -12,6 +12,23 @@ Metrics
 5. Click Position Error       -- avg px distance from click to nearest element center
 6. LLM Dependency Ratio       -- non-noop steps / total steps (proxy; full tracking
                                  needs per-step LLM logging in agent.py)
+7. Timing                     -- run duration, time-to-first-action, and per-step
+                                 observe/decide/execute latency (from agent.py's
+                                 per-step timestamps; see evaluate_run()).
+8. Manual Intervention Rate   -- DAgger corrections / actionable steps (cognitive-
+                                 load proxy — a human had to step in).
+
+Objective thresholds
+---------------------
+The pass/fail flags in evaluate_run()'s "objectives" dict track the thesis'
+quantified targets directly, so a single run tells you which objectives it
+would clear:
+  action_prediction_accuracy >= 0.90   (learning pipeline / BC model objectives)
+  execution_error_rate       <= 0.10   (execution mechanism objective)
+  wasted_step_rate           <= 0.20   (execution mechanism objective)
+  task_completion_rate       >= 0.85   (agentic framework integration objective)
+  generalization_success_rate>= 0.75   (adaptation / unseen-GUI objective — needs
+                                        a session flagged unseen; see --unseen)
 
 Usage
 -----
@@ -28,6 +45,11 @@ import math
 import os
 import re
 import sys
+if hasattr(sys.stdout, "reconfigure"):
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")  # em-dash/arrow chars below can crash cp1252 consoles/pipes
+    except Exception:
+        pass
 from pathlib import Path
 from typing import Any
 
@@ -421,19 +443,37 @@ def report(session_dir: Path | None, aggregate_all: bool) -> None:
 
 # ─── per-run evaluator (works on agent.run() results, no trace files needed) ──
 
-def evaluate_run(results: list[dict], goal: str = "", heuristic_steps: int = 0) -> dict:
+def evaluate_run(
+    results: list[dict],
+    goal: str = "",
+    heuristic_steps: int = 0,
+    run_duration_sec: float | None = None,
+    time_to_first_action_sec: float | None = None,
+    manual_interventions: int = 0,
+) -> dict:
     """
-    Compute the three core metrics from agent.run() results list.
-    Works on complete AND early-terminated runs.
+    Compute metrics from agent.run() results list. Works on complete AND
+    early-terminated runs.
 
-    Returns a dict with keys: task_completion_rate, action_prediction_accuracy,
-    execution_success_rate, and a formatted summary string.
+    run_duration_sec / time_to_first_action_sec / manual_interventions come
+    from agent._run_duration_sec / agent._time_to_first_action_sec /
+    agent._manual_interventions (set by LLMAgent.run()) — pass them through
+    from the caller since they live on the agent, not in results.
+
+    Returns a dict with the core rate metrics, a "timing" sub-dict, an
+    "objectives" sub-dict (pass/fail vs each thesis objective's target),
+    and a formatted summary string.
     """
     if not results:
         return {
             "task_completion_rate":       0.0,
             "action_prediction_accuracy": 0.0,
             "execution_success_rate":     0.0,
+            "timing": {
+                "run_duration_sec":          run_duration_sec,
+                "time_to_first_action_sec":  time_to_first_action_sec,
+            },
+            "manual_interventions": manual_interventions,
             "summary": "No steps recorded.",
         }
 
@@ -445,6 +485,26 @@ def evaluate_run(results: list[dict], goal: str = "", heuristic_steps: int = 0) 
     no_change     = 0
     total_clicks  = 0
     on_target     = 0
+
+    # ── timing (per-step fields set by LLMAgent.run(), absent on older traces) ──
+    def _avg(lst: list[float]) -> float | None:
+        return sum(lst) / len(lst) if lst else None
+
+    observe_times = [r["observe_time_sec"] for r in results if "observe_time_sec" in r]
+    decide_times  = [r["decide_time_sec"]  for r in results if "decide_time_sec"  in r]
+    execute_times = [r["execute_time_sec"] for r in results if "execute_time_sec" in r]
+    step_times    = [r["step_time_sec"]    for r in results if "step_time_sec"    in r]
+    timing = {
+        "run_duration_sec":         run_duration_sec,
+        "time_to_first_action_sec": time_to_first_action_sec,
+        "avg_observe_time_sec":     _avg(observe_times),   # perception latency (objective 1)
+        "avg_decide_time_sec":      _avg(decide_times),    # model inference latency (objectives 3, 5)
+        "avg_execute_time_sec":     _avg(execute_times),   # dispatch latency (objective 9)
+        "avg_step_time_sec":        _avg(step_times),
+        "total_measured_step_time_sec": sum(step_times) if step_times else None,
+        "steps_per_minute":         (60.0 * len(step_times) / sum(step_times))
+                                     if step_times and sum(step_times) > 0 else None,
+    }
 
     for i, r in enumerate(results):
         action = r.get("action", {})
@@ -590,25 +650,60 @@ def evaluate_run(results: list[dict], goal: str = "", heuristic_steps: int = 0) 
     wasted_rate   = no_change / actionable if actionable else 0.0
     steps_per_field = total_steps / len(fields_filled) if fields_filled else float("inf")
 
+    # execution error rate = actionable steps that neither succeeded nor were
+    # merely no-ops — covers no_change + unexpected + error validations (objective 9)
+    execution_error_rate = 1.0 - esr
+    intervention_rate = manual_interventions / actionable if actionable else 0.0
+
+    # ── objective pass/fail — the thesis' quantified targets, checked directly ──
+    objectives = {
+        "action_prediction_accuracy_ge_90pct": {
+            "target": 0.90, "actual": apa, "pass": apa >= 0.90,
+            "objective": "learning pipeline / BC model — action prediction accuracy",
+        },
+        "execution_error_rate_le_10pct": {
+            "target": 0.10, "actual": execution_error_rate, "pass": execution_error_rate <= 0.10,
+            "objective": "execution mechanism — execution error rate",
+        },
+        "wasted_step_rate_le_20pct": {
+            "target": 0.20, "actual": wasted_rate, "pass": wasted_rate <= 0.20,
+            "objective": "execution mechanism — redundant steps",
+        },
+        "task_completion_rate_ge_85pct": {
+            "target": 0.85, "actual": tcr, "pass": tcr >= 0.85,
+            "objective": "agentic framework integration — end-to-end completion without manual intervention",
+        },
+        "no_manual_intervention": {
+            "target": 0, "actual": manual_interventions, "pass": manual_interventions == 0,
+            "objective": "agentic framework integration — \"without manual intervention\"",
+        },
+    }
+
     _dep_str  = (f"{llm_dep*100:.1f}%"         if llm_dep         is not None else "n/a")
     _tdep_str = (f"{transformer_dep*100:.1f}%" if transformer_dep is not None else "n/a")
     _conf_str = (f"{avg_conf:.3f}"             if avg_conf        is not None else "n/a")
     _spf_str  = f"{steps_per_field:.1f}" if steps_per_field != float("inf") else "∞"
+    _dur_str  = f"{run_duration_sec:.1f}s" if run_duration_sec is not None else "n/a"
+    _ttfa_str = f"{time_to_first_action_sec:.1f}s" if time_to_first_action_sec is not None else "n/a"
+    _avgstep_str = f"{timing['avg_step_time_sec']:.2f}s" if timing["avg_step_time_sec"] is not None else "n/a"
+    _spm_str  = f"{timing['steps_per_minute']:.1f}" if timing["steps_per_minute"] is not None else "n/a"
     summary = (
         f"\n{border}\n"
         f"  RUN METRICS\n"
         f"  Goal: {goal[:55]}\n"
         f"{border}\n"
         f"  Task Completion Rate       {tcr*100:>6.1f}%   "
-        f"({'done' if done else f'{len(fields_filled)} fields filled / {ESTIMATED_TOTAL_FIELDS} total'})\n"
+        f"({'done' if done else f'{len(fields_filled)} fields filled / {ESTIMATED_TOTAL_FIELDS} total'})  ← target ≥85%\n"
         f"  Wasted Step Rate           {wasted_rate*100:>6.1f}%   "
-        f"({no_change} no_change / {actionable} actionable)  ← loops; target <20%\n"
+        f"({no_change} no_change / {actionable} actionable)  ← loops; target ≤20%\n"
         f"  Steps per Field            {_spf_str:>6}     "
         f"({total_steps} steps / {len(fields_filled)} fields)  ← efficiency; target <5\n"
         f"  Action Prediction Accuracy {apa*100:>6.1f}%   "
-        f"({on_target} on-target / {total_clicks} clicks)\n"
+        f"({on_target} on-target / {total_clicks} clicks)  ← target ≥90%\n"
         f"  Execution Success Rate     {esr*100:>6.1f}%   "
         f"({succeeded} state-changing / {actionable} actionable steps)\n"
+        f"  Execution Error Rate       {execution_error_rate*100:>6.1f}%   "
+        f"← target ≤10%\n"
         f"  Value Accuracy             {val_acc*100:>6.1f}%   "
         f"({correct_values} correct / {correct_values+wrong_values} typed values)\n"
         f"  LLM Dependency             {_dep_str:>7}   "
@@ -617,6 +712,13 @@ def evaluate_run(results: list[dict], goal: str = "", heuristic_steps: int = 0) 
         f"({transformer_steps} transformer / {tagged_steps} total)  ← target >95%\n"
         f"  Heuristic Steps            {heuristic_steps:>7}   "
         f"(auto-handlers)  avg transformer conf={_conf_str}\n"
+        f"  Manual Interventions       {manual_interventions:>7}   "
+        f"(intervention rate {intervention_rate*100:.1f}% of actionable steps)  ← target 0\n"
+        f"{border}\n"
+        f"  TIMING\n"
+        f"  Run Duration               {_dur_str:>7}\n"
+        f"  Time to First Action       {_ttfa_str:>7}   (cold-start / setup latency)\n"
+        f"  Avg Step Time              {_avgstep_str:>7}   ({_spm_str} steps/min)\n"
         f"  Total steps: {total_steps}  |  Terminated: {'naturally' if done else 'early/max_steps'}\n"
         f"{border}\n"
         f"{value_section}"
@@ -628,6 +730,8 @@ def evaluate_run(results: list[dict], goal: str = "", heuristic_steps: int = 0) 
         "task_completion_rate":       tcr,
         "action_prediction_accuracy": apa,
         "execution_success_rate":     esr,
+        "execution_error_rate":       execution_error_rate,
+        "wasted_step_rate":           wasted_rate,
         "value_accuracy":             val_acc,
         "llm_dependency":             llm_dep,
         "transformer_dependency":     transformer_dep,
@@ -635,9 +739,13 @@ def evaluate_run(results: list[dict], goal: str = "", heuristic_steps: int = 0) 
         "llm_steps":                  llm_steps,
         "transformer_steps":          transformer_steps,
         "heuristic_steps":            heuristic_steps,
+        "manual_interventions":       manual_interventions,
+        "intervention_rate":          intervention_rate,
         "fields_filled":              sorted(fields_filled),
         "total_steps":                total_steps,
         "completed":                  done,
+        "timing":                     timing,
+        "objectives":                 objectives,
         "summary":                    summary,
     }
 
