@@ -37,6 +37,11 @@ This document is for developers working on Intern itself.
 
 ## Current Status
 
+> 🌲 **Tree Task** — a 3D progress map grown from the [Task List](#task-list) below,
+> one branch per phase, one leaf per task, summit at 100%: `treetask/index.html`.
+> Keep it synced: whenever a checkbox here flips, flip the matching `done` flag in
+> that file's `PHASES` data. See [Task List](#task-list) for the sync convention.
+
 **The core loop works end-to-end on the vertical slice.** Proven this far:
 
 - **Navigation cloning confirmed** — the transformer reproduces the user's
@@ -387,6 +392,12 @@ the CoT lines in `_call_openai_compat()`.
 ---
 
 ## Task List
+
+> **Sync with Tree Task:** this list is the source of truth; `treetask/index.html`
+> mirrors it as a 3D tree (`PHASES` array — one entry per phase below, one item per
+> checkbox, `done: true/false`). When a checkbox here changes — including mid-work,
+> whenever we hit a problem or the plan diverges — update the matching entry there
+> in the same pass, not as a separate cleanup step.
 
 **Priority: COMPLETE SCOPE #1 (the form) first — then generalize.**
 

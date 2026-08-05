@@ -8,6 +8,7 @@ See [DEVELOPERS.md](DEVELOPERS.md) for the project overview, architecture, and t
 
 - Every session, commit and push all work done: `git add`, `git commit`, `git push` — do this for every change, not just at the end.
 - Do not add Claude as co-author on commits pushed to GitHub.
+- Whenever we encounter a problem or diverge from the plan, consistently update the Tree Task branches (`treetask/index.html`) to reflect it — keep it in sync with DEVELOPERS.md's Task List, not as an afterthought.
 
 ## Architecture
 

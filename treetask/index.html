@@ -1,0 +1,623 @@
+<title>Tree Task — Intern</title>
+<style>
+  :root{
+    --bg:#E7EDF1;
+    --bg-elev:#F5F8FAee;
+    --ink:#16202B;
+    --ink-dim:#55606C;
+    --growth:#2F9E6E;
+    --dormant:#8C8172;
+    --summit:#C7860A;
+    --line: rgba(22,32,43,0.14);
+    --font-display:"Iowan Old Style","Palatino Linotype","Book Antiqua",Georgia,serif;
+    --font-body:"Segoe UI","Helvetica Neue",Arial,sans-serif;
+    --font-mono:"Cascadia Code","Consolas","SF Mono",ui-monospace,monospace;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#0D131F;
+      --bg-elev:#161F30ee;
+      --ink:#E9EDF3;
+      --ink-dim:#9AA5B8;
+      --growth:#5FD1A0;
+      --dormant:#A79C89;
+      --summit:#F0B429;
+      --line: rgba(233,237,243,0.14);
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#0D131F; --bg-elev:#161F30ee; --ink:#E9EDF3; --ink-dim:#9AA5B8;
+    --growth:#5FD1A0; --dormant:#A79C89; --summit:#F0B429; --line: rgba(233,237,243,0.14);
+  }
+  :root[data-theme="light"]{
+    --bg:#E7EDF1; --bg-elev:#F5F8FAee; --ink:#16202B; --ink-dim:#55606C;
+    --growth:#2F9E6E; --dormant:#8C8172; --summit:#C7860A; --line: rgba(22,32,43,0.14);
+  }
+
+  *{box-sizing:border-box;}
+  html,body{height:100%;}
+  body{
+    margin:0; background:var(--bg); color:var(--ink);
+    font-family:var(--font-body);
+    overflow:hidden;
+    -webkit-font-smoothing:antialiased;
+  }
+  @media (prefers-reduced-motion: no-preference){
+    .fade-in{ animation: fadeIn .9s ease both; }
+    .fade-in.delay1{ animation-delay:.12s; }
+    .fade-in.delay2{ animation-delay:.22s; }
+  }
+  @keyframes fadeIn{ from{ opacity:0; transform:translateY(6px);} to{opacity:1; transform:none;} }
+
+  canvas{ position:fixed; inset:0; width:100%; height:100%; display:block; touch-action:none; cursor:grab; }
+  canvas.dragging{ cursor:grabbing; }
+
+  .sr-only{ position:absolute; width:1px;height:1px; padding:0;margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
+
+  header.hdr{
+    position:fixed; top:0; left:0; padding:28px 30px 20px; max-width:min(58ch,60vw);
+    pointer-events:none; z-index:5;
+  }
+  .eyebrow{
+    font-family:var(--font-mono); font-size:11px; letter-spacing:.14em; text-transform:uppercase;
+    color:var(--summit); margin:0 0 10px;
+  }
+  h1{
+    font-family:var(--font-display); font-weight:600; font-size:clamp(28px,4.4vw,46px);
+    margin:0 0 8px; text-wrap:balance; letter-spacing:.005em;
+  }
+  .sub{
+    font-size:14.5px; line-height:1.55; color:var(--ink-dim); margin:0; max-width:46ch;
+  }
+
+  .panel{
+    position:fixed; z-index:6; background:var(--bg-elev); backdrop-filter:blur(10px);
+    border:1px solid var(--line); border-radius:14px; box-shadow:0 12px 30px rgba(0,0,0,.14);
+  }
+
+  .altimeter{
+    left:26px; bottom:26px; padding:18px 20px; width:236px;
+  }
+  .altimeter .label{
+    font-family:var(--font-mono); font-size:10.5px; letter-spacing:.12em; text-transform:uppercase;
+    color:var(--ink-dim); margin:0 0 4px;
+  }
+  .altimeter .big{
+    font-family:var(--font-mono); font-variant-numeric:tabular-nums; font-size:38px; font-weight:600;
+    line-height:1; margin:0 0 6px; letter-spacing:-.01em;
+  }
+  .altimeter .big small{ font-size:16px; font-weight:500; color:var(--ink-dim); }
+  .track{ height:6px; border-radius:4px; background:var(--line); overflow:hidden; margin:10px 0 12px; }
+  .track > i{ display:block; height:100%; background:var(--growth); border-radius:4px; }
+  .peaknote{ font-size:11.5px; color:var(--ink-dim); line-height:1.5; margin:0; }
+  .peaknote b{ color:var(--summit); font-weight:600; }
+
+  .controls{ display:flex; gap:8px; margin-top:14px; }
+  .controls button{
+    font-family:var(--font-mono); font-size:11px; letter-spacing:.04em; text-transform:uppercase;
+    color:var(--ink); background:transparent; border:1px solid var(--line); border-radius:8px;
+    padding:7px 10px; cursor:pointer; flex:1;
+  }
+  .controls button:hover{ border-color:var(--summit); color:var(--summit); }
+  .controls button:focus-visible{ outline:2px solid var(--summit); outline-offset:2px; }
+  .controls button[aria-pressed="true"]{ color:var(--summit); border-color:var(--summit); }
+
+  .legend{
+    right:26px; top:26px; padding:16px 18px; width:250px; max-height:min(64vh,520px); overflow-y:auto;
+  }
+  .legend .label{
+    font-family:var(--font-mono); font-size:10.5px; letter-spacing:.12em; text-transform:uppercase;
+    color:var(--ink-dim); margin:0 0 12px;
+  }
+  .phase-row{ margin-bottom:12px; }
+  .phase-row:last-child{ margin-bottom:0; }
+  .phase-row .top{ display:flex; justify-content:space-between; align-items:baseline; gap:8px; margin-bottom:4px; }
+  .phase-row .tag{ font-family:var(--font-mono); font-size:10.5px; color:var(--ink-dim); }
+  .phase-row .name{ font-size:12.5px; font-weight:600; flex:1; }
+  .phase-row.current .name{ color:var(--summit); }
+  .phase-row .pct{ font-family:var(--font-mono); font-variant-numeric:tabular-nums; font-size:11.5px; color:var(--ink-dim); }
+  .phase-row .track{ margin:0; height:4px; }
+  .phase-row .track > i{ background:var(--growth); }
+  .phase-row.current .track > i{ background:var(--summit); }
+
+  .swatches{ display:flex; flex-direction:column; gap:6px; margin-top:14px; padding-top:14px; border-top:1px solid var(--line); }
+  .swatch{ display:flex; align-items:center; gap:8px; font-size:11px; color:var(--ink-dim); }
+  .dot{ width:8px; height:8px; border-radius:50%; flex:none; }
+  .dot.grown{ background:var(--growth); box-shadow:0 0 6px var(--growth); }
+  .dot.dormant{ background:var(--dormant); }
+  .diamond{ width:8px;height:8px; background:var(--summit); transform:rotate(45deg); flex:none; }
+
+  .tooltip{
+    position:fixed; z-index:20; pointer-events:none; max-width:280px;
+    background:var(--bg-elev); border:1px solid var(--line); border-radius:10px;
+    padding:10px 12px; box-shadow:0 10px 24px rgba(0,0,0,.2); opacity:0; transform:translateY(4px);
+    transition:opacity .12s ease, transform .12s ease;
+  }
+  .tooltip.show{ opacity:1; transform:none; }
+  .tooltip .ph{ font-family:var(--font-mono); font-size:10px; letter-spacing:.08em; text-transform:uppercase; color:var(--summit); margin:0 0 4px; }
+  .tooltip .tx{ font-size:12.5px; line-height:1.45; margin:0; }
+  .tooltip .st{ font-family:var(--font-mono); font-size:10px; margin:6px 0 0; color:var(--ink-dim); }
+
+  footer.foot{
+    position:fixed; left:26px; bottom:0; transform:translateY(100%);
+    padding:8px 0 0; font-family:var(--font-mono); font-size:10.5px; color:var(--ink-dim);
+    opacity:.85;
+  }
+
+  @media (max-width: 760px){
+    header.hdr{ max-width:80vw; padding:20px 18px 14px; }
+    h1{ font-size:26px; }
+    .legend{ display:none; }
+    .altimeter{ width:200px; left:16px; bottom:16px; }
+  }
+</style>
+
+<canvas id="scene" role="img" aria-label="Interactive 3D map of the Intern project's progress, shaped as a tree climbing toward a summit"></canvas>
+
+<header class="hdr">
+  <p class="eyebrow fade-in">Field survey — Intern project</p>
+  <h1 class="fade-in delay1">Tree Task</h1>
+  <p class="sub fade-in delay2">A living map of the climb toward completion. Each branch is a phase from
+    <em>DEVELOPERS.md</em>, each leaf a task — lit when shipped, bare stone when still ahead.
+    The summit lights only at 100%.</p>
+</header>
+
+<div class="panel altimeter fade-in delay2">
+  <p class="label">Current altitude</p>
+  <p class="big" id="pctBig">—<small>%</small></p>
+  <div class="track"><i id="pctBar" style="width:0%"></i></div>
+  <p class="peaknote" id="peakNote">Loading survey data…</p>
+  <div class="controls">
+    <button id="btnRotate" type="button" aria-pressed="true">Auto-climb</button>
+    <button id="btnReset" type="button">Reset view</button>
+  </div>
+</div>
+
+<div class="panel legend fade-in delay2" id="legend">
+  <p class="label">Branches</p>
+  <div id="phaseList"></div>
+  <div class="swatches">
+    <div class="swatch"><span class="dot grown"></span> Shipped</div>
+    <div class="swatch"><span class="dot dormant"></span> Ahead of us</div>
+    <div class="swatch"><span class="diamond"></span> Architectural blocker (Big Three)</div>
+  </div>
+</div>
+
+<div class="tooltip" id="tooltip"><p class="ph" id="ttPhase"></p><p class="tx" id="ttText"></p><p class="st" id="ttStatus"></p></div>
+
+<footer class="foot" id="foot"></footer>
+
+<div class="sr-only" id="srSummary"></div>
+
+<script>
+"use strict";
+
+/* ── Source of truth — mirrors DEVELOPERS.md § Task List ─────────────── */
+const SYNC_DATE = "2026-08-06";
+const PHASES = [
+  { id:"foundation", order:0, tag:"FOUNDATION", label:"Scope-Agnostic Engine", note:"Done — kept as bedrock",
+    items:[
+      {t:"ScopeConfig — form hardcodes moved into injected config; agent is app-blind", done:true},
+      {t:"Perception adapter seam — Observer base, canonical schema, loud validation on mismatch", done:true},
+      {t:"DataSource injection (partial) — source I/O now goes through the seam", done:true},
+      {t:"Scope abstraction — declare a scope in one place (deferred to scope #2)", done:false},
+    ]},
+  { id:"p0", order:1, tag:"P0", label:"Complete Scope #1 — the form", current:true, note:"The current focus",
+    stages:[
+      { name:"Stage 1 — Multi-tab traversal", items:[
+        {t:"Combobox click-fill — empty combobox click opens + selects", done:true},
+        {t:"False-done guard — Notepad intake text no longer false-triggers completion", done:true},
+        {t:"Option B — the focused widget's type decides fill vs navigate", done:true},
+        {t:"Tab-targeting solved — the transformer's pointer predicts tab switches itself", done:true},
+        {t:"Multi-tab traversal works — 3-tab switch + fill, clean", done:true},
+        {t:"All 8 tabs trained — click_acc 0.88, fixation gone", done:true},
+        {t:"Tab-click now goes to the tab actually clicked", done:true},
+        {t:"Tab-visit order — model still jumps / revisits tabs", done:false},
+      ]},
+      { name:"Stage 2 — Reliability: no stalling", items:[
+        {t:"Empty-field fixation solved — the 'attempted' state feature", done:true},
+        {t:"Drift solved — form-window lock + in-form click guard", done:true},
+        {t:"Below-fold reach solved — Tab doubles as scroll-to-reveal", done:true},
+        {t:"'99' double-type fixed — idempotent typing", done:true},
+        {t:"(leave blank) still typed literally — skip-check bug unresolved", done:false},
+        {t:"Scroll may not actually move the form — unverified", done:false},
+        {t:"Checkbox cold-start / first click still unreliable", done:false},
+        {t:"Combobox retry timing — open → miss → escape → retry", done:false},
+      ]},
+      { name:"Stage 2.5 — Transformer navigates, agent only does HOW", items:[
+        {t:"Strip the stuck-guard auto-advance-tab crutch", done:false},
+        {t:"Strip focus-first-empty-field — prefer the transformer", done:false},
+        {t:"Scroll-reveal should let the model pick the next tab", done:false},
+      ]},
+      { name:"Stage 3 — Multi-record: all 5", items:[
+        {t:"Record advance ×5 — proven 1→2, need all five clean", done:false},
+        {t:"Per-record data refresh for records 2–5", done:false},
+      ]},
+      { name:"Stage 4 — Verification", items:[
+        {t:"End-to-end completion metric — 0% → ~100%", done:false},
+        {t:"Expected-vs-actual diff report at submit", done:false},
+      ]},
+    ]},
+  { id:"p1", order:2, tag:"P1", label:"Generalize", note:"Only after #1 completes a task",
+    items:[
+      {t:"Finish scope abstraction", done:false},
+      {t:"Excel full transfer — wire source/target + executor, train, measure", done:false},
+      {t:"Random-order test — clones any order, not a bias", done:false},
+    ],
+    blockers:[
+      "Big Three #1 — Perception: UIA accessibility tree → vision (pixels)",
+      "Big Three #2 — Action space: form-fields → universal executor",
+      "Big Three #3 — Workflow: linear demos → branching control flow",
+    ]},
+  { id:"p2", order:3, tag:"P2", label:"Scope #3",
+    items:[ {t:"Email / ticket triage — needs Action-Space + Control-Flow first", done:false} ]},
+  { id:"p3", order:4, tag:"P3", label:"Polish & known issues", note:"Non-blocking",
+    items:[
+      {t:"LLM value errors — occasionally answers into the wrong field", done:false},
+      {t:"No prompt caching — every step is a fresh LLM call", done:false},
+      {t:"No memory component — each record runs from a blank slate", done:false},
+      {t:"Observability — no structured trace / record-level summary", done:false},
+      {t:"Combobox / mid-record crash recovery", done:false},
+      {t:"Cross-task shared backbone (trunk + per-task heads)", done:false},
+      {t:"Ghost cursor overlay, training-readiness indicator, DAgger productionized", done:false},
+    ]},
+  { id:"p4", order:5, tag:"P4", label:"Thesis / data / benchmark", note:"Parallel track",
+    items:[
+      {t:"Thesis — finish Chapter 3, revise paper if nominated", done:false},
+      {t:"Data collection — 500,000 traces, convenience sampling", done:false},
+      {t:"Benchmark — compare against similar systems", done:false},
+      {t:"Chess fidelity benchmark — clone-ELO ≈ human-ELO, matching style", done:false},
+    ]},
+  { id:"p5", order:6, tag:"P5", label:"RL phase", note:"Future",
+    items:[ {t:"Actor-Critic / PPO, BC transformer as Actor, KL penalty vs BC", done:false} ]},
+];
+
+/* ── Flatten + tally ──────────────────────────────────────────────────── */
+function phaseItems(p){
+  if (p.stages) return p.stages.flatMap(s => s.items.map(it => ({...it, stage:s.name})));
+  return p.items.map(it => ({...it, stage:null}));
+}
+PHASES.forEach(p=>{
+  const items = phaseItems(p);
+  p._items = items;
+  p._done = items.filter(i=>i.done).length;
+  p._total = items.length;
+  p._pct = p._total ? (p._done/p._total*100) : 0;
+});
+const TOTAL_DONE = PHASES.reduce((a,p)=>a+p._done,0);
+const TOTAL_ITEMS = PHASES.reduce((a,p)=>a+p._total,0);
+const OVERALL_PCT = TOTAL_DONE/TOTAL_ITEMS*100;
+
+/* ── UI: altimeter + legend ───────────────────────────────────────────── */
+document.getElementById("pctBig").innerHTML = OVERALL_PCT.toFixed(1)+"<small>%</small>";
+document.getElementById("pctBar").style.width = OVERALL_PCT.toFixed(1)+"%";
+document.getElementById("peakNote").innerHTML =
+  TOTAL_DONE+" of "+TOTAL_ITEMS+" tasks shipped. <b>Summit = 100%</b>, still "+(100-OVERALL_PCT).toFixed(1)+"% of climb ahead.";
+document.getElementById("foot").textContent =
+  "Synced with DEVELOPERS.md · Task List · "+SYNC_DATE;
+document.getElementById("srSummary").textContent =
+  "Tree Task progress map. Overall completion "+OVERALL_PCT.toFixed(1)+"%. "+
+  PHASES.map(p=>p.label+": "+p._done+" of "+p._total+" tasks done").join(". ");
+
+const listEl = document.getElementById("phaseList");
+PHASES.forEach(p=>{
+  const row = document.createElement("div");
+  row.className = "phase-row"+(p.current?" current":"");
+  row.innerHTML =
+    '<div class="top"><span class="tag">'+p.tag+'</span><span class="name">'+p.label+'</span>'+
+    '<span class="pct">'+p._done+'/'+p._total+'</span></div>'+
+    '<div class="track"><i style="width:'+p._pct.toFixed(0)+'%"></i></div>';
+  listEl.appendChild(row);
+});
+
+/* ── 3D scene ──────────────────────────────────────────────────────────── */
+const canvas = document.getElementById("scene");
+const ctx = canvas.getContext("2d");
+const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+const TREE_HEIGHT = 300;
+const GOLDEN = 137.5077640500378 * Math.PI/180;
+
+/* deterministic jitter, no external RNG needed */
+function seeded(i){ const x = Math.sin(i*12.9898)*43758.5453; return x-Math.floor(x); }
+
+function buildGeometry(){
+  const branches = [];  // {a:[x,y,z], b:[x,y,z], phase}
+  const twigs = [];     // {a:[x,y,z], b:[x,y,z], leaf, phase}
+  const leaves = [];    // {p:[x,y,z], item, phaseLabel, isBlocker}
+
+  PHASES.forEach((ph, idx) => {
+    const az = idx*GOLDEN;
+    const attachH = (idx+0.9)/(PHASES.length+0.55) * TREE_HEIGHT * 0.92;
+    const trunkR = 15 - (attachH/TREE_HEIGHT)*10;
+    const elev = (38 + (idx%3)*7) * Math.PI/180;
+    const branchLen = 46 + Math.min(p_len(ph),24)*3.2;
+
+    const base = [Math.cos(az)*trunkR, attachH, Math.sin(az)*trunkR];
+    const dir = [Math.cos(az)*Math.cos(elev), Math.sin(elev), Math.sin(az)*Math.cos(elev)];
+    const tip = [base[0]+dir[0]*branchLen, base[1]+dir[1]*branchLen, base[2]+dir[2]*branchLen];
+    branches.push({a:base, b:tip, phase:ph, w: ph.current?7:5});
+
+    const items = ph._items;
+    const n = Math.max(items.length,1);
+    items.forEach((it, i) => {
+      const t = 0.28 + (i/n)*0.72;
+      const twigBase = lerp3(base, tip, t);
+      const jitterA = (seeded(idx*97+i)-0.5) * 1.15;
+      const jitterE = (seeded(idx*53+i+7)-0.5) * 0.7;
+      const tAz = az + jitterA;
+      const tEl = elev + 0.35 + jitterE;
+      const tLen = 13 + seeded(idx*31+i)*10;
+      const tdir = [Math.cos(tAz)*Math.cos(tEl), Math.sin(tEl), Math.sin(tAz)*Math.cos(tEl)];
+      const leafP = [twigBase[0]+tdir[0]*tLen, twigBase[1]+tdir[1]*tLen, twigBase[2]+tdir[2]*tLen];
+      twigs.push({a:twigBase, b:leafP, done:it.done});
+      leaves.push({p:leafP, item:it, phaseLabel:ph.label, isBlocker:false});
+    });
+
+    (ph.blockers||[]).forEach((bt, i) => {
+      const t = 0.85 + i*0.05;
+      const bBase = lerp3(base, tip, Math.min(t,0.97));
+      const bAz = az - 0.9 - i*0.22;
+      const bdir = [Math.cos(bAz)*0.6, 0.75, Math.sin(bAz)*0.6];
+      const len = 26;
+      const bp = [bBase[0]+bdir[0]*len, bBase[1]+bdir[1]*len, bBase[2]+bdir[2]*len];
+      twigs.push({a:bBase, b:bp, done:false, blocker:true});
+      leaves.push({p:bp, item:{t:bt, done:false}, phaseLabel:ph.label, isBlocker:true});
+    });
+  });
+
+  return {branches, twigs, leaves};
+}
+function p_len(ph){ return ph._items.length; }
+function lerp3(a,b,t){ return [a[0]+(b[0]-a[0])*t, a[1]+(b[1]-a[1])*t, a[2]+(b[2]-a[2])*t]; }
+
+const GEO = buildGeometry();
+const GROUND_RINGS = [40,80,120,160,200,240];
+
+/* ── camera ────────────────────────────────────────────────────────────── */
+let rotY = 0.6, rotX = 0.18;
+let dragging = false, lastX=0, lastY=0, autoRotate = !reduceMotion;
+let dpr = Math.max(1, Math.min(2, window.devicePixelRatio||1));
+
+function resize(){
+  const w = window.innerWidth, h = window.innerHeight;
+  canvas.width = w*dpr; canvas.height = h*dpr;
+  canvas.style.width = w+"px"; canvas.style.height = h+"px";
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+}
+window.addEventListener("resize", resize);
+resize();
+
+function rotate(p){
+  let [x,y,z] = p;
+  let cx = Math.cos(rotY), sx = Math.sin(rotY);
+  let x1 = x*cx - z*sx, z1 = x*sx + z*cx;
+  let cy = Math.cos(rotX), sy = Math.sin(rotX);
+  let y2 = y*cy - z1*sy, z2 = y*sy + z1*cy;
+  return [x1, y2, z2];
+}
+
+function project(p){
+  const [x,y,z] = rotate(p);
+  const D = 560, f = 640;
+  const scale = f/(D+z);
+  const w = window.innerWidth, h = window.innerHeight;
+  const cx = w*0.5, groundY = h*0.86;
+  return { x: cx + x*scale, y: groundY - y*scale, z, s: scale };
+}
+
+/* ── growth-in animation ───────────────────────────────────────────────── */
+let growStart = null, growT = reduceMotion ? 1 : 0;
+function tickGrow(now){
+  if (growStart===null) growStart = now;
+  const dt = (now-growStart)/1500;
+  growT = reduceMotion ? 1 : Math.min(1, easeOutCubic(dt));
+}
+function easeOutCubic(t){ t=Math.min(Math.max(t,0),1); return 1-Math.pow(1-t,3); }
+
+/* ── colors (theme-aware, re-read each frame — cheap) ─────────────────── */
+function colors(){
+  const s = getComputedStyle(document.documentElement);
+  return {
+    growth: s.getPropertyValue("--growth").trim(),
+    dormant: s.getPropertyValue("--dormant").trim(),
+    summit: s.getPropertyValue("--summit").trim(),
+    ink: s.getPropertyValue("--ink").trim(),
+    inkDim: s.getPropertyValue("--ink-dim").trim(),
+    line: s.getPropertyValue("--line").trim(),
+  };
+}
+
+/* ── render ────────────────────────────────────────────────────────────── */
+let hoverLeaf = null;
+const screenLeaves = [];
+
+function draw(now){
+  tickGrow(now);
+  if (autoRotate && !dragging) rotY += 0.0016;
+
+  const w = window.innerWidth, h = window.innerHeight;
+  ctx.clearRect(0,0,w,h);
+  const C = colors();
+
+  // ground contour rings (topographic)
+  GROUND_RINGS.forEach((r,i)=>{
+    ctx.beginPath();
+    const steps = 64;
+    for(let s=0;s<=steps;s++){
+      const a = (s/steps)*Math.PI*2;
+      const pt = project([Math.cos(a)*r, 0, Math.sin(a)*r]);
+      if (s===0) ctx.moveTo(pt.x,pt.y); else ctx.lineTo(pt.x,pt.y);
+    }
+    ctx.strokeStyle = C.line;
+    ctx.lineWidth = 1;
+    ctx.stroke();
+  });
+
+  const growHeight = (OVERALL_PCT/100) * TREE_HEIGHT * growT;
+
+  // trunk as tapered segments
+  const trunkSteps = 22;
+  for(let i=0;i<trunkSteps;i++){
+    const y0 = (i/trunkSteps)*TREE_HEIGHT*growT, y1 = ((i+1)/trunkSteps)*TREE_HEIGHT*growT;
+    const r0 = 15 - (y0/TREE_HEIGHT)*10.5, r1 = 15 - (y1/TREE_HEIGHT)*10.5;
+    const grown = y1 <= growHeight+2;
+    drawLimb([0,y0,0],[0,y1,0], (r0+r1)/2 * 0.9, grown ? C.growth : C.dormant, grown?0.95:0.55, C);
+  }
+
+  // branches
+  const items3d = [];
+  GEO.branches.forEach(b=>{
+    const grown = b.a[1] <= growHeight;
+    items3d.push({type:"limb", a:b.a, b:b.b, w:b.w, col: grown?C.growth:C.dormant, alpha: grown?0.9:0.5, depth: depthOf(b.a,b.b)});
+  });
+  GEO.twigs.forEach(tw=>{
+    const grown = tw.done && tw.a[1] <= growHeight+40;
+    items3d.push({type:"limb", a:tw.a, b:tw.b, w: tw.blocker?2.6:2.2, col: tw.blocker ? C.summit : (grown?C.growth:C.dormant), alpha: tw.blocker?0.8:(grown?0.85:0.4), depth: depthOf(tw.a,tw.b)});
+  });
+  GEO.leaves.forEach(lf=>{
+    items3d.push({type:"leaf", p:lf.p, leaf:lf, depth: depthOf(lf.p,lf.p)});
+  });
+
+  items3d.sort((a,b)=>b.depth-a.depth);
+  screenLeaves.length = 0;
+
+  items3d.forEach(it=>{
+    if (it.type==="limb"){
+      drawLimb(it.a, it.b, it.w, it.col, it.alpha, C);
+    } else {
+      const pt = project(it.p);
+      const isBlocker = it.leaf.isBlocker;
+      const grown = it.leaf.item.done;
+      const r = Math.max(2.2, 3.4*pt.s) * (isBlocker?1.15:1);
+      const isHover = hoverLeaf===it.leaf;
+      ctx.beginPath();
+      if (isBlocker){
+        ctx.save();
+        ctx.translate(pt.x,pt.y); ctx.rotate(Math.PI/4);
+        ctx.fillStyle = C.summit;
+        ctx.globalAlpha = isHover?1:0.88;
+        ctx.fillRect(-r*0.8,-r*0.8,r*1.6,r*1.6);
+        ctx.restore();
+        ctx.globalAlpha = 1;
+      } else {
+        ctx.fillStyle = grown ? C.growth : C.dormant;
+        ctx.globalAlpha = isHover ? 1 : (grown?0.95:0.7);
+        if (grown){ ctx.shadowColor = C.growth; ctx.shadowBlur = isHover?14:7; }
+        ctx.arc(pt.x, pt.y, isHover? r*1.6 : r, 0, Math.PI*2);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+      }
+      ctx.globalAlpha = 1;
+      screenLeaves.push({x:pt.x,y:pt.y,r:Math.max(r,7),leaf:it.leaf});
+    }
+  });
+
+  // growth ring (current altitude)
+  if (growT>0.01){
+    const ringPts = [];
+    const steps=48;
+    for(let s=0;s<=steps;s++){
+      const a=(s/steps)*Math.PI*2;
+      const rad = 15 - (growHeight/TREE_HEIGHT)*10.5;
+      ringPts.push(project([Math.cos(a)*(rad+3), growHeight, Math.sin(a)*(rad+3)]));
+    }
+    ctx.beginPath();
+    ringPts.forEach((p,i)=> i===0?ctx.moveTo(p.x,p.y):ctx.lineTo(p.x,p.y));
+    ctx.strokeStyle = C.summit; ctx.lineWidth=1.4; ctx.globalAlpha=0.75;
+    ctx.shadowColor=C.summit; ctx.shadowBlur=8;
+    ctx.stroke();
+    ctx.shadowBlur=0; ctx.globalAlpha=1;
+  }
+
+  // summit marker
+  const summitPt = project([0, TREE_HEIGHT*growT, 0]);
+  const atSummit = OVERALL_PCT>=100;
+  ctx.beginPath();
+  ctx.moveTo(summitPt.x, summitPt.y);
+  ctx.lineTo(summitPt.x, summitPt.y-18*summitPt.s);
+  ctx.lineTo(summitPt.x+11*summitPt.s, summitPt.y-13*summitPt.s);
+  ctx.lineTo(summitPt.x, summitPt.y-9*summitPt.s);
+  ctx.closePath();
+  ctx.fillStyle = C.summit;
+  ctx.globalAlpha = atSummit ? 1 : 0.28;
+  if (atSummit){ ctx.shadowColor=C.summit; ctx.shadowBlur=16; }
+  ctx.fill();
+  ctx.shadowBlur=0; ctx.globalAlpha=1;
+
+  ctx.font = "10.5px "+getComputedStyle(document.documentElement).getPropertyValue("--font-mono");
+  ctx.fillStyle = C.inkDim;
+  ctx.globalAlpha = 0.85;
+  ctx.fillText("SUMMIT · 100%"+(atSummit?"":" (locked)"), summitPt.x+14*summitPt.s, summitPt.y-10*summitPt.s);
+  ctx.globalAlpha = 1;
+
+  requestAnimationFrame(draw);
+}
+
+function depthOf(a,b){
+  const ra = rotate(a), rb = rotate(b);
+  return (ra[2]+rb[2])/2;
+}
+
+function drawLimb(a,b,width,col,alpha,C){
+  const pa = project(a), pb = project(b);
+  ctx.beginPath();
+  ctx.moveTo(pa.x,pa.y); ctx.lineTo(pb.x,pb.y);
+  ctx.strokeStyle = col;
+  ctx.globalAlpha = alpha;
+  ctx.lineWidth = Math.max(1, width * ((pa.s+pb.s)/2));
+  ctx.lineCap = "round";
+  ctx.stroke();
+  ctx.globalAlpha = 1;
+}
+
+requestAnimationFrame(draw);
+
+/* ── interaction ───────────────────────────────────────────────────────── */
+canvas.addEventListener("pointerdown", e=>{
+  dragging = true; lastX=e.clientX; lastY=e.clientY;
+  canvas.classList.add("dragging");
+  canvas.setPointerCapture(e.pointerId);
+});
+window.addEventListener("pointerup", ()=>{ dragging=false; canvas.classList.remove("dragging"); });
+window.addEventListener("pointermove", e=>{
+  if (dragging){
+    rotY += (e.clientX-lastX)*0.0055;
+    rotX = Math.max(-0.05, Math.min(0.55, rotX + (e.clientY-lastY)*0.004));
+    lastX=e.clientX; lastY=e.clientY;
+    hideTooltip();
+    return;
+  }
+  const mx=e.clientX, my=e.clientY;
+  let best=null, bestD=1e9;
+  screenLeaves.forEach(sl=>{
+    const d = Math.hypot(sl.x-mx, sl.y-my);
+    if (d<sl.r+6 && d<bestD){ bestD=d; best=sl; }
+  });
+  if (best){ hoverLeaf=best.leaf; showTooltip(best.leaf, mx, my); }
+  else { hoverLeaf=null; hideTooltip(); }
+});
+
+const tooltip = document.getElementById("tooltip");
+function showTooltip(leaf, x, y){
+  document.getElementById("ttPhase").textContent = leaf.phaseLabel + (leaf.isBlocker?" · architectural blocker":"");
+  document.getElementById("ttText").textContent = leaf.item.t;
+  document.getElementById("ttStatus").textContent = leaf.isBlocker ? "Gates generalization (P1)" : (leaf.item.done ? "Shipped" : "Ahead of us");
+  tooltip.style.left = Math.min(x+16, window.innerWidth-296)+"px";
+  tooltip.style.top = Math.min(y+16, window.innerHeight-120)+"px";
+  tooltip.classList.add("show");
+}
+function hideTooltip(){ tooltip.classList.remove("show"); }
+
+const btnRotate = document.getElementById("btnRotate");
+btnRotate.addEventListener("click", ()=>{
+  autoRotate = !autoRotate;
+  btnRotate.setAttribute("aria-pressed", String(autoRotate));
+  btnRotate.textContent = autoRotate ? "Auto-climb" : "Paused";
+});
+if (reduceMotion){ autoRotate=false; btnRotate.setAttribute("aria-pressed","false"); btnRotate.textContent="Paused"; }
+
+document.getElementById("btnReset").addEventListener("click", ()=>{
+  rotY=0.6; rotX=0.18;
+});
+</script>
