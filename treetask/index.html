@@ -101,6 +101,7 @@
   .controls button:hover{ border-color:var(--summit); color:var(--summit); }
   .controls button:focus-visible{ outline:2px solid var(--summit); outline-offset:2px; }
   .controls button[aria-pressed="true"]{ color:var(--summit); border-color:var(--summit); }
+  .hint{ font-size:10.5px; color:var(--ink-dim); margin:10px 0 0; opacity:.75; }
 
   .legend{
     right:26px; top:26px; padding:16px 18px; width:250px; max-height:min(64vh,520px); overflow-y:auto;
@@ -171,6 +172,7 @@
     <button id="btnRotate" type="button" aria-pressed="true">Auto-climb</button>
     <button id="btnReset" type="button">Reset view</button>
   </div>
+  <p class="hint">Drag to orbit · scroll or pinch to zoom</p>
 </div>
 
 <div class="panel legend fade-in delay2" id="legend">
@@ -382,9 +384,10 @@ const GEO = buildGeometry();
 const GROUND_RINGS = [40,80,120,160,200,240];
 
 /* ── camera ────────────────────────────────────────────────────────────── */
-let rotY = 0.6, rotX = 0.18;
+let rotY = 0.6, rotX = 0.18, zoom = 1;
 let dragging = false, lastX=0, lastY=0, autoRotate = !reduceMotion;
 let dpr = Math.max(1, Math.min(2, window.devicePixelRatio||1));
+function clampZoom(z){ return Math.max(0.4, Math.min(3.2, z)); }
 
 function resize(){
   const w = window.innerWidth, h = window.innerHeight;
@@ -407,7 +410,7 @@ function rotate(p){
 function project(p){
   const [x,y,z] = rotate(p);
   const D = 560, f = 640;
-  const scale = f/(D+z);
+  const scale = (f/(D+z)) * zoom;
   const w = window.innerWidth, h = window.innerHeight;
   const cx = w*0.5, groundY = h*0.86;
   return { x: cx + x*scale, y: groundY - y*scale, z, s: scale };
@@ -622,13 +625,45 @@ function drawEdge(a,b,width,col,alpha){
 requestAnimationFrame(draw);
 
 /* ── interaction ───────────────────────────────────────────────────────── */
+canvas.addEventListener("wheel", e=>{
+  e.preventDefault();
+  zoom = clampZoom(zoom * (1 - e.deltaY*0.0012));
+  hideTooltip();
+}, {passive:false});
+
+const activePointers = new Map();
+let pinchStartDist = null, pinchStartZoom = 1;
+
 canvas.addEventListener("pointerdown", e=>{
-  dragging = true; lastX=e.clientX; lastY=e.clientY;
-  canvas.classList.add("dragging");
+  activePointers.set(e.pointerId, {x:e.clientX, y:e.clientY});
   canvas.setPointerCapture(e.pointerId);
+  if (activePointers.size===2){
+    dragging = false; canvas.classList.remove("dragging");
+    const pts = [...activePointers.values()];
+    pinchStartDist = Math.hypot(pts[0].x-pts[1].x, pts[0].y-pts[1].y);
+    pinchStartZoom = zoom;
+  } else {
+    dragging = true; lastX=e.clientX; lastY=e.clientY;
+    canvas.classList.add("dragging");
+  }
 });
-window.addEventListener("pointerup", ()=>{ dragging=false; canvas.classList.remove("dragging"); });
+window.addEventListener("pointerup", e=>{
+  activePointers.delete(e.pointerId);
+  pinchStartDist = null;
+  dragging = activePointers.size===1;
+  if (!dragging) canvas.classList.remove("dragging");
+});
+window.addEventListener("pointercancel", e=>{ activePointers.delete(e.pointerId); pinchStartDist=null; dragging=false; });
 window.addEventListener("pointermove", e=>{
+  if (activePointers.has(e.pointerId)) activePointers.set(e.pointerId, {x:e.clientX, y:e.clientY});
+
+  if (activePointers.size===2 && pinchStartDist){
+    const pts = [...activePointers.values()];
+    const d = Math.hypot(pts[0].x-pts[1].x, pts[0].y-pts[1].y);
+    zoom = clampZoom(pinchStartZoom * (d/pinchStartDist));
+    hideTooltip();
+    return;
+  }
   if (dragging){
     rotY += (e.clientX-lastX)*0.0055;
     rotX = Math.max(-0.05, Math.min(0.55, rotX + (e.clientY-lastY)*0.004));
@@ -674,6 +709,6 @@ btnRotate.addEventListener("click", ()=>{
 if (reduceMotion){ autoRotate=false; btnRotate.setAttribute("aria-pressed","false"); btnRotate.textContent="Paused"; }
 
 document.getElementById("btnReset").addEventListener("click", ()=>{
-  rotY=0.6; rotX=0.18;
+  rotY=0.6; rotX=0.18; zoom=1;
 });
 </script>
