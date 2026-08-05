@@ -43,12 +43,25 @@ if os.path.exists(_env_path):
                 _k, _v = _line.split("=", 1)
                 os.environ.setdefault(_k.strip(), _v.strip())
 
+import datetime as _datetime
+
+_LOG_DIR = os.path.join(_ROOT, "logs")
+os.makedirs(_LOG_DIR, exist_ok=True)
+_LOG_FILE = os.path.join(_LOG_DIR, f"run_task_{_datetime.datetime.now():%Y%m%d_%H%M%S}.log")
+_LATEST_LOG = os.path.join(_LOG_DIR, "latest.log")  # always overwritten — tail this for the current run
+
 logging.basicConfig(
     format="[%(asctime)s] [%(levelname)s] %(name)s — %(message)s",
     datefmt="%H:%M:%S",
     level=logging.INFO,
+    handlers=[
+        logging.StreamHandler(),
+        logging.FileHandler(_LOG_FILE, encoding="utf-8"),
+        logging.FileHandler(_LATEST_LOG, mode="w", encoding="utf-8"),
+    ],
 )
 logger = logging.getLogger("run_task")
+logger.info("Logging to %s (also mirrored to %s)", _LOG_FILE, _LATEST_LOG)
 
 # ── config ────────────────────────────────────────────────────────────────────
 GOAL          = "Fill the car insurance form using data from the open text file"
