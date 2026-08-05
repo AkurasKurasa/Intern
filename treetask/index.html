@@ -124,7 +124,7 @@
   .swatch{ display:flex; align-items:center; gap:8px; font-size:11px; color:var(--ink-dim); }
   .dot{ width:8px; height:8px; border-radius:50%; flex:none; }
   .dot.grown{ background:var(--growth); box-shadow:0 0 6px var(--growth); }
-  .dot.dormant{ background:var(--dormant); }
+  .dot.dormant{ background:transparent; border:1.5px solid var(--dormant); }
   .diamond{ width:8px;height:8px; background:var(--summit); transform:rotate(45deg); flex:none; }
 
   .tooltip{
@@ -152,14 +152,14 @@
   }
 </style>
 
-<canvas id="scene" role="img" aria-label="Interactive 3D map of the Intern project's progress, shaped as a tree climbing toward a summit"></canvas>
+<canvas id="scene" role="img" aria-label="Interactive 3D node graph of the Intern project's progress, climbing toward a summit node"></canvas>
 
 <header class="hdr">
-  <p class="eyebrow fade-in">Field survey — Intern project</p>
+  <p class="eyebrow fade-in">Task graph — Intern project</p>
   <h1 class="fade-in delay1">Tree Task</h1>
-  <p class="sub fade-in delay2">A living map of the climb toward completion. Each branch is a phase from
-    <em>DEVELOPERS.md</em>, each leaf a task — lit when shipped, bare stone when still ahead.
-    The summit lights only at 100%.</p>
+  <p class="sub fade-in delay2">A node map of the climb toward completion. Each hub is a phase from
+    <em>DEVELOPERS.md</em>, each small node a task — lit when shipped, dark when still ahead.
+    The peak node lights only at 100%.</p>
 </header>
 
 <div class="panel altimeter fade-in delay2">
@@ -174,7 +174,7 @@
 </div>
 
 <div class="panel legend fade-in delay2" id="legend">
-  <p class="label">Branches</p>
+  <p class="label">Phases</p>
   <div id="phaseList"></div>
   <div class="swatches">
     <div class="swatch"><span class="dot grown"></span> Shipped</div>
@@ -321,55 +321,62 @@ const GOLDEN = 137.5077640500378 * Math.PI/180;
 /* deterministic jitter, no external RNG needed */
 function seeded(i){ const x = Math.sin(i*12.9898)*43758.5453; return x-Math.floor(x); }
 
+/*
+ * Node graph, not a plant: a central spine (root → summit) passes through one
+ * attach-point per phase; each phase hangs a hub node off the spine, and each
+ * task hangs a small node off its hub. Everything below is nodes + straight
+ * edges — positions only, no organic curvature.
+ */
 function buildGeometry(){
-  const branches = [];  // {a:[x,y,z], b:[x,y,z], phase}
-  const twigs = [];     // {a:[x,y,z], b:[x,y,z], leaf, phase}
-  const leaves = [];    // {p:[x,y,z], item, phaseLabel, isBlocker}
+  const spine = [[0,0,0]];               // polyline: root → each phase attach → summit
+  const hubEdges = [];                    // {a,b,phase}
+  const hubs = [];                        // {p:[x,y,z], phase}
+  const taskEdges = [];                   // {a,b,done,blocker}
+  const nodes = [];                       // {p:[x,y,z], item, phaseLabel, isBlocker}
 
   PHASES.forEach((ph, idx) => {
     const az = idx*GOLDEN;
     const attachH = (idx+0.9)/(PHASES.length+0.55) * TREE_HEIGHT * 0.92;
-    const trunkR = 15 - (attachH/TREE_HEIGHT)*10;
-    const elev = (38 + (idx%3)*7) * Math.PI/180;
-    const branchLen = 46 + Math.min(p_len(ph),24)*3.2;
+    const spineR = 15 - (attachH/TREE_HEIGHT)*10;
+    const elev = (32 + (idx%3)*6) * Math.PI/180;
+    const hubDist = 52 + Math.min(p_len(ph),24)*3.0;
 
-    const base = [Math.cos(az)*trunkR, attachH, Math.sin(az)*trunkR];
+    const spinePt = [Math.cos(az)*spineR, attachH, Math.sin(az)*spineR];
+    spine.push(spinePt);
+
     const dir = [Math.cos(az)*Math.cos(elev), Math.sin(elev), Math.sin(az)*Math.cos(elev)];
-    const tip = [base[0]+dir[0]*branchLen, base[1]+dir[1]*branchLen, base[2]+dir[2]*branchLen];
-    branches.push({a:base, b:tip, phase:ph, w: ph.current?7:5});
+    const hubPt = [spinePt[0]+dir[0]*hubDist, spinePt[1]+dir[1]*hubDist, spinePt[2]+dir[2]*hubDist];
+    hubEdges.push({a:spinePt, b:hubPt, phase:ph});
+    hubs.push({p:hubPt, phase:ph});
 
     const items = ph._items;
     const n = Math.max(items.length,1);
+    const fanSpread = Math.min(1.2, 0.4 + n*0.05);
     items.forEach((it, i) => {
-      const t = 0.28 + (i/n)*0.72;
-      const twigBase = lerp3(base, tip, t);
-      const jitterA = (seeded(idx*97+i)-0.5) * 1.15;
-      const jitterE = (seeded(idx*53+i+7)-0.5) * 0.7;
-      const tAz = az + jitterA;
-      const tEl = elev + 0.35 + jitterE;
-      const tLen = 13 + seeded(idx*31+i)*10;
-      const tdir = [Math.cos(tAz)*Math.cos(tEl), Math.sin(tEl), Math.sin(tAz)*Math.cos(tEl)];
-      const leafP = [twigBase[0]+tdir[0]*tLen, twigBase[1]+tdir[1]*tLen, twigBase[2]+tdir[2]*tLen];
-      twigs.push({a:twigBase, b:leafP, done:it.done});
-      leaves.push({p:leafP, item:it, phaseLabel:ph.label, isBlocker:false});
+      const fanT = n>1 ? (i/(n-1)-0.5) : 0;
+      const nAz = az + fanT*fanSpread;
+      const nEl = elev + 0.1 + (seeded(idx*53+i+7)-0.5)*0.1;
+      const len = 24 + seeded(idx*31+i)*8;
+      const ndir = [Math.cos(nAz)*Math.cos(nEl), Math.sin(nEl), Math.sin(nAz)*Math.cos(nEl)];
+      const p = [hubPt[0]+ndir[0]*len, hubPt[1]+ndir[1]*len, hubPt[2]+ndir[2]*len];
+      taskEdges.push({a:hubPt, b:p, done:it.done, blocker:false});
+      nodes.push({p, item:it, phaseLabel:ph.label, isBlocker:false});
     });
 
     (ph.blockers||[]).forEach((bt, i) => {
-      const t = 0.85 + i*0.05;
-      const bBase = lerp3(base, tip, Math.min(t,0.97));
-      const bAz = az - 0.9 - i*0.22;
-      const bdir = [Math.cos(bAz)*0.6, 0.75, Math.sin(bAz)*0.6];
-      const len = 26;
-      const bp = [bBase[0]+bdir[0]*len, bBase[1]+bdir[1]*len, bBase[2]+bdir[2]*len];
-      twigs.push({a:bBase, b:bp, done:false, blocker:true});
-      leaves.push({p:bp, item:{t:bt, done:false}, phaseLabel:ph.label, isBlocker:true});
+      const bAz = az - 0.55 - i*0.22, bEl = elev + 0.3;
+      const len = 32;
+      const bdir = [Math.cos(bAz)*Math.cos(bEl), Math.sin(bEl), Math.sin(bAz)*Math.cos(bEl)];
+      const p = [hubPt[0]+bdir[0]*len, hubPt[1]+bdir[1]*len, hubPt[2]+bdir[2]*len];
+      taskEdges.push({a:hubPt, b:p, done:false, blocker:true});
+      nodes.push({p, item:{t:bt, done:false}, phaseLabel:ph.label, isBlocker:true});
     });
   });
 
-  return {branches, twigs, leaves};
+  spine.push([0, TREE_HEIGHT, 0]);
+  return {spine, hubEdges, hubs, taskEdges, nodes};
 }
 function p_len(ph){ return ph._items.length; }
-function lerp3(a,b,t){ return [a[0]+(b[0]-a[0])*t, a[1]+(b[1]-a[1])*t, a[2]+(b[2]-a[2])*t]; }
 
 const GEO = buildGeometry();
 const GROUND_RINGS = [40,80,120,160,200,240];
@@ -429,8 +436,8 @@ function colors(){
 }
 
 /* ── render ────────────────────────────────────────────────────────────── */
-let hoverLeaf = null;
-const screenLeaves = [];
+let hoverNode = null;
+const screenNodes = [];
 
 function draw(now){
   tickGrow(now);
@@ -440,8 +447,8 @@ function draw(now){
   ctx.clearRect(0,0,w,h);
   const C = colors();
 
-  // ground contour rings (topographic)
-  GROUND_RINGS.forEach((r,i)=>{
+  // ground rings — a plotting grid, not terrain
+  GROUND_RINGS.forEach((r)=>{
     ctx.beginPath();
     const steps = 64;
     for(let s=0;s<=steps;s++){
@@ -455,65 +462,98 @@ function draw(now){
   });
 
   const growHeight = (OVERALL_PCT/100) * TREE_HEIGHT * growT;
+  const scaledSpine = GEO.spine.map(p=>[p[0],p[1]*growT,p[2]]);
 
-  // trunk as tapered segments
-  const trunkSteps = 22;
-  for(let i=0;i<trunkSteps;i++){
-    const y0 = (i/trunkSteps)*TREE_HEIGHT*growT, y1 = ((i+1)/trunkSteps)*TREE_HEIGHT*growT;
-    const r0 = 15 - (y0/TREE_HEIGHT)*10.5, r1 = 15 - (y1/TREE_HEIGHT)*10.5;
-    const grown = y1 <= growHeight+2;
-    drawLimb([0,y0,0],[0,y1,0], (r0+r1)/2 * 0.9, grown ? C.growth : C.dormant, grown?0.95:0.55, C);
-  }
-
-  // branches
   const items3d = [];
-  GEO.branches.forEach(b=>{
-    const grown = b.a[1] <= growHeight;
-    items3d.push({type:"limb", a:b.a, b:b.b, w:b.w, col: grown?C.growth:C.dormant, alpha: grown?0.9:0.5, depth: depthOf(b.a,b.b)});
+
+  for(let i=0;i<scaledSpine.length-1;i++){
+    const a = scaledSpine[i], b = scaledSpine[i+1];
+    const grown = b[1] <= growHeight+1;
+    items3d.push({type:"edge", a, b, w:3, col: grown?C.growth:C.dormant, alpha: grown?0.95:0.55, depth: depthOf(a,b)});
+  }
+  GEO.hubEdges.forEach(e=>{
+    const a=[e.a[0],e.a[1]*growT,e.a[2]], b=[e.b[0],e.b[1]*growT,e.b[2]];
+    const grown = a[1] <= growHeight;
+    items3d.push({type:"edge", a, b, w: e.phase.current?2.6:2, col: grown?C.growth:C.dormant, alpha: grown?0.9:0.5, depth: depthOf(a,b)});
   });
-  GEO.twigs.forEach(tw=>{
-    const grown = tw.done && tw.a[1] <= growHeight+40;
-    items3d.push({type:"limb", a:tw.a, b:tw.b, w: tw.blocker?2.6:2.2, col: tw.blocker ? C.summit : (grown?C.growth:C.dormant), alpha: tw.blocker?0.8:(grown?0.85:0.4), depth: depthOf(tw.a,tw.b)});
+  GEO.taskEdges.forEach(te=>{
+    const a=[te.a[0],te.a[1]*growT,te.a[2]], b=[te.b[0],te.b[1]*growT,te.b[2]];
+    const grown = te.done && a[1] <= growHeight+40;
+    items3d.push({type:"edge", a, b, w:1.4, col: te.blocker ? C.summit : (grown?C.growth:C.dormant), alpha: te.blocker?0.75:(grown?0.85:0.35), depth: depthOf(a,b)});
   });
-  GEO.leaves.forEach(lf=>{
-    items3d.push({type:"leaf", p:lf.p, leaf:lf, depth: depthOf(lf.p,lf.p)});
+  GEO.hubs.forEach(hb=>{
+    const p=[hb.p[0],hb.p[1]*growT,hb.p[2]];
+    items3d.push({type:"hub", p, hub:hb, depth: depthOf(p,p)});
+  });
+  GEO.nodes.forEach(nd=>{
+    const p=[nd.p[0],nd.p[1]*growT,nd.p[2]];
+    items3d.push({type:"node", p, node:nd, depth: depthOf(p,p)});
   });
 
   items3d.sort((a,b)=>b.depth-a.depth);
-  screenLeaves.length = 0;
+  screenNodes.length = 0;
 
   items3d.forEach(it=>{
-    if (it.type==="limb"){
-      drawLimb(it.a, it.b, it.w, it.col, it.alpha, C);
+    if (it.type==="edge"){
+      drawEdge(it.a, it.b, it.w, it.col, it.alpha);
+    } else if (it.type==="hub"){
+      const pt = project(it.p);
+      const ph = it.hub.phase;
+      const R = Math.max(5, 8.5*pt.s) * (ph.current?1.25:1);
+      const isHover = hoverNode && hoverNode.hub===it.hub;
+      const fillFrac = Math.sqrt(Math.max(ph._pct,0)/100);
+      ctx.beginPath(); ctx.arc(pt.x,pt.y,R,0,Math.PI*2);
+      ctx.strokeStyle = ph.current ? C.summit : (ph._pct>0?C.growth:C.dormant);
+      ctx.lineWidth = 1.6; ctx.globalAlpha = isHover?1:0.85; ctx.stroke();
+      if (fillFrac>0){
+        ctx.beginPath(); ctx.arc(pt.x,pt.y,R*fillFrac,0,Math.PI*2);
+        ctx.fillStyle = C.growth; ctx.globalAlpha = isHover?0.95:0.75;
+        ctx.shadowColor=C.growth; ctx.shadowBlur = isHover?12:5;
+        ctx.fill(); ctx.shadowBlur=0;
+      }
+      ctx.globalAlpha=1;
+      ctx.font = "600 "+Math.max(10,11*pt.s)+"px "+fontVar("--font-mono");
+      ctx.fillStyle = ph.current ? C.summit : C.ink;
+      ctx.textAlign="center";
+      ctx.fillText(ph.tag, pt.x, pt.y - R - 8*pt.s);
+      ctx.textAlign="left";
+      screenNodes.push({x:pt.x,y:pt.y,r:Math.max(R,10),hub:it.hub});
     } else {
       const pt = project(it.p);
-      const isBlocker = it.leaf.isBlocker;
-      const grown = it.leaf.item.done;
-      const r = Math.max(2.2, 3.4*pt.s) * (isBlocker?1.15:1);
-      const isHover = hoverLeaf===it.leaf;
-      ctx.beginPath();
+      const isBlocker = it.node.isBlocker;
+      const grown = it.node.item.done;
+      const r = Math.max(2.2, 3.2*pt.s) * (isBlocker?1.1:1);
+      const isHover = hoverNode && hoverNode.node===it.node;
       if (isBlocker){
         ctx.save();
         ctx.translate(pt.x,pt.y); ctx.rotate(Math.PI/4);
-        ctx.fillStyle = C.summit;
-        ctx.globalAlpha = isHover?1:0.88;
-        ctx.fillRect(-r*0.8,-r*0.8,r*1.6,r*1.6);
+        ctx.strokeStyle = C.summit; ctx.lineWidth = 1.6;
+        ctx.globalAlpha = isHover?1:0.85;
+        ctx.strokeRect(-r*0.8,-r*0.8,r*1.6,r*1.6);
+        if (isHover){ ctx.fillStyle=C.summit; ctx.globalAlpha=0.3; ctx.fillRect(-r*0.8,-r*0.8,r*1.6,r*1.6); }
         ctx.restore();
         ctx.globalAlpha = 1;
-      } else {
-        ctx.fillStyle = grown ? C.growth : C.dormant;
-        ctx.globalAlpha = isHover ? 1 : (grown?0.95:0.7);
-        if (grown){ ctx.shadowColor = C.growth; ctx.shadowBlur = isHover?14:7; }
+      } else if (grown){
+        ctx.beginPath();
+        ctx.fillStyle = C.growth;
+        ctx.globalAlpha = isHover ? 1 : 0.92;
+        ctx.shadowColor = C.growth; ctx.shadowBlur = isHover?14:6;
         ctx.arc(pt.x, pt.y, isHover? r*1.6 : r, 0, Math.PI*2);
         ctx.fill();
-        ctx.shadowBlur = 0;
+        ctx.shadowBlur = 0; ctx.globalAlpha = 1;
+      } else {
+        ctx.beginPath();
+        ctx.strokeStyle = C.dormant; ctx.lineWidth = 1.4;
+        ctx.globalAlpha = isHover ? 1 : 0.65;
+        ctx.arc(pt.x, pt.y, isHover? r*1.5 : r, 0, Math.PI*2);
+        ctx.stroke();
+        ctx.globalAlpha = 1;
       }
-      ctx.globalAlpha = 1;
-      screenLeaves.push({x:pt.x,y:pt.y,r:Math.max(r,7),leaf:it.leaf});
+      screenNodes.push({x:pt.x,y:pt.y,r:Math.max(r,7),node:it.node});
     }
   });
 
-  // growth ring (current altitude)
+  // current-altitude ring
   if (growT>0.01){
     const ringPts = [];
     const steps=48;
@@ -530,28 +570,36 @@ function draw(now){
     ctx.shadowBlur=0; ctx.globalAlpha=1;
   }
 
-  // summit marker
+  // summit node
   const summitPt = project([0, TREE_HEIGHT*growT, 0]);
   const atSummit = OVERALL_PCT>=100;
-  ctx.beginPath();
-  ctx.moveTo(summitPt.x, summitPt.y);
-  ctx.lineTo(summitPt.x, summitPt.y-18*summitPt.s);
-  ctx.lineTo(summitPt.x+11*summitPt.s, summitPt.y-13*summitPt.s);
-  ctx.lineTo(summitPt.x, summitPt.y-9*summitPt.s);
-  ctx.closePath();
-  ctx.fillStyle = C.summit;
-  ctx.globalAlpha = atSummit ? 1 : 0.28;
-  if (atSummit){ ctx.shadowColor=C.summit; ctx.shadowBlur=16; }
-  ctx.fill();
-  ctx.shadowBlur=0; ctx.globalAlpha=1;
+  const sR = Math.max(6,9*summitPt.s);
+  drawHex(summitPt.x, summitPt.y, sR, C.summit, atSummit?1:0.3, atSummit);
 
-  ctx.font = "10.5px "+getComputedStyle(document.documentElement).getPropertyValue("--font-mono");
+  ctx.font = "10.5px "+fontVar("--font-mono");
   ctx.fillStyle = C.inkDim;
   ctx.globalAlpha = 0.85;
-  ctx.fillText("SUMMIT · 100%"+(atSummit?"":" (locked)"), summitPt.x+14*summitPt.s, summitPt.y-10*summitPt.s);
+  ctx.fillText("SUMMIT · 100%"+(atSummit?"":" (locked)"), summitPt.x+sR+8, summitPt.y);
   ctx.globalAlpha = 1;
 
   requestAnimationFrame(draw);
+}
+
+function fontVar(name){ return getComputedStyle(document.documentElement).getPropertyValue(name); }
+
+function drawHex(cx,cy,r,col,alpha,glow){
+  ctx.beginPath();
+  for(let i=0;i<6;i++){
+    const a = i/6*Math.PI*2 - Math.PI/2;
+    const x = cx+Math.cos(a)*r, y = cy+Math.sin(a)*r;
+    i===0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y);
+  }
+  ctx.closePath();
+  ctx.fillStyle = col;
+  ctx.globalAlpha = alpha;
+  if (glow){ ctx.shadowColor=col; ctx.shadowBlur=18; }
+  ctx.fill();
+  ctx.shadowBlur=0; ctx.globalAlpha=1;
 }
 
 function depthOf(a,b){
@@ -559,14 +607,14 @@ function depthOf(a,b){
   return (ra[2]+rb[2])/2;
 }
 
-function drawLimb(a,b,width,col,alpha,C){
+function drawEdge(a,b,width,col,alpha){
   const pa = project(a), pb = project(b);
   ctx.beginPath();
   ctx.moveTo(pa.x,pa.y); ctx.lineTo(pb.x,pb.y);
   ctx.strokeStyle = col;
   ctx.globalAlpha = alpha;
   ctx.lineWidth = Math.max(1, width * ((pa.s+pb.s)/2));
-  ctx.lineCap = "round";
+  ctx.lineCap = "butt";
   ctx.stroke();
   ctx.globalAlpha = 1;
 }
@@ -590,19 +638,27 @@ window.addEventListener("pointermove", e=>{
   }
   const mx=e.clientX, my=e.clientY;
   let best=null, bestD=1e9;
-  screenLeaves.forEach(sl=>{
-    const d = Math.hypot(sl.x-mx, sl.y-my);
-    if (d<sl.r+6 && d<bestD){ bestD=d; best=sl; }
+  screenNodes.forEach(sn=>{
+    const d = Math.hypot(sn.x-mx, sn.y-my);
+    if (d<sn.r+6 && d<bestD){ bestD=d; best=sn; }
   });
-  if (best){ hoverLeaf=best.leaf; showTooltip(best.leaf, mx, my); }
-  else { hoverLeaf=null; hideTooltip(); }
+  if (best){ hoverNode=best; showTooltip(best, mx, my); }
+  else { hoverNode=null; hideTooltip(); }
 });
 
 const tooltip = document.getElementById("tooltip");
-function showTooltip(leaf, x, y){
-  document.getElementById("ttPhase").textContent = leaf.phaseLabel + (leaf.isBlocker?" · architectural blocker":"");
-  document.getElementById("ttText").textContent = leaf.item.t;
-  document.getElementById("ttStatus").textContent = leaf.isBlocker ? "Gates generalization (P1)" : (leaf.item.done ? "Shipped" : "Ahead of us");
+function showTooltip(sn, x, y){
+  if (sn.hub){
+    const ph = sn.hub.phase;
+    document.getElementById("ttPhase").textContent = ph.tag + (ph.current?" · current focus":"");
+    document.getElementById("ttText").textContent = ph.label + (ph.note?" — "+ph.note:"");
+    document.getElementById("ttStatus").textContent = ph._done+" / "+ph._total+" tasks done ("+ph._pct.toFixed(0)+"%)";
+  } else {
+    const nd = sn.node;
+    document.getElementById("ttPhase").textContent = nd.phaseLabel + (nd.isBlocker?" · architectural blocker":"");
+    document.getElementById("ttText").textContent = nd.item.t;
+    document.getElementById("ttStatus").textContent = nd.isBlocker ? "Gates generalization (P1)" : (nd.item.done ? "Shipped" : "Ahead of us");
+  }
   tooltip.style.left = Math.min(x+16, window.innerWidth-296)+"px";
   tooltip.style.top = Math.min(y+16, window.innerHeight-120)+"px";
   tooltip.classList.add("show");
