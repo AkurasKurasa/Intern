@@ -109,14 +109,27 @@ def _canonical_index(tab_name: str) -> int | None:
 
 
 def _clicked_element(state: dict, pos) -> dict | None:
+    """
+    Smallest-area bbox containing the click point, not the first match in
+    array order. Elements overlap (window > panel > button), and the window
+    is typically listed first — taking the first match silently attributed
+    every click inside the form to "Car Insurance ... Data Entry Form"
+    instead of the actual button clicked, so submit_reached never fired even
+    when the user demonstrably clicked Submit. Found 2026-08-06.
+    """
     if not pos or len(pos) < 2:
         return None
     x, y = pos
+    best, best_area = None, None
     for e in state.get("elements", []):
         b = e.get("bbox")
-        if b and len(b) == 4 and b[0] <= x <= b[2] and b[1] <= y <= b[3]:
-            return e
-    return None
+        if not b or len(b) != 4:
+            continue
+        if b[0] <= x <= b[2] and b[1] <= y <= b[3]:
+            area = max(1, (b[2] - b[0]) * (b[3] - b[1]))
+            if best_area is None or area < best_area:
+                best, best_area = e, area
+    return best
 
 
 def check_session(session_dir: Path) -> dict:
