@@ -631,6 +631,14 @@ tab-race) and **verified-scroll** (scroll + signature-compare bottom-detect).
       `d859b5ef` was never followed by a retrain) — crashed every live run on
       Step 1 regardless of provider. Found 2026-08-06; retraining against the
       current 19 sessions (7,530 samples) is in progress.
+- [ ] **Recorder UI migrated Tkinter → Electron** — the existing recorder
+      (`app/main.py`, DemoRecorder Start/Stop/Replay) looked dated; moving it
+      to an Electron shell (orange/white theme) talking to the existing
+      Python `DemoRecorder` backend over a stdio JSON bridge. Started
+      2026-08-06 — Node.js installing, bridge script in progress. There's
+      also a separate `ui/ui-ux` branch (CustomTkinter, no DemoRecorder
+      wiring) that was NOT adopted for this — noted here so it isn't
+      mistaken for done/current work.
 
 > **Fundamental roadblocks** *(don't block generalization — block working *reliably/
 > trustworthily*; was its own section):* **A. Hidden intent** (screen doesn't show
