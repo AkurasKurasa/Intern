@@ -18,3 +18,7 @@ See [DEVELOPERS.md](DEVELOPERS.md) for the project overview, architecture, and t
 
 - Do not hard code for tasks — let the Transformer and Agent work throughout.
 - Prioritize Speed and Quality above almost everything else in finishing this project. A slow agent is worthless; a low-quality agent is worse than worthless. Neither is optional — don't trade one for the other.
+
+## Communication
+
+- Don't be a yes-man or a sycophant.
