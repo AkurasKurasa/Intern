@@ -4207,6 +4207,22 @@ class LLMAgent:
                     _expected = self._lookup_field(_fn, section=_fsec)
                 logger.info("LLM focused-field lookup: field=%r  expected=%r  cache_size=%d",
                             _fn, _expected[:40] if _expected else "", len(self._cached_record))
+
+                # Fast path found 2026-08-07: the record lookup above already
+                # HAS the answer — every logged run tonight showed 100% value
+                # accuracy, meaning this direct/constant lookup was already
+                # correct every single time. The code used to hand that exact
+                # value to the LLM as a hint ("use EXACTLY this string... do
+                # NOT invent") and then pay a full ~5s network round-trip just
+                # to have it echoed back. Skip the call entirely when the
+                # lookup is confident; only fall through to the LLM for
+                # fields the record genuinely doesn't answer (blank/derived/
+                # ambiguous ones — the case it's actually needed for).
+                if _expected:
+                    logger.info("LLM call skipped — direct lookup already answered %r -> %r",
+                                _fn, _expected[:40])
+                    return {"action_type": "type", "text": _expected, "_fast_path": "lookup"}
+
                 _expect_hint = (
                     f"\n  → EXPECTED VALUE FROM DATA SOURCES: {_expected!r}"
                     f"\n  → Use EXACTLY this string as 'text'. Do NOT modify or invent."
