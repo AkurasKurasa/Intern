@@ -121,6 +121,10 @@ class CarInsuranceFrame(wx.Frame):
 
         self._build_ui()
         self.Centre()
+        # Without this, initial focus is whatever wx's construction order happens
+        # to leave it on (observed landing on a Policyholder-tab field while the
+        # Policy tab was showing) — not the visible tab's first field.
+        wx.CallAfter(self._focus_first_input, self.nb.GetPage(0))
 
     # ── Top-level UI ──────────────────────────────────────────────────────────
 
@@ -144,6 +148,7 @@ class CarInsuranceFrame(wx.Frame):
         # ── Notebook ──────────────────────────────────────────────────────────
         self.nb = wx.Notebook(outer, name="main_notebook")
         outer_sz.Add(self.nb, 1, wx.EXPAND | wx.ALL, 8)
+        self.nb.Bind(wx.EVT_NOTEBOOK_PAGE_CHANGED, self._on_tab_changed)
 
         for builder in [
             self._build_policy_tab,
@@ -185,6 +190,28 @@ class CarInsuranceFrame(wx.Frame):
         outer.SetSizer(outer_sz)
 
     # ── Layout helpers ────────────────────────────────────────────────────────
+
+    def _on_tab_changed(self, event):
+        """Every tab switch (human click, agent click, or Submit & New's reset
+        to tab 1) lands on a known, consistent first field — not wherever focus
+        last happened to be. Removes the 'which field is focused after
+        switching tabs' ambiguity for both human demo recording and the agent."""
+        event.Skip()
+        idx = event.GetSelection()
+        if idx < 0 or idx >= self.nb.GetPageCount():
+            return
+        page = self.nb.GetPage(idx)
+        wx.CallAfter(self._focus_first_input, page)
+
+    def _focus_first_input(self, page):
+        """First fillable control on `page`, in the same left-to-right,
+        top-to-bottom order the fields were built in (page's direct children
+        are added in that order — see _row())."""
+        for child in page.GetChildren():
+            if isinstance(child, (wx.TextCtrl, wx.Choice, wx.ComboBox, wx.CheckBox)):
+                child.SetFocus()
+                return True
+        return False
 
     def _make_page(self, title: str, tab_name: str):
         page = scrolled.ScrolledPanel(self.nb, name=tab_name)
@@ -850,6 +877,10 @@ class CarInsuranceFrame(wx.Frame):
             if hasattr(_pg, "Scroll"):
                 _pg.Scroll(0, 0)
         self.nb.SetSelection(0)
+        # Belt-and-suspenders: SetSelection(0) only fires EVT_NOTEBOOK_PAGE_CHANGED
+        # if the selection actually changes — if we were already on tab 0, that
+        # event never fires, so the first-input focus would silently be skipped.
+        wx.CallAfter(self._focus_first_input, self.nb.GetPage(0))
         self._status_lbl.SetLabel(
             f"  Submitted #{self._record_counter} — Ready for next record"
         )
