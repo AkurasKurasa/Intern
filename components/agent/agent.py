@@ -3750,7 +3750,23 @@ class LLMAgent:
                             always done via _filled_this_tab.
         min_y             : only consider fields whose top-edge y >= min_y (used
                             by pane-escape to avoid jumping back above the pane).
+
+        Bug found 2026-08-07 via a live stuck-loop (repeatedly re-focusing a
+        field from an INACTIVE tab, forever): this method's own candidate scan
+        below trusts `state["elements"]` bboxes to tell active-tab fields from
+        inactive-tab ones, which does not hold — verified live that a hidden
+        tab's field can report the exact same positive on-screen bbox as when
+        visible. What IS reliable, also verified live: the inactive tab's own
+        PANE genuinely stops existing in the UIA tree (Exists()==False), while
+        the active tab's pane exists with real children. `_uia_focus_first_field`
+        already implements exactly that pane-scoped search correctly — it was
+        just never called from here. Try it first for the common case
+        (min_y<=0, true for every current caller); only fall back to the
+        state-dict scan below (which lacks this guarantee) if it finds nothing,
+        or if a caller ever asks for the min_y floor it doesn't support.
         """
+        if min_y <= 0 and self._uia_focus_first_field():
+            return True
         elements = state.get("elements", [])
         # Compute actual tab-strip bottom so clicks never land on the tab bar.
         _tab_bottoms = [
