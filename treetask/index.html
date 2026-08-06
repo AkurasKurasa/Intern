@@ -112,9 +112,12 @@
     font-family:var(--font-mono); font-size:10.5px; letter-spacing:.12em; text-transform:uppercase;
     color:var(--ink-dim); margin:0 0 12px;
   }
-  .phase-row{ margin-bottom:12px; }
+  .phase-row{ margin-bottom:12px; cursor:pointer; border-radius:6px; margin-left:-6px; margin-right:-6px; padding:0 6px; transition:opacity .15s ease, background .15s ease; }
   .phase-row:last-child{ margin-bottom:0; }
+  .phase-row:hover{ background:var(--line); }
+  .phase-row.collapsed{ opacity:.5; }
   .phase-row .top{ display:flex; justify-content:space-between; align-items:baseline; gap:8px; margin-bottom:4px; }
+  .phase-row .chev{ font-size:9px; color:var(--ink-dim); flex:none; width:9px; }
   .phase-row .tag{ font-family:var(--font-mono); font-size:10.5px; color:var(--ink-dim); }
   .phase-row .name{ font-size:12.5px; font-weight:600; flex:1; }
   .phase-row.current .name{ color:var(--summit); }
@@ -163,9 +166,9 @@
 <header class="hdr">
   <p class="eyebrow fade-in">Task graph — Intern project</p>
   <h1 class="fade-in delay1">Task Tree</h1>
-  <p class="sub fade-in delay2">A node map of the climb toward completion. Each hub is a phase from
-    <em>DEVELOPERS.md</em>, each small node a task — lit when shipped, dark when still ahead.
-    The peak node lights only at 100%.</p>
+  <p class="sub fade-in delay2"><em>Complete Intern</em> sits at the root, at the top. Each hub hanging
+    below it is a phase from <em>DEVELOPERS.md</em>, each small node a task — lit when shipped, dark when
+    still ahead. Click a hub, in the scene or the list, to collapse or expand it.</p>
 </header>
 
 <div class="panel altimeter fade-in delay2">
@@ -177,7 +180,7 @@
     <button id="btnRotate" type="button" aria-pressed="true">Auto-climb</button>
     <button id="btnReset" type="button">Reset view</button>
   </div>
-  <p class="hint">Drag to orbit · scroll or pinch to zoom</p>
+  <p class="hint">Drag to orbit · scroll or pinch to zoom · click a hub to collapse it</p>
 </div>
 
 <div class="panel legend fade-in delay2" id="legend">
@@ -350,6 +353,28 @@ const TOTAL_DONE = PHASES.reduce((a,p)=>a+p._done,0);
 const TOTAL_ITEMS = PHASES.reduce((a,p)=>a+p._total,0);
 const OVERALL_PCT = TOTAL_DONE/TOTAL_ITEMS*100;
 
+/* ── Collapse state — click a hub (3D or list) to hide/show its tasks ───── */
+const COLLAPSE_KEY = "taskTreeCollapsed";
+try {
+  const saved = JSON.parse(localStorage.getItem(COLLAPSE_KEY) || "[]");
+  PHASES.forEach(p=>{ p._collapsed = saved.includes(p.id); });
+} catch(e){ PHASES.forEach(p=>{ p._collapsed = false; }); }
+function persistCollapse(){
+  try { localStorage.setItem(COLLAPSE_KEY, JSON.stringify(PHASES.filter(p=>p._collapsed).map(p=>p.id))); }
+  catch(e){ /* storage unavailable — collapse still works, just won't persist */ }
+}
+function toggleCollapse(ph){
+  ph._collapsed = !ph._collapsed;
+  persistCollapse();
+  updatePhaseRow(ph);
+}
+function updatePhaseRow(p){
+  if (!p._rowEl) return;
+  p._rowEl.classList.toggle("collapsed", !!p._collapsed);
+  const chev = p._rowEl.querySelector(".chev");
+  if (chev) chev.textContent = p._collapsed ? "▸" : "▾";
+}
+
 /* ── UI: altimeter + legend ───────────────────────────────────────────── */
 document.getElementById("pctBig").innerHTML = OVERALL_PCT.toFixed(1)+"<small>%</small>";
 document.getElementById("pctBar").style.width = OVERALL_PCT.toFixed(1)+"%";
@@ -365,12 +390,15 @@ const listEl = document.getElementById("phaseList");
 PHASES.forEach(p=>{
   const row = document.createElement("div");
   row.className = "phase-row"+(p.current?" current":"");
-  row.title = p.desc || "";
+  row.title = (p.desc || "") + "  ·  click to collapse/expand its tasks";
   row.innerHTML =
-    '<div class="top"><span class="tag">'+p.tag+'</span><span class="name">'+p.label+'</span>'+
+    '<div class="top"><span class="chev">▾</span><span class="tag">'+p.tag+'</span><span class="name">'+p.label+'</span>'+
     '<span class="pct">'+p._done+'/'+p._total+'</span></div>'+
     '<div class="track"><i style="width:'+p._pct.toFixed(0)+'%"></i></div>';
+  row.addEventListener("click", ()=> toggleCollapse(p));
   listEl.appendChild(row);
+  p._rowEl = row;
+  updatePhaseRow(p);
 });
 
 /* ── 3D scene ──────────────────────────────────────────────────────────── */
@@ -385,23 +413,27 @@ const GOLDEN = 137.5077640500378 * Math.PI/180;
 function seeded(i){ const x = Math.sin(i*12.9898)*43758.5453; return x-Math.floor(x); }
 
 /*
- * Node graph, not a plant: a central spine (root → summit) passes through one
- * attach-point per phase; each phase hangs a hub node off the spine, and each
- * task hangs a small node off its hub. Everything below is nodes + straight
+ * Inverted node graph: "Complete Intern" is the root, fixed at the top. A
+ * central trunk descends from it; each phase hangs a hub off the trunk at
+ * its own depth, and each task hangs a small node off its hub, drooping
+ * further down and outward — a real root-at-top hierarchy, not a climb
+ * toward a goal reached only at 100%. Everything below is nodes + straight
  * edges — positions only, no organic curvature.
  */
 function buildGeometry(){
-  const spine = [[0,0,0]];               // polyline: root → each phase attach → summit
+  const spine = [[0, TREE_HEIGHT, 0]];    // polyline: root (Complete Intern) → each phase attach → base
   const hubEdges = [];                    // {a,b,phase}
   const hubs = [];                        // {p:[x,y,z], phase}
-  const taskEdges = [];                   // {a,b,done,blocker}
-  const nodes = [];                       // {p:[x,y,z], item, phaseLabel, isBlocker}
+  const taskEdges = [];                   // {a,b,done,blocker,phase}
+  const nodes = [];                       // {p:[x,y,z], item, phaseLabel, isBlocker, phase}
 
   PHASES.forEach((ph, idx) => {
     const az = idx*GOLDEN;
-    const attachH = (idx+0.9)/(PHASES.length+0.55) * TREE_HEIGHT * 0.92;
-    const spineR = 15 - (attachH/TREE_HEIGHT)*10;
-    const elev = (32 + (idx%3)*6) * Math.PI/180;
+    // Descends from the root: phase 0 attaches near the top (close to
+    // Complete Intern), the last phase attaches near the base.
+    const attachH = TREE_HEIGHT - (idx+0.9)/(PHASES.length+0.55) * TREE_HEIGHT * 0.92;
+    const spineR = 15 - ((TREE_HEIGHT-attachH)/TREE_HEIGHT)*10;   // trunk widest at the root
+    const elev = -(32 + (idx%3)*6) * Math.PI/180;                 // branches droop downward off the trunk
     const hubDist = 52 + Math.min(p_len(ph),24)*3.0;
 
     const spinePt = [Math.cos(az)*spineR, attachH, Math.sin(az)*spineR];
@@ -418,16 +450,16 @@ function buildGeometry(){
     items.forEach((it, i) => {
       const fanT = n>1 ? (i/(n-1)-0.5) : 0;
       const nAz = az + fanT*fanSpread;
-      const nEl = elev + 0.1 + (seeded(idx*53+i+7)-0.5)*0.1;
+      const nEl = elev - 0.1 - (seeded(idx*53+i+7)-0.5)*0.1;
       const len = 24 + seeded(idx*31+i)*8;
       const ndir = [Math.cos(nAz)*Math.cos(nEl), Math.sin(nEl), Math.sin(nAz)*Math.cos(nEl)];
       const p = [hubPt[0]+ndir[0]*len, hubPt[1]+ndir[1]*len, hubPt[2]+ndir[2]*len];
-      taskEdges.push({a:hubPt, b:p, done:it.done, blocker:!!it.isBlocker, locked:!!it._locked});
-      nodes.push({p, item:it, phaseLabel:ph.label, isBlocker:!!it.isBlocker});
+      taskEdges.push({a:hubPt, b:p, done:it.done, blocker:!!it.isBlocker, locked:!!it._locked, phase:ph});
+      nodes.push({p, item:it, phaseLabel:ph.label, isBlocker:!!it.isBlocker, phase:ph});
     });
   });
 
-  spine.push([0, TREE_HEIGHT, 0]);
+  spine.push([0, 0, 0]);   // base — trunk's far end, no special meaning
   return {spine, hubEdges, hubs, taskEdges, nodes};
 }
 function p_len(ph){ return ph._items.length; }
@@ -517,24 +549,29 @@ function draw(now){
     ctx.stroke();
   });
 
+  // Progress grows DOWN from the root: growFloor is the y-threshold above
+  // (i.e. at-or-above) which the trunk/branches count as "grown/lit".
   const growHeight = (OVERALL_PCT/100) * TREE_HEIGHT * growT;
+  const growFloor  = TREE_HEIGHT*growT - growHeight;
   const scaledSpine = GEO.spine.map(p=>[p[0],p[1]*growT,p[2]]);
 
   const items3d = [];
 
   for(let i=0;i<scaledSpine.length-1;i++){
     const a = scaledSpine[i], b = scaledSpine[i+1];
-    const grown = b[1] <= growHeight+1;
+    const grown = b[1] >= growFloor-1;
     items3d.push({type:"edge", a, b, w:3, col: grown?C.growth:C.dormant, alpha: grown?0.95:0.55, depth: depthOf(a,b)});
   }
   GEO.hubEdges.forEach(e=>{
+    if (e.phase._collapsed) return;
     const a=[e.a[0],e.a[1]*growT,e.a[2]], b=[e.b[0],e.b[1]*growT,e.b[2]];
-    const grown = a[1] <= growHeight;
+    const grown = a[1] >= growFloor;
     items3d.push({type:"edge", a, b, w: e.phase.current?2.6:2, col: grown?C.growth:C.dormant, alpha: grown?0.9:0.5, depth: depthOf(a,b)});
   });
   GEO.taskEdges.forEach(te=>{
+    if (te.phase._collapsed) return;
     const a=[te.a[0],te.a[1]*growT,te.a[2]], b=[te.b[0],te.b[1]*growT,te.b[2]];
-    const grown = te.done && a[1] <= growHeight+40;
+    const grown = te.done && a[1] >= growFloor-40;
     const col = te.blocker ? C.summit : (te.locked ? C.locked : (grown?C.growth:C.dormant));
     items3d.push({type:"edge", a, b, w:1.4, col, alpha: te.blocker?0.75:(te.locked?0.25:(grown?0.85:0.35)), dash: !!te.locked, depth: depthOf(a,b)});
   });
@@ -543,6 +580,7 @@ function draw(now){
     items3d.push({type:"hub", p, hub:hb, depth: depthOf(p,p)});
   });
   GEO.nodes.forEach(nd=>{
+    if (nd.phase._collapsed) return;
     const p=[nd.p[0],nd.p[1]*growT,nd.p[2]];
     items3d.push({type:"node", p, node:nd, depth: depthOf(p,p)});
   });
@@ -561,7 +599,10 @@ function draw(now){
       const fillFrac = Math.sqrt(Math.max(ph._pct,0)/100);
       ctx.beginPath(); ctx.arc(pt.x,pt.y,R,0,Math.PI*2);
       ctx.strokeStyle = ph.current ? C.summit : (ph._pct>0?C.growth:C.dormant);
-      ctx.lineWidth = 1.6; ctx.globalAlpha = isHover?1:0.85; ctx.stroke();
+      ctx.lineWidth = 1.6; ctx.globalAlpha = isHover?1:(ph._collapsed?0.55:0.85);
+      if (ph._collapsed) ctx.setLineDash([3,3]);
+      ctx.stroke();
+      ctx.setLineDash([]);
       if (fillFrac>0){
         ctx.beginPath(); ctx.arc(pt.x,pt.y,R*fillFrac,0,Math.PI*2);
         ctx.fillStyle = C.growth; ctx.globalAlpha = isHover?0.95:0.75;
@@ -572,7 +613,7 @@ function draw(now){
       ctx.font = "600 "+Math.max(10,11*pt.s)+"px "+fontVar("--font-mono");
       ctx.fillStyle = ph.current ? C.summit : C.ink;
       ctx.textAlign="center";
-      ctx.fillText(ph.tag, pt.x, pt.y - R - 8*pt.s);
+      ctx.fillText(ph.tag + (ph._collapsed ? "  ▸" : ""), pt.x, pt.y - R - 8*pt.s);
       ctx.textAlign="left";
       screenNodes.push({x:pt.x,y:pt.y,r:Math.max(R,10),hub:it.hub});
     } else {
@@ -619,14 +660,14 @@ function draw(now){
     }
   });
 
-  // current-altitude ring
-  if (growT>0.01){
+  // current-depth ring — how far the grown trunk reaches down from the root
+  if (growT>0.01 && growHeight>0.5){
     const ringPts = [];
     const steps=48;
     for(let s=0;s<=steps;s++){
       const a=(s/steps)*Math.PI*2;
-      const rad = 15 - (growHeight/TREE_HEIGHT)*10.5;
-      ringPts.push(project([Math.cos(a)*(rad+3), growHeight, Math.sin(a)*(rad+3)]));
+      const rad = 15 - ((TREE_HEIGHT*growT-growFloor)/TREE_HEIGHT)*10.5;
+      ringPts.push(project([Math.cos(a)*(rad+3), growFloor, Math.sin(a)*(rad+3)]));
     }
     ctx.beginPath();
     ringPts.forEach((p,i)=> i===0?ctx.moveTo(p.x,p.y):ctx.lineTo(p.x,p.y));
@@ -636,16 +677,23 @@ function draw(now){
     ctx.shadowBlur=0; ctx.globalAlpha=1;
   }
 
-  // summit node
-  const summitPt = project([0, TREE_HEIGHT*growT, 0]);
-  const atSummit = OVERALL_PCT>=100;
-  const sR = Math.max(6,9*summitPt.s);
-  drawHex(summitPt.x, summitPt.y, sR, C.summit, atSummit?1:0.3, atSummit);
+  // root node — "Complete Intern", fixed at the top, always present (it's
+  // the root of the hierarchy now, not a goal only reached at 100%)
+  const rootPt = project([0, TREE_HEIGHT*growT, 0]);
+  const atGoal = OVERALL_PCT>=100;
+  const rR = Math.max(7,10*rootPt.s);
+  drawHex(rootPt.x, rootPt.y, rR, C.summit, atGoal?1:0.9, true);
 
-  ctx.font = "10.5px "+fontVar("--font-mono");
+  ctx.textAlign = "center";
+  ctx.font = "700 "+Math.max(11,12.5*rootPt.s)+"px "+fontVar("--font-mono");
+  ctx.fillStyle = C.summit;
+  ctx.globalAlpha = 1;
+  ctx.fillText("COMPLETE INTERN", rootPt.x, rootPt.y - rR - 12*rootPt.s);
+  ctx.font = "10px "+fontVar("--font-mono");
   ctx.fillStyle = C.inkDim;
   ctx.globalAlpha = 0.85;
-  ctx.fillText("COMPLETE INTERN · 100%"+(atSummit?"":" (locked)"), summitPt.x+sR+8, summitPt.y);
+  ctx.fillText(OVERALL_PCT.toFixed(1)+"% climbed"+(atGoal?" · reached":""), rootPt.x, rootPt.y - rR - 12*rootPt.s + 14);
+  ctx.textAlign = "left";
   ctx.globalAlpha = 1;
 
   requestAnimationFrame(draw);
@@ -698,6 +746,7 @@ canvas.addEventListener("wheel", e=>{
 
 const activePointers = new Map();
 let pinchStartDist = null, pinchStartZoom = 1;
+let dragDistance = 0;   // total pointer movement since pointerdown — small enough at pointerup means "click", not "drag"
 
 canvas.addEventListener("pointerdown", e=>{
   activePointers.set(e.pointerId, {x:e.clientX, y:e.clientY});
@@ -709,14 +758,25 @@ canvas.addEventListener("pointerdown", e=>{
     pinchStartZoom = zoom;
   } else {
     dragging = true; lastX=e.clientX; lastY=e.clientY;
+    dragDistance = 0;
     canvas.classList.add("dragging");
   }
 });
 window.addEventListener("pointerup", e=>{
+  const wasTap = activePointers.size===1 && dragDistance < 6;
   activePointers.delete(e.pointerId);
   pinchStartDist = null;
   dragging = activePointers.size===1;
   if (!dragging) canvas.classList.remove("dragging");
+  if (wasTap){
+    const mx=e.clientX, my=e.clientY;
+    let best=null, bestD=1e9;
+    screenNodes.forEach(sn=>{
+      const d = Math.hypot(sn.x-mx, sn.y-my);
+      if (d<sn.r+6 && d<bestD){ bestD=d; best=sn; }
+    });
+    if (best && best.hub) toggleCollapse(best.hub.phase);
+  }
 });
 window.addEventListener("pointercancel", e=>{ activePointers.delete(e.pointerId); pinchStartDist=null; dragging=false; });
 window.addEventListener("pointermove", e=>{
@@ -730,6 +790,7 @@ window.addEventListener("pointermove", e=>{
     return;
   }
   if (dragging){
+    dragDistance += Math.hypot(e.clientX-lastX, e.clientY-lastY);
     rotY += (e.clientX-lastX)*0.0055;
     rotX = Math.max(-0.05, Math.min(0.55, rotX + (e.clientY-lastY)*0.004));
     lastX=e.clientX; lastY=e.clientY;
@@ -755,7 +816,8 @@ function showTooltip(sn, x, y){
     document.getElementById("ttPhase").textContent = ph.tag + (ph.current?" · current focus":"");
     document.getElementById("ttText").textContent = ph.label + (ph.note?" — "+ph.note:"");
     document.getElementById("ttDesc").textContent = ph.desc || "";
-    statusEl.textContent = ph._done+" / "+ph._total+" tasks done ("+ph._pct.toFixed(0)+"%)";
+    statusEl.textContent = ph._done+" / "+ph._total+" tasks done ("+ph._pct.toFixed(0)+"%)"+
+      (ph._collapsed ? "  ·  click to expand" : "  ·  click to collapse");
   } else {
     const nd = sn.node;
     document.getElementById("ttPhase").textContent = nd.phaseLabel + (nd.isBlocker?" · architectural blocker":"");
