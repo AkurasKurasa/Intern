@@ -172,7 +172,6 @@ class CarInsuranceFrame(wx.Frame):
         footer_sz.AddStretchSpacer()
 
         btn_specs = [
-            ("Submit & New",  "btn_submit_new",    self._on_submit_new),
             ("Submit",        "btn_submit",        self._on_submit),
             ("Clear All",     "btn_clear",         self._on_clear),
             ("Print Preview", "btn_print_preview", self._on_print_preview),
@@ -865,9 +864,30 @@ class CarInsuranceFrame(wx.Frame):
 
     # ── button handlers ───────────────────────────────────────────────────────
 
-    def _on_submit_new(self, event):
-        """Submit & New — save silently, clear form, go to tab 1.  No dialogs."""
+    def _on_submit(self, event):
+        """
+        The ONE submit action (unifies the former Submit / Submit & New split).
+
+        Two real bugs came from having two adjacent buttons: (1) Submit's
+        wx.MessageBox is a MODAL dialog owned by this same process — Windows
+        won't let SetForegroundWindow win the form back while it's open, so a
+        misclick froze the agent permanently; (2) the two buttons sat ~13px
+        apart on screen, an easy target for a pointer that's only ~31%
+        accurate to confuse. One button, no dialog, removes both at once.
+
+        Missing required fields -> refuse via the status bar (no dialog, no
+        silent save of an incomplete record either — the old Submit & New's
+        silence was its own problem, it saved+cleared no matter what state
+        the form was in).
+        """
         data = self._collect_data()
+        missing = [f.replace("_"," ").title()
+                   for f in ["policy_number","ph_first","ph_last","v_vin"]
+                   if not str(data.get(f,"")).strip()]
+        if missing:
+            self._status_lbl.SetLabel("  Missing required: " + ", ".join(missing))
+            return
+
         self._auto_save(data)
         self._record_counter += 1
         self._clear_all_fields()
@@ -884,26 +904,6 @@ class CarInsuranceFrame(wx.Frame):
         self._status_lbl.SetLabel(
             f"  Submitted #{self._record_counter} — Ready for next record"
         )
-
-    def _on_submit(self, event):
-        data = self._collect_data()
-        missing = [f.replace("_"," ").title()
-                   for f in ["policy_number","ph_first","ph_last","v_vin"]
-                   if not str(data.get(f,"")).strip()]
-        if missing:
-            wx.MessageBox("Please fill in required fields:\n• " + "\n• ".join(missing),
-                          "Missing Fields", wx.OK | wx.ICON_WARNING)
-            return
-        path = self._auto_save(data)
-        wx.MessageBox(
-            f"Record submitted successfully.\n"
-            f"Policy : {data.get('policy_number','')}\n"
-            f"Insured: {data.get('ph_first','')} {data.get('ph_last','')}\n"
-            f"Vehicle: {data.get('v_year','')} {data.get('v_make','')} "
-            f"{data.get('v_model','')}\n\n"
-            f"Saved to: {os.path.basename(path) if path else '(save failed)'}",
-            "Submitted", wx.OK | wx.ICON_INFORMATION)
-        self._status_lbl.SetLabel("  Submitted")
 
 
 # ══════════════════════════════════════════════════════════════════════════════
