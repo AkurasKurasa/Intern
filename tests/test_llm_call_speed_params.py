@@ -11,6 +11,15 @@ capped max_tokens at 512 to match, so the cap can't truncate a verbose
 
 Locks in both values so they don't silently drift back to the slower
 defaults.
+
+Also locks in a second fix from the same investigation: the system prompt
+used to get a random [sid:...] tag appended on every call specifically to
+defeat LM Studio's prompt-cache reuse. That line was bundled into an
+unrelated commit (OCR-cache scoping) with no diagnosed bug behind it, while
+measurably forcing the ~750-token system prompt to be fully reprocessed on
+every single call (~5s/call regardless of max_tokens — the real bottleneck,
+not output length). Removed so the identical prefix can actually be cached
+across calls within a run.
 """
 import json
 import sys
@@ -51,3 +60,19 @@ def test_reasoning_instruction_bounds_the_think_block_length():
     _, kwargs = fake_client.chat.completions.create.call_args
     system_msg = kwargs["messages"][0]["content"]
     assert "1-2 short sentences" in system_msg
+
+
+def test_system_prompt_is_identical_across_calls_so_it_can_be_cached():
+    # The whole point of removing the [sid:...] tag: repeated calls within a
+    # run must send byte-identical system prompts, or the server has nothing
+    # stable to cache against.
+    agent, fake_client = _make_agent_with_mock_client()
+
+    agent._call_openai_compat("first user message")
+    first_system_msg = fake_client.chat.completions.create.call_args[1]["messages"][0]["content"]
+
+    agent._call_openai_compat("second, different user message")
+    second_system_msg = fake_client.chat.completions.create.call_args[1]["messages"][0]["content"]
+
+    assert first_system_msg == second_system_msg
+    assert "[sid:" not in first_system_msg

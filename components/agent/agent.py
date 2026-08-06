@@ -4335,13 +4335,22 @@ class LLMAgent:
 
     def _call_openai_compat(self, user_msg: str) -> Dict[str, Any]:
         """Handles both Groq and LM Studio — both use the OpenAI client format."""
-        import uuid
-        # Unique tag per call breaks LM Studio's server-side KV-cache accumulation
+        # A random per-call [sid:...] tag used to be appended here specifically
+        # to defeat LM Studio's KV-cache reuse ("breaks server-side KV-cache
+        # accumulation"). Traced 2026-08-07: that line was bundled into an
+        # unrelated commit (OCR-cache instance scoping) with no diagnosed bug,
+        # no test, no explanation — not a proven fix. Meanwhile it forced the
+        # full ~750-token system prompt to be reprocessed from scratch on
+        # every call, measured as the dominant per-step latency cost (~5s/call
+        # regardless of max_tokens). Removed so the identical system-prompt
+        # prefix can actually be cached across calls within a run. Each call
+        # still sends a complete, self-contained message list (no threaded
+        # conversation history), so there's nothing else here that could
+        # legitimately bleed between calls even if the cache activates.
         system_msg = (
             self._system_prompt
             + "\n\nBefore choosing an action, reason briefly (1-2 short sentences) inside"
             + " <think>...</think> tags. Then output ONLY a JSON object on the last line."
-            + f"\n[sid:{uuid.uuid4().hex[:12]}]"
         )
         # max_tokens found 2026-08-07: this task is a short field-value decision,
         # not open-ended generation — 2048 was a generous, unused ceiling that
