@@ -8,7 +8,10 @@ See [DEVELOPERS.md](DEVELOPERS.md) for the project overview, architecture, and t
 
 - Every session, commit and push all work done: `git add`, `git commit`, `git push` — do this for every change, not just at the end.
 - Do not add Claude as co-author on commits pushed to GitHub.
-- Whenever we encounter a problem or diverge from the plan, consistently update the Task Tree branches (`treetask/index.html`) to reflect it — keep it in sync with DEVELOPERS.md's Task List, not as an afterthought.
+- Whenever we encounter a problem or diverge from the plan, consistently update the Task Tree branches (`treetask/index.html`) to reflect it — keep it in sync with DEVELOPERS.md's Task List, not as an afterthought. DEVELOPERS.md's Task List is restructured to match the Task Tree's branches (Scope #1/#2/#3, Perception, Representation, Learning, Adaptability, Scalability, Execution and Integration, Evaluation, UI/UX), not the other way around.
+- Every choice we make on how to solve a problem gets recorded in the Task Tree — not just that a problem happened, but the decision made about how to solve it.
+- Every node in the Task Tree (hub and task) has a description, not just a label.
+- Task Tree nodes can declare prerequisites; a node that depends on an unfinished prerequisite is shown locked/blocked, and unlocks once the prerequisite is done.
 - Always create unit tests, integration tests, and E2E tests after every problem we encounter and solve.
 
 ## Architecture

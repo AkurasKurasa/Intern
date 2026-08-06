@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Intern</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark">I</span>
+      <span class="brand-name">Intern</span>
+      <span class="brand-sub">BC Demo Recorder</span>
+    </div>
+    <div class="clock" id="clock"></div>
+  </header>
+
+  <main class="layout">
+    <section class="col-main">
+
+      <div class="card card-primary">
+        <div class="card-head">
+          <h2>Demo Recorder</h2>
+          <span class="hint">action-triggered · F9 toggle · F10 save · F8 replay-newest</span>
+        </div>
+
+        <div class="stats-row">
+          <div class="stat">
+            <span class="stat-label">Status</span>
+            <span class="stat-value" id="statStatus"><i class="dot" id="statusDot"></i>Idle</span>
+          </div>
+          <div class="stat">
+            <span class="stat-label">Frames</span>
+            <span class="stat-value" id="statFrames">0</span>
+          </div>
+          <div class="stat">
+            <span class="stat-label">Sessions</span>
+            <span class="stat-value" id="statSessions">0</span>
+          </div>
+        </div>
+
+        <div class="status-bar" id="statusBar">Ready — click Start Demo to begin</div>
+
+        <label class="field-label" for="outDir">Save to</label>
+        <input class="field" id="outDir" type="text" value="data/demos/eight_Tabs" />
+
+        <div class="btn-row">
+          <button class="btn btn-primary" id="btnStart">● Start Demo</button>
+          <button class="btn btn-danger" id="btnStop" disabled>■ Stop &amp; Save</button>
+          <button class="btn btn-ghost" id="btnReplay">⟳ Replay ×N</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <h2>About this recorder</h2>
+        </div>
+        <p class="muted">
+          Fires a UI-Automation snapshot on every click or keystroke while recording —
+          fill the form normally, no separate capture step needed. Navigate tabs in a
+          consistent order, avoid idle clicks, and click Submit at the end of each pass;
+          every action becomes a training example the model clones directly.
+        </p>
+      </div>
+    </section>
+
+    <aside class="col-log">
+      <h3>Activity Log</h3>
+      <div class="log" id="log"></div>
+    </aside>
+  </main>
+
+  <script src="renderer.js"></script>
+</body>
+</html>
