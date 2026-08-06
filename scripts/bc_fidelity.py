@@ -70,7 +70,21 @@ def _load_json(path: Path) -> Any:
     return None
 
 
+# Policy-tab keys that don't carry the "policy_" prefix (see the Policy-tab
+# block of _LABEL_TO_KEY below) — _TAB_PREFIXES' prefix match can't catch
+# these, so without this override they silently fell into "Other" tab
+# everywhere _tab_of() is used, including tab_coverage in score_submission()
+# (10% of the fidelity score). Found 2026-08-06 while reframing the
+# recording quality gate's scroll check.
+_UNPREFIXED_POLICY_KEYS = {
+    "effective_date", "expiration_date", "agent_id", "agent_name",
+    "agency_name", "underwriter", "renewal_flag", "paperless", "esign",
+}
+
+
 def _tab_of(key: str) -> str:
+    if key in _UNPREFIXED_POLICY_KEYS:
+        return "Policy"
     for prefix, tab in _TAB_PREFIXES.items():
         if key.startswith(prefix):
             return tab

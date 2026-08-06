@@ -9,10 +9,15 @@ recording pays off:
                              (reuses validate_transitions.py)
   2. Encoding ambiguity   — can every click target be uniquely identified?
                              (reuses encoding_ambiguity.py)
-  3. Scroll coverage      — is scroll actually being demonstrated at all?
-                             Known gap as of 2026-08-06: 0/11,062 prior steps
-                             had a scroll action — recording more of the SAME
-                             pattern (Tab-only navigation) won't fix that.
+  3. Below-fold reach     — NOT a scroll-action count. Scrolling is the
+                             system's job (Tab-triggered auto-reveal), not
+                             something the recorder needs to demonstrate with
+                             the mouse wheel — corrected 2026-08-06 after this
+                             script wrongly flagged "NO SCROLL" on every
+                             session. What actually matters is whether Tab
+                             navigation kept going far enough to reach every
+                             field in a section, scrolled-into-view or not —
+                             measured here as per-tab field coverage.
   4. Tab-order consistency— sessions visiting tabs in a consistent left-to-
                              right order, vs. jumping/revisiting (the exact
                              documented cause of the model's tab-order gap).
@@ -47,7 +52,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from validate_transitions import validate_session, _load_session_steps          # noqa: E402
 from encoding_ambiguity import state_ambiguity                                  # noqa: E402
 from bc_fidelity import _LABEL_TO_KEY, _tab_of                                  # noqa: E402
-from collections import Counter                                                 # noqa: E402
+from collections import Counter, defaultdict                                    # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
 TRACES_DIR = ROOT / "tasks" / "form_filling" / "traces"
@@ -61,6 +66,14 @@ CANONICAL_TAB_ORDER = [
     "Policy", "Policyholder", "Vehicle", "Coverage",
     "Driver 1", "Driver 2", "Driver 3", "Claims", "Payment",
 ]
+
+# Per-tab known field counts, derived from bc_fidelity's own label→key map —
+# the only tabs it covers are Policy/Policyholder/Vehicle. Used as the
+# denominator for below-fold reach: what fraction of a tab's known fields did
+# the session actually touch? A session that stops at the fields visible
+# without scrolling will show low coverage on the longer tabs (Policyholder,
+# Vehicle) even though it never needed to scroll the mouse wheel to prove it.
+_TAB_FIELD_COUNTS: Counter = Counter(_tab_of(k) for k in _LABEL_TO_KEY.values())
 
 
 def _tab_of_state(state: dict) -> str:
@@ -110,23 +123,31 @@ def check_session(session_dir: Path) -> dict:
     steps = _load_session_steps(session_dir)
     n = len(steps)
 
-    scroll_actions = 0
     submit_reached = False
     tabs_visited_order: list[str] = []
     seen_tabs: set[str] = set()
+    fields_touched: dict[str, set[str]] = defaultdict(set)
 
     for i, step in enumerate(steps):
         action = step.get("action", {})
         a_type = action.get("action_type", "noop")
         state = step.get("state", {})
-
-        if a_type == "scroll":
-            scroll_actions += 1
+        elems = state.get("elements", [])
 
         tab = _tab_of_state(state)
         if tab and tab not in seen_tabs:
             seen_tabs.add(tab)
             tabs_visited_order.append(tab)
+
+        if a_type in ("click", "keyboard", "type"):
+            fid = state.get("focused_element_id", "")
+            label = next((
+                (e.get("label") or e.get("text") or "").strip().lower()
+                for e in elems if e.get("element_id") == fid
+            ), "")
+            key = _LABEL_TO_KEY.get(label)
+            if key:
+                fields_touched[_tab_of(key)].add(key)
 
         if a_type == "click":
             el = _clicked_element(state, action.get("click_position"))
@@ -139,15 +160,26 @@ def check_session(session_dir: Path) -> dict:
     indices = [i for i in (_canonical_index(t) for t in tabs_visited_order) if i is not None]
     order_consistent = all(b >= a for a, b in zip(indices, indices[1:])) if len(indices) > 1 else True
 
+    # Below-fold reach: for tabs bc_fidelity actually has a known field count
+    # for (Policy/Policyholder/Vehicle), what fraction of that tab's fields
+    # got touched? Low coverage on a visited tab means navigation stopped
+    # short of fields that would only become visible further down.
+    tab_coverage: dict[str, float] = {}
+    for tab in seen_tabs:
+        total = _TAB_FIELD_COUNTS.get(tab, 0)
+        if total:
+            tab_coverage[tab] = len(fields_touched.get(tab, set())) / total
+    low_coverage_tabs = [t for t, c in tab_coverage.items() if c < 0.5]
+
     return {
         "session": session_dir.name,
         "total_steps": n,
-        "scroll_actions": scroll_actions,
-        "has_scroll": scroll_actions > 0,
         "tabs_visited": tabs_visited_order,
         "tabs_covered": len(seen_tabs),
         "tab_order_consistent": order_consistent,
         "submit_reached": submit_reached,
+        "tab_coverage": tab_coverage,
+        "low_coverage_tabs": low_coverage_tabs,
     }
 
 
@@ -181,40 +213,42 @@ def main() -> None:
 
     coverage_rows = []
     total_steps = 0
-    sessions_with_scroll = 0
     sessions_order_ok = 0
     sessions_submitted = 0
+    sessions_full_field_coverage = 0
     tab_coverage_sum = 0
 
     for sd in sessions:
         c = check_session(sd)
         coverage_rows.append(c)
         total_steps += c["total_steps"]
-        sessions_with_scroll += c["has_scroll"]
         sessions_order_ok += c["tab_order_consistent"]
         sessions_submitted += c["submit_reached"]
         tab_coverage_sum += c["tabs_covered"]
+        sessions_full_field_coverage += (not c["low_coverage_tabs"])
 
         flags = []
-        if not c["has_scroll"]:
-            flags.append("NO SCROLL")
         if not c["tab_order_consistent"]:
             flags.append("TAB ORDER JUMPS")
         if not c["submit_reached"]:
             flags.append("DIDN'T SUBMIT")
+        if c["low_coverage_tabs"]:
+            flags.append("BELOW-FOLD FIELDS MISSED: " + ", ".join(c["low_coverage_tabs"]))
         flag_str = ("  [" + ", ".join(flags) + "]") if flags else "  [ok]"
+        cov_str = ", ".join(f"{t}={c['tab_coverage'][t]*100:.0f}%" for t in c["tab_coverage"]) or "n/a"
         print(f"  {c['session']:<28} {c['total_steps']:>5} steps  "
-              f"{c['tabs_covered']}/8 tabs  scroll={c['scroll_actions']:<3}{flag_str}")
+              f"{c['tabs_covered']}/8 tabs  field-coverage: {cov_str}{flag_str}")
 
     n_sessions = len(sessions)
     print(f"  {'-'*96}")
     print(f"  Total recorded steps this batch: {total_steps}")
-    print(f"  Sessions with >=1 scroll action:  {sessions_with_scroll}/{n_sessions} "
-          f"({sessions_with_scroll/n_sessions*100:.0f}%)  ← was 0/19 before; needs to be >0 for scroll to be learnable")
     print(f"  Sessions with consistent tab order: {sessions_order_ok}/{n_sessions} "
           f"({sessions_order_ok/n_sessions*100:.0f}%)  ← the documented cause of tab-jumping")
     print(f"  Sessions that reached Submit:      {sessions_submitted}/{n_sessions} "
           f"({sessions_submitted/n_sessions*100:.0f}%)  ← incomplete passes teach incomplete behavior")
+    print(f"  Sessions with full below-fold reach: {sessions_full_field_coverage}/{n_sessions} "
+          f"({sessions_full_field_coverage/n_sessions*100:.0f}%)  ← Tab nav reached every known field on "
+          f"Policy/Policyholder/Vehicle, not just what's visible without scrolling")
     print(f"  Avg tabs covered per session:      {tab_coverage_sum/n_sessions:.1f}/8")
 
     # Reuse the existing per-session checks for mapping correctness + ambiguity
@@ -244,8 +278,9 @@ def main() -> None:
 
     print(f"\n  VERDICT: ", end="")
     problems = []
-    if sessions_with_scroll / n_sessions < 0.3:
-        problems.append("record more scroll — most sessions still have none")
+    if sessions_full_field_coverage / n_sessions < 0.5:
+        problems.append("some tabs are being under-filled — keep tabbing until every field in a "
+                         "section is reached, even the ones off-screen (the app scrolls for you)")
     if sessions_order_ok / n_sessions < 0.8:
         problems.append("keep tab order strictly left-to-right")
     if sessions_submitted / n_sessions < 0.8:
@@ -269,7 +304,7 @@ def main() -> None:
             "timestamp": _dt.datetime.now().isoformat(),
             "sessions_checked": n_sessions,
             "total_steps": total_steps,
-            "scroll_coverage": sessions_with_scroll / n_sessions,
+            "below_fold_field_coverage": sessions_full_field_coverage / n_sessions,
             "tab_order_consistency": sessions_order_ok / n_sessions,
             "submit_rate": sessions_submitted / n_sessions,
             "transition_mapping_accuracy": round(map_acc, 4),
