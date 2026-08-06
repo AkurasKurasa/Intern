@@ -71,6 +71,12 @@ GROQ_API_KEY  = os.environ.get("GROQ_API_KEY", "")
 SOURCE_WINDOW = "Notepad"     # title fragment of the data source window
 MAX_STEPS     = 200
 STEP_DELAY    = 1.5
+CORRECTION_WATCH_SECONDS = 0.5  # DAgger correction-capture window per failed step (0 = off).
+                                 # Default was 4.0s (agent.py's own default) — that's a real-time
+                                 # block for a human to physically step in and correct; on a run
+                                 # nobody's actively supervising to correct in real time, 5 failures
+                                 # in a row cost 20s of pure dead wait for zero benefit. Bump this
+                                 # back up only for a deliberate live DAgger-collection session.
 
 # ── run ───────────────────────────────────────────────────────────────────────
 if __name__ == "__main__":
@@ -145,6 +151,7 @@ if __name__ == "__main__":
         scope            = INSURANCE_SCOPE,   # the only place insurance-specifics live
         model_path       = _args.model,
         route_capsule    = False,             # honor --model; don't let the capsule router override
+        correction_watch_seconds = CORRECTION_WATCH_SECONDS,
     )
     logger.info("Model checkpoint: %s", _args.model)
     if _args.start_tab:

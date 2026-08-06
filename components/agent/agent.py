@@ -325,6 +325,20 @@ def _state_to_text(state: Dict[str, Any], record_num: int = 1, visual_cache: Opt
     return "\n".join(lines)
 
 
+def _is_llm_unavailable(llm_action: Dict[str, Any]) -> bool:
+    """
+    True iff this llm_action is _ask_llm()'s infra-failure sentinel (connection
+    error / non-JSON response / timeout — see _ask_llm's except block), NOT a
+    genuine "the value should be blank" decision from a reachable LLM.
+
+    The two used to collapse to the same thing downstream (both end up as an
+    empty prediction["text"]), which made a dead LLM connection silently look
+    like every field was legitimately blank — the agent would Tab-skip an
+    entire form instead of surfacing that the provider was unreachable.
+    """
+    return llm_action.get("action_type") == "wait" and llm_action.get("reason") == "llm unavailable"
+
+
 def _history_to_text(history: List[Dict[str, Any]]) -> str:
     if not history:
         return "No actions taken yet."
@@ -530,6 +544,11 @@ class LLMAgent:
         observer:          Optional[Any]  = None,   # perception adapter (snapshot()→schema); default=UIA
         data_source:       Optional[Any]  = None,   # DataSource for field values; default=Notepad
         route_capsule:     bool           = True,   # False = use model_path as-is (skip capsule router)
+        correction_watch_seconds: float   = 4.0,    # DAgger: how long to watch for a human correction after
+                                                     # a failed step. 0 = disabled. Default preserves the
+                                                     # original DAgger-collection behavior; verification/
+                                                     # unattended runs should pass a much smaller value —
+                                                     # this blocks in real time and no one's there to correct.
     ):
         # Per-application config (tabs, sections, record delimiter). Default =
         # fully generic: no tabs, no sections, no assumptions. Each scope passes
@@ -623,6 +642,7 @@ class LLMAgent:
         self._schema_checked = False   # validate the adapter once, on first observe
         self._validator         = StateValidator()
         self._correction        = CorrectionHandler()
+        self._correction_watch_seconds = correction_watch_seconds
         self._record_num: int               = record_num
         # 'attempted' state-feature (inference side): identities of fields acted on
         # this session, fed to the transformer so it stops re-targeting them (the
@@ -818,6 +838,8 @@ class LLMAgent:
         _confirmed_blank_fields: set      = set()  # fields where peek found no value → treat as blank
         _heuristic_steps:        int      = 0      # steps decided by auto-handlers (not LLM/transformer)
         _manual_interventions:   int      = 0      # DAgger corrections the human had to make — cognitive-load proxy
+        _llm_unavailable_streak: int      = 0      # consecutive "llm unavailable" — infra failure, NOT "value is blank"
+        _LLM_UNAVAILABLE_LIMIT:  int      = 3       # halt rather than silently Tab-skip the whole form
 
         _record_cache_loaded     = False
         _tc_advance_verified     = False   # True once the full top→bottom scan passes before advance/submit
@@ -1681,6 +1703,24 @@ class LLMAgent:
                     # transformer chose to FILL → LLM supplies the value (the WHAT).
                     # LLM owns value-filling per the architecture.
                     llm_action = self._ask_llm(state)
+
+                    if _is_llm_unavailable(llm_action):
+                        _llm_unavailable_streak += 1
+                        logger.warning(
+                            "LLM unavailable (%d/%d) — NOT treating as leave-blank; retrying, not skipping.",
+                            _llm_unavailable_streak, _LLM_UNAVAILABLE_LIMIT,
+                        )
+                        if _llm_unavailable_streak >= _LLM_UNAVAILABLE_LIMIT:
+                            logger.error(
+                                "LLM unavailable %d times in a row — halting rather than blank-filling "
+                                "the rest of the form. Check the provider (e.g. LM Studio's local server).",
+                                _llm_unavailable_streak,
+                            )
+                            break
+                        time.sleep(self.step_delay)
+                        continue
+                    _llm_unavailable_streak = 0
+
                     if llm_action.get("action_type") == "done":
                         logger.info("LLM: task complete."); break
                     prediction = self._merge(t_pred, t_conf, llm_action, state)
@@ -2319,9 +2359,11 @@ class LLMAgent:
                 if hasattr(self._task_plugin, "_no_change_streak"):
                     _no_change_streak = self._task_plugin._no_change_streak
 
-            if validation.status in ("no_change", "unexpected", "error") and self._task_name:
-                logger.info("Validation failed (%s) — watching for user correction …", validation.status)
-                steps = self._correction.watch(self._observer, seconds=4.0)
+            if (validation.status in ("no_change", "unexpected", "error") and self._task_name
+                    and self._correction_watch_seconds > 0):
+                logger.info("Validation failed (%s) — watching for user correction (%.1fs) …",
+                            validation.status, self._correction_watch_seconds)
+                steps = self._correction.watch(self._observer, seconds=self._correction_watch_seconds)
                 if steps:
                     saved = self._correction.save(self._task_name, steps)
                     if saved:

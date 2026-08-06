@@ -292,6 +292,7 @@ const PHASES = [
       {id:"execution_error_rate_10", t:"Execution error ≤10%, waste ≤20%", done:false, desc:"Both computed in evaluate_run() with explicit pass/fail flags (2026-08-06) — no clean live measurement yet."},
       {id:"execution_llm_value_errors", t:"LLM value errors", done:false, desc:"Occasionally answers into the wrong field. Fix = better prompt or lookup-as-validator, not silent replacement."},
       {id:"execution_llm_unavailable_vs_blank", t:"LLM-unavailable vs. leave-blank were indistinguishable", done:true, desc:"A dead LLM connection looked identical to a genuine leave-blank decision — agent silently Tab-skipped the whole form. Fixed: _is_llm_unavailable() halts after 3 consecutive failures instead."},
+      {id:"execution_correction_watch_speed", t:"4s correction-watch was blocking on every failure", done:true, desc:"Proven from a live run: 5 failures in a row cost 20s of pure dead wait (62%). Fixed: correction_watch_seconds is now configurable, run_task.py defaults to 0.5s instead of 4.0s."},
       {id:"execution_combobox_crash_recovery", t:"Combobox crash recovery", done:false, desc:"Combobox / mid-record crash recovery."},
       {id:"execution_no_prompt_caching", t:"No prompt caching", done:false, desc:"Each step is a fresh LLM call, no batching/budget."},
       {id:"execution_no_memory", t:"No memory component", done:false, desc:"Each record runs from a blank slate."},
