@@ -3011,10 +3011,32 @@ class LLMAgent:
             return
         try:
             import win32gui
-            if win32gui.GetForegroundWindow() == self._locked_hwnd:
+            fg = win32gui.GetForegroundWindow()
+            if fg == self._locked_hwnd:
                 return
             if not win32gui.IsWindow(self._locked_hwnd):
                 return
+
+            # A MODAL dialog owned by the SAME process as the locked form (e.g. a
+            # wx.MessageBox popped by clicking Submit) blocks SetForegroundWindow
+            # from ever winning the form back — Windows won't foreground an owner
+            # window while its modal child is open, so re-asserting alone loops
+            # forever. Detect this generically (same PID, different hwnd — no
+            # hardcoded dialog titles/text) and dismiss it with Escape first.
+            try:
+                import win32process
+                _, form_pid = win32process.GetWindowThreadProcessId(self._locked_hwnd)
+                _, fg_pid   = win32process.GetWindowThreadProcessId(fg)
+                if fg and fg_pid == form_pid:
+                    logger.warning(
+                        "Foreign window from the form's own process is blocking it "
+                        "(hwnd=%s) — likely a modal dialog. Dismissing with Escape.", fg)
+                    import pyautogui
+                    pyautogui.press("escape")
+                    time.sleep(0.15)
+            except Exception as _dlg_exc:
+                logger.debug("Modal-dialog dismiss check failed: %s", _dlg_exc)
+
             # Alt keypress satisfies the SetForegroundWindow focus-steal restriction.
             try:
                 import win32com.client

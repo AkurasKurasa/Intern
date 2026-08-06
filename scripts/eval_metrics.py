@@ -41,6 +41,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
 import math
 import os
 import re
@@ -52,6 +53,14 @@ if hasattr(sys.stdout, "reconfigure"):
         pass
 from pathlib import Path
 from typing import Any
+
+# Bare print() never reaches logs/latest.log — run_task.py's logging.basicConfig
+# attaches FileHandlers to the ROOT logger, which only captures logger.*() calls.
+# A run's RUN METRICS block was invisible in the saved log for exactly this
+# reason (found 2026-08-06 while diagnosing a run from its log). Silent when this
+# module runs standalone (no basicConfig configured → INFO calls produce no
+# console output), so this changes nothing for CLI usage.
+_logger = logging.getLogger(__name__)
 
 ROOT = Path(__file__).resolve().parent.parent
 TRACES_DIR      = ROOT / "tasks" / "form_filling" / "traces" / "live"
@@ -725,6 +734,7 @@ def evaluate_run(
     )
 
     print(summary)
+    _logger.info(summary)
 
     return {
         "task_completion_rate":       tcr,

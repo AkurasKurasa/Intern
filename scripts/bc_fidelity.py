@@ -22,6 +22,7 @@ Fidelity score (0-100%):
 from __future__ import annotations
 
 import json
+import logging
 import os
 import sys
 if hasattr(sys.stdout, "reconfigure"):
@@ -32,6 +33,11 @@ if hasattr(sys.stdout, "reconfigure"):
 from datetime import datetime
 from pathlib import Path
 from typing import Any
+
+# Bare print() never reaches logs/latest.log (see eval_metrics.py for the full
+# explanation) — the BC SCORE block was invisible in the saved log for exactly
+# this reason. Silent in standalone CLI usage (no basicConfig → INFO is a no-op).
+_logger = logging.getLogger(__name__)
 
 ROOT           = Path(__file__).resolve().parent.parent
 REFERENCE_PATH = ROOT / "data" / "output" / "reference" / "gold_standard.json"
@@ -604,30 +610,37 @@ def _print_report(s: dict, goal: str, submission_name: str) -> None:
     star   = "DONE" if bc >= 0.80 else f"{bc*100:.1f}% / 80%"
     dur    = s.get("duration_sec")
     dur_str = f"{dur:.1f}s" if dur is not None else "n/a"
-    print(f"\n{border}")
-    print(f"  BC SCORE: {bc*100:.1f}%  [{star}]   Duration: {dur_str}")
-    print(f"  Goal: {goal[:52]}")
-    print(border)
-    print(f"  Task Fidelity          {s['fidelity']*100:>6.1f}%   (correct values vs intake)")
-    print(f"    Field Match Rate     {s['field_match_rate']*100:>6.1f}%"
-          f"   ({s['fields_matched']}/{s['fields_total']} fields correct)")
-    print(f"    Value Accuracy       {s['value_accuracy']*100:>6.1f}%"
-          f"   (of {s['fields_filled']} filled)")
-    print(f"    Tab Coverage         {s['tab_coverage']*100:>6.1f}%"
-          f"   {s['tabs_covered']}")
-    print(f"    Completion           {'100.0' if s['completed'] else '  0.0'}%")
+
+    lines = [
+        f"\n{border}",
+        f"  BC SCORE: {bc*100:.1f}%  [{star}]   Duration: {dur_str}",
+        f"  Goal: {goal[:52]}",
+        border,
+        f"  Task Fidelity          {s['fidelity']*100:>6.1f}%   (correct values vs intake)",
+        f"    Field Match Rate     {s['field_match_rate']*100:>6.1f}%"
+        f"   ({s['fields_matched']}/{s['fields_total']} fields correct)",
+        f"    Value Accuracy       {s['value_accuracy']*100:>6.1f}%"
+        f"   (of {s['fields_filled']} filled)",
+        f"    Tab Coverage         {s['tab_coverage']*100:>6.1f}%"
+        f"   {s['tabs_covered']}",
+        f"    Completion           {'100.0' if s['completed'] else '  0.0'}%",
+    ]
     bm = s.get("behavioral_match")
     if bm is not None:
-        print(f"  Behavioral Match       {bm*100:>6.1f}%   (sequence vs human sessions)")
-        print(f"    Sequence Similarity  {s.get('sequence_sim',0)*100:>6.1f}%")
-        print(f"    Tab Order Match      {s.get('tab_order_match',0)*100:>6.1f}%")
-        print(f"    {s.get('detail','')}")
+        lines.append(f"  Behavioral Match       {bm*100:>6.1f}%   (sequence vs human sessions)")
+        lines.append(f"    Sequence Similarity  {s.get('sequence_sim',0)*100:>6.1f}%")
+        lines.append(f"    Tab Order Match      {s.get('tab_order_match',0)*100:>6.1f}%")
+        lines.append(f"    {s.get('detail','')}")
     if s.get("mismatches"):
-        print(f"\n  Top mismatches:")
+        lines.append("\n  Top mismatches:")
         for m in s["mismatches"][:5]:
-            print(f"    {m['field']}: expected {m['expected']!r}, got {m['got']!r}")
-    print(f"\n  Submission: {submission_name}")
-    print(f"{border}\n")
+            lines.append(f"    {m['field']}: expected {m['expected']!r}, got {m['got']!r}")
+    lines.append(f"\n  Submission: {submission_name}")
+    lines.append(f"{border}\n")
+
+    for line in lines:
+        print(line)
+    _logger.info("\n".join(lines))
 
 
 def _append_progress(s: dict, goal: str, submission_name: str) -> None:
