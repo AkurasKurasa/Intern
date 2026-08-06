@@ -875,19 +875,13 @@ class CarInsuranceFrame(wx.Frame):
         apart on screen, an easy target for a pointer that's only ~31%
         accurate to confuse. One button, no dialog, removes both at once.
 
-        Missing required fields -> refuse via the status bar (no dialog, no
-        silent save of an incomplete record either — the old Submit & New's
-        silence was its own problem, it saved+cleared no matter what state
-        the form was in).
+        No required-field gate — submits and clears unconditionally, even on
+        a partial/practice pass. Recording/testing needs to reach Submit and
+        get a clean reset regardless of completeness; a real incomplete
+        record is still visible after the fact (missing fields are just
+        empty in the saved JSON), so nothing is silently lost.
         """
         data = self._collect_data()
-        missing = [f.replace("_"," ").title()
-                   for f in ["policy_number","ph_first","ph_last","v_vin"]
-                   if not str(data.get(f,"")).strip()]
-        if missing:
-            self._status_lbl.SetLabel("  Missing required: " + ", ".join(missing))
-            return
-
         self._auto_save(data)
         self._record_counter += 1
         self._clear_all_fields()
