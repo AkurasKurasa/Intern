@@ -7,6 +7,7 @@ const readline = require("readline");
 
 const REPO_ROOT = path.join(__dirname, "..");
 const BRIDGE_SCRIPT = path.join(REPO_ROOT, "app", "recorder_bridge.py");
+const DEMOS_ROOT = path.join(REPO_ROOT, "data", "demos");
 
 function resolvePython() {
   const candidates = [
@@ -81,11 +82,19 @@ function queueOrSend(cmd) {
 function createWindow() {
   mainWindow = new BrowserWindow({
     title: "Intern",
-    width: 900,
-    height: 680,
-    minWidth: 700,
-    minHeight: 520,
+    width: 1040,
+    height: 720,
+    minWidth: 760,
+    minHeight: 560,
     backgroundColor: "#FFFFFF",
+    // Native min/max/close buttons stay native, but the strip they sit in
+    // (and its full width) paints orange instead of the default OS chrome.
+    titleBarStyle: "hidden",
+    titleBarOverlay: {
+      color: "#F97316",
+      symbolColor: "#FFFFFF",
+      height: 34,
+    },
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
@@ -94,6 +103,46 @@ function createWindow() {
   });
   mainWindow.setMenuBarVisibility(false);
   mainWindow.loadFile(path.join(__dirname, "renderer", "index.html"));
+}
+
+// Reads data/demos/<group>/session_*/ directly off disk — a static listing,
+// no need to round-trip through the Python bridge for this.
+function listWorkflows() {
+  const groups = [];
+  if (!fs.existsSync(DEMOS_ROOT)) return groups;
+
+  for (const groupName of fs.readdirSync(DEMOS_ROOT)) {
+    const groupPath = path.join(DEMOS_ROOT, groupName);
+    if (!fs.statSync(groupPath).isDirectory()) continue;
+
+    const sessions = [];
+    for (const sessionName of fs.readdirSync(groupPath)) {
+      if (!sessionName.startsWith("session_")) continue;
+      const sessionPath = path.join(groupPath, sessionName);
+      if (!fs.statSync(sessionPath).isDirectory()) continue;
+
+      const files = fs.readdirSync(sessionPath)
+        .filter((f) => f.endsWith(".json") && f !== "session_manifest.json");
+      const stat = fs.statSync(sessionPath);
+      sessions.push({
+        name: sessionName,
+        steps: files.length,
+        mtime: stat.mtimeMs,
+      });
+    }
+    sessions.sort((a, b) => b.mtime - a.mtime);
+
+    if (sessions.length) {
+      groups.push({
+        name: groupName,
+        totalSteps: sessions.reduce((a, s) => a + s.steps, 0),
+        sessionCount: sessions.length,
+        sessions,
+      });
+    }
+  }
+  groups.sort((a, b) => b.sessions[0].mtime - a.sessions[0].mtime);
+  return groups;
 }
 
 app.whenReady().then(() => {
@@ -122,3 +171,4 @@ ipcMain.handle("recorder-stop", () => {
 ipcMain.handle("recorder-replay", (_evt, n) => {
   queueOrSend({ cmd: "replay", n: n || 10 });
 });
+ipcMain.handle("workflows-list", () => listWorkflows());

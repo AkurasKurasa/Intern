@@ -1,15 +1,14 @@
 :root {
   --orange: #F97316;
   --orange-dark: #C2410C;
-  --orange-light: #FFEDD5;
+  --orange-tint: #FFF1E7;
   --white: #FFFFFF;
-  --border: #EAE0D5;
+  --border: #EDEDED;
+  --border-strong: #E2E2E2;
   --ink: #1C1917;
-  --dim: #78716C;
+  --dim: #8A8580;
   --green: #16A34A;
   --red: #DC2626;
-  --card-bg: #FFFFFF;
-  --status-bg: #FFF3EA;
 }
 
 * { box-sizing: border-box; }
@@ -21,49 +20,181 @@ html, body {
   color: var(--ink);
   font-family: "Segoe UI", -apple-system, sans-serif;
   font-size: 14px;
+  overflow: hidden;
 }
 
-.topbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 14px 22px;
-  border-bottom: 1px solid var(--border);
-}
-
-.brand { display: flex; align-items: baseline; gap: 8px; }
-.brand-mark {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 26px; height: 26px;
+/* ── Custom titlebar strip ────────────────────────────────────────────── */
+/* Matches the native titleBarOverlay color (main.js) so the whole top edge,
+   including the min/max/close button cluster the OS draws over the right
+   side, reads as one continuous orange bar. */
+.titlebar {
+  height: 34px; flex: none;
   background: var(--orange);
-  color: white;
-  font-weight: 700;
-  border-radius: 7px;
-  font-size: 14px;
+  display: flex; align-items: center;
+  padding-left: 14px;
+  font-size: 12px; font-weight: 600; color: white; letter-spacing: .02em;
+  -webkit-app-region: drag;
+  user-select: none;
 }
-.brand-name { font-size: 16px; font-weight: 600; }
-.brand-sub { font-size: 12px; color: var(--dim); }
+
+/* ── Splash / landing screen ─────────────────────────────────────────── */
+.splash {
+  position: fixed; top: 34px; left: 0; right: 0; bottom: 0; z-index: 50;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 10px;
+  background: var(--white);
+  color: var(--ink);
+  transition: opacity .5s ease, visibility .5s ease;
+}
+.splash.hide { opacity: 0; visibility: hidden; pointer-events: none; }
+
+.splash-mark {
+  position: relative;
+  width: 80px; height: 80px;
+  display: flex; align-items: center; justify-content: center;
+  margin-bottom: 10px;
+  animation: splashPop .7s cubic-bezier(.2,1.4,.4,1) both;
+}
+.splash-i {
+  font-size: 36px; font-weight: 800; color: var(--orange);
+  background: var(--white); width: 100%; height: 100%; border-radius: 20px;
+  border: 1.5px solid var(--orange);
+  display: flex; align-items: center; justify-content: center;
+}
+.splash-ring {
+  position: absolute; inset: -10px;
+  border: 1.5px solid var(--orange-tint);
+  border-radius: 26px;
+  animation: splashRing 2.2s ease-in-out infinite;
+}
+@keyframes splashPop {
+  from { transform: scale(.6); opacity: 0; }
+  to   { transform: scale(1); opacity: 1; }
+}
+@keyframes splashRing {
+  0%, 100% { transform: scale(1);   opacity: 1; }
+  50%      { transform: scale(1.18); opacity: 0; }
+}
+
+.splash-title {
+  margin: 0; font-size: 28px; font-weight: 700; letter-spacing: .01em; color: var(--ink);
+  animation: splashFade .6s ease .15s both;
+}
+.splash-tag {
+  margin: 0 0 18px; font-size: 13px; color: var(--dim);
+  animation: splashFade .6s ease .3s both;
+}
+@keyframes splashFade {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: none; }
+}
+
+.splash-bar {
+  width: 200px; height: 3px; border-radius: 4px;
+  background: var(--border-strong); overflow: hidden;
+  animation: splashFade .6s ease .4s both;
+}
+.splash-bar > i {
+  display: block; height: 100%; width: 30%; border-radius: 4px;
+  background: var(--orange);
+  animation: splashLoad 1.3s ease-in-out infinite;
+}
+@keyframes splashLoad {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(430%); }
+}
+.splash-status {
+  margin: 10px 0 0; font-size: 11.5px; color: var(--dim);
+  font-family: Consolas, monospace;
+  animation: splashFade .6s ease .4s both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .splash-ring, .splash-bar > i { animation: none; }
+}
+
+/* ── Shell: icon sidebar + one content area ──────────────────────────── */
+.shell {
+  display: flex;
+  height: calc(100% - 34px);
+  opacity: 0;
+  transition: opacity .45s ease .1s;
+}
+.shell.show { opacity: 1; }
+
+.sidebar {
+  flex: none;
+  width: 60px;
+  background: var(--white);
+  border-right: 1px solid var(--border);
+  display: flex; flex-direction: column; align-items: center;
+  padding: 16px 0;
+  gap: 8px;
+}
+.side-mark {
+  width: 32px; height: 32px; border-radius: 9px;
+  background: var(--white); color: var(--orange);
+  border: 1.5px solid var(--orange);
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 700; font-size: 14px;
+  margin-bottom: 12px;
+}
+.side-btn {
+  width: 40px; height: 40px; border-radius: 10px;
+  border: 1px solid transparent; background: transparent; color: var(--dim);
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  transition: background .15s ease, color .15s ease, border-color .15s ease;
+}
+.side-btn:hover { background: var(--orange-tint); color: var(--orange-dark); }
+.side-btn.active { background: var(--orange-tint); color: var(--orange); border-color: var(--orange); }
+.side-btn:focus-visible { outline: 2px solid var(--orange); outline-offset: 2px; }
+
+.side-status {
+  margin-top: auto;
+  width: 40px; height: 40px;
+  display: flex; align-items: center; justify-content: center;
+  border-top: 1px solid var(--border);
+}
+.side-status .dot { width: 8px; height: 8px; }
+
+.content {
+  flex: 1;
+  min-width: 0;
+  position: relative;
+  overflow: hidden;
+}
+
+.panel {
+  display: none;
+  flex-direction: column;
+  height: 100%;
+  padding: 18px 22px;
+}
+.panel.active { display: flex; }
+
+.panel-head {
+  display: flex; align-items: baseline; justify-content: space-between;
+  padding-bottom: 12px; margin-bottom: 14px; border-bottom: 1px solid var(--border);
+}
+.panel-head h2 { margin: 0; font-size: 18px; }
+.hint { font-size: 11.5px; color: var(--dim); margin: 3px 0 0; }
 .clock { font-family: Consolas, monospace; font-size: 12px; color: var(--dim); }
 
-.layout {
-  display: flex;
-  gap: 16px;
-  padding: 18px;
-  height: calc(100% - 58px);
-}
+.panel-body { flex: 1; min-height: 0; overflow-y: auto; }
+.panel-body.two-col { display: flex; gap: 16px; }
+.col-main { flex: 1; display: flex; flex-direction: column; gap: 14px; min-width: 0; }
 
-.col-main { flex: 1; display: flex; flex-direction: column; gap: 14px; overflow-y: auto; }
 .col-log {
   width: 280px;
   flex: none;
   display: flex;
   flex-direction: column;
-  background: var(--status-bg);
+  background: var(--white);
   border: 1px solid var(--border);
   border-radius: 12px;
   padding: 14px;
+  max-height: 100%;
 }
 .col-log h3 { margin: 0 0 10px; font-size: 13px; }
 .log {
@@ -80,21 +211,21 @@ html, body {
 .log-dim { color: var(--dim); }
 
 .card {
-  background: var(--card-bg);
+  background: var(--white);
   border: 1px solid var(--border);
   border-radius: 14px;
   padding: 18px 20px;
 }
-.card-primary { border-color: var(--orange); box-shadow: 0 2px 14px rgba(249, 115, 22, 0.08); }
+.card-primary { border-color: var(--orange); }
 
 .card-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 12px; }
-.card-head h2 { margin: 0; font-size: 15px; }
-.hint { font-size: 11.5px; color: var(--dim); }
+.card-head h3 { margin: 0; font-size: 14px; }
 
 .stats-row { display: flex; gap: 10px; margin-bottom: 12px; }
 .stat {
   flex: 1;
-  background: var(--status-bg);
+  background: var(--white);
+  border: 1px solid var(--border);
   border-radius: 10px;
   padding: 10px 14px;
 }
@@ -106,8 +237,10 @@ html, body {
 .dot.error { background: var(--red); }
 
 .status-bar {
-  background: var(--status-bg);
-  border-radius: 8px;
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--orange);
+  border-radius: 6px;
   padding: 8px 12px;
   font-size: 12.5px;
   color: var(--dim);
@@ -118,29 +251,57 @@ html, body {
 .field {
   width: 100%;
   padding: 8px 10px;
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-strong);
   border-radius: 8px;
   font-family: Consolas, monospace;
   font-size: 12.5px;
   margin-bottom: 14px;
   color: var(--ink);
+  background: var(--white);
 }
 .field:focus { outline: none; border-color: var(--orange); }
 
 .btn-row { display: flex; gap: 10px; }
 .btn {
-  border: none;
+  border: 1px solid transparent;
   border-radius: 9px;
   padding: 10px 18px;
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
-  transition: filter 0.12s ease;
+  transition: filter 0.12s ease, background .12s ease;
 }
-.btn:hover:not(:disabled) { filter: brightness(0.92); }
-.btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.btn:hover:not(:disabled) { filter: brightness(0.96); }
+.btn:disabled { opacity: 0.4; cursor: not-allowed; }
 .btn-primary { background: var(--orange); color: white; }
-.btn-danger { background: var(--red); color: white; }
-.btn-ghost { background: var(--status-bg); color: var(--ink); border: 1px solid var(--border); }
+.btn-danger { background: var(--white); color: var(--red); border-color: var(--red); }
+.btn-danger:not(:disabled):hover { background: #FDF2F2; }
+.btn-ghost { background: var(--white); color: var(--ink); border-color: var(--border-strong); }
+.btn-sm { padding: 6px 12px; font-size: 12px; }
 
 .muted { color: var(--dim); font-size: 13px; line-height: 1.6; margin: 0; }
+
+/* ── Workflows panel ──────────────────────────────────────────────────── */
+.workflows-list { display: flex; flex-direction: column; gap: 12px; }
+.wf-group {
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 14px 18px;
+}
+.wf-group-head {
+  display: flex; align-items: baseline; justify-content: space-between;
+  cursor: pointer; user-select: none;
+}
+.wf-group-head .name { font-size: 14.5px; font-weight: 600; }
+.wf-group-head .meta { font-size: 12px; color: var(--dim); font-family: Consolas, monospace; }
+.wf-group-head .chev { font-size: 10px; color: var(--orange); margin-right: 6px; }
+
+.wf-sessions { margin-top: 10px; border-top: 1px solid var(--border); padding-top: 10px; display: none; }
+.wf-group.open .wf-sessions { display: block; }
+.wf-session {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 6px 0; font-size: 12.5px;
+}
+.wf-session .sname { font-family: Consolas, monospace; color: var(--ink); }
+.wf-session .ssteps { color: var(--dim); font-family: Consolas, monospace; }

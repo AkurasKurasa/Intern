@@ -1,3 +1,42 @@
+/* ── Splash → shell transition ────────────────────────────────────────── */
+const splashEl    = document.getElementById("splash");
+const splashStatus= document.getElementById("splashStatus");
+const shellEl     = document.getElementById("shell");
+
+const SPLASH_MIN_MS = 1200;
+const splashStart = Date.now();
+let bridgeIsReady = false;
+
+function maybeDismissSplash() {
+  const elapsed = Date.now() - splashStart;
+  if (!bridgeIsReady || elapsed < SPLASH_MIN_MS) return;
+  splashEl.classList.add("hide");
+  shellEl.classList.add("show");
+  setTimeout(() => { splashEl.style.display = "none"; }, 550);
+}
+// Fallback: don't hang forever on the splash if the backend never reports ready.
+setTimeout(() => { bridgeIsReady = true; maybeDismissSplash(); }, 4000);
+
+/* ── Sidebar navigation ───────────────────────────────────────────────── */
+const navRecorder = document.getElementById("navRecorder");
+const navWorkflows = document.getElementById("navWorkflows");
+const panelRecorder = document.getElementById("panel-recorder");
+const panelWorkflows = document.getElementById("panel-workflows");
+
+function showPanel(name) {
+  const toRecorder = name === "recorder";
+  panelRecorder.classList.toggle("active", toRecorder);
+  panelWorkflows.classList.toggle("active", !toRecorder);
+  navRecorder.classList.toggle("active", toRecorder);
+  navWorkflows.classList.toggle("active", !toRecorder);
+  navRecorder.setAttribute("aria-current", toRecorder ? "page" : "false");
+  navWorkflows.setAttribute("aria-current", !toRecorder ? "page" : "false");
+  if (!toRecorder) loadWorkflows();
+}
+navRecorder.addEventListener("click", () => showPanel("recorder"));
+navWorkflows.addEventListener("click", () => showPanel("workflows"));
+
+/* ── Recorder panel ───────────────────────────────────────────────────── */
 const statusDot   = document.getElementById("statusDot");
 const statStatus  = document.getElementById("statStatus");
 const statFrames  = document.getElementById("statFrames");
@@ -9,6 +48,8 @@ const btnStop     = document.getElementById("btnStop");
 const btnReplay   = document.getElementById("btnReplay");
 const logEl       = document.getElementById("log");
 const clockEl     = document.getElementById("clock");
+const sideStatusDot = document.getElementById("sideStatusDot");
+const sideStatus     = document.getElementById("sideStatus");
 
 let sessions = 0;
 
@@ -61,6 +102,13 @@ window.recorderAPI.onEvent((event) => {
   switch (event.event) {
     case "ready":
       log("Backend ready.", "dim");
+      sideStatusDot.classList.remove("error");
+      sideStatusDot.style.background = "";
+      sideStatusDot.classList.add("recording");
+      sideStatus.title = "Backend connected";
+      bridgeIsReady = true;
+      splashStatus.textContent = "Ready.";
+      maybeDismissSplash();
       break;
     case "started":
       setRecording(true);
@@ -91,8 +139,73 @@ window.recorderAPI.onEvent((event) => {
       setRecording(false);
       statusBar.textContent = `Error: ${event.message}`;
       log(event.message, "err");
+      sideStatusDot.classList.add("error");
       break;
     default:
       console.log("Unhandled event:", event);
   }
 });
+
+/* ── Workflows panel ──────────────────────────────────────────────────── */
+const workflowsListEl = document.getElementById("workflowsList");
+const btnRefreshWorkflows = document.getElementById("btnRefreshWorkflows");
+let workflowsLoaded = false;
+
+function timeAgo(ms) {
+  const s = Math.max(0, (Date.now() - ms) / 1000);
+  if (s < 60) return "just now";
+  if (s < 3600) return Math.floor(s / 60) + "m ago";
+  if (s < 86400) return Math.floor(s / 3600) + "h ago";
+  return Math.floor(s / 86400) + "d ago";
+}
+
+async function loadWorkflows() {
+  workflowsListEl.innerHTML = '<p class="muted">Loading…</p>';
+  let groups;
+  try {
+    groups = await window.workflowsAPI.list();
+  } catch (e) {
+    workflowsListEl.innerHTML = `<p class="muted">Couldn't read data/demos/ (${e.message || e}).</p>`;
+    return;
+  }
+  if (!groups || !groups.length) {
+    workflowsListEl.innerHTML = '<p class="muted">No recorded workflows yet — start one from the Recorder tab.</p>';
+    return;
+  }
+
+  workflowsListEl.innerHTML = "";
+  groups.forEach((g, gi) => {
+    const card = document.createElement("div");
+    card.className = "wf-group" + (gi === 0 ? " open" : "");
+
+    const head = document.createElement("div");
+    head.className = "wf-group-head";
+    head.innerHTML =
+      `<span><span class="chev">▸</span><span class="name">${escapeHtml(g.name)}</span></span>` +
+      `<span class="meta">${g.sessionCount} session${g.sessionCount===1?"":"s"} · ${g.totalSteps.toLocaleString()} steps</span>`;
+    head.addEventListener("click", () => card.classList.toggle("open"));
+    card.appendChild(head);
+
+    const body = document.createElement("div");
+    body.className = "wf-sessions";
+    g.sessions.forEach((s) => {
+      const row = document.createElement("div");
+      row.className = "wf-session";
+      row.innerHTML =
+        `<span class="sname">${escapeHtml(s.name)}</span>` +
+        `<span class="ssteps">${s.steps.toLocaleString()} steps · ${timeAgo(s.mtime)}</span>`;
+      body.appendChild(row);
+    });
+    card.appendChild(body);
+    workflowsListEl.appendChild(card);
+  });
+  workflowsLoaded = true;
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, (c) => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+  }[c]));
+}
+
+btnRefreshWorkflows.addEventListener("click", loadWorkflows);

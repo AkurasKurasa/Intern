@@ -453,7 +453,7 @@ class TrajectoryDataset(Dataset):
 
     def __init__(
         self,
-        data_dir: str | Path,
+        data_dir: str | Path | list[str | Path],
         max_elements: int = 128,
         hist_len: int = 4,
         glob: str = "*.json",
@@ -464,21 +464,26 @@ class TrajectoryDataset(Dataset):
         self.aug_drop_prob = aug_drop_prob
 
         # Collect trace files as *groups* — each group is a contiguous recording
-        # session whose traces are temporally adjacent.  The flat files in `root`
-        # form one group; each `session_*` subfolder forms its own group.  Sliding
-        # windows are later built *within* each group so history never crosses a
-        # session boundary (which would stitch together unrelated demonstrations).
-        root = Path(data_dir)
-        print(f"[Dataset] Scanning {root} for trace files...", flush=True)
+        # session whose traces are temporally adjacent.  The flat files directly
+        # under a root form one group; each `session_*` subfolder forms its own
+        # group.  Sliding windows are later built *within* each group so history
+        # never crosses a session boundary (which would stitch together unrelated
+        # demonstrations). data_dir may be a single directory or a list of
+        # directories (e.g. combining the curated tasks/form_filling/traces set
+        # with a freshly-recorded data/demos/<name> batch) — each is scanned the
+        # same way and their groups are pooled together.
+        roots = [Path(d) for d in data_dir] if isinstance(data_dir, (list, tuple)) else [Path(data_dir)]
+        print(f"[Dataset] Scanning {', '.join(str(r) for r in roots)} for trace files...", flush=True)
         file_groups: List[List[Path]] = []
-        flat_files = sorted(root.glob(glob))
-        if flat_files:
-            file_groups.append(flat_files)
-        for session_dir in sorted(root.glob("session_*")):
-            if session_dir.is_dir():
-                session_files = sorted(session_dir.glob(glob))
-                if session_files:
-                    file_groups.append(session_files)
+        for root in roots:
+            flat_files = sorted(root.glob(glob))
+            if flat_files:
+                file_groups.append(flat_files)
+            for session_dir in sorted(root.glob("session_*")):
+                if session_dir.is_dir():
+                    session_files = sorted(session_dir.glob(glob))
+                    if session_files:
+                        file_groups.append(session_files)
         if not file_groups:
             raise FileNotFoundError(f"No trace JSONs in {data_dir!r} (including session subfolders)")
         print(f"[Dataset] Found {sum(len(g) for g in file_groups)} files in {len(file_groups)} session(s).", flush=True)
@@ -486,8 +491,15 @@ class TrajectoryDataset(Dataset):
         # ── Dataset init cache ──────────────────────────────────────────────────
         # Reading 10k+ JSONs at init takes 2-10 min. Cache stores filtered file
         # paths + action metadata; invalidated when any session is newer than cache.
+        # Cache lives next to the first root, keyed by how many roots + their
+        # resolved paths so a multi-dir combo never collides with a single-dir
+        # cache (or a different combo) sitting in the same first directory.
         import pickle as _pickle
-        _cache_path = root / ".dataset_cache.pkl"
+        import hashlib as _hashlib
+        _roots_key  = "|".join(str(r.resolve()) for r in roots)
+        _roots_hash = _hashlib.sha1(_roots_key.encode("utf-8")).hexdigest()[:10]
+        _cache_name = ".dataset_cache.pkl" if len(roots) == 1 else f".dataset_cache_combined_{_roots_hash}.pkl"
+        _cache_path = roots[0] / _cache_name
         # ELEM_FEATURES in the key → a change in the feature layout invalidates
         # any stale cache built with a different one.
         _cache_key  = (max_elements, hist_len, aug_drop_prob, ELEM_FEATURES, "v5_attempted")
@@ -1185,7 +1197,7 @@ def _run_epoch(model, loader, optimizer, device, lambda_click, lambda_key, label
 
 
 def train(
-    data_dir: str = "data/output/traces/live",
+    data_dir: str | list[str] = "data/output/traces/live",
     epochs: int = 50,
     batch_size: int = 16,
     lr: float = 1e-4,

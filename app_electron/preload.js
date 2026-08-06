@@ -8,3 +8,7 @@ contextBridge.exposeInMainWorld("recorderAPI", {
     ipcRenderer.on("recorder-event", (_evt, event) => callback(event));
   },
 });
+
+contextBridge.exposeInMainWorld("workflowsAPI", {
+  list: () => ipcRenderer.invoke("workflows-list"),
+});

@@ -46,7 +46,9 @@ def main():
         description="Train Intern's TransformerAgentNetwork via Behavioral Cloning."
     )
     parser.add_argument("--trace_dir",  default="data/output/traces/live",
-                        help="Trace directory (flat or session_* sub-dirs)")
+                        help="Trace directory (flat or session_* sub-dirs). Comma-separate "
+                             "multiple directories to pool them into one training run, e.g. "
+                             "tasks/form_filling/traces,data/demos/eight_Tabs")
     parser.add_argument("--save_path",  default="tasks/form_filling/model.pt",
                         help="Checkpoint output path")
     parser.add_argument("--epochs",     type=int,   default=50)
@@ -72,15 +74,21 @@ def main():
                              "try 8-12 for long multi-tab trajectories)")
     args = parser.parse_args()
 
-    # Resolve relative paths from the project root
-    trace_dir = args.trace_dir if os.path.isabs(args.trace_dir) \
-        else os.path.join(_ROOT, args.trace_dir)
-    save_path = args.save_path if os.path.isabs(args.save_path) \
+    # Resolve relative paths from the project root — comma-separated --trace_dir
+    # pools multiple directories into one training run (see TrajectoryDataset).
+    def _resolve(d: str) -> str:
+        d = d.strip()
+        return d if os.path.isabs(d) else os.path.join(_ROOT, d)
+
+    trace_dirs = [_resolve(d) for d in args.trace_dir.split(",") if d.strip()]
+    save_path  = args.save_path if os.path.isabs(args.save_path) \
         else os.path.join(_ROOT, args.save_path)
 
-    if not os.path.isdir(trace_dir):
-        print(f"[ERROR] Trace directory not found: {trace_dir}")
-        sys.exit(1)
+    for d in trace_dirs:
+        if not os.path.isdir(d):
+            print(f"[ERROR] Trace directory not found: {d}")
+            sys.exit(1)
+    trace_dir = trace_dirs if len(trace_dirs) > 1 else trace_dirs[0]
 
     os.makedirs(os.path.dirname(save_path), exist_ok=True)
 
