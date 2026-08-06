@@ -8,6 +8,7 @@
     --growth:#2F9E6E;
     --dormant:#8C8172;
     --summit:#C7860A;
+    --locked:#9CA3AF;
     --line: rgba(22,32,43,0.14);
     --font-display:"Iowan Old Style","Palatino Linotype","Book Antiqua",Georgia,serif;
     --font-body:"Segoe UI","Helvetica Neue",Arial,sans-serif;
@@ -22,16 +23,17 @@
       --growth:#5FD1A0;
       --dormant:#A79C89;
       --summit:#F0B429;
+      --locked:#5B6472;
       --line: rgba(233,237,243,0.14);
     }
   }
   :root[data-theme="dark"]{
     --bg:#0D131F; --bg-elev:#161F30ee; --ink:#E9EDF3; --ink-dim:#9AA5B8;
-    --growth:#5FD1A0; --dormant:#A79C89; --summit:#F0B429; --line: rgba(233,237,243,0.14);
+    --growth:#5FD1A0; --dormant:#A79C89; --summit:#F0B429; --locked:#5B6472; --line: rgba(233,237,243,0.14);
   }
   :root[data-theme="light"]{
     --bg:#E7EDF1; --bg-elev:#F5F8FAee; --ink:#16202B; --ink-dim:#55606C;
-    --growth:#2F9E6E; --dormant:#8C8172; --summit:#C7860A; --line: rgba(22,32,43,0.14);
+    --growth:#2F9E6E; --dormant:#8C8172; --summit:#C7860A; --locked:#9CA3AF; --line: rgba(22,32,43,0.14);
   }
 
   *{box-sizing:border-box;}
@@ -126,6 +128,7 @@
   .dot{ width:8px; height:8px; border-radius:50%; flex:none; }
   .dot.grown{ background:var(--growth); box-shadow:0 0 6px var(--growth); }
   .dot.dormant{ background:transparent; border:1.5px solid var(--dormant); }
+  .dot.locked{ background:transparent; border:1.5px dashed var(--locked); opacity:.7; }
   .diamond{ width:8px;height:8px; background:var(--summit); transform:rotate(45deg); flex:none; }
 
   .tooltip{
@@ -136,8 +139,10 @@
   }
   .tooltip.show{ opacity:1; transform:none; }
   .tooltip .ph{ font-family:var(--font-mono); font-size:10px; letter-spacing:.08em; text-transform:uppercase; color:var(--summit); margin:0 0 4px; }
-  .tooltip .tx{ font-size:12.5px; line-height:1.45; margin:0; }
+  .tooltip .tx{ font-size:12.5px; font-weight:600; line-height:1.4; margin:0; }
+  .tooltip .ds{ font-size:11.5px; line-height:1.5; margin:4px 0 0; color:var(--ink-dim); }
   .tooltip .st{ font-family:var(--font-mono); font-size:10px; margin:6px 0 0; color:var(--ink-dim); }
+  .tooltip .st.locked{ color:var(--locked); }
 
   footer.foot{
     position:fixed; left:26px; bottom:0; transform:translateY(100%);
@@ -181,11 +186,12 @@
   <div class="swatches">
     <div class="swatch"><span class="dot grown"></span> Shipped</div>
     <div class="swatch"><span class="dot dormant"></span> Ahead of us</div>
+    <div class="swatch"><span class="dot locked"></span> Locked — prerequisite unmet</div>
     <div class="swatch"><span class="diamond"></span> Architectural blocker (Big Three)</div>
   </div>
 </div>
 
-<div class="tooltip" id="tooltip"><p class="ph" id="ttPhase"></p><p class="tx" id="ttText"></p><p class="st" id="ttStatus"></p></div>
+<div class="tooltip" id="tooltip"><p class="ph" id="ttPhase"></p><p class="tx" id="ttText"></p><p class="ds" id="ttDesc"></p><p class="st" id="ttStatus"></p></div>
 
 <footer class="foot" id="foot"></footer>
 
@@ -197,84 +203,118 @@
 /* ── Source of truth — mirrors DEVELOPERS.md § Task List ─────────────── */
 const SYNC_DATE = "2026-08-06";
 const PHASES = [
-  { id:"foundation", order:0, tag:"FOUNDATION", label:"Scope-Agnostic Engine", note:"Done — kept as bedrock",
+  { id:"scope1", order:0, tag:"SCOPE 1", label:"Data Entry Form Filling", current:true,
+    desc:"The car insurance form — single-app key-value entry, mostly linear. Current focus; the thesis's proven vertical slice.",
     items:[
-      {t:"ScopeConfig — form hardcodes moved into injected config; agent is app-blind", done:true},
-      {t:"Perception adapter seam — Observer base, canonical schema, loud validation on mismatch", done:true},
-      {t:"DataSource injection (partial) — source I/O now goes through the seam", done:true},
-      {t:"Scope abstraction — declare a scope in one place (deferred to scope #2)", done:false},
+      {id:"scope1_combobox_fill", t:"Combobox click-fill", done:true, desc:"Empty combobox click opens + selects, no spiral."},
+      {id:"scope1_false_done_guard", t:"False-done guard", done:true, desc:"Notepad intake text no longer false-triggers completion."},
+      {id:"scope1_option_b", t:"Option B (WHERE/HOW)", done:true, desc:"The focused widget's type decides fill vs navigate, replacing the unstable action-type head. Whipsaw gone."},
+      {id:"scope1_tab_targeting", t:"Tab-targeting solved", done:true, desc:"The transformer's pointer predicts tab switches itself. 0% wasted, 100% value-acc."},
+      {id:"scope1_multi_tab_works", t:"Multi-tab traversal works", done:true, desc:"3-tab switch + fill, clean."},
+      {id:"scope1_all_8_tabs", t:"All 8 tabs trained", done:true, desc:"model_eight_tabs.pt, click_acc 0.88 at the time. Stale as of 2026-08-06 — see Learning branch."},
+      {id:"scope1_tab_click_fix", t:"Tab-click → clicked tab", done:true, desc:"Navigates to the tab actually clicked (sorted-index), not blind current+1."},
+      {id:"scope1_tab_order", t:"Tab-visit order", done:false, desc:"Model still jumps / revisits tabs (skips Policyholder/Vehicle/Coverage). Fix via cleaner demos, NOT a hardcoded order."},
+      {id:"scope1_leave_blank_bug", t:"(leave blank) typed literally", done:false, desc:"_lookup_field's skip-check mismatches the skip-set. Fix: substring-match leave-blank/none."},
+      {id:"scope1_checkbox_coldstart", t:"Checkbox cold-start", done:false, desc:"Reliable first action from a blank screen (Renewal checkbox handling)."},
+      {id:"scope1_combobox_retry", t:"Combobox retry", done:false, desc:"Open → miss → Escape → retry timing."},
+      {id:"scope1_record_advance_5", t:"Record advance ×5", done:false, desc:"Proven 1→2, need all 5 clean."},
+      {id:"scope1_per_record_refresh", t:"Per-record data refresh", done:false, desc:"refresh(record_num) for records 2–5 (only record 1 verified)."},
+      {id:"scope1_e2e_metric", t:"End-to-end completion metric", done:false, desc:"0% → ~100%, Field-Match high, low wasted steps."},
+      {id:"scope1_expected_vs_actual", t:"Expected-vs-actual diff at submit", done:false, desc:"Per-record correctness report."},
+      {id:"scope1_rerecord_50k", t:"~50,000-step end-to-end re-recording", done:false, desc:"In progress 2026-08-06. Current 19-session dataset fails its own quality gate: 0% scroll coverage, 26% Submit rate, 81.7% transition-mapping accuracy, 10.88% encoding ambiguity. Blocks several downstream branches."},
+      {id:"scope1_speed", t:"Speed / execution time", done:false, desc:"eval_metrics.py already tracks avg_step_time_sec, steps_per_minute, run_duration_sec, time_to_first_action_sec — no successful live run yet to set a real baseline."},
     ]},
-  { id:"p0", order:1, tag:"P0", label:"Complete Scope #1 — the form", current:true, note:"The current focus",
-    stages:[
-      { name:"Stage 1 — Multi-tab traversal", items:[
-        {t:"Combobox click-fill — empty combobox click opens + selects", done:true},
-        {t:"False-done guard — Notepad intake text no longer false-triggers completion", done:true},
-        {t:"Option B — the focused widget's type decides fill vs navigate", done:true},
-        {t:"Tab-targeting solved — the transformer's pointer predicts tab switches itself", done:true},
-        {t:"Multi-tab traversal works — 3-tab switch + fill, clean", done:true},
-        {t:"All 8 tabs trained — click_acc 0.88, fixation gone", done:true},
-        {t:"Tab-click now goes to the tab actually clicked", done:true},
-        {t:"Tab-visit order — model still jumps / revisits tabs", done:false},
-      ]},
-      { name:"Stage 2 — Reliability: no stalling", items:[
-        {t:"Empty-field fixation solved — the 'attempted' state feature", done:true},
-        {t:"Drift solved — form-window lock + in-form click guard", done:true},
-        {t:"Below-fold reach solved — Tab doubles as scroll-to-reveal", done:true},
-        {t:"'99' double-type fixed — idempotent typing", done:true},
-        {t:"(leave blank) still typed literally — skip-check bug unresolved", done:false},
-        {t:"Scroll may not actually move the form — unverified", done:false},
-        {t:"Checkbox cold-start / first click still unreliable", done:false},
-        {t:"Combobox retry timing — open → miss → escape → retry", done:false},
-      ]},
-      { name:"Stage 2.5 — Transformer navigates, agent only does HOW", items:[
-        {t:"Strip the stuck-guard auto-advance-tab crutch", done:false},
-        {t:"Strip focus-first-empty-field — prefer the transformer", done:false},
-        {t:"Scroll-reveal should let the model pick the next tab", done:false},
-      ]},
-      { name:"Stage 3 — Multi-record: all 5", items:[
-        {t:"Record advance ×5 — proven 1→2, need all five clean", done:false},
-        {t:"Per-record data refresh for records 2–5", done:false},
-      ]},
-      { name:"Stage 4 — Verification", items:[
-        {t:"End-to-end completion metric — 0% → ~100%", done:false},
-        {t:"Expected-vs-actual diff report at submit", done:false},
-      ]},
-    ]},
-  { id:"p1", order:2, tag:"P1", label:"Generalize", note:"Only after #1 completes a task",
+  { id:"scope2", order:1, tag:"SCOPE 2", label:"Web Form → Excel", note:"Not started",
+    desc:"Cross-application transfer (web source → Excel grid); 2D target; mixed perception. Starts only after Scope #1 completes a task.",
     items:[
-      {t:"Finish scope abstraction", done:false},
-      {t:"Excel full transfer — wire source/target + executor, train, measure", done:false},
-      {t:"Random-order test — clones any order, not a bias", done:false},
-    ],
-    blockers:[
-      "Big Three #1 — Perception: UIA accessibility tree → vision (pixels)",
-      "Big Three #2 — Action space: form-fields → universal executor",
-      "Big Three #3 — Workflow: linear demos → branching control flow",
+      {id:"scope2_excel_perception_proven", t:"Excel perception swap proven", done:true, desc:"ExcelObserver normalizes to the canonical schema."},
+      {id:"scope2_excel_full_transfer", t:"Excel full transfer", done:false, desc:"Wire source/target + executor for cells, record Excel demos, train, measure clone.",
+        requires:["scope1_record_advance_5","scope1_e2e_metric"]},
     ]},
-  { id:"p2", order:3, tag:"P2", label:"Scope #3",
-    items:[ {t:"Email / ticket triage — needs Action-Space + Control-Flow first", done:false} ]},
-  { id:"p3", order:4, tag:"P3", label:"Polish & known issues", note:"Non-blocking",
+  { id:"scope3", order:2, tag:"SCOPE 3", label:"Email / Ticket Triage", note:"Not started",
+    desc:"Decision-making / conditional behavior — the strongest personalization claim. Kept to decisions inferable from visible content.",
     items:[
-      {t:"LLM value errors — occasionally answers into the wrong field", done:false},
-      {t:"No prompt caching — every step is a fresh LLM call", done:false},
-      {t:"No memory component — each record runs from a blank slate", done:false},
-      {t:"Observability — no structured trace / record-level summary", done:false},
-      {t:"Combobox / mid-record crash recovery", done:false},
-      {t:"Cross-task shared backbone (trunk + per-task heads)", done:false},
-      {t:"Ghost cursor overlay, training-readiness indicator, DAgger productionized", done:false},
-      {t:"BC fidelity scorer was scoring stale submissions — fixed, now refuses runs older than the submission", done:true},
-      {t:"model.pt was a stale checkpoint (394 vs 395 features) — retraining in progress", done:false},
-      {t:"Recorder UI migrated Tkinter to Electron (orange/white, stdio bridge to DemoRecorder)", done:false},
+      {id:"scope3_email_triage", t:"Email / ticket triage", done:false, desc:"Needs Action-Space (Big Three #2) + Control-Flow (Big Three #3) first.",
+        requires:["execution_action_space_big3_2","execution_control_flow_big3_3"]},
     ]},
-  { id:"p4", order:5, tag:"P4", label:"Thesis / data / benchmark", note:"Parallel track",
+  { id:"perception", order:3, tag:"PERCEPTION", label:"Perception", note:"Objective 1",
+    desc:"Thesis objective 1: ≥95% detection accuracy across multiple GUI environments.",
     items:[
-      {t:"Thesis — finish Chapter 3, revise paper if nominated", done:false},
-      {t:"Data collection — 500,000 traces, convenience sampling", done:false},
-      {t:"Benchmark — compare against similar systems", done:false},
-      {t:"Chess fidelity benchmark — clone-ELO ≈ human-ELO, matching style", done:false},
+      {id:"perception_adapter_seam", t:"Perception adapter seam", done:true, desc:"Observer base (capture→normalize→validate), injectable, canonical schema, loud validation on mismatch."},
+      {id:"perception_vision_big3_1", t:"Big Three #1: UIA → Vision", done:false, isBlocker:true, desc:"General agent must see pixels: screenshot → VLM localizes + reads elements, hybrid UIA-grounding + VLM-understanding. Prototype exists, not proven at the 95% bar."},
+      {id:"perception_detection_accuracy_95", t:"Detection accuracy ≥95%", done:false, desc:"Tooling exists (scripts/perception_eval.py --log) — no logged runs yet."},
     ]},
-  { id:"p5", order:6, tag:"P5", label:"RL phase", note:"Future",
-    items:[ {t:"Actor-Critic / PPO, BC transformer as Actor, KL penalty vs BC", done:false} ]},
+  { id:"representation", order:4, tag:"REPRESENTATION", label:"Representation", note:"Objective 2",
+    desc:"Thesis objective 2: <5% encoding-ambiguity error rate.",
+    items:[
+      {id:"representation_datasource_injection", t:"DataSource injection (partial)", done:true, desc:"data_source is injectable, agent reads source I/O through the seam."},
+      {id:"representation_encoding_ambiguity_5", t:"Encoding ambiguity <5%", done:false, desc:"Measured 2026-08-06: 10.88% — above target. scripts/encoding_ambiguity.py --log."},
+      {id:"representation_transition_mapping_90", t:"Transition mapping ≥90%", done:false, desc:"Does each recorded action visibly do something? Measured 2026-08-06: 81.7%. scripts/validate_transitions.py --log."},
+    ]},
+  { id:"learning", order:5, tag:"LEARNING", label:"Learning", note:"Objectives 3 & 5",
+    desc:"Thesis objectives 3 & 5: ≥90% action prediction accuracy (training + held-out eval).",
+    items:[
+      {id:"learning_fixation_solved", t:"Empty-field fixation solved", done:true, desc:"'attempted' state-feature (ELEM_FEATURES 394→395) — transformer stops re-targeting acted-on fields."},
+      {id:"learning_double_type_fixed", t:"'99' double-type fixed", done:true, desc:"Typing is idempotent (select-all before paste)."},
+      {id:"learning_training_metrics_wired", t:"Training-time metrics wired", done:true, desc:"Per-epoch/total training time + throughput now logged (transformer_training_log.jsonl), 2026-08-06."},
+      {id:"learning_stale_checkpoint_fixed", t:"Stale checkpoint fixed", done:true, desc:"model.pt was trained for 394 elem features, code encodes 395 — drifted, crashed every run. Retrained on GPU 2026-08-06: epoch 65/80, val_acc=68.4%, val_click_acc=30.9%."},
+      {id:"learning_scroll_head_dead", t:"scroll_head never wired", done:false, desc:"Defined but never used in forward()/loss — scroll has no learnable target/magnitude. Found 2026-08-06.",
+        requires:["scope1_rerecord_50k"]},
+      {id:"learning_action_accuracy_90", t:"Action prediction accuracy ≥90%", done:false, desc:"Currently 30.9% click_acc — data-quality-limited, not architecture-limited.",
+        requires:["scope1_rerecord_50k"]},
+      {id:"learning_rl_phase", t:"RL phase (future)", done:false, desc:"Actor-Critic / PPO with the BC transformer as Actor; KL penalty vs BC. Online fine-tuning from StateValidator reward."},
+    ]},
+  { id:"adaptability", order:6, tag:"ADAPTABILITY", label:"Adaptability", note:"Objective 6",
+    desc:"Thesis objective 6: ≥75% success rate on unseen GUI environments.",
+    items:[
+      {id:"adaptability_unseen_success_75", t:"Unseen-GUI success ≥75%", done:false, desc:"Not instrumented — needs a held-out/perturbed-layout test session distinct from training envs."},
+      {id:"adaptability_scroll_gap", t:"Scroll navigation gap", done:false, desc:"Three-layer gap found 2026-08-06: 0/11,062 steps ever scrolled (data); scroll_head dead (model); agent.py's scroll-reveal block runs unconditionally in EVERY mode, preempting the transformer entirely (agent). Fix order: record → wire loss → fix executor focus-assert → strip the hardcoded block one change at a time.",
+        requires:["scope1_rerecord_50k"]},
+    ]},
+  { id:"scalability", order:7, tag:"SCALABILITY", label:"Scalability", note:"Objective 7",
+    desc:"Thesis objective 7: ≥90% performance maintained as dataset/task volume grows.",
+    items:[
+      {id:"scalability_scopeconfig", t:"ScopeConfig", done:true, desc:"Form hardcodes moved into injected config — agent is app-blind."},
+      {id:"scalability_scope_abstraction", t:"Scope abstraction", done:false, desc:"Declare a scope (goal+config+observer+source+model) in ONE place, not scattered in run_task.py. Deferred to Scope #2."},
+      {id:"scalability_perf_at_scale", t:"Performance vs. dataset size", done:false, desc:"Tooling exists (scripts/scaling_report.py) — needs ≥2 training runs logged at different sizes.",
+        requires:["scope1_rerecord_50k"]},
+      {id:"scalability_shared_backbone", t:"Cross-task shared backbone", done:false, desc:"Trunk + per-task heads, for when Scope #2/#3 exist."},
+    ]},
+  { id:"execution", order:8, tag:"EXEC + INTEGR.", label:"Execution and Integration", note:"Objectives 8, 9, 10",
+    desc:"Thesis objectives 8-10: ≥85% end-to-end completion w/o intervention; ≤10% execution error; ≤20% wasted steps; unified coordinated framework.",
+    items:[
+      {id:"execution_drift_solved", t:"Drift solved", done:true, desc:"Form-window LOCK + in-form click guard. No more typing into PowerShell / clicking Notepad."},
+      {id:"execution_belowfold_solved", t:"Below-fold reach solved", done:true, desc:"The drift guard's Tab doubles as scroll — wx ScrolledPanel auto-scrolls the focused field into view."},
+      {id:"execution_action_space_big3_2", t:"Big Three #2: universal action space", done:false, isBlocker:true, desc:"Today: click/type/select(+combobox). Need click, double_click, type, select, drag, scroll, hotkey, wait, verify, menu, file-dialog."},
+      {id:"execution_control_flow_big3_3", t:"Big Three #3: control flow", done:false, isBlocker:true, desc:"Demos are one linear path; real tasks branch/loop/skip/error-recover. LLM induces the workflow from multiple traces → execute → DAgger-correct."},
+      {id:"execution_agentic_integration_85", t:"End-to-end completion ≥85%", done:false, desc:"eval_metrics.py now tracks manual_interventions (DAgger corrections) as a direct signal.",
+        requires:["scope1_e2e_metric"]},
+      {id:"execution_error_rate_10", t:"Execution error ≤10%, waste ≤20%", done:false, desc:"Both computed in evaluate_run() with explicit pass/fail flags (2026-08-06) — no clean live measurement yet."},
+      {id:"execution_llm_value_errors", t:"LLM value errors", done:false, desc:"Occasionally answers into the wrong field. Fix = better prompt or lookup-as-validator, not silent replacement."},
+      {id:"execution_combobox_crash_recovery", t:"Combobox crash recovery", done:false, desc:"Combobox / mid-record crash recovery."},
+      {id:"execution_no_prompt_caching", t:"No prompt caching", done:false, desc:"Each step is a fresh LLM call, no batching/budget."},
+      {id:"execution_no_memory", t:"No memory component", done:false, desc:"Each record runs from a blank slate."},
+      {id:"execution_observability", t:"Observability", done:false, desc:"No structured trace / record-level summary; no screenshot history for VLM mis-reads."},
+      {id:"execution_ghost_cursor", t:"Ghost cursor overlay", done:false, desc:"Training-readiness indicator; DAgger productionized."},
+    ]},
+  { id:"evaluation", order:9, tag:"EVALUATION", label:"Evaluation", note:"Objectives 11 & 12",
+    desc:"Thesis objectives 11-12: 10-20%+ and statistically significant improvement over RPA tools on setup time, adaptability, error, cognitive workload.",
+    items:[
+      {id:"evaluation_bc_score_bug_fixed", t:"BC score staleness bug fixed", done:true, desc:"score_run() picked newest-by-mtime, which could be a stale blank auto-save unrelated to the run. Fixed 2026-08-06: refuses submissions older than the run's own start time."},
+      {id:"evaluation_rpa_comparison", t:"RPA baseline comparison", done:false, desc:"Setup time, adaptability, execution error, cognitive-workload proxy, with real significance testing. Tooling exists (compare_baseline.py, setup_time_tracker.py) — needs real RPA measurements collected manually.",
+        requires:["execution_agentic_integration_85","execution_error_rate_10"]},
+      {id:"evaluation_objectives_dashboard", t:"Unified objectives dashboard", done:false, desc:"scripts/objectives_report.py, built 2026-08-06 — exists and runs, but most underlying metrics still show 'no data' pending real runs."},
+      {id:"evaluation_benchmark", t:"Benchmark vs. similar systems", done:false, desc:"Compare against similar systems."},
+      {id:"evaluation_chess_fidelity", t:"Chess fidelity benchmark", done:false, desc:"Clone a human's play (openings, tendencies, blunders); clone-ELO ≈ human-ELO + matching style."},
+      {id:"evaluation_thesis_writing", t:"Thesis writing", done:false, desc:"Finish Chapter 3; revise paper if nominated."},
+      {id:"evaluation_data_collection_500k", t:"Data collection: 500,000 traces", done:false, desc:"Convenience-sampling setting."},
+    ]},
+  { id:"uiux", order:10, tag:"UI/UX", label:"UI/UX", note:"Not a thesis objective",
+    desc:"Developer tooling — the demo recorder's interface. Not a thesis objective.",
+    items:[
+      {id:"uiux_electron_scaffold", t:"Electron scaffold launches", done:true, desc:"app_electron/: orange/white theme, talks to the existing Python DemoRecorder over a stdio JSON bridge (recording logic has to stay in Python). Fixed ELECTRON_RUN_AS_NODE forcing plain-Node mode. 2026-08-06."},
+      {id:"uiux_electron_feature_parity", t:"Full feature parity + .exe packaging", done:false, desc:"Screen Observer panel, F8 replay-newest hotkey, packaging via electron-builder. Note: a separate ui/ui-ux branch (CustomTkinter, no DemoRecorder wiring) was NOT adopted for this."},
+    ]},
 ];
 
 /* ── Flatten + tally ──────────────────────────────────────────────────── */
@@ -289,6 +329,17 @@ PHASES.forEach(p=>{
   p._total = items.length;
   p._pct = p._total ? (p._done/p._total*100) : 0;
 });
+
+/* ── Prerequisites: a task with an unmet `requires` id is locked ────────── */
+const ITEM_BY_ID = {};
+PHASES.forEach(p=> p._items.forEach(it=>{ if (it.id) ITEM_BY_ID[it.id] = it; }));
+PHASES.forEach(p=> p._items.forEach(it=>{
+  const reqs = it.requires || [];
+  const unmet = reqs.filter(rid => !(ITEM_BY_ID[rid] && ITEM_BY_ID[rid].done));
+  it._locked = unmet.length > 0;
+  it._unmetLabels = unmet.map(rid => (ITEM_BY_ID[rid] && ITEM_BY_ID[rid].t) || rid);
+}));
+
 const TOTAL_DONE = PHASES.reduce((a,p)=>a+p._done,0);
 const TOTAL_ITEMS = PHASES.reduce((a,p)=>a+p._total,0);
 const OVERALL_PCT = TOTAL_DONE/TOTAL_ITEMS*100;
@@ -297,7 +348,7 @@ const OVERALL_PCT = TOTAL_DONE/TOTAL_ITEMS*100;
 document.getElementById("pctBig").innerHTML = OVERALL_PCT.toFixed(1)+"<small>%</small>";
 document.getElementById("pctBar").style.width = OVERALL_PCT.toFixed(1)+"%";
 document.getElementById("peakNote").innerHTML =
-  TOTAL_DONE+" of "+TOTAL_ITEMS+" tasks shipped. <b>Summit = 100%</b>, still "+(100-OVERALL_PCT).toFixed(1)+"% of climb ahead.";
+  TOTAL_DONE+" of "+TOTAL_ITEMS+" tasks shipped. <b>Complete Intern = 100%</b>, still "+(100-OVERALL_PCT).toFixed(1)+"% of climb ahead.";
 document.getElementById("foot").textContent =
   "Synced with DEVELOPERS.md · Task List · "+SYNC_DATE;
 document.getElementById("srSummary").textContent =
@@ -308,6 +359,7 @@ const listEl = document.getElementById("phaseList");
 PHASES.forEach(p=>{
   const row = document.createElement("div");
   row.className = "phase-row"+(p.current?" current":"");
+  row.title = p.desc || "";
   row.innerHTML =
     '<div class="top"><span class="tag">'+p.tag+'</span><span class="name">'+p.label+'</span>'+
     '<span class="pct">'+p._done+'/'+p._total+'</span></div>'+
@@ -364,17 +416,8 @@ function buildGeometry(){
       const len = 24 + seeded(idx*31+i)*8;
       const ndir = [Math.cos(nAz)*Math.cos(nEl), Math.sin(nEl), Math.sin(nAz)*Math.cos(nEl)];
       const p = [hubPt[0]+ndir[0]*len, hubPt[1]+ndir[1]*len, hubPt[2]+ndir[2]*len];
-      taskEdges.push({a:hubPt, b:p, done:it.done, blocker:false});
-      nodes.push({p, item:it, phaseLabel:ph.label, isBlocker:false});
-    });
-
-    (ph.blockers||[]).forEach((bt, i) => {
-      const bAz = az - 0.55 - i*0.22, bEl = elev + 0.3;
-      const len = 32;
-      const bdir = [Math.cos(bAz)*Math.cos(bEl), Math.sin(bEl), Math.sin(bAz)*Math.cos(bEl)];
-      const p = [hubPt[0]+bdir[0]*len, hubPt[1]+bdir[1]*len, hubPt[2]+bdir[2]*len];
-      taskEdges.push({a:hubPt, b:p, done:false, blocker:true});
-      nodes.push({p, item:{t:bt, done:false}, phaseLabel:ph.label, isBlocker:true});
+      taskEdges.push({a:hubPt, b:p, done:it.done, blocker:!!it.isBlocker, locked:!!it._locked});
+      nodes.push({p, item:it, phaseLabel:ph.label, isBlocker:!!it.isBlocker});
     });
   });
 
@@ -435,6 +478,7 @@ function colors(){
     growth: s.getPropertyValue("--growth").trim(),
     dormant: s.getPropertyValue("--dormant").trim(),
     summit: s.getPropertyValue("--summit").trim(),
+    locked: s.getPropertyValue("--locked").trim(),
     ink: s.getPropertyValue("--ink").trim(),
     inkDim: s.getPropertyValue("--ink-dim").trim(),
     line: s.getPropertyValue("--line").trim(),
@@ -485,7 +529,8 @@ function draw(now){
   GEO.taskEdges.forEach(te=>{
     const a=[te.a[0],te.a[1]*growT,te.a[2]], b=[te.b[0],te.b[1]*growT,te.b[2]];
     const grown = te.done && a[1] <= growHeight+40;
-    items3d.push({type:"edge", a, b, w:1.4, col: te.blocker ? C.summit : (grown?C.growth:C.dormant), alpha: te.blocker?0.75:(grown?0.85:0.35), depth: depthOf(a,b)});
+    const col = te.blocker ? C.summit : (te.locked ? C.locked : (grown?C.growth:C.dormant));
+    items3d.push({type:"edge", a, b, w:1.4, col, alpha: te.blocker?0.75:(te.locked?0.25:(grown?0.85:0.35)), dash: !!te.locked, depth: depthOf(a,b)});
   });
   GEO.hubs.forEach(hb=>{
     const p=[hb.p[0],hb.p[1]*growT,hb.p[2]];
@@ -501,7 +546,7 @@ function draw(now){
 
   items3d.forEach(it=>{
     if (it.type==="edge"){
-      drawEdge(it.a, it.b, it.w, it.col, it.alpha);
+      drawEdge(it.a, it.b, it.w, it.col, it.alpha, it.dash);
     } else if (it.type==="hub"){
       const pt = project(it.p);
       const ph = it.hub.phase;
@@ -547,6 +592,15 @@ function draw(now){
         ctx.arc(pt.x, pt.y, isHover? r*1.6 : r, 0, Math.PI*2);
         ctx.fill();
         ctx.shadowBlur = 0; ctx.globalAlpha = 1;
+      } else if (it.node.item._locked){
+        ctx.beginPath();
+        ctx.strokeStyle = C.locked; ctx.lineWidth = 1.2;
+        ctx.globalAlpha = isHover ? 0.9 : 0.4;
+        ctx.setLineDash([2,2]);
+        ctx.arc(pt.x, pt.y, isHover? r*1.4 : r*0.85, 0, Math.PI*2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.globalAlpha = 1;
       } else {
         ctx.beginPath();
         ctx.strokeStyle = C.dormant; ctx.lineWidth = 1.4;
@@ -585,7 +639,7 @@ function draw(now){
   ctx.font = "10.5px "+fontVar("--font-mono");
   ctx.fillStyle = C.inkDim;
   ctx.globalAlpha = 0.85;
-  ctx.fillText("SUMMIT · 100%"+(atSummit?"":" (locked)"), summitPt.x+sR+8, summitPt.y);
+  ctx.fillText("COMPLETE INTERN · 100%"+(atSummit?"":" (locked)"), summitPt.x+sR+8, summitPt.y);
   ctx.globalAlpha = 1;
 
   requestAnimationFrame(draw);
@@ -613,7 +667,7 @@ function depthOf(a,b){
   return (ra[2]+rb[2])/2;
 }
 
-function drawEdge(a,b,width,col,alpha){
+function drawEdge(a,b,width,col,alpha,dash){
   const pa = project(a), pb = project(b);
   ctx.beginPath();
   ctx.moveTo(pa.x,pa.y); ctx.lineTo(pb.x,pb.y);
@@ -621,7 +675,9 @@ function drawEdge(a,b,width,col,alpha){
   ctx.globalAlpha = alpha;
   ctx.lineWidth = Math.max(1, width * ((pa.s+pb.s)/2));
   ctx.lineCap = "butt";
+  if (dash) ctx.setLineDash([3,3]);
   ctx.stroke();
+  if (dash) ctx.setLineDash([]);
   ctx.globalAlpha = 1;
 }
 
@@ -686,16 +742,26 @@ window.addEventListener("pointermove", e=>{
 
 const tooltip = document.getElementById("tooltip");
 function showTooltip(sn, x, y){
+  const statusEl = document.getElementById("ttStatus");
+  statusEl.classList.remove("locked");
   if (sn.hub){
     const ph = sn.hub.phase;
     document.getElementById("ttPhase").textContent = ph.tag + (ph.current?" · current focus":"");
     document.getElementById("ttText").textContent = ph.label + (ph.note?" — "+ph.note:"");
-    document.getElementById("ttStatus").textContent = ph._done+" / "+ph._total+" tasks done ("+ph._pct.toFixed(0)+"%)";
+    document.getElementById("ttDesc").textContent = ph.desc || "";
+    statusEl.textContent = ph._done+" / "+ph._total+" tasks done ("+ph._pct.toFixed(0)+"%)";
   } else {
     const nd = sn.node;
     document.getElementById("ttPhase").textContent = nd.phaseLabel + (nd.isBlocker?" · architectural blocker":"");
     document.getElementById("ttText").textContent = nd.item.t;
-    document.getElementById("ttStatus").textContent = nd.isBlocker ? "Gates generalization (P1)" : (nd.item.done ? "Shipped" : "Ahead of us");
+    document.getElementById("ttDesc").textContent = nd.item.desc || "";
+    if (nd.item._locked){
+      statusEl.textContent = "Locked — requires: " + nd.item._unmetLabels.join(", ");
+      statusEl.classList.add("locked");
+    } else {
+      statusEl.textContent = nd.isBlocker ? "Architectural blocker — gates generalization"
+        : (nd.item.done ? "Shipped" : "Ahead of us");
+    }
   }
   tooltip.style.left = Math.min(x+16, window.innerWidth-296)+"px";
   tooltip.style.top = Math.min(y+16, window.innerHeight-120)+"px";
