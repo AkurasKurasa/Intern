@@ -17,35 +17,35 @@ function maybeDismissSplash() {
 // Fallback: don't hang forever on the splash if the backend never reports ready.
 setTimeout(() => { bridgeIsReady = true; maybeDismissSplash(); }, 4000);
 
-/* ── Sidebar navigation ───────────────────────────────────────────────── */
+/* ── Sidebar navigation — controls what shows in the middle main area ──── */
+/* The recorder panel on the right is always visible; the sidebar only
+   switches the (currently placeholder) middle content. */
 const navRecorder = document.getElementById("navRecorder");
 const navWorkflows = document.getElementById("navWorkflows");
-const panelRecorder = document.getElementById("panel-recorder");
-const panelWorkflows = document.getElementById("panel-workflows");
+const emptyState = document.getElementById("emptyState");
+const workflowsWrap = document.getElementById("workflowsWrap");
 
-function showPanel(name) {
-  const toRecorder = name === "recorder";
-  panelRecorder.classList.toggle("active", toRecorder);
-  panelWorkflows.classList.toggle("active", !toRecorder);
-  navRecorder.classList.toggle("active", toRecorder);
-  navWorkflows.classList.toggle("active", !toRecorder);
-  navRecorder.setAttribute("aria-current", toRecorder ? "page" : "false");
-  navWorkflows.setAttribute("aria-current", !toRecorder ? "page" : "false");
-  if (!toRecorder) loadWorkflows();
+function showMain(name) {
+  const toHome = name === "home";
+  emptyState.hidden = !toHome;
+  workflowsWrap.hidden = toHome;
+  navRecorder.classList.toggle("active", toHome);
+  navWorkflows.classList.toggle("active", !toHome);
+  navRecorder.setAttribute("aria-current", toHome ? "page" : "false");
+  navWorkflows.setAttribute("aria-current", !toHome ? "page" : "false");
+  if (!toHome) loadWorkflows();
 }
-navRecorder.addEventListener("click", () => showPanel("recorder"));
-navWorkflows.addEventListener("click", () => showPanel("workflows"));
+navRecorder.addEventListener("click", () => showMain("home"));
+navWorkflows.addEventListener("click", () => showMain("workflows"));
 
-/* ── Recorder panel ───────────────────────────────────────────────────── */
+/* ── Recorder panel (always visible, right column) ────────────────────── */
 const statusDot   = document.getElementById("statusDot");
 const statStatus  = document.getElementById("statStatus");
 const statFrames  = document.getElementById("statFrames");
 const statSessions= document.getElementById("statSessions");
-const statusBar   = document.getElementById("statusBar");
 const outDirInput = document.getElementById("outDir");
 const btnStart    = document.getElementById("btnStart");
 const btnStop     = document.getElementById("btnStop");
-const btnReplay   = document.getElementById("btnReplay");
 const logEl       = document.getElementById("log");
 const clockEl     = document.getElementById("clock");
 const sideStatusDot = document.getElementById("sideStatusDot");
@@ -74,28 +74,18 @@ function log(message, level = "dim") {
 function setRecording(isRecording) {
   btnStart.disabled = isRecording;
   btnStop.disabled = !isRecording;
-  btnReplay.disabled = isRecording;
   statusDot.className = "dot" + (isRecording ? " recording" : "");
-  statStatus.innerHTML = `<i class="dot${isRecording ? " recording" : ""}" id="statusDot"></i>${isRecording ? "Recording" : "Idle"}`;
+  statStatus.textContent = isRecording ? "Recording" : "Idle";
 }
 
 btnStart.addEventListener("click", () => {
   window.recorderAPI.start(outDirInput.value.trim() || null);
   statFrames.textContent = "0";
-  statusBar.textContent = "Recording — fill the form, then click Stop & Save";
+  log("Recording — fill the form, then click Stop & Save.", "dim");
 });
 
 btnStop.addEventListener("click", () => {
   window.recorderAPI.stop();
-});
-
-btnReplay.addEventListener("click", () => {
-  const n = prompt("Duplicate the newest session how many times?", "10");
-  if (!n) return;
-  const count = parseInt(n, 10);
-  if (!count || count < 1) return;
-  log(`Replaying newest session x${count}...`, "dim");
-  window.recorderAPI.replay(count);
 });
 
 window.recorderAPI.onEvent((event) => {
@@ -122,14 +112,13 @@ window.recorderAPI.onEvent((event) => {
       sessions += 1;
       statSessions.textContent = String(sessions);
       statFrames.textContent = String(event.steps);
-      statusBar.textContent = `Saved — ${event.steps} frames · ${sessions} session(s) total`;
-      log(`Session saved — ${event.steps} frames. Now click Replay ×N to repeat it.`, "ok");
+      log(`Saved — ${event.steps} frames. Now click Replay ×N to repeat it.`, "ok");
       break;
     case "replay_progress":
-      statusBar.textContent = `Replaying (${event.current}/${event.total})...`;
+      statStatus.textContent = `Replaying ${event.current}/${event.total}`;
       break;
     case "replay_done":
-      statusBar.textContent = `Copied ×${event.made} → data/demos/human (${event.steps_each} steps each)`;
+      statStatus.textContent = "Idle";
       log(`Replay done — ${event.made} copies (${event.steps_each} steps each) -> ${event.dest}`, "ok");
       break;
     case "log":
@@ -137,7 +126,6 @@ window.recorderAPI.onEvent((event) => {
       break;
     case "error":
       setRecording(false);
-      statusBar.textContent = `Error: ${event.message}`;
       log(event.message, "err");
       sideStatusDot.classList.add("error");
       break;
@@ -181,7 +169,7 @@ async function loadWorkflows() {
     const head = document.createElement("div");
     head.className = "wf-group-head";
     head.innerHTML =
-      `<span><span class="chev">▸</span><span class="name">${escapeHtml(g.name)}</span></span>` +
+      `<span><span class="chev">▸</span><span class="wf-tag">Form</span><span class="name">${escapeHtml(g.name)}</span></span>` +
       `<span class="meta">${g.sessionCount} session${g.sessionCount===1?"":"s"} · ${g.totalSteps.toLocaleString()} steps</span>`;
     head.addEventListener("click", () => card.classList.toggle("open"));
     card.appendChild(head);

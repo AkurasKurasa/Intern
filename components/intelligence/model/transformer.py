@@ -533,6 +533,7 @@ class TrajectoryDataset(Dataset):
                     self._attempted_by_file = _cached.get("attempted_by_file", {})
                     print(f"[Dataset] Loaded from cache: {len(self._samples)} samples "
                           f"from {len(self._grouped_files)} session(s).")
+                    self._prime_all_embeddings()
                     self._preload_tensors()
                     return
             except Exception as _ce:
@@ -738,7 +739,35 @@ class TrajectoryDataset(Dataset):
         except Exception as _se:
             print(f"[Dataset] Cache save failed ({_se}), continuing without cache.")
 
+        self._prime_all_embeddings()
         self._preload_tensors()
+
+    def _prime_all_embeddings(self) -> None:
+        """
+        Batch-embed every unique element label in the dataset via the real
+        sentence-transformer BEFORE tensor encoding starts.
+
+        _embed_text() silently falls back to a content hash (no semantic
+        structure at all) for any text not already in _embed_cache — and
+        nothing called _prime_embed_cache() anywhere in the pipeline, so
+        every training run to date learned click-targeting from 384 of its
+        395 input features being meaningless per-label noise. Found
+        2026-08-07 while investigating why val_click_acc plateaued at
+        ~29-31% across three differently-sized datasets in one session —
+        dataset size was never going to fix a representation problem.
+        """
+        labels: set = set()
+        unique_files: list = []
+        for group in self._grouped_files:
+            unique_files.extend(group)
+        unique_files = list(dict.fromkeys(unique_files))
+        for fpath in unique_files:
+            t = _load_trace(fpath)
+            if not t:
+                continue
+            for e in t.get("state", {}).get("elements", []):
+                labels.add(_elem_label(e))
+        _prime_embed_cache(list(labels))
 
     def _preload_tensors(self) -> None:
         """

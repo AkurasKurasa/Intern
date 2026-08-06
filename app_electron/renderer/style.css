@@ -3,6 +3,8 @@
   --orange-dark: #C2410C;
   --orange-tint: #FFF1E7;
   --white: #FFFFFF;
+  --page-bg: #F6F6F4;
+  --chip-bg: #EFEFEC;
   --border: #EDEDED;
   --border-strong: #E2E2E2;
   --ink: #1C1917;
@@ -37,13 +39,13 @@ html, body {
   user-select: none;
 }
 
-/* ── Splash / landing screen ─────────────────────────────────────────── */
+/* ── Splash / landing screen — full brand-color, catchy entry moment ──── */
 .splash {
   position: fixed; top: 34px; left: 0; right: 0; bottom: 0; z-index: 50;
   display: flex; flex-direction: column; align-items: center; justify-content: center;
   gap: 10px;
-  background: var(--white);
-  color: var(--ink);
+  background: radial-gradient(120% 120% at 50% 20%, #FFA857 0%, var(--orange) 45%, var(--orange-dark) 100%);
+  color: white;
   transition: opacity .5s ease, visibility .5s ease;
 }
 .splash.hide { opacity: 0; visibility: hidden; pointer-events: none; }
@@ -56,14 +58,14 @@ html, body {
   animation: splashPop .7s cubic-bezier(.2,1.4,.4,1) both;
 }
 .splash-i {
-  font-size: 36px; font-weight: 800; color: var(--orange);
-  background: var(--white); width: 100%; height: 100%; border-radius: 20px;
-  border: 1.5px solid var(--orange);
+  font-size: 36px; font-weight: 800; color: var(--orange-dark);
+  background: white; width: 100%; height: 100%; border-radius: 20px;
   display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 10px 26px rgba(0,0,0,.22);
 }
 .splash-ring {
   position: absolute; inset: -10px;
-  border: 1.5px solid var(--orange-tint);
+  border: 1.5px solid rgba(255,255,255,.55);
   border-radius: 26px;
   animation: splashRing 2.2s ease-in-out infinite;
 }
@@ -72,16 +74,16 @@ html, body {
   to   { transform: scale(1); opacity: 1; }
 }
 @keyframes splashRing {
-  0%, 100% { transform: scale(1);   opacity: 1; }
+  0%, 100% { transform: scale(1);   opacity: .6; }
   50%      { transform: scale(1.18); opacity: 0; }
 }
 
 .splash-title {
-  margin: 0; font-size: 28px; font-weight: 700; letter-spacing: .01em; color: var(--ink);
+  margin: 0; font-size: 28px; font-weight: 700; letter-spacing: .01em; color: white;
   animation: splashFade .6s ease .15s both;
 }
 .splash-tag {
-  margin: 0 0 18px; font-size: 13px; color: var(--dim);
+  margin: 0 0 18px; font-size: 13px; color: rgba(255,255,255,.85);
   animation: splashFade .6s ease .3s both;
 }
 @keyframes splashFade {
@@ -91,12 +93,12 @@ html, body {
 
 .splash-bar {
   width: 200px; height: 3px; border-radius: 4px;
-  background: var(--border-strong); overflow: hidden;
+  background: rgba(255,255,255,.3); overflow: hidden;
   animation: splashFade .6s ease .4s both;
 }
 .splash-bar > i {
   display: block; height: 100%; width: 30%; border-radius: 4px;
-  background: var(--orange);
+  background: white;
   animation: splashLoad 1.3s ease-in-out infinite;
 }
 @keyframes splashLoad {
@@ -104,7 +106,7 @@ html, body {
   100% { transform: translateX(430%); }
 }
 .splash-status {
-  margin: 10px 0 0; font-size: 11.5px; color: var(--dim);
+  margin: 10px 0 0; font-size: 11.5px; color: rgba(255,255,255,.8);
   font-family: Consolas, monospace;
   animation: splashFade .6s ease .4s both;
 }
@@ -113,7 +115,7 @@ html, body {
   .splash-ring, .splash-bar > i { animation: none; }
 }
 
-/* ── Shell: icon sidebar + one content area ──────────────────────────── */
+/* ── Shell: icon rail | main area | recorder panel ────────────────────── */
 .shell {
   display: flex;
   height: calc(100% - 34px);
@@ -158,118 +160,111 @@ html, body {
 }
 .side-status .dot { width: 8px; height: 8px; }
 
-.content {
+/* ── Main area — middle column, content TBD ───────────────────────────── */
+.main-area {
   flex: 1;
   min-width: 0;
   position: relative;
   overflow: hidden;
+  background: var(--white);
 }
 
-.panel {
-  display: none;
-  flex-direction: column;
-  height: 100%;
-  padding: 18px 22px;
+.empty-state {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 14px;
 }
-.panel.active { display: flex; }
+.empty-mark {
+  width: 52px; height: 52px; border-radius: 14px;
+  background: var(--chip-bg); color: var(--dim);
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 700; font-size: 22px;
+}
+.empty-text { color: var(--dim); font-size: 13px; margin: 0; }
 
-.panel-head {
+.mid-panel { position: absolute; inset: 0; display: flex; flex-direction: column; padding: 18px 22px; }
+.mid-head {
   display: flex; align-items: baseline; justify-content: space-between;
-  padding-bottom: 12px; margin-bottom: 14px; border-bottom: 1px solid var(--border);
+  padding-bottom: 12px; margin-bottom: 14px; border-bottom: 1px solid var(--border-strong);
 }
-.panel-head h2 { margin: 0; font-size: 18px; }
+.mid-head h2 { margin: 0; font-size: 18px; }
+.mid-body { flex: 1; min-height: 0; overflow-y: auto; }
+
 .hint { font-size: 11.5px; color: var(--dim); margin: 3px 0 0; }
-.clock { font-family: Consolas, monospace; font-size: 12px; color: var(--dim); }
 
-.panel-body { flex: 1; min-height: 0; overflow-y: auto; }
-.panel-body.two-col { display: flex; gap: 16px; }
-.col-main { flex: 1; display: flex; flex-direction: column; gap: 14px; min-width: 0; }
-
-.col-log {
-  width: 280px;
+/* ── Recorder panel — small, always-visible, rightmost ────────────────── */
+.recorder-panel {
   flex: none;
-  display: flex;
-  flex-direction: column;
-  background: var(--white);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 14px;
-  max-height: 100%;
+  width: 260px;
+  background: var(--page-bg);
+  border-left: 1px solid var(--border-strong);
+  display: flex; flex-direction: column;
+  padding: 16px 16px 14px;
+  gap: 10px;
+  overflow: hidden;
 }
-.col-log h3 { margin: 0 0 10px; font-size: 13px; }
-.log {
-  flex: 1;
-  overflow-y: auto;
-  font-family: Consolas, monospace;
-  font-size: 11.5px;
-  line-height: 1.5;
+.rp-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 2px; }
+.rp-head h2 { margin: 0; font-size: 14px; font-weight: 700; }
+.clock { font-family: Consolas, monospace; font-size: 10.5px; color: var(--dim); }
+
+.rp-status {
+  display: flex; align-items: center; gap: 7px;
+  background: var(--white); border: 1px solid var(--border-strong);
+  border-radius: 8px; padding: 7px 10px;
+  font-size: 12.5px; font-weight: 600;
 }
-.log-entry { margin-bottom: 8px; }
-.log-time { color: var(--dim); }
-.log-ok { color: var(--green); }
-.log-err { color: var(--red); }
-.log-dim { color: var(--dim); }
-
-.card {
-  background: var(--white);
-  border: 1px solid var(--border);
-  border-radius: 14px;
-  padding: 18px 20px;
+.rp-stats {
+  font-size: 11.5px; color: var(--dim); font-family: Consolas, monospace;
+  display: flex; align-items: baseline; gap: 4px;
 }
-.card-primary { border-color: var(--orange); }
+.rp-stats span:first-child, .rp-stats span:nth-child(4) { color: var(--ink); font-weight: 600; }
+.rp-stats-label { margin-right: 2px; }
+.rp-sep { margin: 0 2px; }
 
-.card-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 12px; }
-.card-head h3 { margin: 0; font-size: 14px; }
-
-.stats-row { display: flex; gap: 10px; margin-bottom: 12px; }
-.stat {
-  flex: 1;
-  background: var(--white);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 10px 14px;
-}
-.stat-label { display: block; font-size: 11px; color: var(--dim); margin-bottom: 2px; }
-.stat-value { display: flex; align-items: center; gap: 6px; font-size: 20px; font-weight: 600; }
-
-.dot { width: 9px; height: 9px; border-radius: 50%; background: var(--dim); display: inline-block; }
-.dot.recording { background: var(--green); box-shadow: 0 0 6px var(--green); }
-.dot.error { background: var(--red); }
-
-.status-bar {
-  background: var(--white);
-  border: 1px solid var(--border);
-  border-left: 3px solid var(--orange);
-  border-radius: 6px;
-  padding: 8px 12px;
-  font-size: 12.5px;
-  color: var(--dim);
-  margin-bottom: 14px;
-}
-
-.field-label { display: block; font-size: 11.5px; color: var(--dim); margin-bottom: 4px; }
+.field-label { display: block; font-size: 11px; color: var(--dim); margin: 2px 0 0; }
 .field {
   width: 100%;
-  padding: 8px 10px;
+  padding: 7px 9px;
   border: 1px solid var(--border-strong);
-  border-radius: 8px;
+  border-radius: 7px;
   font-family: Consolas, monospace;
-  font-size: 12.5px;
-  margin-bottom: 14px;
+  font-size: 11.5px;
   color: var(--ink);
   background: var(--white);
 }
 .field:focus { outline: none; border-color: var(--orange); }
 
-.btn-row { display: flex; gap: 10px; }
+.rp-btn-row { display: flex; gap: 8px; }
+.rp-replay { width: 100%; }
+
+.rp-log-head { margin: 4px 0 0; font-size: 11px; color: var(--dim); text-transform: uppercase; letter-spacing: .04em; }
+
+.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--dim); display: inline-block; flex: none; }
+.dot.recording { background: var(--green); box-shadow: 0 0 6px var(--green); }
+.dot.error { background: var(--red); }
+
+.log {
+  flex: 1; min-height: 0;
+  overflow-y: auto;
+  font-family: Consolas, monospace;
+  font-size: 10.5px;
+  line-height: 1.5;
+}
+.log-entry { margin-bottom: 6px; }
+.log-time { color: var(--dim); }
+.log-ok { color: var(--green); }
+.log-err { color: var(--red); }
+.log-dim { color: var(--dim); }
+
 .btn {
   border: 1px solid transparent;
-  border-radius: 9px;
-  padding: 10px 18px;
-  font-size: 13px;
+  border-radius: 8px;
+  padding: 8px 14px;
+  font-size: 12.5px;
   font-weight: 600;
   cursor: pointer;
   transition: filter 0.12s ease, background .12s ease;
+  flex: 1;
 }
 .btn:hover:not(:disabled) { filter: brightness(0.96); }
 .btn:disabled { opacity: 0.4; cursor: not-allowed; }
@@ -277,23 +272,29 @@ html, body {
 .btn-danger { background: var(--white); color: var(--red); border-color: var(--red); }
 .btn-danger:not(:disabled):hover { background: #FDF2F2; }
 .btn-ghost { background: var(--white); color: var(--ink); border-color: var(--border-strong); }
-.btn-sm { padding: 6px 12px; font-size: 12px; }
+.btn-sm { padding: 6px 12px; font-size: 12px; flex: none; }
 
 .muted { color: var(--dim); font-size: 13px; line-height: 1.6; margin: 0; }
 
-/* ── Workflows panel ──────────────────────────────────────────────────── */
+/* ── Workflows list (shown in the main area) ──────────────────────────── */
 .workflows-list { display: flex; flex-direction: column; gap: 12px; }
 .wf-group {
   background: var(--white);
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-strong);
   border-radius: 14px;
   padding: 14px 18px;
+  box-shadow: 0 1px 2px rgba(28,25,23,.04);
 }
 .wf-group-head {
   display: flex; align-items: baseline; justify-content: space-between;
   cursor: pointer; user-select: none;
 }
 .wf-group-head .name { font-size: 14.5px; font-weight: 600; }
+.wf-tag {
+  display: inline-block; font-size: 10px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .04em; color: var(--orange); background: var(--orange-tint);
+  border-radius: 5px; padding: 2px 6px; margin-right: 8px;
+}
 .wf-group-head .meta { font-size: 12px; color: var(--dim); font-family: Consolas, monospace; }
 .wf-group-head .chev { font-size: 10px; color: var(--orange); margin-right: 6px; }
 

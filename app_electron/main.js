@@ -23,6 +23,7 @@ function resolvePython() {
 }
 
 let mainWindow = null;
+let miniWindow = null;
 let bridge = null;
 let bridgeReady = false;
 const pendingCommands = [];
@@ -49,7 +50,7 @@ function startBridge() {
       bridgeReady = true;
       for (const cmd of pendingCommands.splice(0)) sendCommand(cmd);
     }
-    if (mainWindow) mainWindow.webContents.send("recorder-event", event);
+    broadcast("recorder-event", event);
   });
 
   bridge.stderr.on("data", (data) => {
@@ -59,14 +60,20 @@ function startBridge() {
   bridge.on("exit", (code) => {
     console.log("Bridge process exited with code", code);
     bridgeReady = false;
-    if (mainWindow) {
-      mainWindow.webContents.send("recorder-event", {
-        event: "log",
-        message: `Backend process exited (code ${code}).`,
-        level: "err",
-      });
-    }
+    broadcast("recorder-event", {
+      event: "log",
+      message: `Backend process exited (code ${code}).`,
+      level: "err",
+    });
   });
+}
+
+// Recorder state lives in the main process (via the bridge) — both the main
+// window and the mini widget (when minimized) are just views onto it, so
+// every recorder event goes to whichever of them currently exists.
+function broadcast(channel, payload) {
+  if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send(channel, payload);
+  if (miniWindow && !miniWindow.isDestroyed()) miniWindow.webContents.send(channel, payload);
 }
 
 function sendCommand(cmd) {
@@ -103,6 +110,44 @@ function createWindow() {
   });
   mainWindow.setMenuBarVisibility(false);
   mainWindow.loadFile(path.join(__dirname, "renderer", "index.html"));
+
+  // Minimizing the main window doesn't stop a recording — swap in a small
+  // always-on-top widget so Start/Stop/status stay reachable without the
+  // full window open.
+  mainWindow.on("minimize", () => {
+    if (!miniWindow || miniWindow.isDestroyed()) createMiniWindow();
+    miniWindow.show();
+  });
+  mainWindow.on("restore", () => {
+    if (miniWindow && !miniWindow.isDestroyed()) miniWindow.hide();
+  });
+}
+
+function createMiniWindow() {
+  miniWindow = new BrowserWindow({
+    title: "Intern — mini",
+    width: 240,
+    height: 168,
+    resizable: false,
+    minimizable: false,
+    maximizable: false,
+    fullscreenable: false,
+    alwaysOnTop: true,
+    skipTaskbar: true,
+    frame: false,
+    backgroundColor: "#F6F6F4",
+    webPreferences: {
+      preload: path.join(__dirname, "preload.js"),
+      contextIsolation: true,
+      nodeIntegration: false,
+    },
+  });
+  miniWindow.loadFile(path.join(__dirname, "renderer", "mini.html"));
+
+  const { width: sw, height: sh } = require("electron").screen.getPrimaryDisplay().workAreaSize;
+  miniWindow.setPosition(sw - 260, sh - 188);
+
+  miniWindow.on("closed", () => { miniWindow = null; });
 }
 
 // Reads data/demos/<group>/session_*/ directly off disk — a static listing,
@@ -172,3 +217,10 @@ ipcMain.handle("recorder-replay", (_evt, n) => {
   queueOrSend({ cmd: "replay", n: n || 10 });
 });
 ipcMain.handle("workflows-list", () => listWorkflows());
+ipcMain.handle("restore-main", () => {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.restore();
+    mainWindow.focus();
+  }
+  if (miniWindow && !miniWindow.isDestroyed()) miniWindow.hide();
+});
