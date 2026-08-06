@@ -1,4 +1,4 @@
-<title>Tree Task — Intern</title>
+<title>Task Tree — Intern</title>
 <style>
   :root{
     --bg:#E7EDF1;
@@ -157,7 +157,7 @@
 
 <header class="hdr">
   <p class="eyebrow fade-in">Task graph — Intern project</p>
-  <h1 class="fade-in delay1">Tree Task</h1>
+  <h1 class="fade-in delay1">Task Tree</h1>
   <p class="sub fade-in delay2">A node map of the climb toward completion. Each hub is a phase from
     <em>DEVELOPERS.md</em>, each small node a task — lit when shipped, dark when still ahead.
     The peak node lights only at 100%.</p>
@@ -262,6 +262,8 @@ const PHASES = [
       {t:"Combobox / mid-record crash recovery", done:false},
       {t:"Cross-task shared backbone (trunk + per-task heads)", done:false},
       {t:"Ghost cursor overlay, training-readiness indicator, DAgger productionized", done:false},
+      {t:"BC fidelity scorer was scoring stale submissions — fixed, now refuses runs older than the submission", done:true},
+      {t:"model.pt was a stale checkpoint (394 vs 395 features) — retraining in progress", done:false},
     ]},
   { id:"p4", order:5, tag:"P4", label:"Thesis / data / benchmark", note:"Parallel track",
     items:[
@@ -298,7 +300,7 @@ document.getElementById("peakNote").innerHTML =
 document.getElementById("foot").textContent =
   "Synced with DEVELOPERS.md · Task List · "+SYNC_DATE;
 document.getElementById("srSummary").textContent =
-  "Tree Task progress map. Overall completion "+OVERALL_PCT.toFixed(1)+"%. "+
+  "Task Tree progress map. Overall completion "+OVERALL_PCT.toFixed(1)+"%. "+
   PHASES.map(p=>p.label+": "+p._done+" of "+p._total+" tasks done").join(". ");
 
 const listEl = document.getElementById("phaseList");

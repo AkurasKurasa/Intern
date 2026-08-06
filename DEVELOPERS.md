@@ -37,10 +37,11 @@ This document is for developers working on Intern itself.
 
 ## Current Status
 
-> 🌲 **Tree Task** — a 3D progress map grown from the [Task List](#task-list) below,
-> one branch per phase, one leaf per task, summit at 100%: `treetask/index.html`.
-> Keep it synced: whenever a checkbox here flips, flip the matching `done` flag in
-> that file's `PHASES` data. See [Task List](#task-list) for the sync convention.
+> 🌲 **Task Tree** — a 3D node-graph progress map grown from the [Task List](#task-list)
+> below: a hub node per phase, a small node per task, summit at 100%:
+> `treetask/index.html`. Keep it synced: whenever a checkbox here flips, flip the
+> matching `done` flag in that file's `PHASES` data. See [Task List](#task-list) for
+> the sync convention.
 
 **The core loop works end-to-end on the vertical slice.** Proven this far:
 
@@ -393,10 +394,10 @@ the CoT lines in `_call_openai_compat()`.
 
 ## Task List
 
-> **Sync with Tree Task:** this list is the source of truth; `treetask/index.html`
-> mirrors it as a 3D tree (`PHASES` array — one entry per phase below, one item per
-> checkbox, `done: true/false`). When a checkbox here changes — including mid-work,
-> whenever we hit a problem or the plan diverges — update the matching entry there
+> **Sync with Task Tree:** this list is the source of truth; `treetask/index.html`
+> mirrors it as a 3D node graph (`PHASES` array — one entry per phase below, one item
+> per checkbox, `done: true/false`). When a checkbox here changes — including
+> mid-work, whenever we hit a problem or the plan diverges — update the matching entry there
 > in the same pass, not as a separate cleanup step.
 
 **Priority: COMPLETE SCOPE #1 (the form) first — then generalize.**
@@ -619,6 +620,17 @@ tab-race) and **verified-scroll** (scroll + signature-compare bottom-detect).
 - [ ] **Combobox / mid-record crash recovery.**
 - [ ] **Cross-task shared backbone** (trunk + per-task heads).
 - [ ] Ghost cursor overlay; training-readiness indicator; DAgger productionized.
+- [x] **BC fidelity scorer was scoring stale submissions** — `score_run()` picked
+      "newest by mtime" in `data/output/submissions/`, which also receives
+      unrelated auto-saves from the standalone form app; a run that crashed at
+      step 1 still got a plausible-looking BC score off a leftover blank
+      submission. Fixed 2026-08-06: refuses to score anything older than the
+      run's own start time (`agent._run_start_ts`).
+- [ ] **`model.pt` was a stale checkpoint** — trained for 394 elem features,
+      current code encodes 395 (drifted after the `'attempted'` fix in
+      `d859b5ef` was never followed by a retrain) — crashed every live run on
+      Step 1 regardless of provider. Found 2026-08-06; retraining against the
+      current 19 sessions (7,530 samples) is in progress.
 
 > **Fundamental roadblocks** *(don't block generalization — block working *reliably/
 > trustworthily*; was its own section):* **A. Hidden intent** (screen doesn't show
