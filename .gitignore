@@ -44,6 +44,7 @@ test_data/
 # Dataset init cache (auto-generated, invalidated on new traces)
 .dataset_cache.pkl
 .dataset_cache_combined_*.pkl
+embed_cache.pkl
 
 # Trace output — large JSON files, never committed
 data/output/traces/
