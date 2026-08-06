@@ -180,7 +180,7 @@
     <button id="btnRotate" type="button" aria-pressed="true">Auto-climb</button>
     <button id="btnReset" type="button">Reset view</button>
   </div>
-  <p class="hint">Drag to orbit · scroll or pinch to zoom · click a hub to collapse it</p>
+  <p class="hint">Drag to orbit · scroll or pinch to zoom · click a task to zoom in on it, a hub to collapse it</p>
 </div>
 
 <div class="panel legend fade-in delay2" id="legend">
@@ -472,7 +472,11 @@ const GROUND_RINGS = [40,80,120,160,200,240];
 let rotY = 0.6, rotX = 0.18, zoom = 1, targetZoom = 1;
 let dragging = false, lastX=0, lastY=0, autoRotate = !reduceMotion;
 let dpr = Math.max(1, Math.min(2, window.devicePixelRatio||1));
-function clampZoom(z){ return Math.max(0.4, Math.min(3.2, z)); }
+// Zoom previously only approached the world origin — scattered task nodes
+// far from center never got close even at max zoom. targetPoint recenters
+// the whole camera on whatever was last clicked (see the tap handler).
+let targetPoint = [0,0,0];
+function clampZoom(z){ return Math.max(0.4, Math.min(14, z)); }
 
 function resize(){
   const w = window.innerWidth, h = window.innerHeight;
@@ -484,7 +488,7 @@ window.addEventListener("resize", resize);
 resize();
 
 function rotate(p){
-  let [x,y,z] = p;
+  let x = p[0]-targetPoint[0], y = p[1]-targetPoint[1], z = p[2]-targetPoint[2];
   let cx = Math.cos(rotY), sx = Math.sin(rotY);
   let x1 = x*cx - z*sx, z1 = x*sx + z*cx;
   let cy = Math.cos(rotX), sy = Math.sin(rotX);
@@ -783,7 +787,15 @@ window.addEventListener("pointerup", e=>{
       const d = Math.hypot(sn.x-mx, sn.y-my);
       if (d<sn.r+6 && d<bestD){ bestD=d; best=sn; }
     });
-    if (best && best.hub) toggleCollapse(best.hub.phase);
+    if (best && best.hub) {
+      toggleCollapse(best.hub.phase);
+    } else if (best && best.node) {
+      // Recenter the camera on this task node and zoom in — clicking a hub
+      // toggles its collapse, clicking a task focuses on it instead.
+      targetPoint = best.node.p;
+      targetZoom = Math.max(targetZoom, 6);
+      hideTooltip();
+    }
   }
 });
 window.addEventListener("pointercancel", e=>{ activePointers.delete(e.pointerId); pinchStartDist=null; dragging=false; });
@@ -854,6 +866,6 @@ btnRotate.addEventListener("click", ()=>{
 if (reduceMotion){ autoRotate=false; btnRotate.setAttribute("aria-pressed","false"); btnRotate.textContent="Paused"; }
 
 document.getElementById("btnReset").addEventListener("click", ()=>{
-  rotY=0.6; rotX=0.18; targetZoom=1;
+  rotY=0.6; rotX=0.18; targetZoom=1; targetPoint=[0,0,0];
 });
 </script>
