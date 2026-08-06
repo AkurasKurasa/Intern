@@ -8,10 +8,18 @@ visible, so the scan happily focused a field on a tab that wasn't even
 showing, forever (a real stuck-loop caught in a live run: 65+ steps
 re-focusing "Policy Number" while the Policyholder tab was active).
 
-Fix: try the already-correct, pane-scoped `_uia_focus_first_field()` first
-(verified live that an inactive tab's pane genuinely stops existing in the
-UIA tree, unlike its bbox) — only fall back to the state-dict scan if that
-finds nothing, or if a caller asks for the min_y floor it doesn't support.
+First fix attempt: try the already-correct, pane-scoped
+`_uia_focus_first_field()` first, fall back to the state-dict scan if that
+returned False. Still broken — caught live, again — because "the active
+pane has nothing left" and "the pane-scoped search failed" both look like
+`False`, and falling back on either let the unsafe scan grab a wrong-tab
+field right back, masking the "nothing left, advance tab" signal every
+caller already handles correctly via `_try_advance_tab`.
+
+Actual fix: for the common case (min_y<=0, true for every current caller),
+the pane-scoped result is authoritative, full stop — no fallback. The
+state-dict scan only survives for the min_y>0 pane-escape case, which
+`_uia_focus_first_field` doesn't support and nothing currently calls.
 """
 import sys
 from pathlib import Path
@@ -40,20 +48,22 @@ def test_prefers_the_pane_scoped_uia_search_and_short_circuits():
 
     assert result is True
     fake._uia_focus_first_field.assert_called_once()
-    # Short-circuited — never touched the unreliable state-dict candidate scan.
     fake._executor.execute.assert_not_called()
 
 
-def test_falls_back_to_state_scan_when_uia_search_finds_nothing():
+def test_uia_false_is_authoritative_no_unsafe_fallback():
+    # This is the actual bug: min_y<=0 and the pane-scoped search says
+    # "nothing left on this tab" must return False outright, NOT fall
+    # through to a scan that can't tell one tab's fields from another's.
     fake = _fake_self(uia_result=False)
-    state = {"elements": [{"type": "editcontrol", "label": "Fallback Field", "text": "",
+    state = {"elements": [{"type": "editcontrol", "label": "Wrong-Tab Field", "text": "",
                             "bbox": [10, 10, 50, 30], "enabled": True}]}
 
     result = LLMAgent._focus_first_empty_field(fake, state)
 
-    assert result is True
+    assert result is False
     fake._uia_focus_first_field.assert_called_once()
-    fake._executor.execute.assert_called_once()
+    fake._executor.execute.assert_not_called()
 
 
 def test_min_y_floor_skips_the_uia_search_entirely():
@@ -63,6 +73,8 @@ def test_min_y_floor_skips_the_uia_search_entirely():
     state = {"elements": [{"type": "editcontrol", "label": "Below Floor", "text": "",
                             "bbox": [10, 500, 50, 520], "enabled": True}]}
 
-    LLMAgent._focus_first_empty_field(fake, state, min_y=100)
+    result = LLMAgent._focus_first_empty_field(fake, state, min_y=100)
 
     fake._uia_focus_first_field.assert_not_called()
+    assert result is True
+    fake._executor.execute.assert_called_once()

@@ -3669,27 +3669,46 @@ class LLMAgent:
             _TARGET_NAMES = {"Edit", "ComboBox"}
 
             # ── Detect active tab pane ────────────────────────────────────────
-            # wx hides inactive panels by moving their DIRECT children off-screen
-            # (negative BoundingRectangle), while the active panel's direct children
-            # remain at positive screen coordinates.  Find the first pane whose
-            # direct children have positive coords — that pane is the active tab.
+            # Bug found 2026-08-07, live: iterating _TAB_PANE_NAMES in list order
+            # and taking the FIRST one that "exists with a positive-coord child"
+            # is not the same as finding the ACTUALLY active one — verified live
+            # this caused the agent to lock onto an earlier tab's pane and skip
+            # straight past Policyholder (Policy -> Vehicle -> Coverage, only
+            # 3/13 Policy fields touched) because that earlier pane satisfied the
+            # loop's check first. self._current_tab_idx is already reliably
+            # maintained elsewhere (it correctly detects "already on this tab"),
+            # so use it directly instead of guessing from coordinates.
             _TAB_PANE_NAMES = self._scope.tab_pane_names   # scope-provided; [] → none
             _search_root = root   # fallback: search entire tree
-            for _pname in _TAB_PANE_NAMES:
+            if 0 <= self._current_tab_idx < len(_TAB_PANE_NAMES):
+                _pname = _TAB_PANE_NAMES[self._current_tab_idx]
                 _pane = root.PaneControl(searchDepth=6, Name=_pname)
-                if not _pane.Exists(maxSearchSeconds=0.05):
-                    continue
-                for _ch in _pane.GetChildren():
-                    try:
-                        _r = _ch.BoundingRectangle
-                        if _r.left >= 0 and _r.top >= 0 and _r.width > 0:
-                            _search_root = _pane   # restrict walk to this pane
-                            break
-                    except Exception:
-                        pass
-                if _search_root is not root:
-                    logger.info("_uia_focus_first_field: active pane = %r", _pname)
-                    break
+                if _pane.Exists(maxSearchSeconds=0.05):
+                    _search_root = _pane
+                    logger.info("_uia_focus_first_field: active pane = %r (tab idx %d)",
+                                _pname, self._current_tab_idx)
+                else:
+                    logger.warning("_uia_focus_first_field: pane %r (tab idx %d) not found — "
+                                    "falling back to coordinate-guess scan.",
+                                    _pname, self._current_tab_idx)
+            if _search_root is root:
+                # Fallback only: current-tab-idx lookup unavailable/failed. Same
+                # coordinate-based guess as before — kept for robustness, not trusted.
+                for _pname in _TAB_PANE_NAMES:
+                    _pane = root.PaneControl(searchDepth=6, Name=_pname)
+                    if not _pane.Exists(maxSearchSeconds=0.05):
+                        continue
+                    for _ch in _pane.GetChildren():
+                        try:
+                            _r = _ch.BoundingRectangle
+                            if _r.left >= 0 and _r.top >= 0 and _r.width > 0:
+                                _search_root = _pane   # restrict walk to this pane
+                                break
+                        except Exception:
+                            pass
+                    if _search_root is not root:
+                        logger.info("_uia_focus_first_field: active pane = %r (coordinate guess)", _pname)
+                        break
 
             # ── Walk the active pane (or full tree as fallback) ───────────────
             # Collect ALL candidates, then sort by screen position (top → left)
@@ -3727,7 +3746,7 @@ class LLMAgent:
             _candidates.sort(key=lambda t: (t[0], t[1]))
             target = _candidates[0][2]
             target.SetFocus()
-            logger.info("Tab-advance focus: UIA SetFocus on %r (first unhandled)", (target.Name or "").strip())
+            logger.info("Tab-advance focus [pane-scoped]: UIA SetFocus on %r (first unhandled)", (target.Name or "").strip())
             return True
         except Exception as exc:
             logger.warning("_uia_focus_first_field: failed — %s", exc)
@@ -3752,21 +3771,29 @@ class LLMAgent:
                             by pane-escape to avoid jumping back above the pane).
 
         Bug found 2026-08-07 via a live stuck-loop (repeatedly re-focusing a
-        field from an INACTIVE tab, forever): this method's own candidate scan
-        below trusts `state["elements"]` bboxes to tell active-tab fields from
-        inactive-tab ones, which does not hold — verified live that a hidden
-        tab's field can report the exact same positive on-screen bbox as when
-        visible. What IS reliable, also verified live: the inactive tab's own
-        PANE genuinely stops existing in the UIA tree (Exists()==False), while
-        the active tab's pane exists with real children. `_uia_focus_first_field`
-        already implements exactly that pane-scoped search correctly — it was
-        just never called from here. Try it first for the common case
-        (min_y<=0, true for every current caller); only fall back to the
-        state-dict scan below (which lacks this guarantee) if it finds nothing,
-        or if a caller ever asks for the min_y floor it doesn't support.
+        field from an INACTIVE tab, forever): the candidate scan below trusts
+        `state["elements"]` bboxes to tell active-tab fields from inactive-tab
+        ones, which does not hold — verified live that a hidden tab's field
+        can report the exact same positive on-screen bbox as when visible.
+        What IS reliable, also verified live: the inactive tab's own PANE
+        genuinely stops existing in the UIA tree (Exists()==False), while the
+        active tab's pane exists with real children. `_uia_focus_first_field`
+        already implements exactly that pane-scoped search correctly.
+
+        First fix attempt tried it, then fell back to the scan below on
+        failure — still broken, caught live: when the active pane is
+        genuinely out of unhandled fields, `_uia_focus_first_field` correctly
+        returns False, but the "fallback" then went and found a WRONG-tab
+        field via the very scan that can't tell tabs apart, masking the one
+        signal (`False` = nothing left here) that callers already use
+        correctly to advance to the next tab (`_try_advance_tab`). So for the
+        common case (min_y<=0, true for every current caller), the pane-scoped
+        result is now authoritative — no unsafe fallback. The state-dict scan
+        only still runs for the min_y>0 pane-escape case, which
+        `_uia_focus_first_field` doesn't support and no caller currently uses.
         """
-        if min_y <= 0 and self._uia_focus_first_field():
-            return True
+        if min_y <= 0:
+            return self._uia_focus_first_field()
         elements = state.get("elements", [])
         # Compute actual tab-strip bottom so clicks never land on the tab bar.
         _tab_bottoms = [
@@ -3820,7 +3847,7 @@ class LLMAgent:
                     _ctrl = _root.ComboBoxControl(searchDepth=10, Name=field_label)
                 if _ctrl.Exists(maxSearchSeconds=0.2):
                     _ctrl.SetFocus()
-                    logger.info("Tab-advance focus: UIA SetFocus on %r (first unhandled)", field_label)
+                    logger.info("Tab-advance focus [state-scan FALLBACK]: UIA SetFocus on %r (first unhandled)", field_label)
                     return True
             except Exception:
                 pass  # fall through to coordinate click
