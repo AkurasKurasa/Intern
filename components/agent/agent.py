@@ -780,6 +780,7 @@ class LLMAgent:
         # ── timing: run-level ────────────────────────────────────────────────
         import datetime as _dt
         _run_start_ts             = time.time()
+        self._run_start_ts        = _run_start_ts
         self._run_start_iso       = _dt.datetime.now().isoformat()
         self._run_duration_sec    = 0.0
         self._time_to_first_action_sec: Optional[float] = None

@@ -85,6 +85,7 @@ def main() -> None:
     setup_times   = _load_jsonl(OUT / "setup_time_log.jsonl")
 
     apa   = _avg([r.get("action_prediction_accuracy") for r in run_metrics])
+    esr   = _avg([r.get("execution_success_rate") for r in run_metrics])
     eer   = _avg([r.get("execution_error_rate") for r in run_metrics])
     wsr   = _avg([r.get("wasted_step_rate") for r in run_metrics])
     tcr   = _avg([r.get("task_completion_rate") for r in run_metrics])
@@ -115,6 +116,12 @@ def main() -> None:
     print(f"\n{'='*94}")
     print("  INTERN — OBJECTIVES DASHBOARD  (objective 10: one view across all components)")
     print(f"{'='*94}\n")
+
+    print(f"  Core run metrics (avg over last {len(run_metrics)} run(s)):")
+    print(f"    Task Completion Rate        {_fmt_pct(tcr)}")
+    print(f"    Action Prediction Accuracy  {_fmt_pct(apa)}")
+    print(f"    Execution Success Rate      {_fmt_pct(esr)}")
+    print()
 
     print(_row("1", "Perception — detection accuracy (multi-environment)", ">=95%",
                _fmt_pct(overall_detection), overall_detection is not None and overall_detection >= 0.95))

@@ -1,0 +1,32 @@
+# Intern — full dependency set (Windows only; UIA/win32/pyautogui are Windows-specific).
+# Install with: pip install -r requirements.txt
+# Also needs Tesseract OCR installed system-wide (not pip-installable):
+#   winget install --id UB-Mannheim.TesseractOCR
+#   Windows: https://github.com/UB-Mannheim/tesseract/wiki
+
+# GUI automation / control
+pyautogui>=0.9.54
+pywin32>=306
+uiautomation>=2.0.20
+pynput>=1.7.6
+wxPython>=4.2.0
+
+# Perception (CV + OCR)
+opencv-python>=4.8.0
+pytesseract>=0.3.10
+mss>=9.0.0
+Pillow>=10.0.0
+
+# Learning (BC transformer)
+torch>=2.0.0
+sentence-transformers>=2.2.0
+numpy>=1.24.0
+
+# LLM providers (lmstudio needs no key; others need one in .env)
+openai>=1.0.0
+
+# Metrics — statistical significance testing (scripts/compare_baseline.py)
+scipy>=1.10.0
+
+# Tests
+pytest>=8.0.0

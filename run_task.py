@@ -191,7 +191,11 @@ if __name__ == "__main__":
         # ── BC fidelity score vs gold standard ───────────────────────────────
         try:
             from bc_fidelity import score_run
-            score_run(results, goal=GOAL, duration_sec=getattr(agent, "_run_duration_sec", None))
+            score_run(
+                results, goal=GOAL,
+                duration_sec=getattr(agent, "_run_duration_sec", None),
+                run_start_ts=getattr(agent, "_run_start_ts", None),
+            )
         except Exception as _fe:
             logger.debug("BC fidelity scorer skipped: %s", _fe)
 

@@ -537,12 +537,25 @@ def score_submission(agent_submission: dict, results: list[dict] | None = None) 
     }
 
 
-def score_run(results: list[dict], goal: str = "", duration_sec: float | None = None) -> dict | None:
+def score_run(
+    results: list[dict],
+    goal: str = "",
+    duration_sec: float | None = None,
+    run_start_ts: float | None = None,
+) -> dict | None:
     """
     Called from run_task.py after agent.run().
     Finds the latest submission JSON, scores it, logs progress.
     duration_sec (agent._run_duration_sec) is recorded in the progress log so
     the trend table shows whether speed is holding as fidelity improves.
+
+    run_start_ts (agent._run_start_ts, epoch seconds) guards against scoring a
+    STALE submission: data/output/submissions/ also receives auto-saves from
+    the standalone form app itself (unrelated to the agent), so "newest by
+    mtime" can silently pick up a leftover file from a run that crashed
+    before ever submitting anything — producing a plausible-looking score for
+    a run that did nothing. If the newest submission predates this run's
+    start, there's no submission FROM this run; say so instead of scoring it.
     """
     if not REFERENCE_PATH.exists():
         print("[BC Fidelity] No gold standard set — skipping fidelity score.")
@@ -556,6 +569,11 @@ def score_run(results: list[dict], goal: str = "", duration_sec: float | None = 
         return None
 
     latest = submissions[-1]
+    if run_start_ts is not None and latest.stat().st_mtime < run_start_ts:
+        print(f"[BC Fidelity] Newest submission ({latest.name}) predates this run's start "
+              "— this run produced no submission. Skipping (not scoring stale data).")
+        return None
+
     agent_data = _load_json(latest)
     if not agent_data:
         return None
