@@ -339,6 +339,35 @@ def _is_llm_unavailable(llm_action: Dict[str, Any]) -> bool:
     return llm_action.get("action_type") == "wait" and llm_action.get("reason") == "llm unavailable"
 
 
+# Matches the gate already established for the non-Option-B merge path
+# (agent.py's _merge(), ~L4045) — same meaning there: below this, the
+# transformer's own pointer isn't trustworthy enough to act on.
+_CLICK_CONF_FLOOR = 0.30
+
+
+def _gate_low_confidence_click(pos: Optional[List[float]], click_conf: float) -> Optional[List[float]]:
+    """
+    Returns `pos` unchanged if it's structurally invalid anyway (nothing to
+    gate) or `click_conf` clears the floor; returns None if it's a plausible
+    click the model itself flagged as unreliable — the caller then falls
+    back to the generic Tab-advance already used for a structurally invalid
+    pointer, same as this function's own null case.
+
+    Found 2026-08-07, live: a ptr_conf=0.20 guess landed on the tab strip
+    and ended a tab pass 9 fields early (Policy: 4/13 filled) — the
+    confidence was already being logged, never acted on. This does NOT hand
+    WHERE to the LLM (forbidden in pure/Option-B mode, see _merge()) — it
+    only declines to act on an unreliable guess. Tab is a universal
+    navigation primitive, not task-specific, so this generalizes to any
+    form the agent is pointed at.
+    """
+    if not pos or not (pos[0] > 1 or pos[1] > 1):
+        return pos
+    if click_conf < _CLICK_CONF_FLOOR:
+        return None
+    return pos
+
+
 def _history_to_text(history: List[Dict[str, Any]]) -> str:
     if not history:
         return "No actions taken yet."
@@ -1747,6 +1776,26 @@ class LLMAgent:
                     # Transformer pointer navigates to the next field
                     _decision_maker = "transformer"
                     _pos2 = t_pred.get("click_position")
+                    # Low-confidence click gate. Found 2026-08-07, live: a
+                    # ptr_conf=0.20 guess landed on the tab strip and ended a
+                    # tab pass 9 fields early (Policy: 4/13 filled). The
+                    # confidence was already being logged, never acted on.
+                    # This does NOT hand WHERE to the LLM (that stays
+                    # forbidden in pure/Option-B mode, see _merge()) — it
+                    # only declines to act on a guess the model itself
+                    # flagged as unreliable, falling back to the SAME
+                    # generic Tab-advance already used below for a
+                    # structurally invalid pointer. Tab is a universal
+                    # navigation primitive, not task-specific, so this holds
+                    # for any form this agent is pointed at, not just this one.
+                    # Threshold matches the gate already established for the
+                    # non-Option-B merge path (agent.py's _merge(), ~L4045).
+                    _click_conf2 = t_pred.get("_click_conf", 0.0)
+                    _gated_pos2 = _gate_low_confidence_click(_pos2, _click_conf2)
+                    if _gated_pos2 is None and _pos2:
+                        logger.info("[OPT2] pointer low-confidence (%.2f < %.2f) — Tab fallback instead of acting on it",
+                                    _click_conf2, _CLICK_CONF_FLOOR)
+                    _pos2 = _gated_pos2
                     if _pos2 and (_pos2[0] > 1 or _pos2[1] > 1):
                         _snap2 = self._snap(_pos2, state) or _pos2
                         # COMBOBOX-AS-FILL: demos action comboboxes as CLICKS, so the
@@ -3704,6 +3753,29 @@ class LLMAgent:
                     logger.warning("_uia_focus_first_field: pane %r (tab idx %d) not found after retries — "
                                     "falling back to coordinate-guess scan.",
                                     _pname, self._current_tab_idx)
+                    # Diagnostics — the retry fix didn't hold up on a live re-test
+                    # (still "not found" ~4s after the click, ruling out a simple
+                    # timing gap). Dump exactly what's really in the tree instead
+                    # of guessing at another fix blind: which window this actually
+                    # queried, and what pane names genuinely exist at this moment.
+                    try:
+                        _fg_title = _w32g.GetWindowText(fg)
+                        logger.warning("_uia_focus_first_field DIAG: foreground hwnd=%s title=%r", fg, _fg_title)
+                        _found_panes = []
+                        def _dump(ctrl, depth=0):
+                            if depth > 5:
+                                return
+                            try:
+                                if ctrl.ControlTypeName == "PaneControl":
+                                    _found_panes.append((ctrl.Name, depth))
+                            except Exception:
+                                pass
+                            for c in ctrl.GetChildren():
+                                _dump(c, depth + 1)
+                        _dump(root)
+                        logger.warning("_uia_focus_first_field DIAG: panes actually in tree = %s", _found_panes[:20])
+                    except Exception as _diag_exc:
+                        logger.warning("_uia_focus_first_field DIAG: dump failed — %s", _diag_exc)
             if _search_root is root:
                 # Fallback only: current-tab-idx lookup unavailable/failed. Same
                 # coordinate-based guess as before — kept for robustness, not trusted.
