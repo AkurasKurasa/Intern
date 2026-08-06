@@ -437,6 +437,7 @@ human help.
 - [ ] `scope1_tab_order` — Tab-visit order: model jumps/revisits tabs (skips Policyholder/Vehicle/Coverage). Fix via cleaner demos (consistent left-to-right order), NOT a hardcoded order.
 - [ ] `scope1_leave_blank_bug` — `(leave blank)` typed literally: `_lookup_field`'s skip-check does `.strip("()")` → `"leave blank"` which isn't in the skip-set. Fix: substring-match leave-blank/none in both the lookup and the LLM value path.
 - [ ] `scope1_checkbox_coldstart` — Checkbox cold-start / first-click: reliable first action from a blank screen (Renewal checkbox handling).
+- [x] `scope1_tab_focus_first_input` — `car_insurance_form_wx.py` now focuses the first fillable control on a tab whenever the tab changes (human click, agent click, Submit & New's reset, or initial launch) — not wherever construction order happened to leave it. Found while implementing (2026-08-06): default launch focus was landing on an unrelated Policyholder field while Policy was the visible tab. Directly relevant to `scope1_checkbox_coldstart` above (same class of problem: what's focused when a tab first appears) but not a full fix for it — checkbox-specific handling is still open.
 - [ ] `scope1_combobox_retry` — Combobox retry: open → miss → Escape → retry timing.
 - [ ] `scope1_record_advance_5` — Record advance ×5: proven 1→2, need all 5 clean.
 - [ ] `scope1_per_record_refresh` — Per-record data refresh: `refresh(record_num)` for records 2–5 (only record 1 verified).

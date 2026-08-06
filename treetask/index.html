@@ -216,6 +216,7 @@ const PHASES = [
       {id:"scope1_tab_order", t:"Tab-visit order", done:false, desc:"Model still jumps / revisits tabs (skips Policyholder/Vehicle/Coverage). Fix via cleaner demos, NOT a hardcoded order."},
       {id:"scope1_leave_blank_bug", t:"(leave blank) typed literally", done:false, desc:"_lookup_field's skip-check mismatches the skip-set. Fix: substring-match leave-blank/none."},
       {id:"scope1_checkbox_coldstart", t:"Checkbox cold-start", done:false, desc:"Reliable first action from a blank screen (Renewal checkbox handling)."},
+      {id:"scope1_tab_focus_first_input", t:"First input now focused on every tab switch", done:true, desc:"Form focuses the first fillable control on tab change/launch/Submit & New, instead of arbitrary construction-order focus. Related to checkbox cold-start above but not a full fix for it."},
       {id:"scope1_combobox_retry", t:"Combobox retry", done:false, desc:"Open → miss → Escape → retry timing."},
       {id:"scope1_record_advance_5", t:"Record advance ×5", done:false, desc:"Proven 1→2, need all 5 clean."},
       {id:"scope1_per_record_refresh", t:"Per-record data refresh", done:false, desc:"refresh(record_num) for records 2–5 (only record 1 verified)."},
