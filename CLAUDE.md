@@ -13,6 +13,7 @@ See [DEVELOPERS.md](DEVELOPERS.md) for the project overview, architecture, and t
 - Every node in the Task Tree (hub and task) has a description, not just a label.
 - Task Tree nodes can declare prerequisites; a node that depends on an unfinished prerequisite is shown locked/blocked, and unlocks once the prerequisite is done.
 - Always create unit tests, integration tests, and E2E tests after every problem we encounter and solve.
+- `Thesis.docx` (repo root, gitignored — kept local, not pushed to GitHub) is the actual thesis paper. Read and understand it, and consistently update it (if necessary) whenever we solve a major problem — meaning a node in the Task Tree, not every minor fix.
 
 ## Architecture
 

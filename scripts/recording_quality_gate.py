@@ -154,12 +154,19 @@ def check_session(session_dir: Path) -> dict:
 def main() -> None:
     import argparse
     ap = argparse.ArgumentParser(description="Quality gate for the recording campaign — run periodically, not just at the end.")
+    ap.add_argument("--dir", default=None,
+                     help="Directory to scan for session_* folders (default: tasks/form_filling/traces, "
+                          "the curated training location). Point this at data/demos/<name>/ to check "
+                          "freshly recorded sessions before they've been copied into the training dir.")
     ap.add_argument("--since-minutes", type=float, default=None,
                      help="Only check sessions modified in the last N minutes (the batch you just recorded).")
     ap.add_argument("--log", action="store_true", help="Append the aggregate result to a trend log.")
     args = ap.parse_args()
 
-    sessions = sorted(d for d in TRACES_DIR.glob("*/") if d.is_dir() and d.name.startswith("session_"))
+    scan_dir = Path(args.dir) if args.dir else TRACES_DIR
+    if not scan_dir.is_absolute():
+        scan_dir = ROOT / scan_dir
+    sessions = sorted(d for d in scan_dir.glob("*/") if d.is_dir() and d.name.startswith("session_"))
     if args.since_minutes is not None:
         cutoff = time.time() - args.since_minutes * 60
         sessions = [s for s in sessions if s.stat().st_mtime >= cutoff]

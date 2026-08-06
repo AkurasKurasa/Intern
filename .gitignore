@@ -75,3 +75,6 @@ data/models/*.bin
 # Environment / secrets
 .env
 *.env
+
+# Personal thesis document — kept local, not pushed to GitHub
+Thesis.docx
