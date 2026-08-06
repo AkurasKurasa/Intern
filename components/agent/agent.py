@@ -4339,13 +4339,18 @@ class LLMAgent:
         # Unique tag per call breaks LM Studio's server-side KV-cache accumulation
         system_msg = (
             self._system_prompt
-            + "\n\nBefore choosing an action, reason briefly inside <think>...</think> tags."
-            + " Then output ONLY a JSON object on the last line."
+            + "\n\nBefore choosing an action, reason briefly (1-2 short sentences) inside"
+            + " <think>...</think> tags. Then output ONLY a JSON object on the last line."
             + f"\n[sid:{uuid.uuid4().hex[:12]}]"
         )
+        # max_tokens found 2026-08-07: this task is a short field-value decision,
+        # not open-ended generation — 2048 was a generous, unused ceiling that
+        # only mattered if the model rambled. Paired with the tightened "1-2
+        # short sentences" instruction above so the cap doesn't truncate a
+        # verbose <think> block before the JSON line ever gets emitted.
         resp = self._llm_client.chat.completions.create(
             model=self._llm_model,
-            max_tokens=2048,
+            max_tokens=512,
             messages=[
                 {"role": "system", "content": system_msg},
                 {"role": "user",   "content": user_msg},
