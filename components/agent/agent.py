@@ -3682,13 +3682,26 @@ class LLMAgent:
             _search_root = root   # fallback: search entire tree
             if 0 <= self._current_tab_idx < len(_TAB_PANE_NAMES):
                 _pname = _TAB_PANE_NAMES[self._current_tab_idx]
-                _pane = root.PaneControl(searchDepth=6, Name=_pname)
-                if _pane.Exists(maxSearchSeconds=0.05):
+                # Bug found 2026-08-07, live, right after the fix above landed:
+                # this lookup ran ~3s after the tab-switch click and still came
+                # up empty for a genuinely-active, 31-field tab (Policyholder) —
+                # wx hadn't finished registering the new page's controls into
+                # the UIA tree yet. A single maxSearchSeconds=0.05 check doesn't
+                # give it room to settle. Retry briefly before accepting "not
+                # found" and falling back to the coordinate-guess scan, which
+                # is exactly the path that then wrongly skips the whole tab.
+                _pane = None
+                for _attempt in range(4):   # ~0.05 + 0.2*3 = up to ~0.65s total
+                    _pane = root.PaneControl(searchDepth=6, Name=_pname)
+                    if _pane.Exists(maxSearchSeconds=0.05):
+                        break
+                    time.sleep(0.2)
+                if _pane is not None and _pane.Exists(maxSearchSeconds=0.05):
                     _search_root = _pane
                     logger.info("_uia_focus_first_field: active pane = %r (tab idx %d)",
                                 _pname, self._current_tab_idx)
                 else:
-                    logger.warning("_uia_focus_first_field: pane %r (tab idx %d) not found — "
+                    logger.warning("_uia_focus_first_field: pane %r (tab idx %d) not found after retries — "
                                     "falling back to coordinate-guess scan.",
                                     _pname, self._current_tab_idx)
             if _search_root is root:

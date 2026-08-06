@@ -13,6 +13,12 @@ loop's check before Policyholder's did.
 Fix: use `self._current_tab_idx` (already reliably maintained elsewhere —
 it correctly detects "already on this tab") to look up the exact pane name
 directly, instead of iterating and guessing from coordinates.
+
+Second bug, found immediately after the above landed (same day, live): the
+direct lookup ran ~3s after the tab-switch click and still came up empty for
+a genuinely-active 31-field tab — wx hadn't finished registering the new
+page into the UIA tree yet, and a single 0.05s existence check gave it no
+room to settle. Fixed with a short retry before falling back.
 """
 import sys
 import types
@@ -75,6 +81,7 @@ def test_goes_straight_to_the_active_tabs_pane_by_index(monkeypatch):
     # locked onto it), but current_tab_idx says Policyholder (index 1) is
     # active. The fix must look up "tab_policyholder" directly, not iterate
     # from "tab_policy" first and stop there.
+    monkeypatch.setattr("agent.agent.time.sleep", lambda *_: None)
     calls = _install_fake_uia(monkeypatch, existing_panes={"tab_policy", "tab_policyholder"})
     agent = _make_agent(current_tab_idx=1)
 
@@ -89,9 +96,42 @@ def test_goes_straight_to_the_active_tabs_pane_by_index(monkeypatch):
     )
 
 
+def test_retries_briefly_before_accepting_pane_not_found(monkeypatch):
+    # The pane doesn't exist on the first 2 checks (still settling after a
+    # tab switch) but shows up on the 3rd — must not give up on the first miss.
+    monkeypatch.setattr("agent.agent.time.sleep", lambda *_: None)
+    calls = []
+    exist_results = iter([False, False, True])
+
+    def make_pane(name):
+        pane = MagicMock()
+        if name == "tab_policyholder":
+            pane.Exists.side_effect = lambda maxSearchSeconds=0.05: next(exist_results)
+        else:
+            pane.Exists.return_value = False
+        pane.GetChildren.return_value = []
+        return pane
+
+    root = MagicMock()
+    def pane_control(searchDepth=6, Name=""):
+        calls.append(Name)
+        return make_pane(Name)
+    root.PaneControl.side_effect = pane_control
+    root.GetChildren.return_value = []
+
+    monkeypatch.setitem(sys.modules, "win32gui", types.SimpleNamespace(GetForegroundWindow=lambda: 111))
+    monkeypatch.setitem(sys.modules, "uiautomation", types.SimpleNamespace(ControlFromHandle=lambda hwnd: root))
+
+    agent = _make_agent(current_tab_idx=1)
+    agent._uia_focus_first_field()
+
+    assert calls.count("tab_policyholder") >= 3, calls
+
+
 def test_falls_back_to_iteration_if_the_indexed_pane_is_missing(monkeypatch):
-    # Direct lookup for the active tab's own pane fails (edge case) — must
-    # still fall back to the old scan rather than crash or silently give up.
+    # Direct lookup for the active tab's own pane fails even after retries —
+    # must still fall back to the old scan rather than crash or silently give up.
+    monkeypatch.setattr("agent.agent.time.sleep", lambda *_: None)
     calls = _install_fake_uia(monkeypatch, existing_panes={"tab_vehicle"})
     agent = _make_agent(current_tab_idx=1)  # "tab_policyholder" won't be found
 
