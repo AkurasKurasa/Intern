@@ -1963,6 +1963,45 @@ class LLMAgent:
                                if _fe2 else "(no focus)")
                     logger.info("[OPT2] TRANSFORMER chose TYPE → LLM value for '%s' → %r",
                                 _flabel, prediction.get("text", "")[:40])
+
+                    # Toggle-avoidance: _merge() can override a "type" decision into
+                    # a "click" (comboboxes need a click to open before a value can
+                    # be selected). If a dropdown is ALREADY open, executing that
+                    # click via the generic path below would CLOSE it instead of
+                    # opening it — a click toggles, it doesn't just open (see
+                    # _open_dropdown_items' docstring). This is the THIRD place this
+                    # exact bug class showed up, found live 2026-08-07: 'Education
+                    # Level' and 'Number of Doors' each burned 8-11 steps toggling
+                    # open/closed before accidentally landing on the right value
+                    # through a different, already-fixed handler. The two dedicated
+                    # combobox handlers already guard against this; this is the one
+                    # place _merge()'s own override reaches the generic execution
+                    # path, bypassing both.
+                    if prediction.get("action_type") == "click":
+                        _already_open_items = _open_dropdown_items(state.get("elements", []))
+                        if _already_open_items:
+                            _wanted = (llm_action.get("text") or "").strip()
+                            _oh = next((e for e in _already_open_items
+                                        if _wanted and _option_matches(_wanted, e.get("text") or e.get("label") or "")),
+                                       None)
+                            if _oh and _oh.get("bbox"):
+                                _ohb = _oh["bbox"]
+                                logger.info("[OPT2] Dropdown for %r already open — selecting %r directly "
+                                            "instead of re-clicking (would toggle it closed).", _flabel, _wanted)
+                                self._executor.execute({"action_type": "click",
+                                                        "click_position": [(_ohb[0]+_ohb[2])/2, (_ohb[1]+_ohb[3])/2]})
+                                time.sleep(0.25)
+                                self._executor.execute({"action_type": "keyboard",
+                                                        "key_count": 1, "keystrokes": ["tab"]})
+                            else:
+                                logger.info("[OPT2] Dropdown for %r already open, no match for %r — "
+                                            "Escape instead of re-clicking (would toggle it closed).",
+                                            _flabel, _wanted)
+                                self._executor.execute({"action_type": "keyboard",
+                                                        "key_count": 1, "keystrokes": ["escape"]})
+                            time.sleep(self.step_delay * 0.4)
+                            continue
+
                     # Leave-blank guard: if the resolved value means "leave empty"
                     # (record said '(leave blank)' / none / n-a, possibly with a note),
                     # DON'T type the placeholder literally — Tab past + mark attempted.

@@ -21,7 +21,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "components"))
-from agent.agent import _open_dropdown_items
+from agent.agent import _open_dropdown_items, _option_matches
 
 
 def _listitem(text, element_id="li1"):
@@ -88,3 +88,44 @@ class TestTogglePrevention:
         already_open = _open_dropdown_items(state_elements)
         should_click = not already_open
         assert should_click is True
+
+
+class TestMergeOverrideThirdOccurrence:
+    """The specific bug found live 2026-08-07 in a THIRD place beyond the two
+    dedicated combobox handlers: _merge() overriding a type decision into a
+    click, executed via the generic path with no toggle-awareness at all.
+    'Education Level' and 'Number of Doors' each burned 8-11 steps this way
+    before accidentally recovering through a different, already-fixed
+    handler. Verifies the exact wiring the fix uses: find a match among
+    already-open items via _option_matches, same as the two handlers do."""
+
+    def test_finds_the_correct_item_among_already_open_options(self):
+        state_elements = [
+            {"element_id": "cb", "type": "comboboxcontrol", "window_role": "active",
+             "bbox": [1400, 500, 1600, 530]},
+            {"element_id": "li0", "type": "listitem", "text": "", "window_role": "active",
+             "bbox": [1400, 540, 1600, 570]},
+            {"element_id": "li1", "type": "listitem", "text": "High School",
+             "window_role": "active", "bbox": [1400, 570, 1600, 600]},
+            {"element_id": "li2", "type": "listitem", "text": "Bachelor's Degree",
+             "window_role": "active", "bbox": [1400, 600, 1600, 630]},
+        ]
+        wanted = "Bachelor's Degree"
+        items = _open_dropdown_items(state_elements)
+        hit = next((e for e in items
+                    if wanted and _option_matches(wanted, e.get("text") or e.get("label") or "")),
+                   None)
+        assert hit is not None
+        assert hit["element_id"] == "li2"
+
+    def test_no_match_among_already_open_options_returns_none(self):
+        state_elements = [
+            {"element_id": "li1", "type": "listitem", "text": "SUV", "window_role": "active",
+             "bbox": [100, 100, 300, 130]},
+        ]
+        wanted = "Sedan"
+        items = _open_dropdown_items(state_elements)
+        hit = next((e for e in items
+                    if wanted and _option_matches(wanted, e.get("text") or e.get("label") or "")),
+                   None)
+        assert hit is None
