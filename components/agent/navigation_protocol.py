@@ -38,8 +38,9 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Callable, Dict, FrozenSet, List, Optional, Set
 
-_FILLABLE_TYPES: Set[str] = {"editcontrol", "input", "comboboxcontrol", "combobox"}
-_SIG_TYPES: Set[str] = {"editcontrol", "comboboxcontrol", "checkboxcontrol"}
+_FILLABLE_TYPES: Set[str] = {"editcontrol", "input", "comboboxcontrol", "combobox",
+                              "checkbox", "checkboxcontrol"}
+_SIG_TYPES: Set[str] = {"editcontrol", "comboboxcontrol", "checkbox", "checkboxcontrol"}
 
 
 class NavAction(Enum):

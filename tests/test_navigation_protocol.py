@@ -59,6 +59,53 @@ class TestHasVisibleEmptyTarget:
         assert has_visible_empty_target(state, VIEWPORT_BOTTOM) is False
 
 
+class TestCheckboxFieldsAreFillableTargets:
+    """Found live 2026-08-07: a run never reached the Drivers tab, stuck in a
+    Policyholder->Vehicle->Coverage->Policyholder cycle. Traced to 23
+    consecutive pure-scroll steps on the Coverage tab (18 checkboxes across
+    "Additional Coverages" and "Discounts Applied" in
+    car_insurance_form_wx.py's _build_coverage_tab) with zero field
+    interaction. Root cause: _FILLABLE_TYPES omitted checkbox types entirely,
+    so has_visible_empty_target() could never return True for a screen made
+    only of checkboxes -- decide() kept returning SCROLL, and the view kept
+    genuinely changing (other comboboxes drifting in/out of frame at the
+    margins) so the dead-scroll cap never tripped either. ui_observer.py maps
+    wx.CheckBox -> "checkbox" (not "checkboxcontrol"), the same
+    mapped-vs-raw split that caused the listitem bug earlier this session --
+    both spellings are included defensively here and in _SIG_TYPES."""
+
+    def test_checkbox_alone_on_screen_is_recognized_as_a_target(self):
+        state = {"elements": [_field("Roadside Assistance", ftype="checkbox")]}
+        assert has_visible_empty_target(state, VIEWPORT_BOTTOM) is True
+
+    def test_legacy_checkboxcontrol_spelling_also_recognized(self):
+        state = {"elements": [_field("GAP Insurance", ftype="checkboxcontrol")]}
+        assert has_visible_empty_target(state, VIEWPORT_BOTTOM) is True
+
+    def test_decide_waits_instead_of_scrolling_forever_on_a_checkbox_only_screen(self):
+        """This is the exact scenario that produced the 23-step scroll stretch:
+        a screen with nothing but checkboxes must make decide() return WAIT,
+        not SCROLL, so the transformer gets a turn instead of being skipped."""
+        state = {"elements": [
+            _field("Uninsured/Underinsured Motorist", ftype="checkbox", bbox=(100, 100, 300, 130)),
+            _field("Personal Injury Protection (PIP)", ftype="checkbox", bbox=(100, 140, 300, 170)),
+            _field("Rental Reimbursement", ftype="checkbox", bbox=(100, 180, 300, 210)),
+        ]}
+        d = decide(state, VIEWPORT_BOTTOM, dead_scroll_count=0)
+        assert d.action == NavAction.WAIT
+
+    def test_clicked_checkbox_stops_being_a_target_once_marked_attempted(self):
+        """Prevents the opposite failure mode: once the transformer has acted
+        on a checkbox, attempted_keys must let decide() move on instead of
+        re-offering the same box forever."""
+        state = {"elements": [_field("Roadside Assistance", ftype="checkbox")]}
+        assert has_visible_empty_target(
+            state, VIEWPORT_BOTTOM,
+            attempted_keys={"roadside assistance"},
+            attempt_key_fn=lambda e, els: (e.get("label") or "").lower(),
+        ) is False
+
+
 class TestVisibleFieldSignature:
     def test_signature_changes_when_new_field_appears(self):
         state_before = {"elements": [_field("A", bbox=(0, 100, 50, 120))]}
@@ -71,6 +118,17 @@ class TestVisibleFieldSignature:
         state = {"elements": [_field("A", bbox=(0, 100, 50, 120))]}
         assert (visible_field_signature(state, VIEWPORT_BOTTOM)
                 == visible_field_signature(state, VIEWPORT_BOTTOM))
+
+    def test_checkbox_type_contributes_to_the_signature(self):
+        """_SIG_TYPES previously said "checkboxcontrol" only, but
+        ui_observer.py's _CTRL_TYPE_MAP produces "checkbox" (no suffix) for
+        real wx.CheckBox controls -- so checkboxes silently never affected
+        the signature at all. Confirms both spellings now count."""
+        state_without = {"elements": []}
+        state_with = {"elements": [_field("Roadside Assistance", ftype="checkbox",
+                                            bbox=(0, 100, 50, 120))]}
+        assert (visible_field_signature(state_without, VIEWPORT_BOTTOM)
+                != visible_field_signature(state_with, VIEWPORT_BOTTOM))
 
 
 class TestDecide:
