@@ -131,9 +131,29 @@ class StateValidator:
         new_elems  = [elems_after[i]  for i in new_ids]
         lost_elems = [elems_before[i] for i in lost_ids]
 
+        # element_id is assigned purely by scan position ("elem_{offset+count}"
+        # in ui_observer.py) — self-consistent within one observation, but NOT
+        # stable across two separate ones. A permanent widget whose id merely
+        # shifted between state_before and state_after (e.g. because some
+        # OTHER element on screen gained/lost text) shows up as "new" by id
+        # even though its content never changed. Found live 2026-08-07: a
+        # status label ("Submitted #9 — Ready for next record") that has sat
+        # on the form since an EARLIER submission got a new id and was read
+        # as a fresh completion signal, ending the run after only 6/176
+        # fields with a false "done." Guard: an element is only a genuinely
+        # NEW completion/error signal if its exact text wasn't already
+        # present (under any id) in the BEFORE snapshot.
+        _before_texts = {
+            (e.get("text") or "").strip().lower()
+            for e in elems_before.values()
+            if (e.get("text") or "").strip()
+        }
+
         # ── Check for error / done dialogs ────────────────────────────────────
         for elem in new_elems:
             text = (elem.get("text") or "").lower()
+            if text.strip() in _before_texts:
+                continue   # pre-existing content under a churned id, not new
             if any(kw in text for kw in _ERROR_KEYWORDS):
                 return ValidationResult(
                     status="error",
