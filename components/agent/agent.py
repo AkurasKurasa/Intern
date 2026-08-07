@@ -344,14 +344,46 @@ def _is_llm_unavailable(llm_action: Dict[str, Any]) -> bool:
 # transformer's own pointer isn't trustworthy enough to act on.
 _CLICK_CONF_FLOOR = 0.30
 
+# A wrong click on a tab-strip element is far more costly than a wrong click
+# on a same-tab field: it skips an entire tab's worth of fields, not just one
+# step. Found live 2026-08-07 (twice, same session): the model clicked away
+# to the Vehicle tab with confidence 0.38-0.39 while Policyholder still had
+# unfilled fields — comfortably above the general 0.30 floor, so nothing
+# blocked it. Section changes get a stricter bar than in-tab navigation.
+# Not tuned to this form's tabs specifically — applies to any tabitem/
+# tabitemcontrol element on any form.
+_TAB_CLICK_CONF_FLOOR = 0.50
 
-def _gate_low_confidence_click(pos: Optional[List[float]], click_conf: float) -> Optional[List[float]]:
+
+def _is_tab_strip_click(pos: Optional[List[float]], elements: Optional[List[Dict[str, Any]]]) -> bool:
+    """True if `pos` falls inside any tab-strip element's bbox."""
+    if not pos or not elements:
+        return False
+    px, py = pos[0], pos[1]
+    for e in elements:
+        if (e.get("type") or "").lower() not in ("tabitem", "tabitemcontrol"):
+            continue
+        if e.get("window_role") == "background":
+            continue
+        b = e.get("bbox")
+        if not b or len(b) != 4:
+            continue
+        if b[0] <= px <= b[2] and b[1] <= py <= b[3]:
+            return True
+    return False
+
+
+def _gate_low_confidence_click(
+    pos: Optional[List[float]],
+    click_conf: float,
+    elements: Optional[List[Dict[str, Any]]] = None,
+) -> Optional[List[float]]:
     """
     Returns `pos` unchanged if it's structurally invalid anyway (nothing to
-    gate) or `click_conf` clears the floor; returns None if it's a plausible
-    click the model itself flagged as unreliable — the caller then falls
-    back to the generic Tab-advance already used for a structurally invalid
-    pointer, same as this function's own null case.
+    gate) or `click_conf` clears the applicable floor; returns None if it's
+    a plausible click the model itself flagged as unreliable — the caller
+    then falls back to the generic Tab-advance already used for a
+    structurally invalid pointer, same as this function's own null case.
 
     Found 2026-08-07, live: a ptr_conf=0.20 guess landed on the tab strip
     and ended a tab pass 9 fields early (Policy: 4/13 filled) — the
@@ -360,10 +392,16 @@ def _gate_low_confidence_click(pos: Optional[List[float]], click_conf: float) ->
     only declines to act on an unreliable guess. Tab is a universal
     navigation primitive, not task-specific, so this generalizes to any
     form the agent is pointed at.
+
+    A click landing on a tab-strip element uses the stricter
+    _TAB_CLICK_CONF_FLOOR instead — see that constant's comment. `elements`
+    is optional (defaults to the general floor) so existing call sites that
+    can't easily supply it keep working unchanged.
     """
     if not pos or not (pos[0] > 1 or pos[1] > 1):
         return pos
-    if click_conf < _CLICK_CONF_FLOOR:
+    floor = _TAB_CLICK_CONF_FLOOR if _is_tab_strip_click(pos, elements) else _CLICK_CONF_FLOOR
+    if click_conf < floor:
         return None
     return pos
 
@@ -1629,9 +1667,12 @@ class LLMAgent:
             if fix:
                 field_name, current_val, expected_val = fix
                 elements   = state.get("elements", [])
-                # Check if dropdown is already open (listitemcontrols visible)
+                # Check if dropdown is already open (listitems visible). Standard
+                # UIA "ListItem" maps to "listitem" (no "control" suffix) in
+                # ui_observer.py's _CTRL_TYPE_MAP -- "listitemcontrol" alone
+                # misses every real dropdown using the standard, mapped type.
                 listitems = [e for e in elements
-                             if e.get("type") == "listitemcontrol"
+                             if e.get("type") in ("listitem", "listitemcontrol")
                              and e.get("window_role") != "background"]
                 if listitems:
                     # Find the matching listitem and click it
@@ -1855,10 +1896,13 @@ class LLMAgent:
                     # Threshold matches the gate already established for the
                     # non-Option-B merge path (agent.py's _merge(), ~L4045).
                     _click_conf2 = t_pred.get("_click_conf", 0.0)
-                    _gated_pos2 = _gate_low_confidence_click(_pos2, _click_conf2)
+                    _elements2   = state.get("elements", [])
+                    _gated_pos2  = _gate_low_confidence_click(_pos2, _click_conf2, elements=_elements2)
                     if _gated_pos2 is None and _pos2:
+                        _floor2 = (_TAB_CLICK_CONF_FLOOR if _is_tab_strip_click(_pos2, _elements2)
+                                   else _CLICK_CONF_FLOOR)
                         logger.info("[OPT2] pointer low-confidence (%.2f < %.2f) — Tab fallback instead of acting on it",
-                                    _click_conf2, _CLICK_CONF_FLOOR)
+                                    _click_conf2, _floor2)
                     _pos2 = _gated_pos2
                     if _pos2 and (_pos2[0] > 1 or _pos2[1] > 1):
                         _snap2 = self._snap(_pos2, state) or _pos2
@@ -1899,12 +1943,14 @@ class LLMAgent:
                                                         "key_count": 1, "keystrokes": ["tab"]})
                                 time.sleep(self.step_delay * 0.5)
                                 continue
+                            # Standard UIA "ListItem" maps to "listitem" (no "control"
+                            # suffix) in ui_observer.py's _CTRL_TYPE_MAP.
                             _items = []
                             for _try in range(4):
                                 time.sleep(0.35)
                                 _cs = self._observe()
                                 _items = [e for e in _cs.get("elements", [])
-                                          if e.get("type") == "listitemcontrol"
+                                          if e.get("type") in ("listitem", "listitemcontrol")
                                           and e.get("window_role") != "background" and e.get("bbox")]
                                 if _items:
                                     break
@@ -2284,12 +2330,21 @@ class LLMAgent:
                 # The dropdown can take a moment to render. Poll a few times before
                 # giving up — otherwise we Escape on an empty observe and waste a
                 # whole open→escape→reopen cycle (the #1 combobox time-sink).
+                # ui_observer.py's _CTRL_TYPE_MAP maps the standard UIA "ListItem"
+                # control type to "listitem" (no "control" suffix) -- only raw,
+                # unmapped ControlTypeName strings fall through as
+                # "listitemcontrol". Checking for "listitemcontrol" alone missed
+                # every real dropdown whose items report the standard, mapped
+                # type -- found live 2026-08-07: a run looped forever opening
+                # "Body Type"'s dropdown, finding 0 list items every time despite
+                # 8 new elements genuinely appearing, and Escaping, over and over.
+                _LISTITEM_TYPES = {"listitem", "listitemcontrol"}
                 _listitems = []
                 for _try in range(4):
                     time.sleep(0.35)
                     _combo_state = self._observe()
                     _listitems = [e for e in _combo_state.get("elements", [])
-                                  if e.get("type") == "listitemcontrol"
+                                  if e.get("type") in _LISTITEM_TYPES
                                   and e.get("window_role") != "background"
                                   and e.get("bbox")]
                     if _listitems:
