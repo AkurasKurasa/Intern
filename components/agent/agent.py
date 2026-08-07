@@ -2722,6 +2722,30 @@ class LLMAgent:
                     # clicks on one tab race through ALL tabs, filling none.)
                     _sorted_tabs = sorted(_all_tabs, key=lambda e: e["bbox"][0])
                     _hit_idx = _sorted_tabs.index(_tab_hit)
+                    # Block backward tab-strip clicks outright — found live 2026-08-08
+                    # via the drill tool: "it jumped to VIN damn". A drill run started
+                    # fresh at Payment (idx 7, never having visited Vehicle idx 2 this
+                    # session, so _advance_blacklist_pos had nothing to block it) —
+                    # the transformer's own pointer clicked Vehicle's tab strip at
+                    # ptr_conf=0.54, comfortably clearing the general 0.50 tab-strip
+                    # floor (execution_tab_click_stricter_confidence), which doesn't
+                    # distinguish direction. Every successful full-form run this
+                    # session progressed strictly forward, never backward — same
+                    # "finish forward, don't come back" principle already validated
+                    # for _advance_blacklist_pos, extended here to cover tabs never
+                    # yet visited this session (which that mechanism can't, since it
+                    # only blacklists tabs the SYSTEM itself has deliberately left).
+                    # Not confidence-gated like the general tab-strip floor — no
+                    # confidence observed live has ever made a backward jump correct.
+                    if _hit_idx < self._current_tab_idx:
+                        logger.info(
+                            "[GUARD] pointer clicked backward to %r (idx %d, currently on idx %d) "
+                            "— Tab instead, this workflow never goes backward.",
+                            _hit_name, _hit_idx, self._current_tab_idx)
+                        self._executor.execute({"action_type": "keyboard",
+                                                "key_count": 1, "keystrokes": ["tab"]})
+                        time.sleep(self.step_delay * 0.4)
+                        continue
                     if _hit_idx != self._current_tab_idx:
                         x1, y1, x2, y2 = _tab_hit["bbox"]
                         logger.info("Tab-click → navigating to %r (idx %d).", _hit_name, _hit_idx)
@@ -3388,6 +3412,17 @@ class LLMAgent:
                 self._attempted_keys.clear()
                 self._advance_blacklist_pos.clear()
                 self._leave_blank_keys.clear()
+                # car_insurance_form_wx.py's own _on_submit() always calls
+                # self.nb.SetSelection(0) — a real Submit puts the FORM on
+                # Policy tab regardless of where the agent started (drill mode
+                # included), so the agent's own idea of "current tab" must
+                # follow suit here or it goes stale — found live 2026-08-08
+                # while fixing execution_backward_tab_click_guard: without
+                # this, a backward-tab-click guard added at the same time
+                # would have wrongly blocked the legitimate Payment -> Policy
+                # reset for the next record, mistaking it for the exact
+                # erroneous backward jump that guard exists to catch.
+                self._current_tab_idx = 0
                 self._attempted_record_num = self._record_num
             sample = list(rec.items())[:5]
             logger.info("Record cache refreshed: %d fields for record %d  sample=%r",
