@@ -39,6 +39,22 @@ by the Win32 guard (not destructive) but never stopped before the click.
 A checkbox has no "value" to check (ui_observer never reports real
 checked state) -- attempted alone is enough here, unlike comboboxes which
 also require a non-empty value.
+
+EXTENDED AGAIN 2026-08-08 to plain editcontrol/input fields -- reported
+directly: "Wasted steps in Coverage due to loops" (traced to Vehicle --
+the run hadn't reached Coverage yet, but the mechanism is identical).
+Confirmed live: the navigate branch's pointer oscillated between TWO
+already-filled fields for 24+ steps straight -- 'Number of Doors' (a
+combobox, already covered) and 'Model' (a plain text field, NOT covered).
+Each individual re-click on a text field is cheap in isolation (a click +
+Tab, no data-corruption risk since clicking a text field doesn't change
+its value) -- exactly why this was deliberately left open before
+(execution_payment_tab_oscillation_fix's round 3: "bounded by the same
+general navigation dynamics... not a special-cased loop anymore"). That
+reasoning covered a single stray click, not a genuine, repeating,
+multi-field OSCILLATION -- the cumulative cost across dozens of steps is
+real. Same value+attempted logic as the combobox case, since a plain
+field's value accurately reflects real state (unlike a checkbox).
 """
 import sys
 from pathlib import Path
@@ -59,10 +75,16 @@ def _checkbox(label="Auto-Pay Enrolled", element_id="cb1", bbox=(1400, 410, 1600
             "text": label, "value": "", "bbox": list(bbox), "window_role": "active"}
 
 
+def _edit(label="Model", element_id="e1", value="Accord", bbox=(1400, 307, 1600, 337)):
+    return {"element_id": element_id, "type": "editcontrol", "label": label,
+            "text": label, "value": value, "bbox": list(bbox), "window_role": "active"}
+
+
 def _run_updated_reclick_guard(agent, click_pos, elements):
     """Mirrors the CURRENT reclick guard in agent.py's run(): find the
     element under the click, and Tab instead of clicking if it's an
-    already-filled+attempted combobox OR an already-attempted checkbox."""
+    already-filled+attempted combobox, an already-attempted checkbox, OR
+    an already-filled+attempted plain text field."""
     elem = agent._elem_at({"elements": elements}, click_pos)
     ty = (elem.get("type") or "").lower() if elem else ""
     key = agent._attempt_key(elem, elements=elements) if elem else None
@@ -70,7 +92,10 @@ def _run_updated_reclick_guard(agent, click_pos, elements):
                         and bool((elem.get("value") or "").strip())
                         and key in agent._attempted_keys)
     checkbox_attempted = ty in ("checkboxcontrol", "checkbox") and key in agent._attempted_keys
-    if combobox_filled or checkbox_attempted:
+    edit_filled = (ty in ("editcontrol", "input")
+                   and bool((elem.get("value") or "").strip())
+                   and key in agent._attempted_keys)
+    if combobox_filled or checkbox_attempted or edit_filled:
         agent._executor.execute({"action_type": "keyboard", "key_count": 1, "keystrokes": ["tab"]})
         return "guarded_tab"
     agent._executor.execute({"action_type": "click", "click_position": click_pos})
@@ -183,5 +208,68 @@ class TestAlreadyAttemptedCheckboxIsNotReclicked:
         agent._mark_attempted(attempted, elements=elements)
 
         outcome = _run_updated_reclick_guard(agent, [1500, 475], elements)   # clicking 'Paperless Billing'
+
+        assert outcome == "clicked"
+
+
+class TestAlreadyFilledEditFieldIsNotReclicked:
+    """Found live 2026-08-08: "Wasted steps in Coverage due to loops" --
+    traced to Vehicle tab, where the navigate branch's pointer oscillated
+    between 'Number of Doors' (a combobox, already guarded) and 'Model' (a
+    plain text field, NOT guarded) for 24+ steps straight."""
+
+    def _make_agent(self):
+        return LLMAgent(goal="test goal", dry_run=True, max_steps=1)
+
+    def test_pointer_drifting_onto_an_already_filled_text_field_is_blocked(self):
+        agent = self._make_agent()
+        agent._executor = MagicMock()
+        field = _edit()   # 'Model' -> 'Accord'
+        elements = [field]
+        agent._mark_attempted(field, elements=elements)
+
+        outcome = _run_updated_reclick_guard(agent, [1500, 320], elements)
+
+        assert outcome == "guarded_tab"
+        click_calls = [c for c in agent._executor.execute.call_args_list
+                       if c.args[0].get("action_type") == "click"]
+        assert len(click_calls) == 0
+
+    def test_unattempted_text_field_can_still_be_clicked(self):
+        agent = self._make_agent()
+        agent._executor = MagicMock()
+        field = _edit()
+        elements = [field]
+        # Never marked attempted -- agent hasn't touched this field yet.
+
+        outcome = _run_updated_reclick_guard(agent, [1500, 320], elements)
+
+        assert outcome == "clicked"
+
+    def test_attempted_but_still_empty_text_field_is_not_blocked(self):
+        """An attempted field with NO real value yet (e.g. a failed type
+        attempt) must stay clickable -- this guard only blocks fields that
+        are genuinely already filled, matching the combobox case's own
+        non-empty-value requirement."""
+        agent = self._make_agent()
+        agent._executor = MagicMock()
+        field = _edit(value="")
+        elements = [field]
+        agent._mark_attempted(field, elements=elements)
+
+        outcome = _run_updated_reclick_guard(agent, [1500, 320], elements)
+
+        assert outcome == "clicked"
+
+    def test_a_different_unattempted_field_is_unaffected(self):
+        agent = self._make_agent()
+        agent._executor = MagicMock()
+        filled = _edit(label="Model", element_id="e1", bbox=(1400, 307, 1600, 337))
+        other = _edit(label="Trim / Sub-model", element_id="e2", value="",
+                       bbox=(1400, 341, 1600, 371))
+        elements = [filled, other]
+        agent._mark_attempted(filled, elements=elements)
+
+        outcome = _run_updated_reclick_guard(agent, [1500, 356], elements)   # clicking 'Trim / Sub-model'
 
         assert outcome == "clicked"

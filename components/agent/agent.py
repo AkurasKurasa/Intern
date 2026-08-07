@@ -2320,13 +2320,39 @@ class LLMAgent:
                             _reclick_ty in ("checkboxcontrol", "checkbox")
                             and _reclick_key in self._attempted_keys
                         )
-                        if _reclick_combobox_filled or _reclick_checkbox_attempted:
+                        # Plain text fields extended in here 2026-08-08, reported
+                        # directly: "Wasted steps in Coverage due to loops" (traced
+                        # to Vehicle -- the run hadn't reached Coverage yet, but
+                        # same mechanism). Confirmed live: the navigate branch's
+                        # pointer oscillated between TWO already-filled fields for
+                        # 24+ steps straight -- 'Number of Doors' (a combobox,
+                        # already caught by the guard above) and 'Model' (a plain
+                        # editcontrol, NOT covered). Each individual re-click on
+                        # 'Model' is cheap in isolation (a click + Tab, no LLM call,
+                        # no data-corruption risk since a text-field click doesn't
+                        # change its value) -- which is exactly why this case was
+                        # deliberately left open in execution_payment_tab_
+                        # oscillation_fix's round-3 writeup ("bounded by the same
+                        # general navigation dynamics... not a special-cased loop
+                        # anymore"). That reasoning covered a single stray click,
+                        # not a genuine, repeating, multi-field OSCILLATION -- the
+                        # cumulative cost across dozens of steps is real. Same
+                        # value+attempted logic as the combobox case (a plain
+                        # field's `value` accurately reflects real state, unlike a
+                        # checkbox, so it needs the same non-empty check).
+                        _reclick_edit_filled = (
+                            _reclick_ty in ("editcontrol", "input")
+                            and bool((_reclick_elem.get("value") or "").strip())
+                            and _reclick_key in self._attempted_keys
+                        )
+                        if _reclick_combobox_filled or _reclick_checkbox_attempted or _reclick_edit_filled:
                             _reclick_label = (_reclick_elem.get("label") or _reclick_elem.get("text") or "?")[:30]
+                            _reclick_reason = ("filled" if (_reclick_combobox_filled or _reclick_edit_filled)
+                                               else "checked")
                             logger.info(
                                 "[OPT2] pointer drifted back onto already-%s %s %r — Tab instead "
                                 "of a wasted re-click.",
-                                "filled" if _reclick_combobox_filled else "checked",
-                                _reclick_ty, _reclick_label)
+                                _reclick_reason, _reclick_ty, _reclick_label)
                             self._executor.execute({"action_type": "keyboard",
                                                     "key_count": 1, "keystrokes": ["tab"]})
                             time.sleep(self.step_delay * 0.4)
