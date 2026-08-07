@@ -14,9 +14,19 @@ in one run, ~4 steps per cycle, before the run finally hit max_steps.
 Fix: _try_advance_tab now blacklists the tab-strip position it's LEAVING
 (not the one it's going to) in self._advance_blacklist_pos, unioned into
 the same confidence-gate blacklist mechanism built earlier tonight for the
-dead-end combobox loop. Bounded to at most one entry — replaced, not
-accumulated, on every advance — so a real later revisit is never
-permanently blocked, only an immediate reversal of the last deliberate move.
+dead-end combobox loop.
+
+CORRECTION, found live 2026-08-07 in a later run: bounding this to one
+entry (replaced, not accumulated) only blocked an IMMEDIATE reversal to
+the single most-recently-left tab. A 2-hop-back click (Coverage ->
+Policyholder, skipping past Vehicle -- the only blacklisted entry) sailed
+straight through, producing a Policyholder/Vehicle/Coverage cycle that
+never reached Drivers. Changed to ACCUMULATE every tab left this record
+instead of replacing -- a click back to ANY already-completed tab is now
+blocked, not just the last one. Cleared only at the new-record boundary
+(alongside self._attempted_keys) so it doesn't carry over and pre-block
+tabs on the next record. Matches the "finish forward, don't come back"
+principle behind verify-at-fill.
 """
 import sys
 from pathlib import Path
@@ -58,15 +68,33 @@ class TestAdvanceBlacklistBlocksImmediateReversal:
         assert _gate_low_confidence_click(pos, 0.76, blacklist=set()) is pos
 
 
-class TestBlacklistIsBoundedToOneEntry:
-    """Mirrors _try_advance_tab's own logic: `self._advance_blacklist_pos = {...}`
-    (assignment, not .add()) — each new advance REPLACES the previous entry
-    rather than accumulating, so a later, different tab isn't blocked by an
-    earlier one that's no longer relevant."""
+class TestBlacklistAccumulatesAcrossMultipleAdvances:
+    """Mirrors _try_advance_tab's current logic: `self._advance_blacklist_pos.add(...)`
+    — each new advance ADDS to the set instead of replacing it, so a click
+    back to any tab already left this record is blocked, not just the most
+    recent one. This is what closes the Policyholder -> Vehicle -> Coverage
+    -> Policyholder cycle: by the time Coverage is left too, both
+    Policyholder's and Vehicle's tab-strip positions are still blacklisted."""
 
-    def test_replacing_the_set_drops_the_old_entry(self):
-        blacklist = {_round_click_pos([1074, 134])}   # left Vehicle
-        # ... later, a different advance happens (left Coverage instead) ...
-        blacklist = {_round_click_pos([1144, 134])}   # REPLACED, not unioned
-        assert _round_click_pos([1074, 134]) not in blacklist
-        assert _round_click_pos([1144, 134]) in blacklist
+    def test_a_second_advance_does_not_drop_the_first_entry(self):
+        blacklist = set()
+        blacklist.add(_round_click_pos([1004, 134]))   # left Policyholder
+        blacklist.add(_round_click_pos([1074, 134]))   # left Vehicle
+        assert _round_click_pos([1004, 134]) in blacklist
+        assert _round_click_pos([1074, 134]) in blacklist
+
+    def test_two_hop_back_click_is_blocked_after_two_advances(self):
+        # The exact live scenario: Policyholder -> Vehicle -> Coverage, then
+        # a click straight back to Policyholder (skipping past Vehicle).
+        blacklist = set()
+        blacklist.add(_round_click_pos([1004, 134]))   # left Policyholder
+        blacklist.add(_round_click_pos([1074, 134]))   # left Vehicle
+        policyholder_pos = [1004, 134]
+        assert _gate_low_confidence_click(policyholder_pos, 0.99, blacklist=blacklist) is None
+
+    def test_cleared_between_records_so_next_record_is_not_pre_blocked(self):
+        blacklist = set()
+        blacklist.add(_round_click_pos([1004, 134]))
+        blacklist.add(_round_click_pos([1074, 134]))
+        blacklist.clear()   # new-record boundary
+        assert _gate_low_confidence_click([1004, 134], 0.99, blacklist=blacklist) == [1004, 134]

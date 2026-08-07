@@ -883,15 +883,20 @@ class LLMAgent:
         self._checked_fields: set           = set()   # checkboxes already clicked this run
         self._filled_this_tab: set          = set()   # edit fields filled on current tab (prevents re-fill on cycling)
         self._nochange_click_pos: set       = set()   # (rx,ry) click positions that gave no_change this tab
-        # (rx,ry) of the tab-strip button for whichever tab _try_advance_tab most
-        # recently, deliberately left as "exhausted" — found live 2026-08-07: the
-        # transformer's OWN pointer clicked straight back onto it the very next
-        # step, 12-13 times in one run (Vehicle <-> Coverage), each cycle costing
-        # ~4 steps of pure tug-of-war between the system's "move on" decision and
-        # the model's "go back" decision. Bounded to at most one entry — cleared
-        # and replaced (not accumulated) on every new advance — so this only ever
-        # blocks an IMMEDIATE reversal of the last deliberate move, never
-        # permanently walls off a tab from legitimate later revisits.
+        # (rx,ry) of every tab-strip button _try_advance_tab has deliberately
+        # left as "exhausted" so far this record — found live 2026-08-07: the
+        # transformer's OWN pointer clicked straight back onto the tab just
+        # left, 12-13 times in one run (Vehicle <-> Coverage), each cycle
+        # costing ~4 steps of pure tug-of-war. Originally bounded to one entry
+        # (replaced, not accumulated) — found live 2026-08-07 that this only
+        # blocked an IMMEDIATE reversal: a 2-hop-back click (Coverage ->
+        # Policyholder, skipping past the single blacklisted Vehicle entry)
+        # sailed straight through, producing a Policyholder/Vehicle/Coverage
+        # cycle that never reached Drivers. Matches the same "finish forward,
+        # don't come back" principle behind verify-at-fill. Now ACCUMULATES
+        # every tab left this record — cleared only at the new-record
+        # boundary alongside self._attempted_keys, so a fresh record's tabs
+        # aren't pre-blocked by the previous record's history.
         self._advance_blacklist_pos: set    = set()
         self._current_tab_idx: int          = start_tab_idx  # tracks which tab we're on
         self._guidance: str = ""
@@ -3096,9 +3101,13 @@ class LLMAgent:
             rec = records.get(self._record_num, records.get(min(records), {}))
             self._cached_record = rec
             # New record = new session → clear attempted history so fields on the
-            # fresh record aren't pre-marked from the previous one.
+            # fresh record aren't pre-marked from the previous one. Also clear the
+            # accumulated tab-advance blacklist (_advance_blacklist_pos) — tabs
+            # left "exhausted" on the previous record must not stay blocked on
+            # this one.
             if self._record_num != self._attempted_record_num:
                 self._attempted_keys.clear()
+                self._advance_blacklist_pos.clear()
                 self._attempted_record_num = self._record_num
             sample = list(rec.items())[:5]
             logger.info("Record cache refreshed: %d fields for record %d  sample=%r",
@@ -4349,12 +4358,13 @@ class LLMAgent:
         tab_name = (next_tab.get("text") or next_tab.get("label") or "?").strip()
         logger.info("Stuck guard: advancing to tab %r @ (%.0f, %.0f)", tab_name, cx, cy)
         # Blacklist the tab we're LEAVING (not the one we're going to) — see
-        # _advance_blacklist_pos's own comment for why. Bounded to one entry:
-        # this REPLACES whatever was blacklisted before, it doesn't accumulate.
+        # _advance_blacklist_pos's own comment for why. ACCUMULATES (adds to
+        # the set, doesn't replace it) so a click back to ANY already-left
+        # tab is blocked, not just the single most recent one.
         _left_tab = tabs[_active_idx]
         if _left_tab.get("bbox"):
             _lx1, _ly1, _lx2, _ly2 = _left_tab["bbox"]
-            self._advance_blacklist_pos = {_round_click_pos([(_lx1 + _lx2) / 2, (_ly1 + _ly2) / 2])}
+            self._advance_blacklist_pos.add(_round_click_pos([(_lx1 + _lx2) / 2, (_ly1 + _ly2) / 2]))
         self._executor.execute({"action_type": "click", "click_position": [cx, cy]})
         self._current_tab_idx = next_idx
         return True
