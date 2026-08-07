@@ -15,6 +15,20 @@ Fix: right after a type action, compare the field's actual post-type value
 against what the agent intended to type (prediction["text"]); if it doesn't
 match, retry (bounded, 2 attempts) inline instead of either silently
 trusting a wrong fill or deferring to a separate re-check pass.
+
+FOLLOW-UP BUG, same day, found from the very first live run after shipping
+this: the caller originally looked up the target element using the
+pre-typing element_id (captured from `state`, before the type action) inside
+the POST-typing snapshot (`state_after`). element_id is assigned purely by
+scan position ("elem_{offset+count}") in ui_observer.py — self-consistent
+WITHIN one observation, but NOT stable across separate observations (any
+element gaining/losing text between scans shifts every id after it). This
+produced a false "mismatch" on the very first field of the first live test
+(typed correctly, but verify-at-fill's stale-id lookup read a different,
+empty element) — 2 wasted retries before giving up, even though the value
+was already correct. Fixed: the caller now re-derives the focused id FRESH
+from state_after itself on every attempt, never reusing an id computed from
+a different snapshot.
 """
 import sys
 from pathlib import Path
@@ -62,6 +76,39 @@ class TestVerifyFillMatches:
     def test_false_when_focused_element_no_longer_found(self):
         els = _elements("PAI-2026-00441", element_id="e1")
         assert _verify_fill_matches(els, "e_missing", "PAI-2026-00441") is False
+
+
+class TestElementIdInstabilityAcrossSnapshots:
+    """The actual live bug: element_id is a scan-position artifact
+    ('elem_{offset+count}' in ui_observer.py), not a stable identity across
+    two separate observations. Using a PRE-typing id to look up the field in
+    a POST-typing snapshot can silently point at the wrong element."""
+
+    def test_stale_pretyping_id_can_miss_in_a_later_snapshot(self):
+        # Snapshot BEFORE typing: this field happened to be "e7".
+        # Snapshot AFTER typing: an unrelated element elsewhere on the form
+        # gained text between scans, shifting every id after it — the SAME
+        # real field is now "e8" in this later snapshot.
+        state_after_elements = [
+            {"element_id": "e7", "type": "editcontrol", "label": "Other Field", "value": ""},
+            {"element_id": "e8", "type": "editcontrol", "label": "Policy Number", "value": "PAI-2026-00441"},
+        ]
+        stale_id = "e7"   # captured from the BEFORE-typing snapshot
+        # Looking it up with the stale id finds the WRONG (empty) element.
+        assert _verify_fill_matches(state_after_elements, stale_id, "PAI-2026-00441") is False
+
+    def test_fresh_id_from_the_same_snapshot_finds_it_correctly(self):
+        state_after = {
+            "focused_element_id": "e8",
+            "elements": [
+                {"element_id": "e7", "type": "editcontrol", "label": "Other Field", "value": ""},
+                {"element_id": "e8", "type": "editcontrol", "label": "Policy Number", "value": "PAI-2026-00441"},
+            ],
+        }
+        # The fix: re-derive the id from state_after's OWN focused_element_id,
+        # never reuse an id computed from an earlier, separate observation.
+        fresh_id = state_after["focused_element_id"]
+        assert _verify_fill_matches(state_after["elements"], fresh_id, "PAI-2026-00441") is True
 
 
 class TestVerifyAtFillRetryLoop:

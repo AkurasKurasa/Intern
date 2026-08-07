@@ -2430,13 +2430,23 @@ class LLMAgent:
             # then move on regardless so a stubborn field can't stall the run.
             if prediction.get("action_type") == "keyboard" and prediction.get("text"):
                 _expected_text = prediction["text"].strip()
-                _foc_id_vf     = state.get("focused_element_id")
                 for _verify_attempt in range(_MAX_VERIFY_RETRIES + 1):
-                    if _verify_fill_matches(state_after.get("elements", []), _foc_id_vf, _expected_text):
+                    # Use THIS snapshot's own reported focused_element_id, not the
+                    # pre-typing one from `state`. element_id is assigned purely by
+                    # scan position ("elem_{offset+count}") — self-consistent WITHIN
+                    # one observation, but not stable ACROSS separate observations
+                    # (any element gaining/losing text between scans shifts every
+                    # id after it). Found 2026-08-07, live: the very first field
+                    # ('Policy Number') triggered 2 wasted retries because the
+                    # pre-typing id no longer pointed at the same field in the
+                    # post-typing snapshot, reading a false empty mismatch even
+                    # though the type had actually already succeeded.
+                    _foc_id_vf_now = state_after.get("focused_element_id")
+                    if _verify_fill_matches(state_after.get("elements", []), _foc_id_vf_now, _expected_text):
                         if _verify_attempt > 0:
                             logger.info("Verify-at-fill: corrected after retry %d.", _verify_attempt)
                         break
-                    _actual_elem = _find_element_by_id(state_after.get("elements", []), _foc_id_vf)
+                    _actual_elem = _find_element_by_id(state_after.get("elements", []), _foc_id_vf_now)
                     _actual_text = (_actual_elem.get("value") or "").strip() if _actual_elem else ""
                     if _verify_attempt >= _MAX_VERIFY_RETRIES:
                         logger.warning(
