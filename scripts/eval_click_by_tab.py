@@ -92,8 +92,9 @@ def main():
         keys = dataset._attempted_by_file.get(str(fpath))
         if not keys:
             return
-        for e in state.get("elements", []):
-            if _attempt_key(e) in keys:
+        elements = state.get("elements", [])
+        for e in elements:
+            if _attempt_key(e, elements=elements) in keys:
                 e["attempted"] = 1.0
 
     per_tab_correct: Counter = Counter()

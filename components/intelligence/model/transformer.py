@@ -207,18 +207,44 @@ def _elem_label(elem: dict) -> str:
     return ((elem.get("label") or elem.get("text") or "").strip())
 
 
-def _attempt_key(elem: dict):
+def _attempt_key(elem: dict, elements: Optional[list] = None):
     """
     Session-stable identity for the 'attempted' feature. Label-primary so it
     survives scroll (positions shift, labels don't); falls back to a coarse
     bbox-center bucket for unlabeled elements. Must match between train-time
-    derivation and the agent's inference-time tracking.
+    derivation and the agent's inference-time tracking (components/agent/agent.py
+    carries an identical copy — keep both in sync).
+
+    Repeated-section forms (Driver 1/2/3, Vehicle 1/2, additional insureds, ...)
+    routinely give every instance of a field the SAME label ("First Name" on
+    every driver block) — found 2026-08-07 from a live report that Driver 1's
+    and Driver 2's First Name fields were "indistinguishable." Label-only kept
+    them literally indistinguishable: filling Driver 1's First Name marked the
+    shared key "first name" as attempted, so Driver 2's First Name (a different,
+    still-empty element) silently read as already-done too.
+
+    Fix: when `elements` (the full elements list from the SAME state as `elem`)
+    is given and more than one element shares `elem`'s label, disambiguate by
+    this element's rank among same-labeled elements in list order. List order
+    reflects accessibility-tree traversal order, which — unlike bbox — does
+    not change with scroll, so this assumes (consistent with this project's
+    other UIA-ordering findings) that traversal order for a given static form
+    is stable across snapshots. `elements=None` keeps the old label-only
+    behavior for any caller that can't supply the full list.
     """
     lbl = (elem.get("label") or elem.get("text") or "").strip().lower()
-    if lbl:
-        return lbl
-    b = elem.get("bbox") or [0, 0, 0, 0]
-    return ("@", round((b[0] + b[2]) / 2 / 20) * 20, round((b[1] + b[3]) / 2 / 20) * 20)
+    if not lbl:
+        b = elem.get("bbox") or [0, 0, 0, 0]
+        return ("@", round((b[0] + b[2]) / 2 / 20) * 20, round((b[1] + b[3]) / 2 / 20) * 20)
+    if elements:
+        same_label_ids = [id(e) for e in elements
+                           if (e.get("label") or e.get("text") or "").strip().lower() == lbl]
+        if len(same_label_ids) > 1:
+            try:
+                return (lbl, same_label_ids.index(id(elem)))
+            except ValueError:
+                pass
+    return lbl
 
 
 def _encode_element(elem: dict, W: float, H: float, focused_id=None) -> List[float]:
@@ -509,7 +535,7 @@ class TrajectoryDataset(Dataset):
         _cache_path = roots[0] / _cache_name
         # ELEM_FEATURES in the key → a change in the feature layout invalidates
         # any stale cache built with a different one.
-        _cache_key  = (max_elements, hist_len, aug_drop_prob, ELEM_FEATURES, "v5_attempted")
+        _cache_key  = (max_elements, hist_len, aug_drop_prob, ELEM_FEATURES, "v7_disambiguated_attempt_key")
 
         def _cache_valid() -> bool:
             if not _cache_path.exists():
@@ -594,6 +620,7 @@ class TrajectoryDataset(Dataset):
         grouped_src_idx:     List[List[int]] = []
         grouped_click_idx:   List[List[int]] = []
         grouped_click_type:  List[List[str]] = []   # clicked element's type (rare-action weighting)
+        grouped_click_key:   List[List[str]] = []   # clicked element's identity (rare-FIELD weighting)
 
         import gc as _gc
         total_files = sum(len(g) for g in file_groups)
@@ -605,6 +632,7 @@ class TrajectoryDataset(Dataset):
             g_src_idx:    List[int]   = []
             g_click_idx:  List[int]   = []
             g_click_type: List[str]   = []
+            g_click_key:  List[str]   = []
             g_acted: set              = set()   # attempt-keys acted on so far (this session)
             manifest = _load_manifest(group_files)
 
@@ -638,10 +666,13 @@ class TrajectoryDataset(Dataset):
                     _find_click_elem_idx(t.get("mouse", {}), state, max_elements)
                     if action[0] == ACTION_CLICK else -1
                 )
-                # Remember the clicked element's TYPE → used for rare-action loss
-                # weighting (general inverse-frequency; rare target types like tabs
-                # get up-weighted, no hardcoded class).
+                # Remember the clicked element's TYPE and specific IDENTITY → used
+                # for rare-action loss weighting (general inverse-frequency; rare
+                # target types like tabs AND rare individual fields within a common
+                # type both get up-weighted, no hardcoded class/field name).
                 click_type = ((elems[click_idx].get("type") or "").lower()
+                              if 0 <= click_idx < len(elems) else "")
+                click_key  = (_attempt_key(elems[click_idx], elements=elems)
                               if 0 <= click_idx < len(elems) else "")
                 # 'attempted' derivation: this step SEES every field acted on in
                 # PRIOR steps (snapshot before adding the current target). Then
@@ -653,12 +684,13 @@ class TrajectoryDataset(Dataset):
                 elif action[0] == ACTION_KEYBOARD and 0 <= src_idx < len(elems):
                     _tgt_elem = elems[src_idx]
                 if _tgt_elem is not None:
-                    g_acted.add(_attempt_key(_tgt_elem))
+                    g_acted.add(_attempt_key(_tgt_elem, elements=elems))
                 valid_files.append(fpath)
                 g_actions.append(action)
                 g_src_idx.append(src_idx)
                 g_click_idx.append(click_idx)
                 g_click_type.append(click_type)
+                g_click_key.append(click_key)
                 t = None  # release JSON dict immediately — prevents memory accumulation
 
             _gc.collect()  # force reclaim after each session group
@@ -670,6 +702,7 @@ class TrajectoryDataset(Dataset):
                 grouped_src_idx.append(g_src_idx)
                 grouped_click_idx.append(g_click_idx)
                 grouped_click_type.append(g_click_type)
+                grouped_click_key.append(g_click_key)
 
         if skipped:
             print(f"[Dataset] Skipped {skipped} traces with no active form controls.")
@@ -694,6 +727,7 @@ class TrajectoryDataset(Dataset):
                 src_idx    = grouped_src_idx[gi][i + hist_len - 1]
                 click_idx  = grouped_click_idx[gi][i + hist_len - 1]
                 click_type = grouped_click_type[gi][i + hist_len - 1]
+                click_key  = grouped_click_key[gi][i + hist_len - 1]
                 if tgt[0] == ACTION_NOOP:
                     continue
                 self._samples.append((
@@ -702,15 +736,26 @@ class TrajectoryDataset(Dataset):
                     [a[0] for a in ctx],               # past action types
                     [[a[1], a[2], a[3]] for a in ctx], # past cont (cx, cy, key_norm)
                     tgt[0], click_idx, tgt[3], src_idx,
-                    click_type,                        # 9th (temp): clicked target type
+                    click_key,                          # 9th (temp): clicked target's specific identity
                 ))
 
         # ── Rare-action loss weighting (general, inverse-frequency) ──────────────
-        # Up-weight samples whose CLICK target is a RARE element type (e.g. tabs),
-        # so the model learns them without distorting the data (no recording tricks,
-        # no duplication). weight ∝ 1/freq(type), normalized so mean click-weight ≈ 1,
-        # capped to avoid blow-ups. Non-click samples → 1.0. Auto-detects whatever is
-        # rare — NO hardcoded class. (DEVELOPERS.md → Concepts: rare-action handling.)
+        # Up-weight samples whose CLICK target is a RARE *specific field* (not just
+        # a rare control TYPE), so the model learns them without distorting the data
+        # (no recording tricks, no duplication). weight ∝ 1/freq(field), normalized
+        # so mean click-weight ≈ 1, capped to avoid blow-ups. Non-click samples → 1.0.
+        # Auto-detects whatever is rare — NO hardcoded class/field name.
+        #
+        # Field-identity weighting subsumes type-level weighting (a rare control
+        # type's instances are also individually rare) and additionally fixes the
+        # common-neighbor-wins-when-uncertain failure mode: two fields of the SAME
+        # type (e.g. "First Name" appears on nearly every record, "Underwriter"
+        # rarely) used to get equal weight under type-only weighting, so the model
+        # had no loss-level incentive to learn the rarer one instead of defaulting
+        # to its more common same-type/same-tab neighbor — exactly the confusion
+        # pattern seen across every per-tab accuracy breakdown this session ("DL
+        # Expiration" -> "DL Issuing State", "Comprehensive Deductible" -> "Collision
+        # Deductible"). (DEVELOPERS.md -> Concepts: rare-action handling.)
         from collections import Counter as _Counter
         _RARE_W_CAP = 8.0
         _tc = _Counter(s[8] for s in self._samples if s[8])
@@ -821,8 +866,9 @@ class TrajectoryDataset(Dataset):
         keys = self._attempted_by_file.get(str(fpath))
         if not keys:
             return
-        for e in state.get("elements", []):
-            if _attempt_key(e) in keys:
+        elements = state.get("elements", [])
+        for e in elements:
+            if _attempt_key(e, elements=elements) in keys:
                 e["attempted"] = 1.0
 
     def _get_tensor(self, fpath: "Path") -> torch.Tensor:

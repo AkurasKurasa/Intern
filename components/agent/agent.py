@@ -1767,7 +1767,7 @@ class LLMAgent:
                     if (not _txt) or _norm in {"none", "n/a", "na"} or _norm.startswith("leave blank"):
                         logger.info("[OPT2] %r → leave-blank/empty — Tab past (skip).", _flabel)
                         if _fe2 is not None:
-                            self._mark_attempted(_fe2)
+                            self._mark_attempted(_fe2, elements=state.get("elements", []))
                         self._executor.execute({"action_type": "keyboard",
                                                 "key_count": 1, "keystrokes": ["tab"]})
                         time.sleep(self.step_delay * 0.4)
@@ -1830,7 +1830,7 @@ class LLMAgent:
                                 logger.info("[OPT2] combobox %r — no value, Tab", _cb_label)
                                 self._executor.execute({"action_type": "keyboard",
                                                         "key_count": 1, "keystrokes": ["escape"]})
-                                self._mark_attempted(_cbox)
+                                self._mark_attempted(_cbox, elements=state.get("elements", []))
                                 self._executor.execute({"action_type": "keyboard",
                                                         "key_count": 1, "keystrokes": ["tab"]})
                                 time.sleep(self.step_delay * 0.5)
@@ -3433,14 +3433,15 @@ class LLMAgent:
         """
         v_bottom = self._form_viewport_bottom(state) - 8   # live form viewport bottom
         _FILL = {"editcontrol", "input", "comboboxcontrol"}
-        for e in state.get("elements", []):
+        _elements = state.get("elements", [])
+        for e in _elements:
             if e.get("window_role") == "background":
                 continue
             if (e.get("type") or "").lower() not in _FILL:
                 continue
             if (e.get("value") or "").strip():          # already filled
                 continue
-            if self._attempt_key(e) in self._attempted_keys:   # tried (empty optional)
+            if self._attempt_key(e, elements=_elements) in self._attempted_keys:   # tried (empty optional)
                 continue
             b = e.get("bbox")
             if not b or len(b) != 4:
@@ -4453,18 +4454,33 @@ class LLMAgent:
         out["elements"] = slim
         return out
 
-    def _attempt_key(self, elem: Dict[str, Any]):
-        """Match transformer._attempt_key exactly (label-primary, scroll-stable)."""
+    def _attempt_key(self, elem: Dict[str, Any], elements: Optional[list] = None):
+        """Match transformer._attempt_key exactly (label-primary, scroll-stable,
+        disambiguated by rank among same-labeled elements when `elements` — the
+        full elements list from elem's own state — is given). Repeated-section
+        forms (Driver 1/2/3, Vehicle 1/2, ...) give every instance of a field
+        the same label; without disambiguation, filling Driver 1's First Name
+        silently marked Driver 2's identically-labeled, still-empty First Name
+        as already-attempted too. See transformer._attempt_key for the full
+        rationale — keep both copies in sync."""
         lbl = (elem.get("label") or elem.get("text") or "").strip().lower()
-        if lbl:
-            return lbl
-        b = elem.get("bbox") or [0, 0, 0, 0]
-        return ("@", round((b[0] + b[2]) / 2 / 20) * 20, round((b[1] + b[3]) / 2 / 20) * 20)
+        if not lbl:
+            b = elem.get("bbox") or [0, 0, 0, 0]
+            return ("@", round((b[0] + b[2]) / 2 / 20) * 20, round((b[1] + b[3]) / 2 / 20) * 20)
+        if elements:
+            same_label_ids = [id(e) for e in elements
+                               if (e.get("label") or e.get("text") or "").strip().lower() == lbl]
+            if len(same_label_ids) > 1:
+                try:
+                    return (lbl, same_label_ids.index(id(elem)))
+                except ValueError:
+                    pass
+        return lbl
 
-    def _mark_attempted(self, elem: Dict[str, Any]) -> None:
+    def _mark_attempted(self, elem: Dict[str, Any], elements: Optional[list] = None) -> None:
         """Record that a field has been acted on this session (attempted feature)."""
         if isinstance(elem, dict):
-            self._attempted_keys.add(self._attempt_key(elem))
+            self._attempted_keys.add(self._attempt_key(elem, elements=elements))
 
     def _elem_at(self, state: Dict[str, Any], pos) -> Optional[Dict[str, Any]]:
         """Element whose bbox contains pos (nearest center on ties)."""
@@ -4486,21 +4502,23 @@ class LLMAgent:
         """Mark the element this step acted on — keyboard→focused, click→element
         under the cursor — so the transformer sees it as attempted next frame."""
         at = prediction.get("action_type")
+        elements = state.get("elements", [])
         elem = None
         if at == "keyboard":
             fid = state.get("focused_element_id")
-            elem = next((e for e in state.get("elements", []) if e.get("element_id") == fid), None)
+            elem = next((e for e in elements if e.get("element_id") == fid), None)
         elif at == "click":
             elem = self._elem_at(state, prediction.get("click_position") or [])
         if elem is not None:
-            self._mark_attempted(elem)
+            self._mark_attempted(elem, elements=elements)
 
     def _stamp_attempted_live(self, state: Dict[str, Any]) -> None:
         """Stamp attempted=1 on observed elements acted on earlier this session."""
         if not self._attempted_keys:
             return
-        for e in state.get("elements", []):
-            if self._attempt_key(e) in self._attempted_keys:
+        elements = state.get("elements", [])
+        for e in elements:
+            if self._attempt_key(e, elements=elements) in self._attempted_keys:
                 e["attempted"] = 1.0
 
     def _predict(self, state: Dict[str, Any]) -> Dict[str, Any]:
