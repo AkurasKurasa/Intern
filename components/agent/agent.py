@@ -2070,6 +2070,29 @@ class LLMAgent:
                                  and e["bbox"][0] - 2 <= _snap2[0] <= e["bbox"][2] + 2
                                  and e["bbox"][1] - 2 <= _snap2[1] <= e["bbox"][3] + 2),
                                 None)
+                        if _cbox is not None and self._attempt_key(
+                                _cbox, elements=state.get("elements", [])) in self._attempted_keys:
+                            # Already confirmed blank earlier this record — don't repeat
+                            # the click/check/escape dance. Found live 2026-08-07: the
+                            # position-based dead-end blacklist (below) only catches 3
+                            # identical clicks in a row at the SAME bucketed position;
+                            # the transformer's click-position estimate for the same
+                            # field wobbles enough between separate approaches (drifting
+                            # back to it minutes apart, not consecutively) to dodge that
+                            # 10px bucket each time. 'Suffix' got the full click-open-
+                            # check-escape-tab treatment 4 separate times in one
+                            # Policyholder pass (10 wasted steps) despite being
+                            # _mark_attempted()'d after the first. attempted_keys is
+                            # label-based (stable regardless of pixel drift), so check
+                            # it FIRST and skip straight to Tab — no click needed, there's
+                            # nothing to open or verify about a field already known blank.
+                            _cb_label_skip = (_cbox.get("label") or _cbox.get("text") or "").strip()
+                            logger.info("[OPT2] combobox %r already attempted (known blank) — Tab, no re-click.",
+                                        _cb_label_skip[:30])
+                            self._executor.execute({"action_type": "keyboard",
+                                                    "key_count": 1, "keystrokes": ["tab"]})
+                            time.sleep(self.step_delay * 0.5)
+                            continue
                         if _cbox is not None:
                             _cb_label = (_cbox.get("label") or _cbox.get("text") or "").strip()
                             logger.info("[OPT2] CLICK on empty combobox %r → treat as FILL", _cb_label[:30])
