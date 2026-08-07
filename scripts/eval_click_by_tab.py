@@ -37,7 +37,10 @@ sys.path.insert(0, str(_ROOT / "components"))
 sys.path.insert(0, str(_ROOT / "scripts"))
 
 import torch
-from intelligence.model.transformer import TrajectoryDataset, predict, _load_embed_cache
+from intelligence.model.transformer import (
+    TrajectoryDataset, predict, _load_embed_cache, _decode_actions, _attempt_key,
+    DEFAULT_W, DEFAULT_H,
+)
 from bc_fidelity import _LABEL_TO_KEY, _tab_of
 
 
@@ -77,6 +80,22 @@ def main():
         key = _LABEL_TO_KEY.get((label or "").strip().lower())
         return _tab_of(key) if key else "Unknown (Coverage/Drivers/Claims/Payment/other)"
 
+    def _stamp_attempted(fpath: Path, state: dict) -> None:
+        """Mirror TrajectoryDataset._stamp_attempted exactly, reusing its
+        already-computed per-file attempted-key sets (dataset._attempted_by_file)
+        so 'has this field already been acted on this session' matches training
+        instead of defaulting to False for everything (every element looking
+        like a first-ever visit, when many were actually already filled by an
+        earlier step in the same session) — a load-bearing feature per
+        learning_fixation_solved, silently missing from every eval run before
+        2026-08-07."""
+        keys = dataset._attempted_by_file.get(str(fpath))
+        if not keys:
+            return
+        for e in state.get("elements", []):
+            if _attempt_key(e) in keys:
+                e["attempted"] = 1.0
+
     per_tab_correct: Counter = Counter()
     per_tab_total: Counter = Counter()
     confusions: defaultdict = defaultdict(Counter)  # tab -> Counter of predicted labels when wrong
@@ -97,6 +116,8 @@ def main():
         if any(t is None for t in traces):
             n_skipped += 1
             continue
+        for f, t in zip(files, traces):
+            _stamp_attempted(f, t.get("state", {}))
 
         *ctx_traces, cur_trace = traces
         state = cur_trace.get("state", {})
@@ -105,14 +126,31 @@ def main():
             n_skipped += 1
             continue
 
+        # Re-derive each context step's action the SAME way TrajectoryDataset does
+        # (_decode_actions on raw mouse/keyboard events) rather than trusting the
+        # trace's own top-level "action" field. That field is a different, raw
+        # summary (string action_type like "drag"/"double_click", pixel-space
+        # click_position) that does NOT go through the drag/double_click -> CLICK
+        # collapse _decode_actions applies before anything reaches training —
+        # feeding it straight into predict() put out-of-distribution action-type
+        # ids into the model's history input (the model never saw action_type=6
+        # "drag" during training, since decode_actions always collapses it to
+        # CLICK=1 first). Found 2026-08-07: this made every prior run of this
+        # script understate accuracy relative to the training loop's own clean
+        # validation on the identical checkpoint (37.1% here vs 57.8% reported).
         history = []
         for t in ctx_traces:
-            action = t.get("action", {}) or {}
+            t_state = t.get("state", {})
+            t_res   = t_state.get("screen_resolution", [DEFAULT_W, DEFAULT_H])
+            t_W     = float(t_res[0]) or DEFAULT_W
+            t_H     = float(t_res[1]) or DEFAULT_H
+            at, cx, cy, aux, _txt = _decode_actions(
+                t.get("mouse", {}), t.get("keyboard", {}), t_W, t_H)
             history.append({
-                "state": t.get("state", {}),
-                "action_type": action.get("action_type") or "no_op",
-                "click_xy": action.get("click_position") or [0.0, 0.0],
-                "key_count": action.get("key_count") or 0,
+                "state": t_state,
+                "action_type": at,                       # int — predict() uses it as-is
+                "click_xy": [cx * t_W, cy * t_H],         # predict() re-normalizes by /W,/H
+                "key_count": aux * 100.0,                 # predict() re-divides by 100
             })
 
         result = predict(state, history=history, model_path=model_path, device_str=args.device)
