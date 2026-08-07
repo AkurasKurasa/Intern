@@ -4675,11 +4675,32 @@ class LLMAgent:
         # elements are clickable vs typeable (e.g. comboboxes need click).
         # Exception: if transformer's click lands on a tab element, do NOT override —
         # the LLM is still trying to fill fields on the current tab.
+        #
+        # Exception #2, found live 2026-08-07 ("Still not fixed btw, new loop"),
+        # right after the fill-click-anchoring fix started landing clicks EXACTLY
+        # on the focused field instead of drifting elsewhere: 'Down Payment ($)'
+        # and 'Payment Due Date' (both plain editcontrol) looped forever with
+        # "Validator -> no_change" every time. Root cause was always here, just
+        # invisible before -- this override never checked the FOCUSED FIELD'S
+        # OWN type, only the transformer's action-type head, which is collapsed
+        # (documented elsewhere: constant near-certain confidence regardless of
+        # what's actually focused) and therefore ALWAYS says "click". A checkbox
+        # or combobox genuinely needs a click before it can be filled; a plain
+        # text field does not -- clicking one that's already focused does
+        # nothing at all, so the "type" decision (which had the real value)
+        # never got executed. The anchoring fix made this land precisely on the
+        # already-focused text field every time instead of missing it, which is
+        # exactly why the loop only became visible after that fix, not before.
+        _tp_fid = state.get("focused_element_id")
+        _tp_fel = next((e for e in state.get("elements", []) if e.get("element_id") == _tp_fid), None)
+        _tp_fel_ty = (_tp_fel.get("type") or "").lower() if _tp_fel else ""
+        _needs_click_first = _tp_fel_ty in ("checkboxcontrol", "checkbox", "comboboxcontrol", "combobox")
         _TRANSFORMER_TYPE_OVERRIDE_THRESHOLD = 0.92
         if (l_type == "type"
                 and t_pred.get("action_type") == "click"
                 and t_conf >= _TRANSFORMER_TYPE_OVERRIDE_THRESHOLD
-                and t_pred.get("click_position")):
+                and t_pred.get("click_position")
+                and _needs_click_first):
             pos = t_pred["click_position"]
             _tab_elems = [e for e in state.get("elements", [])
                           if e.get("type") in ("tabitem", "tabitemcontrol")

@@ -27,3 +27,4 @@ See [DEVELOPERS.md](DEVELOPERS.md) for the project overview, architecture, and t
 - Don't be a yes-man or a sycophant.
 - Explain what you're doing in simple terms as you're doing it, as if you're actually teaching me.
 - As much as possible when you're responding, talk as simple as possible.
+- Explain your solutions to problems clearly.
