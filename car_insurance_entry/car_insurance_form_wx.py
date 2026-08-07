@@ -110,7 +110,6 @@ class CarInsuranceFrame(wx.Frame):
         self.SetBackgroundColour(ACCENT_LT)
 
         self._controls: dict = {}       # field_name → widget
-        self._checkbox_defaults: dict = {}  # field_name → declared default (True/False)
         self._accessibles: list = []    # hold _CtrlAccessible refs — prevents Python GC freeing them
         self._record_counter: int = 0   # increments on each Submit & New
 
@@ -289,7 +288,6 @@ class CarInsuranceFrame(wx.Frame):
         ctrl.SetFont(_font(*FONT_LABEL))
         ctrl.SetValue(default)
         self._controls[name] = ctrl
-        self._checkbox_defaults[name] = default
         return ctrl
 
     def _check_row(self, parent, sizer, checks: list):
@@ -855,25 +853,41 @@ class CarInsuranceFrame(wx.Frame):
             return ""
 
     def _clear_all_fields(self):
-        """Reset every control to its blank / default state.
+        """Reset every control to blank. Checkboxes always reset to
+        UNCHECKED regardless of their construction-time default — direct
+        user spec 2026-08-08: "When I press Submit I want all the checked
+        checkboxes to become unchecked."
 
-        Checkboxes reset to their DECLARED default (self._checkbox_defaults,
-        set at construction time in _check()), not unconditionally to False.
-        Found live 2026-08-08, reported directly: "Submit button doesnt reset
-        Checkboxes." Three checkboxes are declared default=True (Paperless /
-        e-Delivery, Uninsured/Underinsured Motorist, Auto-Pay Enrolled) —
-        checked on the form's first load, matching every record's own data
-        (all three answer "checked" for every record). Submit's reset used to
-        blanket-set every checkbox to False regardless of its own default, so
-        record 2 onward opened with these three WRONGLY unchecked — a fresh
-        form should look like the form did when it first loaded, not like
-        every checkbox got manually unchecked.
+        (An earlier version of this method restored each checkbox to its
+        own declared default instead — wrong call, corrected same day.)
+
+        Also found the same day, investigating why even the ORIGINAL plain
+        ctrl.SetValue(False) wasn't visibly working: the agent checks boxes
+        via a raw Win32 BM_SETCHECK message sent directly to the native
+        control (agent.py does this deliberately — "pyautogui clicks don't
+        toggle wx checkboxes"), bypassing wx's own click/event pipeline
+        entirely. wx's Python-level CheckBox object never observes that
+        change, so its cached internal value can silently disagree with
+        the REAL native/visual state — and ctrl.SetValue(False) only
+        reliably syncs wx's own model, not necessarily the native control,
+        when the two have already diverged this way. Sending BM_SETCHECK
+        directly here forces the actual native widget unchecked regardless
+        of how it got checked in the first place (a real click, wx-level
+        code, or the agent's own raw message) — matching the same
+        mechanism the agent already relies on to check them.
         """
         for name, ctrl in self._controls.items():
             if isinstance(ctrl, wx.TextCtrl):
                 ctrl.SetValue("")
             elif isinstance(ctrl, wx.CheckBox):
-                ctrl.SetValue(self._checkbox_defaults.get(name, False))
+                ctrl.SetValue(False)
+                try:
+                    import win32api
+                    BM_SETCHECK = 0x00F1
+                    BST_UNCHECKED = 0
+                    win32api.SendMessage(ctrl.GetHandle(), BM_SETCHECK, BST_UNCHECKED, 0)
+                except Exception:
+                    pass
             elif isinstance(ctrl, wx.Choice) and ctrl.GetCount() > 0:
                 ctrl.SetSelection(0)
 
