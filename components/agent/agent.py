@@ -379,6 +379,31 @@ def _find_element_by_id(elements: List[Dict[str, Any]], element_id: Optional[str
     return next((e for e in elements if e.get("element_id") == element_id), None)
 
 
+def _is_leave_blank_prediction(prediction: Dict[str, Any]) -> bool:
+    """
+    True only when `prediction` is still actually a type/keyboard action AND
+    its resolved text means "leave this field empty" (blank / none / n-a /
+    "leave blank ..."). Callers should Tab past + mark-attempted only when
+    this returns True.
+
+    Found 2026-08-07, live: `_merge()` can silently turn a "type" decision
+    into a "click" (comboboxes need a click to open their dropdown before a
+    value can be selected). A click prediction has no "text" key at all, so
+    naively checking `prediction.get("text")` after that override always
+    reads as empty and looks exactly like "leave blank" — even when the LLM
+    correctly resolved a real value (e.g. 'Sport 2.0T'). That falsely
+    Tab-skipped away before the click could even open the dropdown, and the
+    transformer then clicked straight back onto the same combobox next step
+    — a confirmed live infinite loop. Gating on action_type=="keyboard" first
+    means a click override is never mistaken for a deliberate leave-blank.
+    """
+    if prediction.get("action_type") != "keyboard":
+        return False
+    txt  = (prediction.get("text") or "").strip()
+    norm = txt.lower().strip().strip("()").strip()
+    return (not txt) or norm in {"none", "n/a", "na"} or norm.startswith("leave blank")
+
+
 def _verify_fill_matches(elements_after: List[Dict[str, Any]],
                           focused_id: Optional[str],
                           expected_text: str) -> bool:
@@ -1801,10 +1826,9 @@ class LLMAgent:
                     # Leave-blank guard: if the resolved value means "leave empty"
                     # (record said '(leave blank)' / none / n-a, possibly with a note),
                     # DON'T type the placeholder literally — Tab past + mark attempted.
-                    # Generic (substring match, no field names).
-                    _txt  = (prediction.get("text") or "").strip()
-                    _norm = _txt.lower().strip().strip("()").strip()
-                    if (not _txt) or _norm in {"none", "n/a", "na"} or _norm.startswith("leave blank"):
+                    # See _is_leave_blank_prediction for why this must gate on
+                    # action_type=="keyboard" first (a live infinite-loop fix).
+                    if _is_leave_blank_prediction(prediction):
                         logger.info("[OPT2] %r → leave-blank/empty — Tab past (skip).", _flabel)
                         if _fe2 is not None:
                             self._mark_attempted(_fe2, elements=state.get("elements", []))
