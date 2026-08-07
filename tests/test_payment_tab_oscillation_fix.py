@@ -56,12 +56,17 @@ def _edit(label="Last Payment Amount ($)", element_id="e1"):
 
 
 def _compute_t_is_type(agent, fe, elements):
-    """Mirrors the CURRENT _t_is_type computation in agent.py's run()."""
+    """Mirrors the CURRENT _t_is_type computation in agent.py's run() --
+    attempted-exclusion scoped to checkboxes only (see the REGRESSION note
+    in agent.py right above _fe2_chk_attempted for why)."""
     fe_ty  = (fe.get("type") or "").lower() if fe else ""
     fe_val = (fe.get("value") or "").strip() if fe else ""
-    fe_attempted = bool(fe) and agent._attempt_key(fe, elements=elements) in agent._attempted_keys
+    fe_chk_attempted = (
+        bool(fe) and fe_ty in ("checkboxcontrol", "checkbox")
+        and agent._attempt_key(fe, elements=elements) in agent._attempted_keys
+    )
     return (fe_ty in ("editcontrol", "input", "comboboxcontrol", "checkboxcontrol", "checkbox")
-            and not fe_val and not fe_attempted)
+            and not fe_val and not fe_chk_attempted)
 
 
 class TestAttemptedCheckboxNoLongerReEntersFillBranch:
@@ -87,17 +92,7 @@ class TestAttemptedCheckboxNoLongerReEntersFillBranch:
 
         assert _compute_t_is_type(agent, cbox, elements) is False
 
-    def test_attempted_edit_field_is_also_excluded(self):
-        """Same principle applies to any field type this decision governs,
-        not just checkboxes."""
-        agent = self._make_agent()
-        field = _edit()
-        elements = [field]
-        agent._mark_attempted(field, elements=elements)
-
-        assert _compute_t_is_type(agent, field, elements) is False
-
-    def test_a_different_unattempted_field_is_unaffected(self):
+    def test_a_different_unattempted_checkbox_is_unaffected(self):
         agent = self._make_agent()
         cbox = _checkbox(label="Auto-Pay Enrolled", element_id="cb1")
         other = _checkbox(label="Paperless Billing", element_id="cb2")
@@ -105,6 +100,54 @@ class TestAttemptedCheckboxNoLongerReEntersFillBranch:
         agent._mark_attempted(cbox, elements=elements)
 
         assert _compute_t_is_type(agent, other, elements) is True
+
+
+class TestAttemptedEditOrComboboxFieldsStayFillable:
+    """REGRESSION, found live 2026-08-07 in the run immediately after the
+    first version of this fix shipped ("Got considerably worse... did you
+    save the best run?"). The first version excluded ANY already-attempted
+    field, not just checkboxes. That broke editcontrol/comboboxcontrol:
+    clicking one just to bring it into FOCUS (e.g. the low-confidence-
+    fallback escalation's direct click) makes _record_attempt() mark it
+    attempted immediately, before any value is ever typed. Confirmed in the
+    log: 'Expiration Date' was clicked exactly once by the escalation fix
+    and never mentioned again for the rest of the run -- never filled.
+    A checkbox click IS the fill action, so excluding attempted checkboxes
+    is correct; a text/combobox click is just navigation, so the same
+    exclusion for them was wrong. These fields must stay fillable purely
+    based on `not fe_val` -- attempted-but-still-empty must NOT block them."""
+
+    def _make_agent(self):
+        return LLMAgent(goal="test goal", dry_run=True, max_steps=1)
+
+    def test_attempted_but_still_empty_edit_field_stays_fillable(self):
+        agent = self._make_agent()
+        field = _edit()   # value="" -- was clicked/focused, never typed into
+        elements = [field]
+        agent._mark_attempted(field, elements=elements)   # e.g. escalation's navigate-click
+
+        assert _compute_t_is_type(agent, field, elements) is True
+
+    def test_attempted_but_still_empty_combobox_stays_fillable(self):
+        agent = self._make_agent()
+        cbox = {"element_id": "cb1", "type": "comboboxcontrol", "label": "Agent ID",
+                "text": "Agent ID", "value": "", "bbox": [900, 500, 1100, 530],
+                "window_role": "active"}
+        elements = [cbox]
+        agent._mark_attempted(cbox, elements=elements)
+
+        assert _compute_t_is_type(agent, cbox, elements) is True
+
+    def test_edit_field_with_a_real_value_is_still_correctly_excluded(self):
+        """Unaffected by the fix: a genuinely-filled edit field (non-empty
+        value) was already excluded by `not fe_val` before any of this --
+        the checkbox-scoped attempted-check doesn't change that."""
+        agent = self._make_agent()
+        field = _edit()
+        field["value"] = "PAI-2026-00441"
+        elements = [field]
+
+        assert _compute_t_is_type(agent, field, elements) is False
 
 
 class TestPreMergeLeaveBlankCheck:

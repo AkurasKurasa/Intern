@@ -1943,24 +1943,37 @@ class LLMAgent:
                 # semantics, not form-specific rules.
                 _fe2_ty  = (_fe2.get("type") or "").lower() if _fe2 else ""
                 _fe2_val = (_fe2.get("value") or "").strip() if _fe2 else ""
-                # Exclude already-attempted fields — critical for checkboxes: ui_observer
-                # never reports a real checked/unchecked state via ValuePattern (wx.CheckBox
-                # doesn't expose it), so a checkbox's `value` reads empty FOREVER, checked or
-                # not. Without this, _t_is_type is unconditionally True for any focused
-                # checkbox, attempted or not, forcing the full ask_llm->merge->click dance
-                # EVERY time focus lands there, relying entirely on a downstream Win32
-                # BM_GETCHECK guard to catch the redundant click and convert it to Tab.
-                # Confirmed live 2026-08-07 ("we reached Payment tab, but there was a loop
-                # at the end"): 'Auto-Pay Enrolled' (already correctly checked) and 'Last
-                # Payment Amount' (legitimately blank) oscillated for 18+ steps at the end
-                # of the run. Same principle as execution_attempted_combobox_position_drift,
-                # applied at the fill-branch's entry condition instead of one specific
-                # sub-handler, so it covers every field type this decision governs.
-                _fe2_attempted = bool(_fe2) and self._attempt_key(
-                    _fe2, elements=state.get("elements", [])) in self._attempted_keys
+                # Exclude already-attempted CHECKBOXES specifically — ui_observer never
+                # reports a real checked/unchecked state via ValuePattern (wx.CheckBox
+                # doesn't expose it), so a checkbox's `value` reads empty FOREVER, checked
+                # or not, and `not _fe2_val` alone can never recognize "already done" for
+                # this one type. Confirmed live 2026-08-07 ("we reached Payment tab, but
+                # there was a loop at the end"): 'Auto-Pay Enrolled' (already correctly
+                # checked) oscillated with 'Last Payment Amount' for 18+ steps.
+                #
+                # REGRESSION, found live 2026-08-07 in the VERY NEXT run ("Got considerably
+                # worse... did you save the best run?"): this check was first written to
+                # cover editcontrol/comboboxcontrol too, not just checkboxes. That broke
+                # them — clicking a text/combobox field to bring it into FOCUS (e.g. the
+                # low-confidence-fallback escalation's direct click, execution_lowconf_
+                # navprotocol_escalation) makes _record_attempt() mark it attempted
+                # immediately, before any value is ever typed into it. For a checkbox a
+                # click IS the fill action, so that's correct; for an editcontrol/combobox
+                # a click is just navigation — the field stayed genuinely empty but was
+                # permanently excluded from ever being filled again. Confirmed in the log:
+                # 'Expiration Date' was clicked exactly once, by the escalation fix, and
+                # never mentioned again for the rest of the run — never typed into.
+                # editcontrol/comboboxcontrol don't need this at all: `not _fe2_val` is
+                # already accurate for them (typing/selecting genuinely changes `value`,
+                # a bare click doesn't) — scoped to checkboxes only, where it's the only
+                # type this gap actually applies to.
+                _fe2_chk_attempted = (
+                    bool(_fe2) and _fe2_ty in ("checkboxcontrol", "checkbox")
+                    and self._attempt_key(_fe2, elements=state.get("elements", [])) in self._attempted_keys
+                )
                 _t_is_type = (_fe2_ty in ("editcontrol", "input", "comboboxcontrol",
                                           "checkboxcontrol", "checkbox")
-                              and not _fe2_val and not _fe2_attempted)
+                              and not _fe2_val and not _fe2_chk_attempted)
 
                 if _t_is_type and self._llm_client:
                     _lowconf_fallback_streak = 0   # real progress — a fillable target is focused
