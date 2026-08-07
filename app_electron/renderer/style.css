@@ -174,6 +174,11 @@ html, body {
   display: flex; flex-direction: column; align-items: center; justify-content: center;
   gap: 14px;
 }
+/* JS toggles visibility via the `hidden` attribute, but an author-stylesheet
+   `display` rule always beats the browser's built-in [hidden]{display:none}
+   default regardless of specificity — without this, both panels stayed
+   permanently stacked on top of each other no matter what `hidden` was set to. */
+.empty-state[hidden], .mid-panel[hidden] { display: none; }
 .empty-mark {
   width: 52px; height: 52px; border-radius: 14px;
   background: var(--chip-bg); color: var(--dim);
