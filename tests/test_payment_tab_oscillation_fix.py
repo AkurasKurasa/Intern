@@ -56,17 +56,16 @@ def _edit(label="Last Payment Amount ($)", element_id="e1"):
 
 
 def _compute_t_is_type(agent, fe, elements):
-    """Mirrors the CURRENT _t_is_type computation in agent.py's run() --
-    attempted-exclusion scoped to checkboxes only (see the REGRESSION note
-    in agent.py right above _fe2_chk_attempted for why)."""
+    """Mirrors the CURRENT _t_is_type computation in agent.py's run():
+    checkbox-only attempted exclusion, PLUS any-type exclusion for fields
+    explicitly confirmed leave-blank (self._leave_blank_keys)."""
     fe_ty  = (fe.get("type") or "").lower() if fe else ""
     fe_val = (fe.get("value") or "").strip() if fe else ""
-    fe_chk_attempted = (
-        bool(fe) and fe_ty in ("checkboxcontrol", "checkbox")
-        and agent._attempt_key(fe, elements=elements) in agent._attempted_keys
-    )
+    fe_key = agent._attempt_key(fe, elements=elements) if fe else None
+    fe_chk_attempted = bool(fe) and fe_ty in ("checkboxcontrol", "checkbox") and fe_key in agent._attempted_keys
+    fe_confirmed_blank = bool(fe) and fe_key in agent._leave_blank_keys
     return (fe_ty in ("editcontrol", "input", "comboboxcontrol", "checkboxcontrol", "checkbox")
-            and not fe_val and not fe_chk_attempted)
+            and not fe_val and not fe_chk_attempted and not fe_confirmed_blank)
 
 
 class TestAttemptedCheckboxNoLongerReEntersFillBranch:
@@ -187,3 +186,59 @@ class TestPreMergeLeaveBlankCheck:
         checked, matching the real code's condition."""
         llm_action = {"action_type": "click", "click_position": [500, 500]}
         assert llm_action.get("action_type") not in ("type", "keyboard")
+
+
+class TestConfirmedBlankFieldsStopReenteringTheFillBranch:
+    """Found live 2026-08-07, the run immediately after the checkbox-only
+    regression fix: 'Last Payment Amount' and 'Last Payment Date' (both
+    editcontrol, genuinely blank per the record) got correctly Tab-skipped
+    via the pre-merge leave-blank check EVERY time focus landed there, but
+    nothing stopped them from being re-asked about again and again --
+    their `value` can never become non-empty by design, so the checkbox-
+    only attempted exclusion doesn't cover them, and each re-ask pays a
+    full ~2s LLM round-trip. self._leave_blank_keys (populated only by a
+    genuine, deliberate leave-blank decision -- never by a bare navigation
+    click, which is exactly what the earlier regression was about) closes
+    this for any field type."""
+
+    def _make_agent(self):
+        return LLMAgent(goal="test goal", dry_run=True, max_steps=1)
+
+    def test_confirmed_blank_edit_field_no_longer_a_fill_target(self):
+        agent = self._make_agent()
+        field = _edit(label="Last Payment Amount ($)")
+        elements = [field]
+        key = agent._attempt_key(field, elements=elements)
+        agent._leave_blank_keys.add(key)
+
+        assert _compute_t_is_type(agent, field, elements) is False
+
+    def test_confirmed_blank_combobox_no_longer_a_fill_target(self):
+        agent = self._make_agent()
+        cbox = {"element_id": "cb1", "type": "comboboxcontrol", "label": "Suffix",
+                "text": "Suffix", "value": "", "bbox": [1400, 240, 1600, 260], "window_role": "active"}
+        elements = [cbox]
+        key = agent._attempt_key(cbox, elements=elements)
+        agent._leave_blank_keys.add(key)
+
+        assert _compute_t_is_type(agent, cbox, elements) is False
+
+    def test_field_merely_clicked_for_navigation_is_unaffected(self):
+        """The critical distinction from the earlier regression: attempted
+        (clicked) alone must NOT exclude a text/combobox field -- only an
+        explicit leave-blank decision (a separate set) does."""
+        agent = self._make_agent()
+        field = _edit(label="Expiration Date")
+        elements = [field]
+        agent._mark_attempted(field, elements=elements)   # navigation click only
+
+        assert _compute_t_is_type(agent, field, elements) is True
+
+    def test_a_different_unconfirmed_field_is_unaffected(self):
+        agent = self._make_agent()
+        confirmed = _edit(label="Last Payment Amount ($)", element_id="e1")
+        other = _edit(label="Last Payment Date", element_id="e2")
+        elements = [confirmed, other]
+        agent._leave_blank_keys.add(agent._attempt_key(confirmed, elements=elements))
+
+        assert _compute_t_is_type(agent, other, elements) is True

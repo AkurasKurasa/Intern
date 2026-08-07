@@ -898,6 +898,25 @@ class LLMAgent:
         # boundary alongside self._attempted_keys, so a fresh record's tabs
         # aren't pre-blocked by the previous record's history.
         self._advance_blacklist_pos: set    = set()
+        # Fields explicitly confirmed leave-blank (LLM/lookup said "nothing
+        # goes here" and we deliberately skipped it) — distinct from
+        # self._attempted_keys, which also includes fields merely CLICKED
+        # for navigation with no decision ever made about them (that
+        # distinction is exactly what execution_payment_tab_oscillation_fix's
+        # regression was about). Found live 2026-08-07, next run after that
+        # regression fix: 'Last Payment Amount'/'Last Payment Date' (both
+        # editcontrol, genuinely blank per the record) got correctly
+        # Tab-skipped every time via the pre-merge leave-blank check, but
+        # _t_is_type's checkbox-only attempted exclusion doesn't cover
+        # editcontrol/comboboxcontrol -- so a legitimately-blank field's
+        # `value` can NEVER become non-empty by design, meaning it re-enters
+        # the fill branch and pays a full ~2s LLM round-trip EVERY time focus
+        # lands there again, forever. Checked here (any field type) in
+        # addition to the checkbox-only attempted check, so a genuine
+        # decision (real value typed, checkbox toggled, OR explicit
+        # leave-blank) always sticks — only an undecided navigation click
+        # doesn't.
+        self._leave_blank_keys: set         = set()
         self._current_tab_idx: int          = start_tab_idx  # tracks which tab we're on
         self._guidance: str = ""
         self._task_name: str = ""   # set via run(task_name=...)
@@ -1967,13 +1986,23 @@ class LLMAgent:
                 # already accurate for them (typing/selecting genuinely changes `value`,
                 # a bare click doesn't) — scoped to checkboxes only, where it's the only
                 # type this gap actually applies to.
+                _fe2_key = self._attempt_key(_fe2, elements=state.get("elements", [])) if _fe2 else None
                 _fe2_chk_attempted = (
                     bool(_fe2) and _fe2_ty in ("checkboxcontrol", "checkbox")
-                    and self._attempt_key(_fe2, elements=state.get("elements", [])) in self._attempted_keys
+                    and _fe2_key in self._attempted_keys
                 )
+                # Any field type, deliberately confirmed leave-blank earlier this record
+                # (see self._leave_blank_keys' own comment) — re-asking is guaranteed to
+                # get the same "nothing goes here" answer every time, at the cost of a
+                # full LLM round-trip per visit. Found live 2026-08-07, next run after
+                # the checkbox-only regression fix: 'Last Payment Amount'/'Last Payment
+                # Date' (editcontrol, genuinely blank) got correctly Tab-skipped each
+                # time but kept re-entering the fill branch forever, since their `value`
+                # can never become non-empty by design.
+                _fe2_confirmed_blank = bool(_fe2) and _fe2_key in self._leave_blank_keys
                 _t_is_type = (_fe2_ty in ("editcontrol", "input", "comboboxcontrol",
                                           "checkboxcontrol", "checkbox")
-                              and not _fe2_val and not _fe2_chk_attempted)
+                              and not _fe2_val and not _fe2_chk_attempted and not _fe2_confirmed_blank)
 
                 if _t_is_type and self._llm_client:
                     _lowconf_fallback_streak = 0   # real progress — a fillable target is focused
@@ -2029,6 +2058,12 @@ class LLMAgent:
                                     _flabel)
                         if _fe2 is not None:
                             self._mark_attempted(_fe2, elements=state.get("elements", []))
+                            # Distinct from _attempted_keys (see self._leave_blank_keys'
+                            # own comment) -- this is a genuine, deliberate "nothing
+                            # goes here" decision, not just a navigation click, so it
+                            # must stick regardless of field type.
+                            self._leave_blank_keys.add(
+                                self._attempt_key(_fe2, elements=state.get("elements", [])))
                         self._executor.execute({"action_type": "keyboard",
                                                 "key_count": 1, "keystrokes": ["tab"]})
                         time.sleep(self.step_delay * 0.4)
@@ -3306,6 +3341,7 @@ class LLMAgent:
             if self._record_num != self._attempted_record_num:
                 self._attempted_keys.clear()
                 self._advance_blacklist_pos.clear()
+                self._leave_blank_keys.clear()
                 self._attempted_record_num = self._record_num
             sample = list(rec.items())[:5]
             logger.info("Record cache refreshed: %d fields for record %d  sample=%r",
