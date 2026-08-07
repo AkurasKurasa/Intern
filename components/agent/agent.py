@@ -429,6 +429,64 @@ def _gate_low_confidence_click(
 
 _LISTITEM_TYPES = {"listitem", "listitemcontrol"}
 
+# Generic submit-button keywords — any button whose visible text/label contains
+# one of these is treated as "the way to finish this record", on any form this
+# agent is pointed at. No form-specific button text (e.g. "Submit") is assumed
+# anywhere else in the file; this is the one shared, reusable set.
+_SUBMIT_KW = {"submit", "save", "ok", "accept", "done", "finish", "new"}
+
+
+def _find_submit_button(elements: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    """First button-type element whose text/label matches _SUBMIT_KW, or None.
+    Deliberately does NOT filter by window_role — on this form (and likely
+    others), the submit button lives on the main window, tagged "background"
+    by the state scanner, so filtering it out here would just miss it."""
+    return next(
+        (e for e in elements
+         if e.get("type") in ("buttoncontrol", "button")
+         and e.get("bbox")
+         and any(kw in (e.get("text") or e.get("label") or "").lower() for kw in _SUBMIT_KW)),
+        None,
+    )
+
+
+_TAB_PANEL_TYPES = {"editcontrol", "comboboxcontrol", "checkboxcontrol",
+                     "buttoncontrol", "button", "panecontrol"}
+
+
+def _detect_active_tab_idx_raw(tabs: List[Dict[str, Any]],
+                                all_elems: List[Dict[str, Any]]) -> Optional[int]:
+    """
+    Which tab (by index into `tabs`) is actually visible on screen right now,
+    or None if no tab's panel could be confirmed. wx moves inactive tab panels
+    to negative screen coordinates, so the active tab is the one whose panel
+    has at least one real, on-screen (bbox[1] >= 0, below the tab strip)
+    interactive element. No hardcoded tab names or count — works for any
+    tabbed form.
+
+    Extracted 2026-08-08 from _try_advance_tab so it can ALSO be used at
+    startup to verify drill mode's assumed start_tab_idx against reality —
+    see LLMAgent.run()'s own startup-verification block for why that case
+    needs the OPPOSITE trust rule from _try_advance_tab's mid-run one (this
+    function itself is neutral — callers decide what "disagreement" means).
+    """
+    for _tii, _tab_el in enumerate(tabs):
+        _tbbox = _tab_el.get("bbox")
+        if not _tbbox:
+            continue
+        _tab_cy = (_tbbox[1] + _tbbox[3]) / 2
+        _panel_elems = [
+            e for e in all_elems
+            if e.get("window_role") != "background"
+            and e.get("bbox")
+            and e["bbox"][1] >= 0
+            and e["bbox"][1] > _tab_cy   # below the tab strip
+            and e.get("type") in _TAB_PANEL_TYPES
+        ]
+        if _panel_elems:
+            return _tii
+    return None
+
 
 def _open_dropdown_items(elements: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """
@@ -1119,6 +1177,41 @@ class LLMAgent:
             observe_time_sec = _t_observed - _step_t0
             if self._locked_hwnd is None:
                 self._lock_form_window(state)
+
+            # Verify the assumed starting tab against reality, once, on the very
+            # first step. self._current_tab_idx starts out as whatever
+            # start_tab_idx claimed (0 normally, or --start_tab N in drill mode)
+            # — that value is NEVER independently checked, it's just trusted.
+            # Found live 2026-08-08, discussed with the user while investigating
+            # execution_advance_blacklist's tab-tracking: drill mode depends on
+            # the human clicking the right tab BEFORE launching — a typo'd
+            # --start_tab, a missed click, or a click that hadn't registered
+            # yet would leave the tracker wrong from step 1, and everything
+            # downstream that trusts it (the backward-tab-click guard included)
+            # would reason from a false premise for the entire run. Unlike
+            # _try_advance_tab's OWN mid-run mismatch handling (which trusts the
+            # tracker over detection, since mid-run noise from a JUST-completed
+            # transition is the normal case) — at this single, fresh, settled
+            # first observation there's no transition noise to distrust
+            # detection for, so here detection wins and the tracker is corrected
+            # to match it, loudly.
+            if step_idx == 0:
+                _boot_tabs = [e for e in state.get("elements", [])
+                              if e.get("type") in ("tabitem", "tabitemcontrol")
+                              and e.get("window_role") != "background"
+                              and e.get("bbox")]
+                _boot_detected = _detect_active_tab_idx_raw(_boot_tabs, state.get("elements", []))
+                if _boot_detected is not None and _boot_detected != self._current_tab_idx:
+                    logger.warning(
+                        "Startup tab check: assumed idx=%d (start_tab_idx) but the form is "
+                        "actually showing idx=%d %r — correcting the tracker to match reality.",
+                        self._current_tab_idx, _boot_detected,
+                        (_boot_tabs[_boot_detected].get("text")
+                         or _boot_tabs[_boot_detected].get("label") or "?") if _boot_tabs else "?")
+                    self._current_tab_idx = _boot_detected
+                elif _boot_detected is not None:
+                    logger.info("Startup tab check: confirmed idx=%d matches reality.", _boot_detected)
+
             llm_action: Dict[str, Any] = {}
             _steps_on_tab += 1
             _cur_elem_count = len(state.get("elements", []))
@@ -2674,7 +2767,6 @@ class LLMAgent:
                     except Exception as _ce:
                         logger.warning("BM_SETCHECK failed for %r: %s", _chk_label, _ce)
 
-                _SUBMIT_KW = {"submit", "save", "ok", "accept", "done", "finish", "new"}
                 # NOTE: do NOT filter by window_role here — Submit/Submit & New buttons live
                 # on the main form window which is tagged "background" by the state scanner,
                 # and we must block clicks on them regardless of their window role.
@@ -4621,37 +4713,13 @@ class LLMAgent:
             if not tabs:
                 return False
 
-        # Detect the active tab by finding which tab's elements have positive
-        # screen coordinates.  wx moves inactive tab panels to negative coords,
-        # so any tab whose children have bbox[1] >= 0 is the active one.
-        # No hardcoded tab names — works for any tabbed form.
-        _active_idx = self._current_tab_idx  # fallback
+        # Detect the active tab (see _detect_active_tab_idx_raw's own docstring
+        # for the mechanism). Mid-run, a detection/tracker MISMATCH is treated as
+        # noise and the tracker wins — see that function's caller-guidance note
+        # for why this differs from the fresh-startup case.
         _all_elems  = state.get("elements", [])
-        for _tii, _tab_el in enumerate(tabs):
-            _tbbox = _tab_el.get("bbox")
-            if not _tbbox:
-                continue
-            _tab_cx = (_tbbox[0] + _tbbox[2]) / 2
-            _tab_cy = (_tbbox[1] + _tbbox[3]) / 2
-            # Check if any interactive element is spatially "below" this tab header
-            # and has a positive y — meaning it belongs to an on-screen panel.
-            _panel_elems = [
-                e for e in _all_elems
-                if e.get("window_role") != "background"
-                and e.get("bbox")
-                and e["bbox"][1] >= 0
-                and e["bbox"][1] > _tab_cy   # below the tab strip
-                and e.get("type") in (
-                    "editcontrol", "comboboxcontrol", "checkboxcontrol",
-                    "buttoncontrol", "button", "panecontrol",
-                )
-            ]
-            if _panel_elems:
-                _active_idx = _tii
-                break
-        # Sanity check: pane detection must stay within one step of the tracked index.
-        # Jumping ahead OR falling behind the tracker is BoundingRectangle noise from
-        # inactive panels that briefly have positive coordinates.  Trust the tracker.
+        _detected   = _detect_active_tab_idx_raw(tabs, _all_elems)
+        _active_idx = _detected if _detected is not None else self._current_tab_idx
         if _active_idx != self._current_tab_idx:
             logger.warning(
                 "_try_advance_tab: pane detection drifted (detected=%d, tracked=%d) — using tracker.",
@@ -4663,8 +4731,49 @@ class LLMAgent:
 
         next_idx = _active_idx + 1
         if next_idx >= len(tabs):
-            logger.info("Stuck guard: already on last tab (%d tabs total) — signalling done.",
+            # Found live 2026-08-08, directly reported: "that's good. The only
+            # problem is that it didn't submit." The log already said
+            # "signalling done" right here — but that was only ever a LOG
+            # MESSAGE, no caller ever acted on it; every call site just
+            # treats a False return as "advance failed", falls through to
+            # normal per-step processing, and hopes the transformer someday
+            # clicks Submit on its own (it doesn't reliably learn to, and
+            # never has in any run this session). This is the one place in
+            # the whole file that already knows, with certainty, "there is no
+            # next tab AND this tab's own content is exhausted" (callers only
+            # reach here via the stuck/drought guards and Navigation
+            # Protocol's ADVANCE_TAB, all of which already confirmed
+            # scrolling reveals nothing new) — the exact, generic condition
+            # for "finished, click the way to finish this record." Reuses
+            # _find_submit_button()/_SUBMIT_KW (the same generic keyword
+            # matching already used elsewhere to BLOCK premature submit
+            # clicks) — no form-specific button text, tab name, or tab count
+            # assumed; this applies to any tabbed form with a submit-like
+            # button, driven purely by tab POSITION (last) and Navigation
+            # Protocol's own exhaustion signal, both already form-agnostic.
+            logger.info("Stuck guard: already on last tab (%d tabs total) — exhausted.",
                         len(tabs))
+            _submit_btn = _find_submit_button(state.get("elements", []))
+            if _submit_btn:
+                _sb1, _sy1, _sb2, _sy2 = _submit_btn["bbox"]
+                _sname = (_submit_btn.get("text") or _submit_btn.get("label") or "?").strip()
+                logger.info("Stuck guard: last tab exhausted — clicking %r @ (%.0f, %.0f).",
+                            _sname, (_sb1 + _sb2) / 2, (_sy1 + _sy2) / 2)
+                self._executor.execute({"action_type": "click",
+                                        "click_position": [(_sb1 + _sb2) / 2, (_sy1 + _sy2) / 2]})
+                # car_insurance_form_wx.py's own _on_submit() always resets to
+                # tab 0 — force the agent's own tracking to match immediately
+                # rather than relying on the record-boundary reset (which
+                # depends on self._record_num, never incremented anywhere in
+                # this file, so it wouldn't fire here). Without this, the
+                # backward-tab-click guard (execution_backward_tab_click_guard)
+                # would wrongly block the legitimate next click onto tab 0 for
+                # whatever the run does next, mistaking the post-submit reset
+                # for the exact erroneous backward jump it exists to catch.
+                self._current_tab_idx = 0
+                return True
+            logger.info("Stuck guard: last tab exhausted, but no submit-like button found — "
+                        "signalling done.")
             return False
 
         next_tab = tabs[next_idx]
