@@ -69,7 +69,13 @@ PROVIDER      = "lmstudio"    # anthropic | groq | gemini | lmstudio | none
 API_KEY       = os.environ.get("ANTHROPIC_API_KEY", "")
 GROQ_API_KEY  = os.environ.get("GROQ_API_KEY", "")
 SOURCE_WINDOW = "Notepad"     # title fragment of the data source window
-MAX_STEPS     = 200
+MAX_STEPS     = 1000  # was 200 -- hard ceiling that guaranteed incompletion regardless of
+                      # bug fixes. The form has 176 fields; even the best live run tonight
+                      # (after 4 real bug fixes) needed ~5-6 raw steps/field, meaning full
+                      # completion needs on the order of 800-1000+ steps, not 200. At the
+                      # old cap, running out of steps was mathematically certain no matter
+                      # how many more loop bugs got fixed. Sized with headroom, not tightly
+                      # tuned -- first real end-to-end attempt will show the real number.
 STEP_DELAY    = 1.0  # was 1.5 -- tonight's live runs showed ~2-3s/step dominated by this
                       # fixed pause, not LLM waits (fast-path lookup already made those
                       # near-free). Some settle time is genuinely load-bearing (a prior
