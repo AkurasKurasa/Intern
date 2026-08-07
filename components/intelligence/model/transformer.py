@@ -940,18 +940,38 @@ class StateEncoder(nn.Module):
     pool the elements (for sequence tokenization) or keep them per-element
     (for pointer heads that must identify a specific element).
 
+    Structured features (bbox position, control type, filled/attempted flags,
+    ...) and the text embedding are projected through separate linear layers
+    before being combined, rather than one linear layer over the full
+    concatenated vector. A single shared projection lets the 384-dim text
+    embedding — 35x the structured feature count — dominate the learned
+    representation by sheer dimensionality, which starves the fine-grained
+    positional signal the click pointer needs to tell apart same-neighborhood
+    fields with near-identical labels (e.g. "DL Expiration" vs "DL Issuing
+    State" — close in embedding space, distinct only by screen position).
+    Splitting guarantees structured features keep a fixed share of the
+    representation regardless of how large the embedding is. Not task-specific
+    — any UI has this same position-vs-label-text tradeoff.
+
     Returns:
         elem_emb : FloatTensor (B, T, d_model) — per-element embeddings
         mask     : BoolTensor  (B, T)          — True for real elements, False for padding
     """
-    def __init__(self, elem_features: int, d_model: int):
+    def __init__(self, elem_features: int, d_model: int, embed_dim: int = _EMBED_DIM):
         super().__init__()
-        self.proj = nn.Linear(elem_features, d_model)
-        self.norm = nn.LayerNorm(d_model)
+        self._struct_dim = elem_features - embed_dim
+        half = d_model // 2
+        self.struct_proj = nn.Linear(self._struct_dim, half)
+        self.embed_proj  = nn.Linear(embed_dim, d_model - half)
+        self.combine     = nn.Linear(d_model, d_model)
+        self.norm        = nn.LayerNorm(d_model)
 
     def forward(self, state: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
         mask = state[..., _REAL_ELEM_FLAG_IDX] > 0.5        # (B, T) bool — index 0 is is_real flag
-        elem_emb = self.norm(self.proj(state))               # (B, T, d_model)
+        struct_part = state[..., :self._struct_dim]
+        embed_part  = state[..., self._struct_dim:]
+        fused = torch.cat([self.struct_proj(struct_part), self.embed_proj(embed_part)], dim=-1)
+        elem_emb = self.norm(self.combine(fused))             # (B, T, d_model)
         # Zero out padding rows so the pooled sequence token (computed upstream)
         # doesn't mix padding noise into the mean.
         elem_emb = elem_emb * mask.unsqueeze(-1).float()
