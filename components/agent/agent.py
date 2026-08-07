@@ -4863,6 +4863,29 @@ class LLMAgent:
                                 _fn, _expected[:40])
                     return {"action_type": "type", "text": _expected, "_fast_path": "lookup"}
 
+                # Blank fast path, found live 2026-08-08 ("there seems to be a
+                # loop of some kind"): three separate, independent lookup
+                # attempts above (cache, refresh+retry, direct peek+retry) all
+                # came back empty for 'Account Type' — a genuinely, confidently
+                # blank field (an ACH bank-account field on a Credit Card
+                # payment record). The code used to treat "still nothing" as
+                # "ambiguous, ask the LLM" — but asking turned out to be
+                # UNRELIABLE specifically for blank fields: the same field, same
+                # step loop, got asked 4 times in a row and answered
+                # inconsistently — 'Full Coverage' (hallucinated, bled over
+                # from Policy Type) three times, then correctly 'blank' only on
+                # the fourth attempt. ~15s and 3 wrong answers wasted on a
+                # field the deterministic lookup had already exhausted three
+                # ways to check. Same trust level as the truthy fast path above
+                # (this project's own lookup-as-validator principle, already
+                # tracked as the fix for execution_llm_value_errors) — if three
+                # independent lookup attempts agree there's no data, there's
+                # nothing for the LLM to add by being asked a fourth time.
+                if _fn != "?":
+                    logger.info("LLM call skipped — direct lookup confirms %r has no record value "
+                                "(leave blank)", _fn)
+                    return {"action_type": "type", "text": "", "_fast_path": "lookup_blank"}
+
                 _expect_hint = (
                     f"\n  → EXPECTED VALUE FROM DATA SOURCES: {_expected!r}"
                     f"\n  → Use EXACTLY this string as 'text'. Do NOT modify or invent."
