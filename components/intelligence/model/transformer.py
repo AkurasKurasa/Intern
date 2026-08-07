@@ -462,6 +462,13 @@ class TrajectoryDataset(Dataset):
         self.max_elements  = max_elements
         self.hist_len      = hist_len
         self.aug_drop_prob = aug_drop_prob
+        # Toggled by train() around the val_loader pass so validation is scored on
+        # clean, unaugmented samples — element dropout makes the click choice easier
+        # (fewer confusable candidates on screen), which inflates val_click_acc if
+        # left on. Train and val share this one Dataset instance via random_split,
+        # so this is a global switch, not per-sample; safe because train()/val() run
+        # sequentially per epoch (num_workers=0, no concurrent access).
+        self._eval_mode    = False
 
         # Collect trace files as *groups* — each group is a contiguous recording
         # session whose traces are temporally adjacent.  The flat files directly
@@ -848,7 +855,7 @@ class TrajectoryDataset(Dataset):
         states = torch.stack(state_tensors)  # (H, T, F)
 
         # Augmentation block — element dropout + order shuffle
-        if self.aug_drop_prob > 0.0:
+        if self.aug_drop_prob > 0.0 and not self._eval_mode:
             states = states.clone()
 
             # Element dropout: randomly zero out UI rows across all history steps.
@@ -1371,7 +1378,9 @@ def train(
     for epoch in range(1, epochs + 1):
         _epoch_t0 = time.time()
         train_m = _run_epoch(model, train_loader, optimizer, device, lambda_click, lambda_key, label_smoothing, _class_weights)
+        dataset._eval_mode = True
         val_m   = _run_epoch(model, val_loader,   None,      device, lambda_click, lambda_key, label_smoothing, _class_weights)
+        dataset._eval_mode = False
         scheduler.step()
         _epoch_time = time.time() - _epoch_t0
         _epoch_times.append(_epoch_time)
