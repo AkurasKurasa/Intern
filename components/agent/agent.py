@@ -1065,6 +1065,15 @@ class LLMAgent:
         _pane_escape_last_field: str      = ""  # last field pane-escape tried to click
         _pane_escape_streak:     int      = 0   # consecutive tries on the same field without escaping
         _confirmed_blank_fields: set      = set()  # fields where peek found no value → treat as blank
+        # Consecutive low-confidence/invalid pointer Tab-fallbacks (OPT2 navigate
+        # branch). Found live 2026-08-07, directly from the user watching a run:
+        # "Too much wasted steps. Whenever there are no longer any targets on the
+        # screen... I need you to activate Navigation Protocol so that there will
+        # be." A single blind Tab is fine (natural model uncertainty self-corrects
+        # most of the time); several in a row with zero progress means the
+        # transformer's own pointer is stuck guessing. Reset on any confident click.
+        _lowconf_fallback_streak: int    = 0
+        _LOWCONF_FALLBACK_LIMIT: int     = 3   # matches _REPEAT_LIMIT's existing convention
         _heuristic_steps:        int      = 0      # steps decided by auto-handlers (not LLM/transformer)
         _manual_interventions:   int      = 0      # DAgger corrections the human had to make — cognitive-load proxy
         _llm_unavailable_streak: int      = 0      # consecutive "llm unavailable" — infra failure, NOT "value is blank"
@@ -1939,6 +1948,7 @@ class LLMAgent:
                               and not _fe2_val)
 
                 if _t_is_type and self._llm_client:
+                    _lowconf_fallback_streak = 0   # real progress — a fillable target is focused
                     # transformer chose to FILL → LLM supplies the value (the WHAT).
                     # LLM owns value-filling per the architecture.
                     llm_action = self._ask_llm(state)
@@ -2055,6 +2065,38 @@ class LLMAgent:
                     _pos2 = _gated_pos2
                     if _pos2 and (_pos2[0] > 1 or _pos2[1] > 1):
                         _snap2 = self._snap(_pos2, state) or _pos2
+                        # Guard against re-clicking an ALREADY-FILLED, already-attempted
+                        # combobox. Found live 2026-08-07 investigating a user report
+                        # ("Stuck on Marital Status"): the transformer's pointer drifted
+                        # back onto 'Marital Status' at ptr_conf=0.58 (correctly filled
+                        # with 'Married' 4 steps earlier) -- moderate confidence, well
+                        # above the gate floor, so nothing blocked it. A plain click on a
+                        # closed combobox TOGGLES it open (+6 elements); the VERY NEXT
+                        # step's click landed on a list-item position and closed it again
+                        # (-6 elements) via the generic path, which has no value-matching
+                        # logic at all -- unlike the dedicated fill handler, it can't tell
+                        # whether it just re-selected 'Married' or silently overwrote it
+                        # with whatever was under the cursor. The run's own metrics can't
+                        # even detect this: Value Accuracy only tracks typed text fields,
+                        # never combobox selections. Unlike the already-attempted-EMPTY-
+                        # combobox fix (execution_attempted_combobox_position_drift, which
+                        # only ever wastes a step), this is a real correctness risk, so it's
+                        # checked for ANY already-filled combobox, not just blank ones.
+                        _reclick_elem = self._elem_at(state, _snap2)
+                        if (_reclick_elem
+                                and (_reclick_elem.get("type") or "").lower() in ("comboboxcontrol", "combobox")
+                                and (_reclick_elem.get("value") or "").strip()
+                                and self._attempt_key(_reclick_elem, elements=state.get("elements", []))
+                                    in self._attempted_keys):
+                            _reclick_label = (_reclick_elem.get("label") or _reclick_elem.get("text") or "?")[:30]
+                            logger.info(
+                                "[OPT2] pointer drifted back onto already-filled combobox %r "
+                                "(value=%r) — Tab instead of risking a re-toggle overwrite.",
+                                _reclick_label, (_reclick_elem.get("value") or "")[:30])
+                            self._executor.execute({"action_type": "keyboard",
+                                                    "key_count": 1, "keystrokes": ["tab"]})
+                            time.sleep(self.step_delay * 0.4)
+                            continue
                         # COMBOBOX-AS-FILL: demos action comboboxes as CLICKS, so the
                         # model clicks them; but a plain click only toggles the
                         # dropdown → open/close oscillation. A click on an EMPTY
@@ -2225,9 +2267,57 @@ class LLMAgent:
                             prediction = {"action_type": "click", "click_position": _snap2}
                             logger.info("[OPT2] TRANSFORMER navigates → click @ (%.0f,%.0f)  ptr_conf=%.2f",
                                         _snap2[0], _snap2[1], t_pred.get("_click_conf", 0.0))
+                            _lowconf_fallback_streak = 0
                     else:
-                        prediction = {"action_type": "keyboard", "key_count": 1, "keystrokes": ["tab"]}
-                        logger.info("[OPT2] pointer invalid — Tab fallback")
+                        # Found live 2026-08-07, directly from the user watching a run:
+                        # "Too much wasted steps. Whenever there are no longer any
+                        # targets on the screen... activate Navigation Protocol so
+                        # that there will be." A single blind Tab is normal (model
+                        # uncertainty usually self-corrects); several low-confidence/
+                        # invalid pointer guesses IN A ROW with zero progress means
+                        # the transformer itself is stuck — hand navigation to the
+                        # same deterministic Navigation Protocol logic that already
+                        # decided a target exists on this screen, instead of
+                        # continuing to blind-Tab and hope.
+                        _lowconf_fallback_streak += 1
+                        if _lowconf_fallback_streak >= _LOWCONF_FALLBACK_LIMIT:
+                            _nav_vb_lc = self._form_viewport_bottom(state) - 8
+                            _target = self._navproto.find_visible_empty_target(
+                                state, _nav_vb_lc, attempted_keys=self._attempted_keys,
+                                attempt_key_fn=self._attempt_key)
+                            if _target and _target.get("bbox"):
+                                _tb = _target["bbox"]
+                                _tlabel = (_target.get("label") or _target.get("text") or "?")[:30]
+                                _tcx, _tcy = (_tb[0] + _tb[2]) / 2, (_tb[1] + _tb[3]) / 2
+                                logger.info(
+                                    "[OPT2] %d low-confidence fallbacks in a row — Navigation "
+                                    "Protocol taking over: known target %r @ (%.0f,%.0f).",
+                                    _lowconf_fallback_streak, _tlabel, _tcx, _tcy)
+                                prediction = {"action_type": "click", "click_position": [_tcx, _tcy]}
+                                _lowconf_fallback_streak = 0
+                            else:
+                                # Nothing left visible either — this IS the "no
+                                # targets on screen" case. Scroll (or advance the
+                                # tab if scrolling is already exhausted) right now
+                                # instead of another blind Tab that just burns a
+                                # step hoping natural tab-order helps.
+                                logger.info(
+                                    "[OPT2] %d low-confidence fallbacks in a row, nothing left "
+                                    "visible either — Navigation Protocol scrolling/advancing.",
+                                    _lowconf_fallback_streak)
+                                if _tab_scroll_count < _MAX_TAB_SCROLLS:
+                                    self._scroll_form_down(state)
+                                    _tab_scroll_count += 1
+                                else:
+                                    self._try_advance_tab(state)
+                                    _tab_scroll_count = 0
+                                _lowconf_fallback_streak = 0
+                                _last_auto_step = step_idx
+                                time.sleep(self.step_delay * 0.5)
+                                continue
+                        else:
+                            prediction = {"action_type": "keyboard", "key_count": 1, "keystrokes": ["tab"]}
+                            logger.info("[OPT2] pointer invalid — Tab fallback")
 
             elif self._llm_client and t_conf < _HIGH_CONF:
                 llm_action = self._ask_llm(state)

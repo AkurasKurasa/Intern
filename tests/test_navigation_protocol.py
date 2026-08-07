@@ -16,6 +16,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "components"))
 from agent.navigation_protocol import (
     NavAction, decide, has_visible_empty_target, visible_field_signature,
+    find_visible_empty_target,
 )
 
 VIEWPORT_BOTTOM = 1000.0
@@ -153,3 +154,43 @@ class TestDecide:
         state = {"elements": [_field("Field 40")]}
         d = decide(state, VIEWPORT_BOTTOM, dead_scroll_count=39, max_dead_scrolls=2)
         assert d.action == NavAction.WAIT
+
+
+class TestFindVisibleEmptyTarget:
+    """Added 2026-08-07, directly requested by the user watching a live run
+    burn steps on repeated low-confidence Tab-fallbacks: "Whenever there are
+    no longer any targets on the screen... activate Navigation Protocol so
+    that there will be." has_visible_empty_target only ever answered
+    yes/no; a caller stuck with an unconfident pointer needs the actual
+    ELEMENT to fall back to, deterministically."""
+
+    def test_returns_the_matching_element(self):
+        target = _field("First Name")
+        state = {"elements": [target]}
+        found = find_visible_empty_target(state, VIEWPORT_BOTTOM)
+        assert found is target
+
+    def test_returns_none_when_nothing_matches(self):
+        state = {"elements": [_field("First Name", value="Alice")]}
+        assert find_visible_empty_target(state, VIEWPORT_BOTTOM) is None
+
+    def test_skips_attempted_and_returns_the_next_real_target(self):
+        attempted = _field("Suffix", bbox=(100, 100, 300, 130))
+        wanted = _field("Marital Status", bbox=(100, 140, 300, 170))
+        state = {"elements": [attempted, wanted]}
+        found = find_visible_empty_target(
+            state, VIEWPORT_BOTTOM,
+            attempted_keys={"suffix"},
+            attempt_key_fn=lambda e, els: (e.get("label") or "").lower(),
+        )
+        assert found is wanted
+
+    def test_has_visible_empty_target_stays_consistent_with_find(self):
+        """The bool version is now powered by this one — same answer, no
+        drift between the two possible."""
+        state_with = {"elements": [_field("First Name")]}
+        state_without = {"elements": [_field("First Name", value="Alice")]}
+        assert has_visible_empty_target(state_with, VIEWPORT_BOTTOM) is True
+        assert find_visible_empty_target(state_with, VIEWPORT_BOTTOM) is not None
+        assert has_visible_empty_target(state_without, VIEWPORT_BOTTOM) is False
+        assert find_visible_empty_target(state_without, VIEWPORT_BOTTOM) is None

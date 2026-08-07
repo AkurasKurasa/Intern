@@ -56,20 +56,25 @@ class NavDecision:
     reason: str
 
 
-def has_visible_empty_target(
+def find_visible_empty_target(
     state: Dict[str, Any],
     viewport_bottom: float,
     attempted_keys: Optional[Set[Any]] = None,
     attempt_key_fn: Optional[Callable[[Dict[str, Any], List[Dict[str, Any]]], Any]] = None,
-) -> bool:
+) -> Optional[Dict[str, Any]]:
     """
-    True when at least one actionable, empty, not-yet-attempted field is
-    currently rendered inside the visible viewport.
+    The first actionable, empty, not-yet-attempted field currently rendered
+    inside the visible viewport, or None if there isn't one.
 
     Universal mechanic — no field names, coordinates, or app names hardcoded:
     fillable WIDGET TYPE + empty VALUE + not yet attempted + on-screen geometry.
     Off-fold fields still report real bboxes, so callers must pass the live
     viewport bottom (from the actual window rect) rather than raw screen height.
+
+    Added 2026-08-07 alongside has_visible_empty_target (which this now
+    powers) so a caller struggling to hit a target via the learned
+    transformer's own low-confidence pointer has something deterministic to
+    fall back to — the ELEMENT itself, not just a yes/no.
     """
     elements = state.get("elements", [])
     attempted_keys = attempted_keys or set()
@@ -88,8 +93,21 @@ def has_visible_empty_target(
             continue
         cy = (b[1] + b[3]) / 2
         if b[1] >= 0 and cy <= viewport_bottom:
-            return True
-    return False
+            return e
+    return None
+
+
+def has_visible_empty_target(
+    state: Dict[str, Any],
+    viewport_bottom: float,
+    attempted_keys: Optional[Set[Any]] = None,
+    attempt_key_fn: Optional[Callable[[Dict[str, Any], List[Dict[str, Any]]], Any]] = None,
+) -> bool:
+    """
+    True when at least one actionable, empty, not-yet-attempted field is
+    currently rendered inside the visible viewport.
+    """
+    return find_visible_empty_target(state, viewport_bottom, attempted_keys, attempt_key_fn) is not None
 
 
 def visible_field_signature(state: Dict[str, Any], viewport_bottom: float) -> FrozenSet[tuple]:
