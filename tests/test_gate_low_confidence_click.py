@@ -17,6 +17,14 @@ fields) at confidence 0.38-0.39, comfortably above 0.30. A wrong tab-strip
 click is far more costly than a wrong same-tab field click (it skips an
 entire tab, not one step), so tab-strip clicks now need a stricter floor
 (_TAB_CLICK_CONF_FLOOR, 0.50) — general, not specific to which tab.
+
+EXTENDED AGAIN 2026-08-07: confidence alone couldn't catch every stuck loop.
+A live run clicked the SAME empty, optional combobox 30+ times at HIGH
+confidence (0.91) — correctly recognized as "nothing to fill" every single
+time, but the handling code `continue`d immediately, bypassing the general
+repeat-action guard. Added a `blacklist` param: once a position is proven
+unproductive (tracked by the caller), the gate rejects it outright
+regardless of confidence.
 """
 import sys
 from pathlib import Path
@@ -24,7 +32,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "components"))
 
 from agent.agent import (
-    _gate_low_confidence_click, _is_tab_strip_click,
+    _gate_low_confidence_click, _is_tab_strip_click, _round_click_pos,
     _CLICK_CONF_FLOOR, _TAB_CLICK_CONF_FLOOR,
 )
 
@@ -103,3 +111,44 @@ class TestIsTabStripClick:
     def test_ignores_background_tab_elements(self):
         bg_tab = dict(_VEHICLE_TAB, window_role="background")
         assert _is_tab_strip_click([1074, 134], [bg_tab]) is False
+
+
+class TestBlacklistOverridesConfidence:
+    def test_matches_the_real_live_failure_case(self):
+        # The exact bug: HIGH confidence (0.91), same combobox, 30+ times.
+        pos = [1493, 320]
+        blacklist = {_round_click_pos(pos)}
+        assert _gate_low_confidence_click(pos, 0.91, blacklist=blacklist) is None
+
+    def test_blacklisted_position_rejected_even_with_max_confidence(self):
+        pos = [1493, 320]
+        blacklist = {_round_click_pos(pos)}
+        assert _gate_low_confidence_click(pos, 1.0, blacklist=blacklist) is None
+
+    def test_nearby_jitter_still_matches_the_blacklist_bucket(self):
+        # 10px bucketing — a couple pixels of pointer noise between two
+        # predictions of "the same" click must not dodge the blacklist.
+        blacklist = {_round_click_pos([1493, 320])}
+        assert _gate_low_confidence_click([1491, 318], 0.91, blacklist=blacklist) is None
+
+    def test_unblacklisted_position_unaffected(self):
+        pos = [700, 500]
+        blacklist = {_round_click_pos([1493, 320])}
+        assert _gate_low_confidence_click(pos, 0.91, blacklist=blacklist) is pos
+
+    def test_no_blacklist_behaves_as_before(self):
+        pos = [1493, 320]
+        assert _gate_low_confidence_click(pos, 0.91) is pos
+        assert _gate_low_confidence_click(pos, 0.91, blacklist=set()) is pos
+
+
+class TestRoundClickPos:
+    def test_buckets_to_the_nearest_10px(self):
+        assert _round_click_pos([1493, 320]) == (1490, 320)
+        assert _round_click_pos([1495, 324]) == (1500, 320)
+
+    def test_matches_the_bucketing_merge_already_uses(self):
+        # Same formula as _merge()'s own no_change blacklist — a shared
+        # convention, not a coincidence.
+        pos = [1456.7, 389.9]
+        assert _round_click_pos(pos) == (round(pos[0] / 10) * 10, round(pos[1] / 10) * 10)

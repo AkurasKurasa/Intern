@@ -48,7 +48,7 @@ import logging
 import os
 import sys
 import time
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 # ── path setup ────────────────────────────────────────────────────────────────
 _THIS_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -373,15 +373,24 @@ def _is_tab_strip_click(pos: Optional[List[float]], elements: Optional[List[Dict
     return False
 
 
+def _round_click_pos(pos: List[float]) -> Tuple[float, float]:
+    """10px-bucketed position key, matching the rounding _merge() already
+    uses for its own no_change blacklist — small pointer jitter between two
+    predictions of "the same" click shouldn't dodge the blacklist."""
+    return (round(pos[0] / 10) * 10, round(pos[1] / 10) * 10)
+
+
 def _gate_low_confidence_click(
     pos: Optional[List[float]],
     click_conf: float,
     elements: Optional[List[Dict[str, Any]]] = None,
+    blacklist: Optional[Set[Tuple[float, float]]] = None,
 ) -> Optional[List[float]]:
     """
     Returns `pos` unchanged if it's structurally invalid anyway (nothing to
-    gate) or `click_conf` clears the applicable floor; returns None if it's
-    a plausible click the model itself flagged as unreliable — the caller
+    gate) or `click_conf` clears the applicable floor and the position isn't
+    blacklisted; returns None if it's a plausible click the model itself
+    flagged as unreliable, or one already proven unproductive — the caller
     then falls back to the generic Tab-advance already used for a
     structurally invalid pointer, same as this function's own null case.
 
@@ -397,9 +406,20 @@ def _gate_low_confidence_click(
     _TAB_CLICK_CONF_FLOOR instead — see that constant's comment. `elements`
     is optional (defaults to the general floor) so existing call sites that
     can't easily supply it keep working unchanged.
+
+    `blacklist` catches a DIFFERENT failure mode confidence alone can't:
+    found live 2026-08-07, a HIGH-confidence (0.91) click landed on the same
+    empty, optional combobox 30+ times in a row — correctly recognized each
+    time as "nothing to fill here," but the code path handling that (Escape
+    + Tab + mark-attempted) `continue`d immediately, bypassing the
+    repeat-action guard that would otherwise have broken the loop. A caller
+    that tracks proven-unproductive positions (e.g. self._nochange_click_pos)
+    can pass them here so a confidently-wrong pointer gets rejected too.
     """
     if not pos or not (pos[0] > 1 or pos[1] > 1):
         return pos
+    if blacklist and _round_click_pos(pos) in blacklist:
+        return None
     floor = _TAB_CLICK_CONF_FLOOR if _is_tab_strip_click(pos, elements) else _CLICK_CONF_FLOOR
     if click_conf < floor:
         return None
@@ -1897,7 +1917,8 @@ class LLMAgent:
                     # non-Option-B merge path (agent.py's _merge(), ~L4045).
                     _click_conf2 = t_pred.get("_click_conf", 0.0)
                     _elements2   = state.get("elements", [])
-                    _gated_pos2  = _gate_low_confidence_click(_pos2, _click_conf2, elements=_elements2)
+                    _gated_pos2  = _gate_low_confidence_click(_pos2, _click_conf2, elements=_elements2,
+                                                              blacklist=self._nochange_click_pos)
                     if _gated_pos2 is None and _pos2:
                         _floor2 = (_TAB_CLICK_CONF_FLOOR if _is_tab_strip_click(_pos2, _elements2)
                                    else _CLICK_CONF_FLOOR)
@@ -1941,6 +1962,27 @@ class LLMAgent:
                                 self._mark_attempted(_cbox, elements=state.get("elements", []))
                                 self._executor.execute({"action_type": "keyboard",
                                                         "key_count": 1, "keystrokes": ["tab"]})
+                                # Fingerprint this exact outcome (position, not just
+                                # label — same defense the general repeat-guard below
+                                # uses) so a stuck loop is detected even though this
+                                # branch `continue`s past that guard's own check.
+                                # Found live 2026-08-07: attempted-marking alone didn't
+                                # stop the transformer's own high-confidence (0.91)
+                                # pointer from clicking straight back onto this same
+                                # empty combobox 30+ times — Escape+Tab correctly
+                                # recognized "nothing to fill" every time but never
+                                # actually broke the cycle. Once this exact position
+                                # repeats _REPEAT_LIMIT times, blacklist it so the
+                                # confidence gate rejects it outright next time,
+                                # regardless of how confident the model is.
+                                _cb_fp = ("combobox_empty", _round_click_pos(_snap2))
+                                _action_history.append(_cb_fp)
+                                if list(_action_history)[-_REPEAT_LIMIT:] == [_cb_fp] * _REPEAT_LIMIT:
+                                    logger.warning(
+                                        "Repeat-action guard: %r stuck empty %dx in a row — blacklisting @ (%.0f,%.0f).",
+                                        _cb_label, _REPEAT_LIMIT, _snap2[0], _snap2[1])
+                                    self._nochange_click_pos.add(_round_click_pos(_snap2))
+                                    _action_history.clear()
                                 time.sleep(self.step_delay * 0.5)
                                 continue
                             # Standard UIA "ListItem" maps to "listitem" (no "control"
