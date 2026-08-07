@@ -1943,9 +1943,24 @@ class LLMAgent:
                 # semantics, not form-specific rules.
                 _fe2_ty  = (_fe2.get("type") or "").lower() if _fe2 else ""
                 _fe2_val = (_fe2.get("value") or "").strip() if _fe2 else ""
+                # Exclude already-attempted fields — critical for checkboxes: ui_observer
+                # never reports a real checked/unchecked state via ValuePattern (wx.CheckBox
+                # doesn't expose it), so a checkbox's `value` reads empty FOREVER, checked or
+                # not. Without this, _t_is_type is unconditionally True for any focused
+                # checkbox, attempted or not, forcing the full ask_llm->merge->click dance
+                # EVERY time focus lands there, relying entirely on a downstream Win32
+                # BM_GETCHECK guard to catch the redundant click and convert it to Tab.
+                # Confirmed live 2026-08-07 ("we reached Payment tab, but there was a loop
+                # at the end"): 'Auto-Pay Enrolled' (already correctly checked) and 'Last
+                # Payment Amount' (legitimately blank) oscillated for 18+ steps at the end
+                # of the run. Same principle as execution_attempted_combobox_position_drift,
+                # applied at the fill-branch's entry condition instead of one specific
+                # sub-handler, so it covers every field type this decision governs.
+                _fe2_attempted = bool(_fe2) and self._attempt_key(
+                    _fe2, elements=state.get("elements", [])) in self._attempted_keys
                 _t_is_type = (_fe2_ty in ("editcontrol", "input", "comboboxcontrol",
                                           "checkboxcontrol", "checkbox")
-                              and not _fe2_val)
+                              and not _fe2_val and not _fe2_attempted)
 
                 if _t_is_type and self._llm_client:
                     _lowconf_fallback_streak = 0   # real progress — a fillable target is focused
@@ -1972,10 +1987,42 @@ class LLMAgent:
 
                     if llm_action.get("action_type") == "done":
                         logger.info("LLM: task complete."); break
-                    prediction = self._merge(t_pred, t_conf, llm_action, state)
-                    _decision_maker = "llm"
+
                     _flabel = ((_fe2.get("label") or _fe2.get("text") or "?")[:30]
                                if _fe2 else "(no focus)")
+
+                    # Recognize "leave blank" on llm_action BEFORE _merge() runs, not
+                    # after. _merge() overrides ANY "type" decision into a "click"
+                    # whenever the transformer's (collapsed, near-constant-confidence)
+                    # action-type head says click — regardless of whether the LLM's
+                    # intended text was real or empty. _is_leave_blank_prediction is
+                    # gated on action_type=="keyboard" specifically so a legitimate
+                    # combobox click-override is never mistaken for leave-blank (see
+                    # its own docstring) — but that gate ALSO means a genuinely empty
+                    # answer (nothing in the record for this field) never gets
+                    # recognized once merge has already turned it into a click, and
+                    # the resulting click uses the transformer's own (~69%-accurate)
+                    # pointer position, not this field's — landing almost anywhere.
+                    # Confirmed live 2026-08-07 ("we reached Payment tab, but there was
+                    # a loop at the end"): 'Last Payment Amount' had no record value,
+                    # the LLM correctly said "type" with empty text, merge overrode it
+                    # to a click at the transformer's drifted pointer position instead
+                    # of Tabbing past a legitimately blank field, contributing to an
+                    # 18+ step oscillation with 'Auto-Pay Enrolled' next to it.
+                    if llm_action.get("action_type") in ("type", "keyboard") and _is_leave_blank_prediction(
+                            {"action_type": "keyboard", "text": llm_action.get("text", "")}):
+                        logger.info("[OPT2] %r → LLM says leave-blank/empty (pre-merge) — "
+                                    "Tab past (skip), not letting merge turn this into a stray click.",
+                                    _flabel)
+                        if _fe2 is not None:
+                            self._mark_attempted(_fe2, elements=state.get("elements", []))
+                        self._executor.execute({"action_type": "keyboard",
+                                                "key_count": 1, "keystrokes": ["tab"]})
+                        time.sleep(self.step_delay * 0.4)
+                        continue
+
+                    prediction = self._merge(t_pred, t_conf, llm_action, state)
+                    _decision_maker = "llm"
                     logger.info("[OPT2] TRANSFORMER chose TYPE → LLM value for '%s' → %r",
                                 _flabel, prediction.get("text", "")[:40])
 
