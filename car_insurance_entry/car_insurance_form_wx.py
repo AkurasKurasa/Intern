@@ -110,6 +110,7 @@ class CarInsuranceFrame(wx.Frame):
         self.SetBackgroundColour(ACCENT_LT)
 
         self._controls: dict = {}       # field_name → widget
+        self._checkbox_defaults: dict = {}  # field_name → declared default (True/False)
         self._accessibles: list = []    # hold _CtrlAccessible refs — prevents Python GC freeing them
         self._record_counter: int = 0   # increments on each Submit & New
 
@@ -288,6 +289,7 @@ class CarInsuranceFrame(wx.Frame):
         ctrl.SetFont(_font(*FONT_LABEL))
         ctrl.SetValue(default)
         self._controls[name] = ctrl
+        self._checkbox_defaults[name] = default
         return ctrl
 
     def _check_row(self, parent, sizer, checks: list):
@@ -853,12 +855,25 @@ class CarInsuranceFrame(wx.Frame):
             return ""
 
     def _clear_all_fields(self):
-        """Reset every control to its blank / default state."""
-        for ctrl in self._controls.values():
+        """Reset every control to its blank / default state.
+
+        Checkboxes reset to their DECLARED default (self._checkbox_defaults,
+        set at construction time in _check()), not unconditionally to False.
+        Found live 2026-08-08, reported directly: "Submit button doesnt reset
+        Checkboxes." Three checkboxes are declared default=True (Paperless /
+        e-Delivery, Uninsured/Underinsured Motorist, Auto-Pay Enrolled) —
+        checked on the form's first load, matching every record's own data
+        (all three answer "checked" for every record). Submit's reset used to
+        blanket-set every checkbox to False regardless of its own default, so
+        record 2 onward opened with these three WRONGLY unchecked — a fresh
+        form should look like the form did when it first loaded, not like
+        every checkbox got manually unchecked.
+        """
+        for name, ctrl in self._controls.items():
             if isinstance(ctrl, wx.TextCtrl):
                 ctrl.SetValue("")
             elif isinstance(ctrl, wx.CheckBox):
-                ctrl.SetValue(False)
+                ctrl.SetValue(self._checkbox_defaults.get(name, False))
             elif isinstance(ctrl, wx.Choice) and ctrl.GetCount() > 0:
                 ctrl.SetSelection(0)
 
