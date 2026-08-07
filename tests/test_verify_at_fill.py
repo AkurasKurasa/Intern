@@ -29,6 +29,29 @@ empty element) — 2 wasted retries before giving up, even though the value
 was already correct. Fixed: the caller now re-derives the focused id FRESH
 from state_after itself on every attempt, never reusing an id computed from
 a different snapshot.
+
+SECOND FOLLOW-UP BUG, found live 2026-08-07 from a user report that the
+agent "did not leave Policyholder" and wasted steps: the give-up path
+logged "moving on" but never actually moved focus off the field. Confirmed
+in the log — "Years Continuously Insured" failed to type ('9' pasted,
+verified as '', retried twice, still ''), then the SAME field was
+re-selected and re-attempted 87 times for the rest of the run, because
+OPT2's fill-branch only checks "is the CURRENTLY FOCUSED thing empty and
+fillable" (pure geometry) with no awareness of attempted_keys — nothing
+had ever moved focus away, so the same broken field just kept winning that
+check forever. The disabled stuck-guard (~L1195, off by design in pure/no-
+autohandlers mode: "we want to see the pure transformer with no rescue")
+used to catch this class of stall, but that's about honest NAVIGATION
+testing — this is a dead end inside an already-approved recovery path
+(verify-at-fill's own give-up branch), not a navigation decision. Fixed:
+the give-up branch now presses Tab, matching what "moving on" already
+claimed to do. Also hardened the retry itself: each retry now re-clicks
+the field's own bbox before ctrl+a/pasting again, instead of blindly
+trusting that real OS keyboard focus still matches UIA's reported focused
+element (the same focus-lag class documented in
+execution_stuck_loop_wrong_tab_field) — three identical back-to-back paste
+failures is more consistent with focus not truly landing than with random
+clipboard flakiness.
 """
 import sys
 from pathlib import Path
@@ -155,3 +178,95 @@ class TestVerifyAtFillRetryLoop:
 
         assert attempts == _MAX_VERIFY_RETRIES
         assert agent._executor.execute.call_count == _MAX_VERIFY_RETRIES * 2
+
+
+def _run_updated_retry_loop(executor, observe, expected_text, focused_id, first_state_after):
+    """Mirrors the CURRENT retry loop in agent.py's run() exactly (post
+    2026-08-07 fix): each retry re-clicks the field's bbox before
+    ctrl+a/retyping, and giving up presses Tab instead of silently leaving
+    focus on the stuck field."""
+    state_after = first_state_after
+    for _verify_attempt in range(_MAX_VERIFY_RETRIES + 1):
+        if _verify_fill_matches(state_after.get("elements", []), focused_id, expected_text):
+            return True
+        actual_elem = _find_element_by_id(state_after.get("elements", []), focused_id)
+        if _verify_attempt >= _MAX_VERIFY_RETRIES:
+            executor.execute({"action_type": "keyboard", "key_count": 1, "keystrokes": ["tab"]})
+            return False
+        if actual_elem and actual_elem.get("bbox"):
+            b = actual_elem["bbox"]
+            executor.execute({"action_type": "click",
+                               "click_position": [(b[0] + b[2]) / 2, (b[1] + b[3]) / 2]})
+        executor.execute({"action_type": "keyboard", "key_count": 1, "keystrokes": ["ctrl+a"]})
+        executor.execute({"action_type": "keyboard", "text": expected_text})
+        state_after = observe()
+    return False
+
+
+class TestGiveUpActuallyMovesOn:
+    """Found live 2026-08-07: "Years Continuously Insured" failed to type,
+    verify-at-fill gave up after 2 retries, logged "moving on" — but never
+    pressed Tab, so the still-focused, still-empty field got re-selected and
+    re-attempted 87 times for the rest of the run (agent "did not leave
+    Policyholder"). Fix: the give-up path now presses Tab for real."""
+
+    def test_giving_up_presses_tab_to_move_focus_off_the_field(self):
+        executor = MagicMock()
+        observe = MagicMock(return_value={"elements": _elements("", element_id="e1")})
+        matched = _run_updated_retry_loop(
+            executor, observe, expected_text="9", focused_id="e1",
+            first_state_after={"elements": _elements("", element_id="e1")},
+        )
+        assert matched is False
+        tab_calls = [c for c in executor.execute.call_args_list
+                     if c.args[0].get("keystrokes") == ["tab"]]
+        assert len(tab_calls) == 1
+
+    def test_success_on_a_retry_never_presses_tab(self):
+        executor = MagicMock()
+        # First check fails (empty), the retry's re-observe reports success.
+        observe = MagicMock(return_value={"elements": _elements("9", element_id="e1")})
+        matched = _run_updated_retry_loop(
+            executor, observe, expected_text="9", focused_id="e1",
+            first_state_after={"elements": _elements("", element_id="e1")},
+        )
+        assert matched is True
+        tab_calls = [c for c in executor.execute.call_args_list
+                     if c.args[0].get("keystrokes") == ["tab"]]
+        assert len(tab_calls) == 0
+
+
+class TestRetryReclicksBeforeRetyping:
+    """Found live 2026-08-07 in the same investigation: three consecutive
+    identical ctrl+a/paste failures on one field is more consistent with
+    real OS keyboard focus not matching UIA's reported focused element than
+    random clipboard flakiness (matches the focus-lag class documented in
+    execution_stuck_loop_wrong_tab_field). Each retry now re-clicks the
+    field's own bbox first, instead of blindly trusting existing focus."""
+
+    def test_retry_clicks_the_fields_bbox_before_retyping(self):
+        executor = MagicMock()
+        els_empty = [{"element_id": "e1", "type": "editcontrol", "label": "Years Continuously Insured",
+                      "value": "", "bbox": [1400, 500, 1600, 530]}]
+        observe = MagicMock(return_value={"elements": els_empty})
+        _run_updated_retry_loop(
+            executor, observe, expected_text="9", focused_id="e1",
+            first_state_after={"elements": els_empty},
+        )
+        click_calls = [c for c in executor.execute.call_args_list
+                       if c.args[0].get("action_type") == "click"]
+        assert len(click_calls) == _MAX_VERIFY_RETRIES
+        assert click_calls[0].args[0]["click_position"] == [1500.0, 515.0]
+
+    def test_no_click_attempted_when_element_has_no_bbox(self):
+        executor = MagicMock()
+        els_no_bbox = [{"element_id": "e1", "type": "editcontrol", "label": "Years Continuously Insured",
+                         "value": ""}]
+        observe = MagicMock(return_value={"elements": els_no_bbox})
+        _run_updated_retry_loop(
+            executor, observe, expected_text="9", focused_id="e1",
+            first_state_after={"elements": els_no_bbox},
+        )
+        click_calls = [c for c in executor.execute.call_args_list
+                       if c.args[0].get("action_type") == "click"]
+        assert len(click_calls) == 0

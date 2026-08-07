@@ -2716,10 +2716,35 @@ class LLMAgent:
                             "Verify-at-fill: still mismatched after %d retries — moving on "
                             "(expected %r, got %r).",
                             _MAX_VERIFY_RETRIES, _expected_text[:40], _actual_text[:40])
+                        # "Moving on" must actually move focus off this field — found
+                        # live 2026-08-07: it didn't, so a field whose paste genuinely
+                        # fails (real OS keyboard focus lagging UIA's reported focus —
+                        # the same lag class documented in
+                        # execution_stuck_loop_wrong_tab_field) stayed focused+empty,
+                        # OPT2's fill-branch re-selected it next step on pure geometry
+                        # (focused+empty+fillable), and the run never left that one
+                        # field for the rest of the session (87 repeats, one run).
+                        # This mirrors the disabled stuck-guard's own escape action
+                        # (~L1216) — not re-enabling that guard, just giving this
+                        # already-approved give-up path the Tab it was already
+                        # claiming to take.
+                        self._executor.execute({"action_type": "keyboard",
+                                                "key_count": 1, "keystrokes": ["tab"]})
+                        time.sleep(self.step_delay * 0.3)
                         break
                     logger.warning("Verify-at-fill: expected %r, got %r — retrying (%d/%d).",
                                     _expected_text[:40], _actual_text[:40],
                                     _verify_attempt + 1, _MAX_VERIFY_RETRIES)
+                    # Re-click the field before retyping — don't just trust that real
+                    # OS keyboard focus still matches UIA's reported focused element.
+                    # A blind ctrl+a/paste retry can't recover from exactly the
+                    # failure mode it's trying to fix if focus itself is the problem.
+                    if _actual_elem and _actual_elem.get("bbox"):
+                        _aeb = _actual_elem["bbox"]
+                        self._executor.execute({"action_type": "click",
+                                                "click_position": [(_aeb[0] + _aeb[2]) / 2,
+                                                                    (_aeb[1] + _aeb[3]) / 2]})
+                        time.sleep(0.1)
                     self._executor.execute({"action_type": "keyboard",
                                             "key_count": 1, "keystrokes": ["ctrl+a"]})
                     self._executor.execute({"action_type": "keyboard", "text": _expected_text})
