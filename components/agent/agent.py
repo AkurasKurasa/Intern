@@ -368,6 +368,38 @@ def _gate_low_confidence_click(pos: Optional[List[float]], click_conf: float) ->
     return pos
 
 
+_MAX_VERIFY_RETRIES = 2
+
+
+def _find_element_by_id(elements: List[Dict[str, Any]], element_id: Optional[str]) -> Optional[Dict[str, Any]]:
+    """Look up an element in a state's elements list by its element_id — used
+    to find the same field's post-action value in a later observation."""
+    if element_id is None:
+        return None
+    return next((e for e in elements if e.get("element_id") == element_id), None)
+
+
+def _verify_fill_matches(elements_after: List[Dict[str, Any]],
+                          focused_id: Optional[str],
+                          expected_text: str) -> bool:
+    """
+    True if the field that was focused before typing now holds exactly the
+    text the agent intended to type. Pure comparison, no I/O — the caller
+    (LLMAgent's main loop) owns the retry/re-observe orchestration, since
+    that requires live executor/observer calls this function can't make.
+
+    Found 2026-08-07, from a direct user report about the old (deleted)
+    Intern iteration lacking any verify-at-fill step: StateValidator only
+    checks whether SOMETHING changed after an action (focus moved, value
+    differs from before) — never whether it changed to the RIGHT thing. A
+    field can type successfully (validator says "ok") while still holding
+    the wrong value, and nothing used to catch that.
+    """
+    elem = _find_element_by_id(elements_after, focused_id)
+    actual_text = (elem.get("value") or "").strip() if elem else ""
+    return actual_text == expected_text.strip()
+
+
 def _history_to_text(history: List[Dict[str, Any]]) -> str:
     if not history:
         return "No actions taken yet."
@@ -2359,6 +2391,44 @@ class LLMAgent:
 
             # 4. Validate
             state_after = self._observe()
+
+            # ── Verify-at-fill: catch a WRONG value the moment it's typed, not later ──
+            # StateValidator (right below) only checks whether SOMETHING changed —
+            # focus moved, value differs from before — never whether it changed to
+            # the RIGHT thing. A field can type successfully (validator says "ok")
+            # while still holding the wrong value, and nothing used to catch that.
+            # Found 2026-08-07 from a direct user report about the old (deleted)
+            # Intern iteration lacking exactly this: "we don't want to keep coming
+            # back to something... a constant checkback always consumes too much
+            # time." Fix is inline and bounded, not a separate re-check pass —
+            # verify against the value the agent itself just decided to type
+            # (prediction["text"]), retry a couple of times if it doesn't match,
+            # then move on regardless so a stubborn field can't stall the run.
+            if prediction.get("action_type") == "keyboard" and prediction.get("text"):
+                _expected_text = prediction["text"].strip()
+                _foc_id_vf     = state.get("focused_element_id")
+                for _verify_attempt in range(_MAX_VERIFY_RETRIES + 1):
+                    if _verify_fill_matches(state_after.get("elements", []), _foc_id_vf, _expected_text):
+                        if _verify_attempt > 0:
+                            logger.info("Verify-at-fill: corrected after retry %d.", _verify_attempt)
+                        break
+                    _actual_elem = _find_element_by_id(state_after.get("elements", []), _foc_id_vf)
+                    _actual_text = (_actual_elem.get("value") or "").strip() if _actual_elem else ""
+                    if _verify_attempt >= _MAX_VERIFY_RETRIES:
+                        logger.warning(
+                            "Verify-at-fill: still mismatched after %d retries — moving on "
+                            "(expected %r, got %r).",
+                            _MAX_VERIFY_RETRIES, _expected_text[:40], _actual_text[:40])
+                        break
+                    logger.warning("Verify-at-fill: expected %r, got %r — retrying (%d/%d).",
+                                    _expected_text[:40], _actual_text[:40],
+                                    _verify_attempt + 1, _MAX_VERIFY_RETRIES)
+                    self._executor.execute({"action_type": "keyboard",
+                                            "key_count": 1, "keystrokes": ["ctrl+a"]})
+                    self._executor.execute({"action_type": "keyboard", "text": _expected_text})
+                    time.sleep(self.step_delay * 0.3)
+                    state_after = self._observe()
+
             validation  = self._validator.validate(state, state_after, prediction)
             logger.info("Validator → %s: %s", validation.status, validation.reason)
 
