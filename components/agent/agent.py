@@ -2074,6 +2074,29 @@ class LLMAgent:
                     logger.info("[OPT2] TRANSFORMER chose TYPE → LLM value for '%s' → %r",
                                 _flabel, prediction.get("text", "")[:40])
 
+                    # When merge overrides this FILL decision into a click, anchor it to
+                    # the ALREADY-FOCUSED field's own bbox, not the transformer's
+                    # independently-predicted click_position. Found live 2026-08-07,
+                    # "Same loop on Auto Enrolled" (1175 log lines): _merge()'s override
+                    # (~L4560) uses t_pred['click_position'] -- the transformer's own,
+                    # SEPARATELY-learned navigation pointer, trained to answer "where do I
+                    # click next", not "where is the field currently in focus". Those are
+                    # different questions with different answers: at one visit the pointer
+                    # guessed (1484,426), which missed 'Auto-Pay Enrolled''s real bbox
+                    # entirely -- the click landed on some unrelated element, WHICH THEN
+                    # got marked attempted by _record_attempt() instead of the checkbox
+                    # actually intended, so 'Auto-Pay Enrolled' itself was never recorded
+                    # as attempted and kept re-entering the fill branch every time focus
+                    # cycled back to it. We already KNOW exactly where the focused field
+                    # is (_fe2['bbox']) -- there's no reason to trust a second, independent
+                    # guess for "click the thing that's already focused". Fixes this for
+                    # every type this override applies to (checkbox, combobox), not just
+                    # the one that happened to surface it.
+                    if prediction.get("action_type") == "click" and _fe2 and _fe2.get("bbox"):
+                        _feb = _fe2["bbox"]
+                        prediction = dict(prediction)
+                        prediction["click_position"] = [(_feb[0] + _feb[2]) / 2, (_feb[1] + _feb[3]) / 2]
+
                     # Toggle-avoidance: _merge() can override a "type" decision into
                     # a "click" (comboboxes need a click to open before a value can
                     # be selected). If a dropdown is ALREADY open, executing that
