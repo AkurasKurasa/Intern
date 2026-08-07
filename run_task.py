@@ -97,7 +97,10 @@ if __name__ == "__main__":
 
     _parser = argparse.ArgumentParser()
     _parser.add_argument("--start_tab", type=int, default=0,
-                         help="Tab index to start from (0=Policy … 4=Drivers). "
+                         help="Tab index to start from, for drilling one tab in "
+                              "isolation instead of re-running the whole form each "
+                              "time: 0=Policy 1=Policyholder 2=Vehicle 3=Coverage "
+                              "4=Drivers 5=History 6=Claims 7=Payment. "
                               "Manually click that tab in the form before running.")
     _parser.add_argument("--model", default="tasks/form_filling/model.pt",
                          help="Transformer checkpoint to load (default = Policy model). "

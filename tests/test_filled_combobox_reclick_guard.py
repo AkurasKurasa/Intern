@@ -29,6 +29,16 @@ mechanism already used for the empty-combobox skip
 (execution_attempted_combobox_position_drift), extended to the filled case
 because re-toggling a filled combobox can destroy correct data, not just
 waste a step.
+
+EXTENDED 2026-08-07 to checkboxes -- reported plainly: "Same problem
+still" (Auto-Pay Enrolled). The fill-click-anchoring fix closed the FILL
+branch's re-entry, but the NAVIGATE branch's own pointer could still
+independently drift back onto an already-checked checkbox's position on
+its own -- 12 wasted click+Tab cycles in one run, each caught downstream
+by the Win32 guard (not destructive) but never stopped before the click.
+A checkbox has no "value" to check (ui_observer never reports real
+checked state) -- attempted alone is enough here, unlike comboboxes which
+also require a non-empty value.
 """
 import sys
 from pathlib import Path
@@ -44,15 +54,23 @@ def _combobox(label="Marital Status", element_id="cb1", value="Married",
             "text": label, "value": value, "bbox": list(bbox), "window_role": "active"}
 
 
+def _checkbox(label="Auto-Pay Enrolled", element_id="cb1", bbox=(1400, 410, 1600, 440)):
+    return {"element_id": element_id, "type": "checkboxcontrol", "label": label,
+            "text": label, "value": "", "bbox": list(bbox), "window_role": "active"}
+
+
 def _run_updated_reclick_guard(agent, click_pos, elements):
     """Mirrors the CURRENT reclick guard in agent.py's run(): find the
-    element under the click, and if it's an already-filled, already-
-    attempted combobox, Tab instead of clicking."""
+    element under the click, and Tab instead of clicking if it's an
+    already-filled+attempted combobox OR an already-attempted checkbox."""
     elem = agent._elem_at({"elements": elements}, click_pos)
-    if (elem
-            and (elem.get("type") or "").lower() in ("comboboxcontrol", "combobox")
-            and (elem.get("value") or "").strip()
-            and agent._attempt_key(elem, elements=elements) in agent._attempted_keys):
+    ty = (elem.get("type") or "").lower() if elem else ""
+    key = agent._attempt_key(elem, elements=elements) if elem else None
+    combobox_filled = (ty in ("comboboxcontrol", "combobox")
+                        and bool((elem.get("value") or "").strip())
+                        and key in agent._attempted_keys)
+    checkbox_attempted = ty in ("checkboxcontrol", "checkbox") and key in agent._attempted_keys
+    if combobox_filled or checkbox_attempted:
         agent._executor.execute({"action_type": "keyboard", "key_count": 1, "keystrokes": ["tab"]})
         return "guarded_tab"
     agent._executor.execute({"action_type": "click", "click_position": click_pos})
@@ -115,5 +133,55 @@ class TestAlreadyFilledComboboxIsNotReclicked:
         agent._mark_attempted(filled, elements=elements)
 
         outcome = _run_updated_reclick_guard(agent, [1500, 515], elements)   # clicking 'Occupation'
+
+        assert outcome == "clicked"
+
+
+class TestAlreadyAttemptedCheckboxIsNotReclicked:
+    """Found live 2026-08-07: "Same problem still" -- 'Auto-Pay Enrolled'
+    stopped re-entering the FILL branch (fixed by anchoring the fill click
+    to the focused field's bbox), but the NAVIGATE branch's own pointer
+    kept independently drifting back onto its screen position 12 times in
+    one run. Each was caught by the downstream Win32 guard and converted
+    to Tab -- not destructive -- but never stopped before the click, so it
+    still cost a wasted click+Tab every single time."""
+
+    def _make_agent(self):
+        return LLMAgent(goal="test goal", dry_run=True, max_steps=1)
+
+    def test_pointer_drifting_onto_an_already_checked_checkbox_is_blocked(self):
+        agent = self._make_agent()
+        agent._executor = MagicMock()
+        cbox = _checkbox()
+        elements = [cbox]
+        agent._mark_attempted(cbox, elements=elements)   # already checked earlier this record
+
+        outcome = _run_updated_reclick_guard(agent, [1500, 425], elements)
+
+        assert outcome == "guarded_tab"
+        click_calls = [c for c in agent._executor.execute.call_args_list
+                       if c.args[0].get("action_type") == "click"]
+        assert len(click_calls) == 0
+
+    def test_unattempted_checkbox_can_still_be_clicked(self):
+        agent = self._make_agent()
+        agent._executor = MagicMock()
+        cbox = _checkbox()
+        elements = [cbox]
+        # Never marked attempted -- agent hasn't touched this checkbox yet.
+
+        outcome = _run_updated_reclick_guard(agent, [1500, 425], elements)
+
+        assert outcome == "clicked"
+
+    def test_a_different_unattempted_checkbox_is_unaffected(self):
+        agent = self._make_agent()
+        agent._executor = MagicMock()
+        attempted = _checkbox(label="Auto-Pay Enrolled", element_id="cb1", bbox=(1400, 410, 1600, 440))
+        other = _checkbox(label="Paperless Billing", element_id="cb2", bbox=(1400, 460, 1600, 490))
+        elements = [attempted, other]
+        agent._mark_attempted(attempted, elements=elements)
+
+        outcome = _run_updated_reclick_guard(agent, [1500, 475], elements)   # clicking 'Paperless Billing'
 
         assert outcome == "clicked"

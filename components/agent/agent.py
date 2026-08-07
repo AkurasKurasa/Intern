@@ -2201,16 +2201,39 @@ class LLMAgent:
                         # only ever wastes a step), this is a real correctness risk, so it's
                         # checked for ANY already-filled combobox, not just blank ones.
                         _reclick_elem = self._elem_at(state, _snap2)
-                        if (_reclick_elem
-                                and (_reclick_elem.get("type") or "").lower() in ("comboboxcontrol", "combobox")
-                                and (_reclick_elem.get("value") or "").strip()
-                                and self._attempt_key(_reclick_elem, elements=state.get("elements", []))
-                                    in self._attempted_keys):
+                        _reclick_ty = (_reclick_elem.get("type") or "").lower() if _reclick_elem else ""
+                        _reclick_key = (self._attempt_key(_reclick_elem, elements=state.get("elements", []))
+                                        if _reclick_elem else None)
+                        _reclick_combobox_filled = (
+                            _reclick_ty in ("comboboxcontrol", "combobox")
+                            and bool((_reclick_elem.get("value") or "").strip())
+                            and _reclick_key in self._attempted_keys
+                        )
+                        # Checkboxes extended in here 2026-08-07: even after the fill-click
+                        # anchoring fix (execution_fill_click_anchored_to_focused_bbox), the
+                        # NAVIGATE branch's own pointer can still independently drift back
+                        # onto an already-checked checkbox's position on its own (a separate
+                        # prediction, unrelated to the fill branch this guard was originally
+                        # built for). Confirmed live: "Same problem still" -- 'Auto-Pay
+                        # Enrolled' no longer re-entered the fill branch (that part of the
+                        # bug is fixed), but the navigate branch's own clicks still landed on
+                        # it 12 times in one run, each one caught downstream by the Win32
+                        # BM_GETCHECK guard and converted to Tab -- not destructive, but a
+                        # wasted click+Tab every time instead of Tabbing immediately. A
+                        # checkbox has no "value" to check (see the checkbox-attempted note
+                        # above _fe2_chk_attempted) -- attempted alone is enough here, unlike
+                        # comboboxes which also require a non-empty value.
+                        _reclick_checkbox_attempted = (
+                            _reclick_ty in ("checkboxcontrol", "checkbox")
+                            and _reclick_key in self._attempted_keys
+                        )
+                        if _reclick_combobox_filled or _reclick_checkbox_attempted:
                             _reclick_label = (_reclick_elem.get("label") or _reclick_elem.get("text") or "?")[:30]
                             logger.info(
-                                "[OPT2] pointer drifted back onto already-filled combobox %r "
-                                "(value=%r) — Tab instead of risking a re-toggle overwrite.",
-                                _reclick_label, (_reclick_elem.get("value") or "")[:30])
+                                "[OPT2] pointer drifted back onto already-%s %s %r — Tab instead "
+                                "of a wasted re-click.",
+                                "filled" if _reclick_combobox_filled else "checked",
+                                _reclick_ty, _reclick_label)
                             self._executor.execute({"action_type": "keyboard",
                                                     "key_count": 1, "keystrokes": ["tab"]})
                             time.sleep(self.step_delay * 0.4)
