@@ -645,9 +645,12 @@ class LLMAgent:
         try:
             from components.agent.state_validator import StateValidator
             from components.recorder.correction_handler import CorrectionHandler
+            from components.agent import navigation_protocol as _navproto
         except ImportError:
             from agent.state_validator import StateValidator
             from recorder.correction_handler import CorrectionHandler
+            from agent import navigation_protocol as _navproto
+        self._navproto = _navproto
 
         self._executor          = ActionExecutor(dry_run=dry_run)
         self._text_resolver     = _TextResolver()
@@ -1638,42 +1641,47 @@ class LLMAgent:
                         time.sleep(self.step_delay)
                         continue
 
-            # ── Scroll-to-reveal (universal mechanic — runs in EVERY mode) ────────
-            # The transformer can only target RENDERED elements; fields below the
-            # fold are invisible to it, so it guesses a below-fold position → blind
-            # click → drift. When no actionable empty field is visible, reveal more
-            # by scrolling (perception-driven, no field names/coords). Scrolls
-            # exhausted at the true bottom → advance the tab. The consecutive-scroll
-            # cap only counts DEAD scrolls — it resets the moment a field is visible,
-            # so a long tab can scroll as many times as it has fields. Gated purely on
-            # field visibility (self-protecting): a transient empty frame can't advance
-            # the tab until _MAX_TAB_SCROLLS dead scrolls have actually happened.
-            if not self._no_visible_empty_field(state):
+            # ── Navigation Protocol (runs in EVERY mode) ───────────────────────────
+            # System-level responsibility, not a cloned behavior: keep an actionable,
+            # empty target visible so the transformer only ever has to decide WHERE
+            # among what's on screen, never learn WHEN/HOW FAR to scroll from
+            # demonstrations that essentially never scrolled (0/11,062 pre-campaign
+            # steps). decide() is a pure function of the state snapshot + how many
+            # consecutive scrolls have already failed to reveal anything new on this
+            # tab — see components/agent/navigation_protocol.py for the full design
+            # rationale and unit tests.
+            _nav_vb = self._form_viewport_bottom(state) - 8   # small safety margin, matches prior behavior
+            _nav = self._navproto.decide(
+                state, _nav_vb, _tab_scroll_count, max_dead_scrolls=2,
+                attempted_keys=self._attempted_keys, attempt_key_fn=self._attempt_key,
+            )
+            if _nav.action == self._navproto.NavAction.WAIT:
                 _tab_scroll_count = 0                # actionable field visible → reset cap
-            else:
-                # Reasoned WHEN: nothing fillable on screen → reveal more.
+            elif _nav.action == self._navproto.NavAction.SCROLL:
                 # VERIFIED HOW: scroll ONCE, then check the visible-field signature
                 # actually CHANGED. Changed → new content revealed, let the transformer
                 # act on it. Unchanged → the view didn't move = we're at the bottom
-                # (don't blind-spin) → advance the tab. NO SetFocus here — it yanks the
-                # view back and fights the scroll (that was the old 6× spin bug).
-                _sig_before = self._visible_field_sig(state)
+                # (don't blind-spin) — the NEXT decide() call will see dead_scroll_count
+                # cross the threshold and return ADVANCE_TAB. NO SetFocus here — it
+                # yanks the view back and fights the scroll (the old 6x spin bug).
+                _sig_before = self._navproto.visible_field_signature(state, _nav_vb)
                 _scrolled   = self._scroll_form_down(state)
                 time.sleep(self.step_delay * 0.6)
                 _state_after = self._observe()
-                if _scrolled and self._visible_field_sig(_state_after) != _sig_before:
-                    logger.info("Scroll-reveal: scroll moved the view — new fields revealed.")
+                _vb_after    = self._form_viewport_bottom(_state_after)
+                if _scrolled and self._navproto.visible_field_signature(_state_after, _vb_after) != _sig_before:
+                    logger.info("Navigation Protocol: scroll moved the view — new fields revealed.")
                     state             = _state_after
                     _tab_scroll_count = 0
                     _last_auto_step   = step_idx
                     _heuristic_steps += 1
                     continue
-                # View did not move → bottom of this tab.
                 _tab_scroll_count += 1
-                logger.info("Scroll-reveal: view unchanged after scroll (%d) — at bottom of tab.",
+                logger.info("Navigation Protocol: view unchanged after scroll (%d) — at bottom of tab.",
                             _tab_scroll_count)
-                if _tab_scroll_count >= 2 and self._try_advance_tab(state):
-                    logger.info("Scroll-reveal: bottom reached — advancing tab.")
+            elif _nav.action == self._navproto.NavAction.ADVANCE_TAB:
+                logger.info("Navigation Protocol: %s", _nav.reason)
+                if self._try_advance_tab(state):
                     _tab_just_switched = True
                     _tab_scroll_count  = 0
                     _last_auto_step    = step_idx
@@ -3401,55 +3409,6 @@ class LLMAgent:
         ev = expected.lower().strip()
         should_check = ev.startswith("yes") or ev in {"check", "true", "1", "checked"}
         return (field_name, should_check)
-
-    def _visible_field_sig(self, state: Dict[str, Any]) -> frozenset:
-        """Signature of fillable fields currently inside the form viewport
-        (label + rounded y). Used to VERIFY a scroll actually moved the view:
-        signature changes → new content revealed; unchanged → at the bottom."""
-        vb = self._form_viewport_bottom(state)
-        sig = set()
-        for e in state.get("elements", []):
-            if e.get("window_role") == "background":
-                continue
-            if (e.get("type") or "").lower() not in ("editcontrol", "comboboxcontrol", "checkboxcontrol"):
-                continue
-            b = e.get("bbox")
-            if not b or len(b) != 4:
-                continue
-            cy = (b[1] + b[3]) / 2
-            if b[1] >= 0 and cy <= vb:
-                lbl = (e.get("label") or e.get("text") or "").strip().lower()
-                sig.add((lbl, round(cy / 15) * 15))
-        return frozenset(sig)
-
-    def _no_visible_empty_field(self, state: Dict[str, Any]) -> bool:
-        """
-        True when NO actionable empty field is currently on-screen — the signal to
-        scroll-to-reveal. Universal mechanic (no field names / coords / app names):
-          fillable WIDGET TYPE (edit/combobox) + empty VALUE + not yet 'attempted'
-          + geometry inside the active window's on-screen rect (GetWindowRect bottom).
-        Off-fold fields still report real bboxes, so we gate on the window's actual
-        visible bottom rather than the raw screen height.
-        """
-        v_bottom = self._form_viewport_bottom(state) - 8   # live form viewport bottom
-        _FILL = {"editcontrol", "input", "comboboxcontrol"}
-        _elements = state.get("elements", [])
-        for e in _elements:
-            if e.get("window_role") == "background":
-                continue
-            if (e.get("type") or "").lower() not in _FILL:
-                continue
-            if (e.get("value") or "").strip():          # already filled
-                continue
-            if self._attempt_key(e, elements=_elements) in self._attempted_keys:   # tried (empty optional)
-                continue
-            b = e.get("bbox")
-            if not b or len(b) != 4:
-                continue
-            cy = (b[1] + b[3]) / 2
-            if b[1] >= 0 and cy <= v_bottom:            # inside the visible window
-                return False                            # an actionable field is visible
-        return True
 
     def _scroll_form_down(self, state: Dict[str, Any]) -> bool:
         """
