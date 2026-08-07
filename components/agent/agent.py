@@ -427,6 +427,31 @@ def _gate_low_confidence_click(
     return pos
 
 
+_LISTITEM_TYPES = {"listitem", "listitemcontrol"}
+
+
+def _open_dropdown_items(elements: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """
+    Real, on-screen list items in `elements` — non-empty exactly when some
+    combobox's dropdown is currently open.
+
+    A combobox click TOGGLES, it doesn't just open — clicking one that's
+    already open closes it instead. Found live 2026-08-07, the actual root
+    cause of a loop that survived both an earlier type-name fix and a poll-
+    timing widening: a PRECEDING step's click (nominally aimed at a
+    different, adjacent field) landed on this combobox's screen position
+    and popped it open by accident. The dedicated combobox-fill handler then
+    blindly clicked "to open" it again, which closed it — so every
+    subsequent poll correctly found 0 items, because there was genuinely
+    nothing open to find. Callers should check this BEFORE clicking to open
+    a combobox, and skip the click if it's already open.
+    """
+    return [e for e in elements
+            if e.get("type") in _LISTITEM_TYPES
+            and e.get("window_role") != "background"
+            and e.get("bbox")]
+
+
 def _tokenize_option(text: str) -> List[str]:
     return [t for t in re.split(r"[^a-z0-9]+", text.lower()) if t]
 
@@ -1994,7 +2019,12 @@ class LLMAgent:
                             # ONE click opens the dropdown; select inline + continue.
                             # (Don't route to the type-handler — its own open-click would
                             #  TOGGLE the dropdown shut → no options → Escape loop.)
-                            self._executor.execute({"action_type": "click", "click_position": _snap2})
+                            #
+                            # Skip the click entirely if a dropdown is ALREADY open —
+                            # see _open_dropdown_items' docstring for why (a click
+                            # toggles, it doesn't just open).
+                            if not _open_dropdown_items(state.get("elements", [])):
+                                self._executor.execute({"action_type": "click", "click_position": _snap2})
                             if not _cb_val:
                                 # Optional field with no record value (e.g. Suffix).
                                 # Escape + Tab past it, and MARK it attempted so the
@@ -2422,8 +2452,18 @@ class LLMAgent:
                 _combo_value = prediction["text"]
                 _bx1, _by1, _bx2, _by2 = _fel["bbox"]
                 _ccx, _ccy = (_bx1 + _bx2) / 2, (_by1 + _by2) / 2
-                logger.info("Combobox: clicking to open dropdown for %r → %r", _flabel, _combo_value)
-                self._executor.execute({"action_type": "click", "click_position": [_ccx, _ccy]})
+                # Check whether the dropdown is ALREADY open before clicking to
+                # "open" it — see _open_dropdown_items' docstring for why (a
+                # click toggles, it doesn't just open); this was the actual root
+                # cause of a loop that survived both the earlier type-name fix
+                # and the poll-timing widening.
+                _already_open = _open_dropdown_items(state.get("elements", []))
+                if _already_open:
+                    logger.info("Combobox: dropdown for %r already open (%d items) — skipping the open-click.",
+                                _flabel, len(_already_open))
+                else:
+                    logger.info("Combobox: clicking to open dropdown for %r → %r", _flabel, _combo_value)
+                    self._executor.execute({"action_type": "click", "click_position": [_ccx, _ccy]})
                 # The dropdown can take a moment to render. Poll a few times before
                 # giving up — otherwise we Escape on an empty observe and waste a
                 # whole open→escape→reopen cycle (the #1 combobox time-sink).
@@ -2439,13 +2479,16 @@ class LLMAgent:
                 # That fix alone wasn't enough, though: re-tested live and 'Sedan'
                 # (a genuinely correct, exact-match option) STILL came up with 0
                 # items in the SAME run where other dropdowns succeeded moments
-                # apart -- not a matching bug, the popup just hadn't finished
-                # rendering within the old 4x0.35s=1.4s poll window every time.
-                # Widened poll patience to match the other combobox handler.
-                _LISTITEM_TYPES = {"listitem", "listitemcontrol"}
+                # apart. Turned out to be neither a matching nor a timing bug —
+                # the REAL cause was the toggle-click issue guarded against just
+                # above (_already_open): once that's fixed, an open→escape→
+                # reopen cycle should be rare, but the poll stays widened as a
+                # second line of defense against genuinely slow renders.
                 _POLL_TRIES, _POLL_INTERVAL = 8, 0.4
-                _listitems = []
+                _listitems = list(_already_open)
                 for _try in range(_POLL_TRIES):
+                    if _listitems:
+                        break
                     time.sleep(_POLL_INTERVAL)
                     _combo_state = self._observe()
                     _listitems = [e for e in _combo_state.get("elements", [])
