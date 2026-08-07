@@ -550,6 +550,8 @@ Objectives 8, 9 & 10 (thesis): ≥85% end-to-end completion without manual
 intervention; ≤10% execution error rate; ≤20% wasted steps; unified coordinated
 framework.
 
+- [x] `execution_max_steps_ceiling` — **Found and fixed 2026-08-07, while pushing toward a real end-to-end attempt after tonight's four live loop-bug fixes.** `run_task.py`'s `MAX_STEPS` was 200 — but the form has 176 fields, and even the best live run tonight needed ~5-6 raw steps per field (typing + navigating + occasional retries) to make progress. Full completion needs on the order of 800-1000+ steps, not 200 — the run was mathematically guaranteed to stop short regardless of how many more correctness bugs got fixed, independent of the transformer's own accuracy. Very likely the single biggest reason no run has reached Submit yet. Raised to 1000 with headroom, not tightly tuned to a computed minimum — the first real attempt at this ceiling will show the actual number needed. Not yet verified live.
+
 - [x] `execution_drift_solved` — Drift solved (2026-06-12): form-window LOCK (capture hwnd at GO, re-assert every step) + in-form click guard. No more typing into PowerShell / clicking Notepad.
 - [x] `execution_belowfold_solved` — Below-fold reach solved: the drift guard's Tab doubles as scroll — wx `ScrolledPanel` auto-scrolls the focused field into view.
 - [ ] `execution_action_space_big3_2` — **Big Three #2:** Action space, form-fields → universal. Today: click/type/select(+combobox). Need click, double_click, type, select, drag, scroll, hotkey, wait, verify, menu, file-dialog. Enumerable engineering, not research.
