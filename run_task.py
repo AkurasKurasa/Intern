@@ -70,7 +70,11 @@ API_KEY       = os.environ.get("ANTHROPIC_API_KEY", "")
 GROQ_API_KEY  = os.environ.get("GROQ_API_KEY", "")
 SOURCE_WINDOW = "Notepad"     # title fragment of the data source window
 MAX_STEPS     = 200
-STEP_DELAY    = 1.5
+STEP_DELAY    = 1.0  # was 1.5 -- tonight's live runs showed ~2-3s/step dominated by this
+                      # fixed pause, not LLM waits (fast-path lookup already made those
+                      # near-free). Some settle time is genuinely load-bearing (a prior
+                      # bug came from checking the screen too soon after a tab switch),
+                      # so this is a moderate cut to test live, not a blind zero-out.
 CORRECTION_WATCH_SECONDS = 0.5  # DAgger correction-capture window per failed step (0 = off).
                                  # Default was 4.0s (agent.py's own default) — that's a real-time
                                  # block for a human to physically step in and correct; on a run

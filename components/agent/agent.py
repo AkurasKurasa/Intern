@@ -46,6 +46,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 import sys
 import time
 from typing import Any, Dict, List, Optional, Set, Tuple
@@ -424,6 +425,47 @@ def _gate_low_confidence_click(
     if click_conf < floor:
         return None
     return pos
+
+
+def _tokenize_option(text: str) -> List[str]:
+    return [t for t in re.split(r"[^a-z0-9]+", text.lower()) if t]
+
+
+def _option_matches(value: str, option: str) -> bool:
+    """
+    True if `option` (a dropdown item's text) should count as matching the
+    wanted `value`, beyond a bare identical string.
+
+    Three tiers, each covering a real live case:
+      1. Exact match (case/whitespace-insensitive).
+      2. Prefix match, either direction — 'Full Coverage' vs 'Full Coverage
+         (Comprehensive)'.
+      3. Whole-word-token containment — 'Sedan' vs '4-Door Sedan'. Found
+         live 2026-08-07: prefix-only matching couldn't catch this (neither
+         string is a prefix of the other), so the agent looped forever
+         opening the dropdown, never finding 'Sedan', closing it, and
+         trying again — 25+ times in one run.
+
+    Deliberately NOT a raw substring check — 'Active' must never match
+    'Inactive' (an explicit constraint from when this matching was first
+    written). Splitting into whole tokens on non-alphanumeric boundaries and
+    requiring the value's token sequence to appear as a contiguous run
+    within the option's tokens preserves that: 'inactive' tokenizes to a
+    single token ['inactive'], so 'active' can never match it as a
+    substring of that token.
+    """
+    v = value.strip().lower()
+    o = option.strip().lower()
+    if not v or not o:
+        return False
+    if v == o or o.startswith(v) or v.startswith(o):
+        return True
+    v_tokens = _tokenize_option(value)
+    o_tokens = _tokenize_option(option)
+    if not v_tokens:
+        return False
+    n = len(v_tokens)
+    return any(o_tokens[i:i + n] == v_tokens for i in range(len(o_tokens) - n + 1))
 
 
 _MAX_VERIFY_RETRIES = 2
@@ -1695,11 +1737,13 @@ class LLMAgent:
                              if e.get("type") in ("listitem", "listitemcontrol")
                              and e.get("window_role") != "background"]
                 if listitems:
-                    # Find the matching listitem and click it
+                    # Find the matching listitem and click it. _option_matches
+                    # handles 'Sedan' matching an option like '4-Door Sedan' —
+                    # a bare exact-only check here would miss it the same way
+                    # the other two combobox handlers did before being fixed.
                     target = next(
                         (e for e in listitems
-                         if (e.get("text") or e.get("label") or "").strip().lower()
-                            == expected_val.lower()),
+                         if _option_matches(expected_val, e.get("text") or e.get("label") or "")),
                         None,
                     )
                     if target and target.get("bbox"):
@@ -1996,11 +2040,8 @@ class LLMAgent:
                                           and e.get("window_role") != "background" and e.get("bbox")]
                                 if _items:
                                     break
-                            _vlc = _cb_val.strip().lower()
                             _o = lambda e: (e.get("text") or e.get("label") or "").strip()
-                            _hit = next((e for e in _items if _o(e).lower() == _vlc), None) \
-                                or next((e for e in _items if _o(e).lower().startswith(_vlc)
-                                         or _vlc.startswith(_o(e).lower())), None)
+                            _hit = next((e for e in _items if _option_matches(_cb_val, _o(e))), None)
                             if _hit:
                                 _b = _hit["bbox"]
                                 self._executor.execute({"action_type": "click",
@@ -2391,16 +2432,13 @@ class LLMAgent:
                                   and e.get("bbox")]
                     if _listitems:
                         break
-                _cv_lc = _combo_value.strip().lower()
                 def _opt(e): return (e.get("text") or e.get("label") or "").strip()
-                # exact first, then prefix-fuzzy (handles 'Full Coverage' vs
-                # 'Full Coverage (Comprehensive)'); avoid loose substring so
-                # 'Active' never matches 'Inactive'.
-                _match = next((e for e in _listitems if _opt(e).lower() == _cv_lc), None)
-                if not _match:
-                    _match = next((e for e in _listitems
-                                   if _opt(e).lower().startswith(_cv_lc)
-                                   or _cv_lc.startswith(_opt(e).lower())), None)
+                # _option_matches: exact, then prefix-fuzzy ('Full Coverage' vs
+                # 'Full Coverage (Comprehensive)'), then whole-word-token
+                # containment ('Sedan' vs '4-Door Sedan') — without ever letting
+                # 'Active' match 'Inactive'. See its docstring for the live bug
+                # (25+-iteration loop) that motivated the third tier.
+                _match = next((e for e in _listitems if _option_matches(_combo_value, _opt(e))), None)
                 if not _match and _listitems:
                     logger.warning("Combobox: %r not in options %s",
                                    _combo_value, [_opt(e) for e in _listitems][:12])
