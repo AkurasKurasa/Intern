@@ -44,3 +44,19 @@ def test_listitem_types_constant_covers_both_forms():
     sys.path.insert(0, str(_AGENT_PY.parent.parent))
     src = _AGENT_PY.read_text(encoding="utf-8")
     assert '_LISTITEM_TYPES = {"listitem", "listitemcontrol"}' in src
+
+
+def test_dropdown_polling_waits_at_least_2_seconds_total():
+    """The type-name fix alone wasn't enough: re-tested live and 'Sedan' (a
+    genuinely correct, exact-match option) STILL came up with 0 items in the
+    same run where other dropdowns succeeded moments apart -- the popup
+    just hadn't finished rendering within the old 4x0.35s=1.4s poll window
+    every time. Both combobox dropdown-polling loops were widened to
+    _POLL_TRIES/_POLL_INTERVAL giving at least 2s of total patience --
+    this locks in that neither silently regresses back to a shorter window."""
+    src = _AGENT_PY.read_text(encoding="utf-8")
+    matches = re.findall(r"_POLL_TRIES,\s*_POLL_INTERVAL\s*=\s*(\d+),\s*([\d.]+)", src)
+    assert len(matches) == 2, f"expected 2 poll-config declarations, found {len(matches)}"
+    for tries, interval in matches:
+        total = int(tries) * float(interval)
+        assert total >= 2.0, f"poll window {tries}x{interval}s = {total}s is under the 2s floor"

@@ -2031,15 +2031,29 @@ class LLMAgent:
                                 continue
                             # Standard UIA "ListItem" maps to "listitem" (no "control"
                             # suffix) in ui_observer.py's _CTRL_TYPE_MAP.
+                            # Poll count/interval: found live 2026-08-07 — 'Sedan' (a
+                            # real, correct option) still came up with 0 list items
+                            # found after the fix above, in the SAME run where other
+                            # dropdowns (Make, Policy Type, ...) succeeded moments
+                            # apart. Not a matching bug — the popup just hadn't
+                            # finished rendering within the old 4x0.35s=1.4s window
+                            # every time. Widened to give slow renders more room
+                            # without meaningfully slowing the common fast case
+                            # (the loop still exits the instant items appear).
+                            _POLL_TRIES, _POLL_INTERVAL = 8, 0.4
                             _items = []
-                            for _try in range(4):
-                                time.sleep(0.35)
+                            for _try in range(_POLL_TRIES):
+                                time.sleep(_POLL_INTERVAL)
                                 _cs = self._observe()
                                 _items = [e for e in _cs.get("elements", [])
                                           if e.get("type") in ("listitem", "listitemcontrol")
                                           and e.get("window_role") != "background" and e.get("bbox")]
                                 if _items:
                                     break
+                            if not _items:
+                                logger.warning(
+                                    "Combobox: dropdown for %r still empty after %d tries (%.1fs) — giving up.",
+                                    _cb_label, _POLL_TRIES, _POLL_TRIES * _POLL_INTERVAL)
                             _o = lambda e: (e.get("text") or e.get("label") or "").strip()
                             _hit = next((e for e in _items if _option_matches(_cb_val, _o(e))), None)
                             if _hit:
@@ -2421,10 +2435,18 @@ class LLMAgent:
                 # type -- found live 2026-08-07: a run looped forever opening
                 # "Body Type"'s dropdown, finding 0 list items every time despite
                 # 8 new elements genuinely appearing, and Escaping, over and over.
+                #
+                # That fix alone wasn't enough, though: re-tested live and 'Sedan'
+                # (a genuinely correct, exact-match option) STILL came up with 0
+                # items in the SAME run where other dropdowns succeeded moments
+                # apart -- not a matching bug, the popup just hadn't finished
+                # rendering within the old 4x0.35s=1.4s poll window every time.
+                # Widened poll patience to match the other combobox handler.
                 _LISTITEM_TYPES = {"listitem", "listitemcontrol"}
+                _POLL_TRIES, _POLL_INTERVAL = 8, 0.4
                 _listitems = []
-                for _try in range(4):
-                    time.sleep(0.35)
+                for _try in range(_POLL_TRIES):
+                    time.sleep(_POLL_INTERVAL)
                     _combo_state = self._observe()
                     _listitems = [e for e in _combo_state.get("elements", [])
                                   if e.get("type") in _LISTITEM_TYPES
@@ -2432,10 +2454,14 @@ class LLMAgent:
                                   and e.get("bbox")]
                     if _listitems:
                         break
+                if not _listitems:
+                    logger.warning("Combobox: dropdown for %r still empty after %d tries (%.1fs) — giving up.",
+                                    _combo_value, _POLL_TRIES, _POLL_TRIES * _POLL_INTERVAL)
                 def _opt(e): return (e.get("text") or e.get("label") or "").strip()
                 # _option_matches: exact, then prefix-fuzzy ('Full Coverage' vs
                 # 'Full Coverage (Comprehensive)'), then whole-word-token
-                # containment ('Sedan' vs '4-Door Sedan') — without ever letting
+                # containment (e.g. a value matching only part of a longer option)
+                # — without ever letting
                 # 'Active' match 'Inactive'. See its docstring for the live bug
                 # (25+-iteration loop) that motivated the third tier.
                 _match = next((e for e in _listitems if _option_matches(_combo_value, _opt(e))), None)
