@@ -2015,8 +2015,26 @@ class LLMAgent:
                     if self._navproto.has_visible_empty_target(
                             _state_after, _vb_after,
                             attempted_keys=self._attempted_keys, attempt_key_fn=self._attempt_key):
+                        # Found 2026-08-08, live, SAME night as the counter fix
+                        # above: even with that fix, a run still logged 7
+                        # straight "actionable field revealed" scrolls with
+                        # nothing ever getting filled in between. Cause: this
+                        # check runs on _state_after, but then just `continue`s
+                        # back to the top of the loop, which takes a totally
+                        # FRESH self._observe() before deciding anything again
+                        # — two separate observations, moments apart, of a UI
+                        # that isn't perfectly frame-stable. When they disagree,
+                        # the fresh one can say "nothing actionable" even though
+                        # this one just confirmed there was, re-triggering
+                        # SCROLL instead of ever letting the transformer act.
+                        # The Drought Guard next door already solves the exact
+                        # same problem the same way: don't gamble on a later
+                        # recheck agreeing — act on the confirmed state right
+                        # now. Directly focus/click the target this same step.
                         logger.info("Navigation Protocol: scroll moved the view — actionable field revealed.")
                         _tab_scroll_count = 0
+                        self._focus_first_empty_field(_state_after, after_scroll=True)
+                        time.sleep(0.3)
                     else:
                         _tab_scroll_count += 1
                         logger.info("Navigation Protocol: scroll moved the view but nothing actionable yet (%d/2).",

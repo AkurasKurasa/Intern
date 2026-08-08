@@ -24,6 +24,7 @@ non-actionable content still counts toward "still nothing to do here."
 """
 import sys
 from pathlib import Path
+from unittest.mock import MagicMock
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "components"))
 from agent.navigation_protocol import has_visible_empty_target, visible_field_signature
@@ -87,3 +88,49 @@ class TestCounterOnlyResetsForActionableContent:
         same = [_field("A", value="x", bbox=(100, 100, 300, 130))]
         result = _run_scroll_branch(same, same, tab_scroll_count=2)
         assert result == 3
+
+
+def _run_scroll_branch_and_focus(sig_before_elements, sig_after_elements, focus_fn):
+    """Mirrors agent.py's run() SAME-DAY follow-up fix: don't just detect an
+    actionable target after a scroll and hope a LATER, separately-observed
+    decide() call agrees -- act on the confirmed state immediately via
+    _focus_first_empty_field, the same pattern the Drought Guard already
+    uses successfully next to this code."""
+    state_before = {"elements": sig_before_elements}
+    state_after  = {"elements": sig_after_elements}
+    sig_before = visible_field_signature(state_before, VIEWPORT_BOTTOM)
+    sig_after  = visible_field_signature(state_after, VIEWPORT_BOTTOM)
+    if sig_after != sig_before and has_visible_empty_target(state_after, VIEWPORT_BOTTOM):
+        focus_fn(state_after, after_scroll=True)
+        return True
+    return False
+
+
+class TestScrollBranchActsImmediatelyOnConfirmedTarget:
+    """Found live 2026-08-08, SAME night as the counter fix above, even with
+    that fix already in place: a run logged 7 straight "actionable field
+    revealed" scrolls in a row, nothing ever getting filled between them.
+    Cause: the confirming check ran on one observation, then the loop
+    `continue`d back to a totally FRESH self._observe() before deciding
+    anything again -- two separate snapshots, moments apart, of a UI that
+    isn't perfectly frame-stable, could disagree. Fix: act on the just-
+    confirmed state directly instead of gambling a later recheck agrees."""
+
+    def test_focus_first_empty_field_is_called_when_a_target_is_confirmed(self):
+        before = [_field("Vehicle Info", value="already filled", bbox=(100, 100, 300, 130))]
+        after  = [_field("Vehicle Info", value="already filled", bbox=(100, 70, 300, 100)),
+                  _field("VIN", value="", bbox=(100, 300, 300, 330))]
+        focus_fn = MagicMock(return_value=True)
+        acted = _run_scroll_branch_and_focus(before, after, focus_fn)
+        assert acted is True
+        focus_fn.assert_called_once()
+        called_state = focus_fn.call_args.args[0]
+        assert called_state["elements"] == after
+
+    def test_focus_first_empty_field_is_not_called_when_nothing_actionable(self):
+        before = [_field("Vehicle Info", value="already filled", bbox=(100, 100, 300, 130))]
+        after  = [_field("Vehicle Info", value="already filled", bbox=(100, 70, 300, 100))]
+        focus_fn = MagicMock(return_value=True)
+        acted = _run_scroll_branch_and_focus(before, after, focus_fn)
+        assert acted is False
+        focus_fn.assert_not_called()
