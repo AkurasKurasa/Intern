@@ -3251,7 +3251,33 @@ class LLMAgent:
                     else:
                         logger.warning("LLM type into non-edit [%s] %r — pressing Tab instead.",
                                        _fel.get("type","?"), _flabel[:40])
-                    prediction = {"action_type": "keyboard", "key_count": 1, "keystrokes": ["tab"]}
+                    # Found 2026-08-09, live, direct user report ("Marital
+                    # Status was not even filled up until Cell Phone but we
+                    # navigated away"): this blind Tab (used to move on
+                    # after checking a checkbox via the raw BM_SETCHECK
+                    # message, which never moves real keyboard focus itself)
+                    # handed movement to WINDOWS' OWN native tab order --
+                    # which, distinct from anything this code decided,
+                    # triggered ANOTHER auto-scroll of its own (element count
+                    # dropped 163->157 right at this exact point in the log).
+                    # Stacked on top of the redirect-to-deepest-cluster fix
+                    # from earlier tonight, that uncontrolled second scroll
+                    # left several shallower fields (Marital Status,
+                    # Occupation, Education Level, Credit Score) scrolled
+                    # past -- and since this module only ever scrolls DOWN,
+                    # never back up, they were gone for the rest of the run.
+                    # Redirect to a KNOWN visible target instead of gambling
+                    # on native tab order, same principle as every other
+                    # Tab-as-navigation removal tonight.
+                    _cb_next = self._navproto.find_visible_empty_target(
+                        state, self._form_viewport_bottom(state) - 8,
+                        attempted_keys=self._attempted_keys, attempt_key_fn=self._attempt_key)
+                    if _cb_next and _cb_next.get("bbox"):
+                        _cnb = _cb_next["bbox"]
+                        prediction = {"action_type": "click",
+                                      "click_position": [(_cnb[0] + _cnb[2]) / 2, (_cnb[1] + _cnb[3]) / 2]}
+                    else:
+                        prediction = {"action_type": "keyboard", "key_count": 1, "keystrokes": ["tab"]}
 
             if prediction.get("action_type") == "click":
                 _cp = prediction.get("click_position", [0, 0])
