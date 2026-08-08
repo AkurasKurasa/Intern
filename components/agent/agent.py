@@ -2012,9 +2012,10 @@ class LLMAgent:
                     state           = _state_after
                     _last_auto_step = step_idx
                     _heuristic_steps += 1
-                    if self._navproto.has_visible_empty_target(
-                            _state_after, _vb_after,
-                            attempted_keys=self._attempted_keys, attempt_key_fn=self._attempt_key):
+                    _revealed_target = self._navproto.find_visible_empty_target(
+                        _state_after, _vb_after,
+                        attempted_keys=self._attempted_keys, attempt_key_fn=self._attempt_key)
+                    if _revealed_target is not None:
                         # Found 2026-08-08, live, SAME night as the counter fix
                         # above: even with that fix, a run still logged 7
                         # straight "actionable field revealed" scrolls with
@@ -2030,10 +2031,35 @@ class LLMAgent:
                         # The Drought Guard next door already solves the exact
                         # same problem the same way: don't gamble on a later
                         # recheck agreeing — act on the confirmed state right
-                        # now. Directly focus/click the target this same step.
+                        # now.
+                        #
+                        # SAME-DAY FOLLOW-UP: routing that "act now" through
+                        # self._focus_first_empty_field() still looped, live --
+                        # its own diagnostic (added to chase this) showed
+                        # _uia_focus_first_field's INDEPENDENT raw UIA tree walk
+                        # found the correct pane but ZERO Edit/ComboBox children
+                        # in it, even though find_visible_empty_target (a
+                        # DIFFERENT system, reading ui_observer.py's own
+                        # already-settled state snapshot) had just found one
+                        # right there. Two separate ways of walking the same UI
+                        # tree, disagreeing — most likely the raw UIA tree
+                        # genuinely hasn't caught up yet immediately after a
+                        # scroll, while _state_after (observed with its own
+                        # settle delay) already has. Stop routing through the
+                        # inconsistent second system: click find_visible_empty_
+                        # target's OWN returned element directly -- the same
+                        # data source that already proved reliable for the
+                        # check, used for the action too, so there's nothing
+                        # left to disagree with.
                         logger.info("Navigation Protocol: scroll moved the view — actionable field revealed.")
                         _tab_scroll_count = 0
-                        self._focus_first_empty_field(_state_after, after_scroll=True)
+                        _rt_bbox = _revealed_target.get("bbox")
+                        if _rt_bbox:
+                            self._executor.execute({
+                                "action_type": "click",
+                                "click_position": [(_rt_bbox[0] + _rt_bbox[2]) / 2,
+                                                    (_rt_bbox[1] + _rt_bbox[3]) / 2],
+                            })
                         time.sleep(0.3)
                     else:
                         _tab_scroll_count += 1
