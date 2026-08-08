@@ -383,6 +383,23 @@ class UIAutomationObserver(Observer):
             except Exception:
                 pass
 
+            # Fallback: TogglePattern — checkboxes/toggle buttons expose
+            # Toggle, not Value, so the ValuePattern read above always left
+            # `value` empty for them regardless of actual checked state.
+            # Found 2026-08-09, live: this made every checkbox look "empty"
+            # forever to anything reading `value` (e.g.
+            # navigation_protocol.find_visible_empty_target) — a checkbox
+            # just checked via the agent's own BM_SETCHECK still read back
+            # as empty, so it kept getting offered as its own "next target"
+            # once a redirect guard started routing through that check.
+            if not value:
+                try:
+                    tgp = ctrl.GetPattern(_uia.PatternId.TogglePattern)
+                    if tgp:
+                        value = "checked" if tgp.ToggleState == _uia.ToggleState.On else ""
+                except Exception:
+                    pass
+
             # Fallback: TextPattern — used by Windows 11 Notepad and
             # other document/editor controls that don't expose ValuePattern.
             if not value:

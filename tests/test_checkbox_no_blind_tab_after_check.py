@@ -65,3 +65,34 @@ class TestNoBlindTabAfterCheckboxCheck:
         ]}
         action = _next_action_after_checkbox_check(state)
         assert action == {"action_type": "keyboard", "key_count": 1, "keystrokes": ["tab"]}
+
+
+class TestMarkAttemptedPreventsSameStepSelfRedirectLoop:
+    """Found 2026-08-09, live, direct user report ("Another loop error"):
+    just-checked 'Homeowner' kept getting offered back as the redirect
+    target across MANY steps -- ui_observer.py's checkbox value read was the
+    root cause (fixed separately, see test_ui_observer_checkbox_toggle_state.py),
+    but even with that fixed, the redirect search inside the SAME step that
+    performed the check still runs against the pre-check state snapshot,
+    where the checkbox's value hasn't caught up yet. agent.py now calls
+    self._mark_attempted() immediately after BM_SETCHECK succeeds, so the
+    attempted-keys layer excludes it even before the next observation cycle
+    would. This test proves find_visible_empty_target respects that,
+    independent of a stale 'value' read."""
+
+    def test_attempted_checkbox_is_skipped_even_if_its_value_still_reads_empty(self):
+        from agent.navigation_protocol import find_visible_empty_target
+
+        state = {"elements": [
+            _field("Homeowner", value="", bbox=(100, 100, 300, 130), ftype="checkboxcontrol"),
+            _field("Marital Status", value="", bbox=(100, 140, 300, 170), ftype="comboboxcontrol"),
+        ]}
+
+        def attempt_key_fn(elem, elements):
+            return (elem.get("label") or "").strip().lower()
+
+        attempted_keys = {"homeowner"}
+        target = find_visible_empty_target(
+            state, VIEWPORT_BOTTOM, attempted_keys=attempted_keys, attempt_key_fn=attempt_key_fn)
+        assert target is not None
+        assert target["label"] == "Marital Status"

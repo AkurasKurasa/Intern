@@ -3347,6 +3347,16 @@ class LLMAgent:
                                         logger.info("Checkbox %r checked via BM_SETCHECK (type intercept).", _flabel_full)
                                         self._checked_fields.add(_flabel_full)
                                         self._filled_this_tab.add(_flabel_full)
+                                        # Belt-and-suspenders alongside the
+                                        # ui_observer.py TogglePattern fix
+                                        # (2026-08-09): mark it attempted
+                                        # immediately so even THIS step's own
+                                        # redirect search (which still runs
+                                        # against the pre-check state) can't
+                                        # offer this same checkbox back to
+                                        # itself before the next observation
+                                        # cycle picks up its new value.
+                                        self._mark_attempted(_fel, elements=state.get("elements", []))
                                 except Exception as _cbe:
                                     logger.warning("Checkbox BM_SETCHECK failed: %s", _cbe)
                     else:
@@ -3452,6 +3462,7 @@ class LLMAgent:
                                 logger.info("Checkbox %r checked via Win32 BM_SETCHECK.", _chk_label)
                                 self._checked_fields.add(_chk_label)
                                 self._filled_this_tab.add(_chk_label)
+                                self._mark_attempted(_chk_at_cp, elements=state.get("elements", []))
                                 _no_change_streak = 0
                                 _last_auto_step   = step_idx
                                 prediction = {"action_type": "keyboard", "key_count": 1, "keystrokes": ["tab"]}
