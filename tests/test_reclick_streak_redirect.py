@@ -27,6 +27,15 @@ verifying" mistake this project has hit and fixed multiple times already
 redirect click and checking whether focus genuinely landed on the target;
 repeated failures to land now escalate to advancing the tab instead of
 retrying the identical failed maneuver forever.
+
+REWRITTEN AGAIN 2026-08-08, SAME NIGHT, on direct repeated user instruction
+("Do not use Tab to fucking navigate"): _RECLICK_REDIRECT_LIMIT dropped
+from 2 to 1 -- the very FIRST drift onto an already-handled field now
+redirects straight to a known target via click, no blind Tab tolerated
+first. The same limit change was also applied to the sibling
+"combobox already attempted (known blank)" guard, which previously had NO
+streak tracking at all and just Tabbed every single time forever -- live
+evidence: 'Suffix' hit that exact untracked path repeatedly across one run.
 """
 import sys
 from pathlib import Path
@@ -90,46 +99,36 @@ def _run_reclick_guard_verified(state, post_redirect_focused_id, reclick_streak,
 
 
 class TestReclickStreakRedirectsInsteadOfBlindTabbing:
-    def test_first_drift_still_gets_a_plain_tab(self):
-        """A single drift-back is normal model uncertainty -- don't
-        over-react to one instance."""
+    def test_first_drift_redirects_immediately_no_tab_tolerated(self):
+        """redirect_limit=1: the very first drift onto an already-handled
+        field goes straight to a known target via click -- no blind Tab
+        first. Matches the real _RECLICK_REDIRECT_LIMIT=1 in agent.py."""
         executor = MagicMock()
         state = {"elements": [
             _field("Years Continuously Insured", value="9", bbox=(100, 100, 300, 130)),
             _field("Cell Phone", value="", bbox=(100, 200, 300, 230)),
         ]}
-        streak = _run_reclick_guard(state, reclick_streak=0, redirect_limit=2, executor=executor)
-        assert streak == 1
-        calls = [c.args[0] for c in executor.execute.call_args_list]
-        assert calls == [{"action_type": "keyboard", "key_count": 1, "keystrokes": ["tab"]}]
-
-    def test_second_consecutive_drift_redirects_to_a_known_empty_target(self):
-        """The actual live bug: the SAME stuck position recurring means a
-        blind Tab keeps failing to escape it -- redirect deterministically."""
-        executor = MagicMock()
-        state = {"elements": [
-            _field("Years Continuously Insured", value="9", bbox=(100, 100, 300, 130)),
-            _field("Cell Phone", value="", bbox=(100, 200, 300, 230)),
-        ]}
-        streak = _run_reclick_guard(state, reclick_streak=1, redirect_limit=2, executor=executor)
+        streak = _run_reclick_guard(state, reclick_streak=0, redirect_limit=1, executor=executor)
         assert streak == 0
         calls = [c.args[0] for c in executor.execute.call_args_list]
         assert calls == [{"action_type": "click", "click_position": [200.0, 215.0]}]
 
     def test_redirect_falls_back_to_tab_when_nothing_else_is_visible(self):
         """No genuinely empty target exists yet (e.g. mid-transition) --
-        still safe to fall back to a plain Tab rather than clicking nothing."""
+        still safe to fall back to a plain Tab rather than clicking nothing.
+        This is the one remaining place Tab can still appear from this
+        guard -- there is genuinely nothing else to click."""
         executor = MagicMock()
         state = {"elements": [
             _field("Years Continuously Insured", value="9", bbox=(100, 100, 300, 130)),
         ]}
-        streak = _run_reclick_guard(state, reclick_streak=1, redirect_limit=2, executor=executor)
+        streak = _run_reclick_guard(state, reclick_streak=0, redirect_limit=1, executor=executor)
         # Streak stays incremented (not reset) since no target was found to
         # redirect to -- matches agent.py: the counter only resets on an
         # actual successful redirect, so the very next step retries
         # immediately instead of waiting through another full Tab-and-hope
         # cycle before trying again.
-        assert streak == 2
+        assert streak == 1
         calls = [c.args[0] for c in executor.execute.call_args_list]
         assert calls == [{"action_type": "keyboard", "key_count": 1, "keystrokes": ["tab"]}]
 
@@ -152,7 +151,7 @@ class TestRedirectIsVerifiedNotAssumed:
         ]}
         streak, stall = _run_reclick_guard_verified(
             state, post_redirect_focused_id="Prior Insurer",
-            reclick_streak=1, stall_count=0, redirect_limit=2, stall_limit=2,
+            reclick_streak=0, stall_count=0, redirect_limit=1, stall_limit=2,
             executor=executor, advance_tab_fn=advance_tab_fn)
         assert (streak, stall) == (0, 0)
         advance_tab_fn.assert_not_called()
@@ -169,7 +168,7 @@ class TestRedirectIsVerifiedNotAssumed:
         ]}
         streak, stall = _run_reclick_guard_verified(
             state, post_redirect_focused_id="Years at Address",   # still stuck there
-            reclick_streak=1, stall_count=0, redirect_limit=2, stall_limit=2,
+            reclick_streak=0, stall_count=0, redirect_limit=1, stall_limit=2,
             executor=executor, advance_tab_fn=advance_tab_fn)
         assert (streak, stall) == (0, 1)
         advance_tab_fn.assert_not_called()
@@ -187,7 +186,40 @@ class TestRedirectIsVerifiedNotAssumed:
         ]}
         streak, stall = _run_reclick_guard_verified(
             state, post_redirect_focused_id="Years at Address",   # still stuck there, AGAIN
-            reclick_streak=1, stall_count=1, redirect_limit=2, stall_limit=2,
+            reclick_streak=0, stall_count=1, redirect_limit=1, stall_limit=2,
             executor=executor, advance_tab_fn=advance_tab_fn)
         assert (streak, stall) == (0, 0)   # stall resets after escalating
         advance_tab_fn.assert_called_once()
+
+
+class TestComboboxAlreadyAttemptedBlankAlsoEscalates:
+    """Found 2026-08-08, live, direct user report ("It's using Tab to
+    fucking navigate. Its not finding the actual optimal view."): the
+    'Suffix' combobox (legitimately blank -- no value in the record) hit a
+    COMPLETELY SEPARATE guard from the one above ("combobox %r already
+    attempted (known blank) -- Tab, no re-click") that had NO streak
+    tracking and NO escalation at all -- it Tabbed every single time it
+    recurred, forever. Live evidence: 'Suffix' hit this exact path 3 times
+    in a row (steps 11-13 of one run), then twice more later in the SAME
+    run, at moderate transformer confidence (0.72+) that never tripped the
+    separate low-confidence gate. Fixed by reusing the SAME _reclick_streak
+    counter and verified-redirect mechanism as the sibling "already-filled"
+    guard, rather than maintaining two inconsistent copies -- this class
+    proves the shared mechanism applies here too, using the same mirror
+    (the real fix literally shares the counters and redirect/verify code)."""
+
+    def test_first_occurrence_redirects_immediately_no_tab_tolerated(self):
+        """Was: unconditional Tab, no escalation whatsoever. Now: the very
+        first time a known-blank combobox (like 'Suffix') recurs, redirect
+        to a real target via click, matching the _RECLICK_REDIRECT_LIMIT=1
+        sibling guard. 'Suffix' itself isn't in this state's elements --
+        the real code already excludes it via attempted_keys before this
+        guard ever fires; this test only checks WHERE the redirect lands."""
+        executor = MagicMock()
+        state = {"elements": [
+            _field("City", value="", bbox=(100, 200, 300, 230)),
+        ]}
+        streak = _run_reclick_guard(state, reclick_streak=0, redirect_limit=1, executor=executor)
+        assert streak == 0
+        calls = [c.args[0] for c in executor.execute.call_args_list]
+        assert calls == [{"action_type": "click", "click_position": [200.0, 215.0]}]

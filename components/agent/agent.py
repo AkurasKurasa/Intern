@@ -1243,7 +1243,15 @@ class LLMAgent:
         # most of the time); several in a row with zero progress means the
         # transformer's own pointer is stuck guessing. Reset on any confident click.
         _lowconf_fallback_streak: int    = 0
-        _LOWCONF_FALLBACK_LIMIT: int     = 3   # matches _REPEAT_LIMIT's existing convention
+        # Was 3 (one blind Tab tolerated per low-confidence guess, up to 3
+        # times, before redirecting) -- changed to 1 on direct, repeated user
+        # instruction 2026-08-08 ("Do not use Tab to navigate"): the very
+        # first low-confidence/invalid pointer now goes straight to
+        # Navigation Protocol's own known target via click, no Tab-and-hope
+        # at all. Tab is still used elsewhere for its OWN legitimate job
+        # (committing a just-selected combobox value, moving off a just-
+        # filled field) -- this only removes it as a NAVIGATION guess.
+        _LOWCONF_FALLBACK_LIMIT: int     = 1
         # Same idea as _lowconf_fallback_streak, but for the reclick guard
         # specifically. Found 2026-08-08, live, direct user report ("still
         # not finding the right view"): the transformer's own pointer aimed
@@ -1255,7 +1263,12 @@ class LLMAgent:
         # somewhere useful; when the SAME stuck position keeps recurring,
         # that gamble keeps failing. Reset on any real fill/click.
         _reclick_streak: int             = 0
-        _RECLICK_REDIRECT_LIMIT: int     = 2
+        # Was 2 (one blind Tab tolerated on the first drift onto an already-
+        # handled field, before redirecting on the second) -- changed to 1 on
+        # direct, repeated user instruction 2026-08-08 ("Do not use Tab to
+        # navigate"): the very first drift onto an already-filled/attempted
+        # field now redirects straight to a known target via click.
+        _RECLICK_REDIRECT_LIMIT: int     = 1
         _redirect_stall_count:   int     = 0
         _REDIRECT_STALL_LIMIT:   int     = 2
         _heuristic_steps:        int      = 0      # steps decided by auto-handlers (not LLM/transformer)
@@ -2681,6 +2694,63 @@ class LLMAgent:
                             # it FIRST and skip straight to Tab — no click needed, there's
                             # nothing to open or verify about a field already known blank.
                             _cb_label_skip = (_cbox.get("label") or _cbox.get("text") or "").strip()
+                            # Found 2026-08-08, live, direct user report ("It's using Tab
+                            # to navigate. Its not finding the actual optimal view."):
+                            # this branch had NO streak tracking at all -- unlike the
+                            # sibling "already-filled" reclick guard below (which
+                            # escalates to a verified redirect after 2 repeats), this one
+                            # just Tabbed every single time, forever, with no memory of
+                            # how many times it had just recurred. Log evidence: 'Suffix'
+                            # hit this exact branch 3 separate times in a row (steps
+                            # 11-13), then again twice more later in the same run --
+                            # moderate transformer confidence (0.72+, not low enough to
+                            # trip the separate low-confidence fallback), just repeatedly
+                            # re-guessing a coordinate it had already been told is a dead
+                            # end. Reuses the SAME _reclick_streak counter and verified-
+                            # redirect mechanism as the already-filled guard -- one
+                            # unified "stop re-visiting a dead field" escalation instead
+                            # of two separate, inconsistently-capable copies of it.
+                            _reclick_streak += 1
+                            if _reclick_streak >= _RECLICK_REDIRECT_LIMIT:
+                                _nav_vb_cb = self._form_viewport_bottom(state) - 8
+                                _cb_rc_target = self._navproto.find_visible_empty_target(
+                                    state, _nav_vb_cb, attempted_keys=self._attempted_keys,
+                                    attempt_key_fn=self._attempt_key)
+                                if _cb_rc_target and _cb_rc_target.get("bbox"):
+                                    _cbrcb = _cb_rc_target["bbox"]
+                                    _cb_rc_label = (_cb_rc_target.get("label") or _cb_rc_target.get("text") or "?")[:30]
+                                    _cb_rc_key = self._attempt_key(_cb_rc_target, elements=state.get("elements", []))
+                                    logger.info(
+                                        "[OPT2] combobox %r already attempted (known blank) %d times in a "
+                                        "row — redirecting to known target %r instead of another blind Tab.",
+                                        _cb_label_skip[:30], _reclick_streak, _cb_rc_label)
+                                    self._executor.execute({
+                                        "action_type": "click",
+                                        "click_position": [(_cbrcb[0] + _cbrcb[2]) / 2, (_cbrcb[1] + _cbrcb[3]) / 2],
+                                    })
+                                    time.sleep(self.step_delay * 0.4)
+                                    _reclick_streak = 0
+                                    # Same verify-don't-assume fix as the sibling guard.
+                                    _cb_rc_check = self._observe()
+                                    _cb_rc_landed = self._attempt_key(
+                                        next((e for e in _cb_rc_check.get("elements", [])
+                                              if e.get("element_id") == _cb_rc_check.get("focused_element_id")), {}),
+                                        elements=_cb_rc_check.get("elements", []),
+                                    ) == _cb_rc_key
+                                    if _cb_rc_landed:
+                                        _redirect_stall_count = 0
+                                        state = _cb_rc_check
+                                        continue
+                                    _redirect_stall_count += 1
+                                    if _redirect_stall_count >= _REDIRECT_STALL_LIMIT:
+                                        _redirect_stall_count = 0
+                                        if self._try_advance_tab(state):
+                                            _tab_just_switched = True
+                                            _tab_scroll_count  = 0
+                                            _last_auto_step    = step_idx
+                                            self._refresh_record_cache(self._observe())
+                                            time.sleep(self.step_delay)
+                                    continue
                             logger.info("[OPT2] combobox %r already attempted (known blank) — Tab, no re-click.",
                                         _cb_label_skip[:30])
                             self._executor.execute({"action_type": "keyboard",

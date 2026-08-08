@@ -11,15 +11,20 @@ zero progress -- the transformer's own click-pointer wasn't confident
 enough to act on anything, and the only existing response was to blindly
 press Tab and hope, over and over.
 
-Fix: track consecutive low-confidence/invalid-pointer fallbacks. After
-_LOWCONF_FALLBACK_LIMIT in a row, stop guessing and ask Navigation
-Protocol's find_visible_empty_target() directly:
-  - a real target IS visible -> click it deterministically (bypass the
-    unconfident pointer for one step).
-  - nothing is visible either -> scroll (or advance the tab if scrolling
-    is already exhausted) instead of another blind Tab.
-A single low-confidence guess is left alone (self-corrects most of the
-time); escalation only kicks in after repeated, proven-unproductive tries.
+First fix (2026-08-07): track consecutive low-confidence/invalid-pointer
+fallbacks, tolerate 2 blind Tabs, escalate to a direct click on the 3rd.
+
+REWRITTEN 2026-08-08 on direct, repeated, escalating user instruction
+("Do not use Tab to fucking navigate you piece of shit") after a live run
+still showed Tab being used as a navigation guess -- moderate-confidence
+repeats onto an already-resolved dead field (e.g. 'Suffix', hit 3+ times in
+one run) don't even trip the low-confidence gate, so tolerating ANY blind
+Tab before redirecting was still producing visible, wasteful Tab-hopping.
+_LOWCONF_FALLBACK_LIMIT dropped from 3 to 1: the very FIRST low-confidence
+or invalid pointer now goes straight to Navigation Protocol's known target
+via click -- no Tab-and-hope tolerated at all. Tab is still used elsewhere
+for its own legitimate job (committing a just-selected combobox value,
+moving off a just-filled field) -- only removed here as a navigation guess.
 """
 import sys
 from pathlib import Path
@@ -28,7 +33,7 @@ from unittest.mock import MagicMock
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "components"))
 from agent.navigation_protocol import find_visible_empty_target
 
-_LOWCONF_FALLBACK_LIMIT = 3
+_LOWCONF_FALLBACK_LIMIT = 1
 
 
 def _field(label, value="", bbox=(1400, 500, 1600, 530)):
@@ -40,7 +45,9 @@ def _run_updated_fallback_branch(executor, streak, state, viewport_bottom,
                                   attempted_keys=None, tab_scroll_count=0, max_tab_scrolls=6,
                                   scroll_fn=None, advance_fn=None):
     """Mirrors the CURRENT escalation logic in agent.py's run() (the `else`
-    arm reached when the transformer's pointer is gated to None or invalid)."""
+    arm reached when the transformer's pointer is gated to None or invalid),
+    now with _LOWCONF_FALLBACK_LIMIT=1 -- every occurrence escalates
+    immediately, never tolerating a blind Tab first."""
     streak += 1
     if streak < _LOWCONF_FALLBACK_LIMIT:
         executor.execute({"action_type": "keyboard", "key_count": 1, "keystrokes": ["tab"]})
@@ -62,44 +69,36 @@ def _run_updated_fallback_branch(executor, streak, state, viewport_bottom,
     return "advanced_tab", 0, 0
 
 
-class TestEscalationOnlyKicksInAfterRepeatedFailures:
-    def test_single_low_confidence_guess_just_tabs(self):
-        executor = MagicMock()
-        outcome, streak, _ = _run_updated_fallback_branch(
-            executor, streak=0, state={"elements": []}, viewport_bottom=1000.0)
-        assert outcome == "blind_tab"
-        assert streak == 1
+class TestEveryLowConfidenceGuessEscalatesImmediately:
+    """The core behavioral change: with _LOWCONF_FALLBACK_LIMIT=1, there is
+    no "tolerate a blind Tab first" state left -- the very first
+    low-confidence/invalid pointer redirects to a known target."""
 
-    def test_below_limit_still_just_tabs(self):
-        executor = MagicMock()
-        outcome, streak, _ = _run_updated_fallback_branch(
-            executor, streak=_LOWCONF_FALLBACK_LIMIT - 2, state={"elements": []},
-            viewport_bottom=1000.0)
-        assert outcome == "blind_tab"
-
-
-class TestEscalationClicksTheKnownTargetDirectly:
-    def test_at_the_limit_with_a_real_target_visible_clicks_it(self):
+    def test_first_low_confidence_guess_with_a_target_visible_clicks_it_directly(self):
         executor = MagicMock()
         target = _field("Marital Status")
         state = {"elements": [target]}
         outcome, streak, _ = _run_updated_fallback_branch(
-            executor, streak=_LOWCONF_FALLBACK_LIMIT - 1, state=state, viewport_bottom=1000.0)
+            executor, streak=0, state=state, viewport_bottom=1000.0)
         assert outcome == "direct_click"
         assert streak == 0
         click_calls = [c for c in executor.execute.call_args_list
                        if c.args[0].get("action_type") == "click"]
         assert len(click_calls) == 1
         assert click_calls[0].args[0]["click_position"] == [1500.0, 515.0]
+        tab_calls = [c for c in executor.execute.call_args_list
+                     if c.args[0].get("action_type") == "keyboard"]
+        assert tab_calls == [], "no Tab should ever be issued as a navigation guess"
 
     def test_already_attempted_targets_are_not_re_clicked(self):
         executor = MagicMock()
         attempted = _field("Suffix")
         state = {"elements": [attempted]}
         outcome, streak, _ = _run_updated_fallback_branch(
-            executor, streak=_LOWCONF_FALLBACK_LIMIT - 1, state=state, viewport_bottom=1000.0,
+            executor, streak=0, state=state, viewport_bottom=1000.0,
             attempted_keys={"suffix"})
-        # No real target visible once Suffix is excluded -> falls to scroll/advance.
+        # No real target visible once Suffix is excluded -> falls to scroll/advance,
+        # never a blind Tab.
         assert outcome in ("scrolled", "advanced_tab")
 
 
@@ -108,7 +107,7 @@ class TestEscalationScrollsOrAdvancesWhenNothingIsVisible:
         executor = MagicMock()
         scroll_fn = MagicMock()
         outcome, streak, tab_scroll_count = _run_updated_fallback_branch(
-            executor, streak=_LOWCONF_FALLBACK_LIMIT - 1, state={"elements": []},
+            executor, streak=0, state={"elements": []},
             viewport_bottom=1000.0, tab_scroll_count=0, max_tab_scrolls=6, scroll_fn=scroll_fn)
         assert outcome == "scrolled"
         assert streak == 0
@@ -119,7 +118,7 @@ class TestEscalationScrollsOrAdvancesWhenNothingIsVisible:
         executor = MagicMock()
         advance_fn = MagicMock()
         outcome, streak, tab_scroll_count = _run_updated_fallback_branch(
-            executor, streak=_LOWCONF_FALLBACK_LIMIT - 1, state={"elements": []},
+            executor, streak=0, state={"elements": []},
             viewport_bottom=1000.0, tab_scroll_count=6, max_tab_scrolls=6, advance_fn=advance_fn)
         assert outcome == "advanced_tab"
         assert streak == 0
@@ -129,8 +128,23 @@ class TestEscalationScrollsOrAdvancesWhenNothingIsVisible:
     def test_no_click_executed_when_falling_back_to_scroll(self):
         executor = MagicMock()
         _run_updated_fallback_branch(
-            executor, streak=_LOWCONF_FALLBACK_LIMIT - 1, state={"elements": []},
+            executor, streak=0, state={"elements": []},
             viewport_bottom=1000.0)
         click_calls = [c for c in executor.execute.call_args_list
                        if c.args[0].get("action_type") == "click"]
         assert len(click_calls) == 0
+
+    def test_no_tab_executed_anywhere_in_the_escalation_ladder(self):
+        """The user's exact instruction, verified across every branch of the
+        ladder: neither the direct-click path, the scroll path, nor the
+        advance-tab path ever issues a Tab keystroke."""
+        executor = MagicMock()
+        scroll_fn = MagicMock()
+        advance_fn = MagicMock()
+        _run_updated_fallback_branch(
+            executor, streak=0, state={"elements": []}, viewport_bottom=1000.0,
+            tab_scroll_count=0, max_tab_scrolls=0, scroll_fn=scroll_fn, advance_fn=advance_fn)
+        tab_calls = [c for c in executor.execute.call_args_list
+                     if c.args[0].get("action_type") == "keyboard"
+                     and c.args[0].get("keystrokes") == ["tab"]]
+        assert tab_calls == []
