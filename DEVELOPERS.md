@@ -981,6 +981,14 @@ framework.
 
   Regression tests: `tests/test_state_validator_id_churn.py` extended with `TestKeyboardValueChangeDisambiguatesRepeatedSections` (2 new tests — three same-labeled Gender fields don't cross-contaminate; an unrelated field's change isn't misattributed to a same-labeled sibling). Full suite 402 passed / 9 skipped / same 2 pre-existing unrelated tesseract failures. Not yet re-verified live.
 
+  **Re-verified live immediately after, direct user report: "Navigation error, fix."** Log (`logs/run_task_20260809_012634.log`) showed steps 108-117: the transformer's own click prediction landed on the SAME already-checked checkbox ('Uninsured/Underinsured Motorist') 10 CONSECUTIVE steps in a row.
+
+  **Root cause: a fourth spot using Tab-as-navigation, missed in every prior Tab-elimination sweep tonight.** The "block re-clicking an already-checked checkbox" guard (inside the click-action branch, structurally separate from the reclick-streak guard — that one only covers edit/combobox fields, never this checkbox-click guard) correctly blocked every one of the 10 clicks so the box couldn't get toggled off, but its fallback was a blind Tab every single time.
+
+  **Fixed the same way as every other Tab-as-navigation spot tonight**: redirect to a known visible target via `find_visible_empty_target()` + `_focus_element_via_uia()` (SetFocus, no coordinate guessing), falling back to a direct click on the target's own bbox only if SetFocus fails, and to Tab only if nothing else is visible at all. Caught my own bug before shipping: first draft set `prediction = None` on a successful SetFocus redirect, then found `prediction.get("action_type")` is called unconditionally a few lines later — would have crashed on `None`. Fixed to `prediction = {"action_type": "no_op"}`, an established, already-safe action type used elsewhere in this file.
+
+  Regression tests: `tests/test_already_checked_checkbox_no_blind_tab.py` (new, 3 tests — SetFocus redirect returns `no_op`; SetFocus failure falls back to a direct click on the target's bbox; Tab only when nothing else is visible). Full suite 405 passed / 9 skipped / same 2 pre-existing unrelated tesseract failures. Not yet re-verified live.
+
 ---
 
 ### Evaluation
