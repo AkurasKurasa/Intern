@@ -71,3 +71,65 @@ class TestIgnoresChurnedIdSameContent:
         ]}
         result = validator.validate(state_before, state_after, {"action_type": "click"})
         assert result.status == "error"
+
+
+def _field(element_id, label, value, etype="editcontrol"):
+    return {"element_id": element_id, "type": etype, "label": label, "text": label,
+            "value": value, "window_role": "active"}
+
+
+class TestKeyboardValueChangeIgnoresChurnedIds:
+    """Found live 2026-08-09, direct user report ("it didn't finish actually
+    filling in necessary tabs that were already present"): the SAME
+    element_id-churn bug the class above already fixed for done/error
+    detection also existed, unfixed, in the "did a value change" check --
+    it matched elems_before[eid] against elems_after[eid] by the same
+    unstable, scan-position id. Live evidence: right after checking the
+    'Homeowner' checkbox (which revealed new elements, shifting every
+    later id), the log reported "Field value changed: 'Male' -> ''" --
+    'Male' was the ALREADY-FILLED 'Gender' combobox's value, several
+    fields away from Homeowner and never touched by this action at all.
+    The id slot Gender used to occupy now held a different, empty field,
+    and the validator compared them as if they were the same field.
+
+    Fixed by matching on (label, type) instead of element_id -- the same
+    stable-identity principle already used by agent.py's own
+    _attempt_key."""
+
+    def test_an_unrelated_field_landing_in_the_old_ids_slot_is_not_reported_as_changed(self):
+        """The actual live bug, reproduced: Gender's id shifts (163 elements
+        appeared after Homeowner's checkbox reveal), and the field that now
+        occupies Gender's OLD id slot is a different, empty field. Must NOT
+        be reported as "Gender changed" -- matching by label proves they're
+        different fields entirely."""
+        validator = StateValidator()
+        state_before = {"elements": [
+            _field("elem_20", "Gender", "Male", etype="comboboxcontrol"),
+            _field("elem_21", "Homeowner", "", etype="checkboxcontrol"),
+        ]}
+        state_after = {"elements": [
+            # Gender's real field, same label, id shifted by newly-revealed
+            # elements elsewhere -- but its OWN value is unchanged.
+            _field("elem_24", "Gender", "Male", etype="comboboxcontrol"),
+            _field("elem_21", "Homeowner", "Checked", etype="checkboxcontrol"),
+            # A field that happens to have landed at Gender's OLD slot
+            # ("elem_20") in this new snapshot -- unrelated, empty.
+            _field("elem_20", "Prior Insurer", "", etype="editcontrol"),
+        ]}
+        result = validator.validate(state_before, state_after, {"action_type": "keyboard"})
+        assert result.reason != "Field value changed: 'Male' → ''"
+
+    def test_a_genuine_value_change_is_still_detected_despite_id_churn(self):
+        """Must not become blind to real changes -- only matching by the
+        WRONG identity should stop, not detection itself. Same field
+        (by label+type), id shifted, value genuinely changed."""
+        validator = StateValidator()
+        state_before = {"elements": [
+            _field("elem_5", "Years Continuously Insured", ""),
+        ]}
+        state_after = {"elements": [
+            _field("elem_9", "Years Continuously Insured", "9"),  # id shifted, real change
+        ]}
+        result = validator.validate(state_before, state_after, {"action_type": "keyboard"})
+        assert result.status == "ok"
+        assert result.reason == "Field value changed: '' → '9'"

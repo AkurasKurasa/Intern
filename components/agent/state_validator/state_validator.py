@@ -189,9 +189,39 @@ class StateValidator:
                 )
 
         # ── Keyboard: check if any value changed ──────────────────────────────
+        # Found 2026-08-09, live, direct user report ("it didn't finish
+        # actually filling in necessary tabs that were already present"):
+        # this matched elem_before/elem_after by the SAME unstable,
+        # position-based element_id ("elem_{offset+count}" in
+        # ui_observer.py) that the completion/error check above (this same
+        # file, ~L134) was already fixed for once before -- an id that's
+        # only self-consistent WITHIN one observation, not stable across
+        # two. Any element-count change between before/after (a scroll, a
+        # revealed field, a dropdown opening) shifts every later id, so
+        # elems_after[eid] can be a COMPLETELY DIFFERENT field than
+        # elems_before[eid]. Live evidence: right after checking the
+        # 'Homeowner' checkbox (159->163 elements) and pressing Tab, this
+        # logged "Field value changed: 'Male' -> ''" -- 'Male' was the
+        # ALREADY-FILLED 'Gender' combobox's value, several fields away
+        # from Homeowner, with no real action taken on it at all. This
+        # was comparing two unrelated fields that happened to share an id
+        # slot, reporting a false "ok" status while masking whatever the
+        # keyboard action actually did (or didn't do).
+        #
+        # Fixed by matching on a STABLE identity (label + type) instead of
+        # position, the same "don't trust the churny id" principle already
+        # applied above -- and the same (label, type) shape agent.py's own
+        # _attempt_key already uses for exactly this reason.
         if action_type == "keyboard" and self.value_matters:
-            for eid, elem_after in elems_after.items():
-                elem_before = elems_before.get(eid)
+            def _stable_key(e):
+                return ((e.get("label") or e.get("text") or "").strip().lower(), e.get("type"))
+
+            _before_by_stable: Dict[tuple, dict] = {}
+            for e in elems_before.values():
+                _before_by_stable.setdefault(_stable_key(e), e)
+
+            for elem_after in elems_after.values():
+                elem_before = _before_by_stable.get(_stable_key(elem_after))
                 if elem_before is None:
                     continue
                 val_before = (elem_before.get("value") or "").strip()
