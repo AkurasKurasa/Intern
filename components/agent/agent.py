@@ -2086,26 +2086,36 @@ class LLMAgent:
             if _nav.action == self._navproto.NavAction.WAIT:
                 _tab_scroll_count = 0                # actionable field visible → reset cap
             elif _nav.action == self._navproto.NavAction.SCROLL:
-                # VERIFIED HOW: scroll ONCE, then check the visible-field signature
-                # actually CHANGED. Changed → new content revealed, let the transformer
-                # act on it. Unchanged → the view didn't move = we're at the bottom
-                # (don't blind-spin) — the NEXT decide() call will see dead_scroll_count
-                # cross the threshold and return ADVANCE_TAB. NO SetFocus here — it
-                # yanks the view back and fights the scroll (the old 6x spin bug).
+                # Scroll ONCE, re-observe, and let the NEXT decide() call (top
+                # of the loop, on the fresh post-scroll state) make the real
+                # WAIT/SCROLL/ADVANCE_TAB call — no acting on anything here.
+                #
+                # Found 2026-08-08, live, immediately after the optimal-view
+                # redesign shipped: "you're just scrolling slowly, filling
+                # nothing." This branch used to click whatever field the
+                # scroll revealed and `continue` straight back to the top,
+                # skipping the transformer's turn entirely — a leftover from
+                # the OLD decide() (any visible target -> WAIT next time). The
+                # NEW decide() only returns WAIT once cur == best (the
+                # genuinely optimal view), so that stale click-and-continue
+                # kept re-triggering SCROLL every single iteration: the same
+                # nearly-stationary field got refocused (never typed into) on
+                # every step, log-confirmed ('First Name' clicked 4 times in a
+                # row, 25px apart, nothing ever filled). Two pieces of logic
+                # built for different rules were fighting each other.
+                #
+                # Fixed by deleting the speculative click. decide() is now the
+                # single source of truth for when scrolling stops; once cur
+                # reaches best, WAIT fires on its own and the normal per-step
+                # transformer/OPT2 flow below — which already knows how to
+                # click AND fill, verified — takes over.
+                _cur_before, _best_before = self._navproto.optimal_view_counts(
+                    state, _nav_vb, attempted_keys=self._attempted_keys, attempt_key_fn=self._attempt_key)
                 _sig_before = self._navproto.visible_field_signature(state, _nav_vb)
-                # DIAGNOSTIC, added 2026-08-08: direct user report ("didn't find
-                # the optimal view") plus log evidence of a real, bounded stall
-                # (steps 31-34 of a live run: -25-unit scroll, "8 unfilled fields
-                # below viewport" identical on all 4 checks, same click position
-                # (1452,870) repeated 4x, nothing ever filled, until a DIFFERENT
-                # scroll on the 5th try finally landed a fill elsewhere). Not
-                # enough evidence yet to know WHY -- guessing (again) risks
-                # burning another round the way the self-calibrating scroll did.
                 # Track one specific off-screen field across this scroll and
-                # measure its ACTUAL pixel movement, using the SAME observation
-                # this branch already takes (no second observe cycle) -- turns
-                # "the count didn't change" into a real, quotable number instead
-                # of an inference.
+                # measure its ACTUAL pixel movement — kept from the earlier
+                # diagnostic round, still useful evidence for scroll-precision
+                # questions independent of the WAIT/SCROLL decision itself.
                 _diag_track_el = self._navproto.find_visible_empty_target(
                     state, 1e9, attempted_keys=self._attempted_keys, attempt_key_fn=self._attempt_key)
                 _diag_track_key = (self._attempt_key(_diag_track_el, elements=state.get("elements", []))
@@ -2131,84 +2141,25 @@ class LLMAgent:
                     else:
                         logger.info("[SCROLL-DIAG] tracked target %r vanished from the post-scroll snapshot.",
                                     (_diag_track_el.get("label") or _diag_track_el.get("text") or "?")[:30])
-                if _view_moved:
-                    # visible_field_signature only proves the view PHYSICALLY moved
-                    # (its own docstring: "not that nothing is left to fill") --
-                    # scrolling shifts nearly every element's y-position, so this
-                    # was true on almost every scroll regardless of whether
-                    # anything ACTIONABLE was revealed. Resetting the dead-scroll
-                    # counter on that alone meant it could never reach
-                    # max_dead_scrolls and hand off to ADVANCE_TAB. Found
-                    # 2026-08-08, live: 11 consecutive pure-scroll steps in a row,
-                    # each logging "new fields revealed", none of them stopping to
-                    # fill anything. Only reset the counter when has_visible_empty_
-                    # target confirms there's actually something to act on now --
-                    # a scroll that reveals new-but-non-actionable content (a
-                    # section header, an already-filled field scrolling into view)
-                    # still counts toward "still nothing to do here."
-                    state           = _state_after
+                state = _state_after if _view_moved else state
+                _cur_after, _best_after = self._navproto.optimal_view_counts(
+                    state, _vb_after, attempted_keys=self._attempted_keys, attempt_key_fn=self._attempt_key)
+                if _view_moved and _cur_after > _cur_before:
+                    # Genuine progress toward the optimal view (more targets
+                    # visible now than before this scroll) -- reset the
+                    # dead-scroll cap so a long tab can keep scrolling as many
+                    # times as it genuinely has real content.
                     _last_auto_step = step_idx
                     _heuristic_steps += 1
-                    _revealed_target = self._navproto.find_visible_empty_target(
-                        _state_after, _vb_after,
-                        attempted_keys=self._attempted_keys, attempt_key_fn=self._attempt_key)
-                    if _revealed_target is not None:
-                        # Found 2026-08-08, live, SAME night as the counter fix
-                        # above: even with that fix, a run still logged 7
-                        # straight "actionable field revealed" scrolls with
-                        # nothing ever getting filled in between. Cause: this
-                        # check runs on _state_after, but then just `continue`s
-                        # back to the top of the loop, which takes a totally
-                        # FRESH self._observe() before deciding anything again
-                        # — two separate observations, moments apart, of a UI
-                        # that isn't perfectly frame-stable. When they disagree,
-                        # the fresh one can say "nothing actionable" even though
-                        # this one just confirmed there was, re-triggering
-                        # SCROLL instead of ever letting the transformer act.
-                        # The Drought Guard next door already solves the exact
-                        # same problem the same way: don't gamble on a later
-                        # recheck agreeing — act on the confirmed state right
-                        # now.
-                        #
-                        # SAME-DAY FOLLOW-UP: routing that "act now" through
-                        # self._focus_first_empty_field() still looped, live --
-                        # its own diagnostic (added to chase this) showed
-                        # _uia_focus_first_field's INDEPENDENT raw UIA tree walk
-                        # found the correct pane but ZERO Edit/ComboBox children
-                        # in it, even though find_visible_empty_target (a
-                        # DIFFERENT system, reading ui_observer.py's own
-                        # already-settled state snapshot) had just found one
-                        # right there. Two separate ways of walking the same UI
-                        # tree, disagreeing — most likely the raw UIA tree
-                        # genuinely hasn't caught up yet immediately after a
-                        # scroll, while _state_after (observed with its own
-                        # settle delay) already has. Stop routing through the
-                        # inconsistent second system: click find_visible_empty_
-                        # target's OWN returned element directly -- the same
-                        # data source that already proved reliable for the
-                        # check, used for the action too, so there's nothing
-                        # left to disagree with.
-                        _rt_label = (_revealed_target.get("label") or _revealed_target.get("text") or "?")[:30]
-                        logger.info(
-                            "Navigation Protocol: scroll moved the view — actionable field revealed: "
-                            "[%s] %r @ %s", _revealed_target.get("type", "?"), _rt_label, _revealed_target.get("bbox"))
-                        _tab_scroll_count = 0
-                        _rt_bbox = _revealed_target.get("bbox")
-                        if _rt_bbox:
-                            self._executor.execute({
-                                "action_type": "click",
-                                "click_position": [(_rt_bbox[0] + _rt_bbox[2]) / 2,
-                                                    (_rt_bbox[1] + _rt_bbox[3]) / 2],
-                            })
-                        time.sleep(0.3)
-                    else:
-                        _tab_scroll_count += 1
-                        logger.info("Navigation Protocol: scroll moved the view but nothing actionable yet (%d/2).",
-                                    _tab_scroll_count)
-                    continue
-                _tab_scroll_count += 1
-                logger.info("Navigation Protocol: view unchanged after scroll (%d) — at bottom of tab.",
-                            _tab_scroll_count)
+                    _tab_scroll_count = 0
+                    logger.info("Navigation Protocol: scroll improved the view (%d → %d of %d possible targets).",
+                                _cur_before, _cur_after, _best_after)
+                else:
+                    _tab_scroll_count += 1
+                    logger.info(
+                        "Navigation Protocol: scroll did not improve the view (%d/%d targets, dead=%d/2).",
+                        _cur_after, _best_after, _tab_scroll_count)
+                continue
             elif _nav.action == self._navproto.NavAction.ADVANCE_TAB:
                 logger.info("Navigation Protocol: %s", _nav.reason)
                 if self._try_advance_tab(state):

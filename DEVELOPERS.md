@@ -865,6 +865,14 @@ framework.
 
   **Also flagged, not yet root-caused**: the same run's log showed the 'State' combobox filled correctly ('California') at step 11, then read back as blank at step 19 with no scroll or click on it in between — a real symptom, but with no evidence yet pointing at a specific cause. Tracked separately rather than guessed at.
 
+  **Re-verified live immediately after the SmallIncrement fix, direct user report: "you're just scrolling slowly, filling nothing."** Log evidence: EVERY step in the run scrolled — none of them ever reached the transformer's own turn. `[SCROLL-DIAG]` showed the same field ('First Name') getting re-clicked 4 times in a row, ~25px apart each time, never typed into.
+
+  **Root cause: two pieces of logic built for different rules were fighting each other.** The SCROLL branch still had OLD code (from before the optimal-view redesign) that clicked whatever field a scroll revealed and `continue`d straight back to the top of the loop, skipping the transformer's turn entirely. Under the OLD `decide()` ("is at least one target visible? then stop scrolling"), that was correct — the NEXT `decide()` call would see that field and return WAIT. Under the NEW `decide()` (WAIT only once `cur == best`, the genuinely maximal view), one revealed field usually isn't enough — so `decide()` kept returning SCROLL immediately again, and the stale click-and-continue kept firing on the same barely-moved field, forever, never once reaching the transformer.
+
+  **Fixed by deleting the speculative click entirely.** The SCROLL branch now only scrolls, re-observes, and updates the dead-scroll counter based on `optimal_view_counts()`'s `cur` (the SAME metric `decide()` itself uses) — progress means `cur` increased, not "something is visible." No action is taken during scrolling; `decide()`, called fresh at the top of the loop on the post-scroll state, is now the single source of truth for when scrolling stops. Once it naturally returns WAIT, the existing per-step transformer/OPT2 flow (already correct, already verified) takes over clicking and filling.
+
+  **`tests/test_dead_scroll_counter_requires_actionable_target.py` fully rewritten** — its old mirror functions tested the exact removed behavior (has_visible_empty_target-based reset, click-and-continue). New version mirrors the cur/best-based reset condition (6 tests, including the isolated regression scenario: one visible target staying at exactly one target must NOT reset the counter, only a genuine cur INCREASE counts as progress) plus a class documenting the click's removal. Full suite 362 passed / 9 skipped / same 2 pre-existing unrelated tesseract failures. Not yet re-verified live.
+
 ---
 
 ### Evaluation
