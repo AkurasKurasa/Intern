@@ -1271,6 +1271,21 @@ class LLMAgent:
         _RECLICK_REDIRECT_LIMIT: int     = 1
         _redirect_stall_count:   int     = 0
         _REDIRECT_STALL_LIMIT:   int     = 2
+        # Found 2026-08-09, live, direct user report ("it didn't want to
+        # navigate"): a combobox whose dropdown never renders (confirmed:
+        # 8 real polling tries, 3.2s, every single attempt) had NO streak
+        # tracking at all -- unlike the sibling "combobox is blank, nothing
+        # to fill" case a few lines above it in the same function (which
+        # already blacklists via _action_history/_nochange_click_pos), this
+        # branch just logged a warning, pressed Escape, and looped forever.
+        # 'Payment Frequency' hit this exact untracked path 121 times
+        # across ~4 minutes in one run before the user gave up and
+        # interrupted it. Per-label counter (not per-position -- the
+        # combobox's own click position doesn't drift the way the
+        # transformer's pointer does elsewhere) tracking consecutive
+        # dropdown-render failures for the SAME field.
+        _combobox_dropdown_fail_counts: Dict[str, int] = {}
+        _COMBOBOX_DROPDOWN_FAIL_LIMIT:  int             = 2
         _heuristic_steps:        int      = 0      # steps decided by auto-handlers (not LLM/transformer)
         _manual_interventions:   int      = 0      # DAgger corrections the human had to make — cognitive-load proxy
         _llm_unavailable_streak: int      = 0      # consecutive "llm unavailable" — infra failure, NOT "value is blank"
@@ -3002,6 +3017,7 @@ class LLMAgent:
                                 self._executor.execute({"action_type": "keyboard",
                                                         "key_count": 1, "keystrokes": ["tab"]})
                                 self._filled_this_tab.add(_cb_label)
+                                _combobox_dropdown_fail_counts.pop(_cb_label, None)
                             else:
                                 if _items:
                                     logger.warning("Combobox(click-fill): %r not in options %s",
@@ -3010,6 +3026,35 @@ class LLMAgent:
                                     logger.warning("Combobox(click-fill): dropdown for %r did not render", _cb_label)
                                 self._executor.execute({"action_type": "keyboard",
                                                         "key_count": 1, "keystrokes": ["escape"]})
+                                # Found 2026-08-09, live, direct user report
+                                # ("it didn't want to navigate"): with no
+                                # streak tracking here, this branch retried
+                                # the SAME stuck combobox forever -- 121
+                                # times across ~4 minutes for 'Payment
+                                # Frequency' in one run, zero progress, only
+                                # stopped when the user gave up. Escalate
+                                # after repeated failures on the SAME field
+                                # instead of retrying identically forever.
+                                _combobox_dropdown_fail_counts[_cb_label] = (
+                                    _combobox_dropdown_fail_counts.get(_cb_label, 0) + 1)
+                                if _combobox_dropdown_fail_counts[_cb_label] >= _COMBOBOX_DROPDOWN_FAIL_LIMIT:
+                                    logger.warning(
+                                        "[OPT2] %r failed to fill %d times in a row (dropdown never rendered "
+                                        "or option never matched) — marking attempted and moving on.",
+                                        _cb_label, _combobox_dropdown_fail_counts[_cb_label])
+                                    _combobox_dropdown_fail_counts.pop(_cb_label, None)
+                                    self._mark_attempted(_cbox, elements=state.get("elements", []))
+                                    _cd_target = self._navproto.find_visible_empty_target(
+                                        state, self._form_viewport_bottom(state) - 8,
+                                        attempted_keys=self._attempted_keys, attempt_key_fn=self._attempt_key)
+                                    if _cd_target and _cd_target.get("bbox"):
+                                        _cd_label = (_cd_target.get("label") or _cd_target.get("text") or "").strip()
+                                        if not (_cd_label and self._focus_element_via_uia(_cd_label)):
+                                            _cdb = _cd_target["bbox"]
+                                            self._executor.execute({
+                                                "action_type": "click",
+                                                "click_position": [(_cdb[0] + _cdb[2]) / 2, (_cdb[1] + _cdb[3]) / 2],
+                                            })
                             time.sleep(self.step_delay * 0.5)
                             continue
                         else:
