@@ -1425,15 +1425,29 @@ class DemoRecorder:
         # Watchdog: pynput listener threads can die upstream of our guards
         # (e.g. NotImplementedError in pynput's own key conversion). Restart any
         # dead listener so recording never permanently stops mid-session.
+        def _report_death(name: str, dead_listener) -> None:
+            # .join() on an already-dead pynput listener re-raises whatever
+            # exception killed its thread -- without this, "died -- restarting"
+            # gave no way to know WHY, or how often, or whether it's the same
+            # cause every time. Found 2026-08-08: a live session reported
+            # unusually frequent restarts (2 deaths in 3 clicks); needed the
+            # real cause before guessing at a fix.
+            try:
+                dead_listener.join(timeout=0)
+            except Exception as exc:
+                print(f"  [watchdog] {name} listener died — restarting (cause: {exc!r})")
+            else:
+                print(f"  [watchdog] {name} listener died — restarting (no exception captured)")
+
         def _watchdog():
             while not self._quit_event.is_set():
                 time.sleep(0.5)
                 try:
                     if not listeners["m"].is_alive():
-                        print("  [watchdog] mouse listener died — restarting")
+                        _report_death("mouse", listeners["m"])
                         listeners["m"] = _make_mouse(); listeners["m"].start()
                     if not listeners["k"].is_alive():
-                        print("  [watchdog] keyboard listener died — restarting")
+                        _report_death("keyboard", listeners["k"])
                         listeners["k"] = _make_keyboard(); listeners["k"].start()
                 except Exception:
                     pass
@@ -1912,11 +1926,21 @@ class DemoRecorder:
 
     def _guard(self, fn):
         """Wrap a pynput callback so an exception is logged instead of silently
-        killing the listener thread."""
+        killing the listener thread.
+
+        Was `except Exception` -- doesn't catch SystemExit/KeyboardInterrupt/
+        other BaseException subclasses, so anything in that gap still killed
+        the listener with NOTHING logged (found 2026-08-08: a live session
+        watchdog-restarted both listeners multiple times with zero exception
+        captured via listener.join(), which only makes sense if something
+        outside Exception's hierarchy was the cause). BaseException closes
+        that gap; this callback's only job is keeping input capture alive,
+        so there's no legitimate reason to let anything propagate and kill it.
+        """
         def _wrapped(*args, **kwargs):
             try:
                 return fn(*args, **kwargs)
-            except Exception:
+            except BaseException:
                 self._log_crash(fn.__name__)
                 return True   # keep listener alive
         return _wrapped
