@@ -4407,12 +4407,21 @@ class LLMAgent:
             ]
             _target = min(_fillable_below, key=lambda e: e["bbox"][1]) if _fillable_below else None
 
+            # One move-to-center, one move-back -- everything in between (the
+            # calibration nudge AND the calibrated follow-up, when one is
+            # needed) happens from the SAME cursor position. Found 2026-08-08,
+            # live: the original version moved to center/back TWICE per call
+            # (once for calibration, once for the follow-up scroll), and with
+            # this running on nearly every one of several consecutive steps,
+            # the cursor visibly jumped back and forth rapidly enough to look
+            # broken. Same underlying scroll amounts, just without the
+            # redundant round-trip.
             orig = pyautogui.position()
-            pyautogui.moveTo(cx, cy, duration=0.15)
+            pyautogui.moveTo(cx, cy, duration=0.1)
             pyautogui.scroll(-5)   # calibration nudge -- same safe amount as before
-            pyautogui.moveTo(orig.x, orig.y, duration=0.1)
 
             if _target is None:
+                pyautogui.moveTo(orig.x, orig.y, duration=0.1)
                 logger.info("Scroll-form: scrolled down at form center (%.0f, %.0f) "
                             "— no more unfilled fields known below the viewport", cx, cy)
                 return True
@@ -4426,6 +4435,7 @@ class LLMAgent:
                            if self._attempt_key(e, elements=_new_elems) == _target_key
                            and e.get("bbox")), None)
             if _found is None:
+                pyautogui.moveTo(orig.x, orig.y, duration=0.1)
                 logger.info("Scroll-form: scrolled down at form center (%.0f, %.0f) "
                             "— calibration target no longer identifiable, stopping at the nudge", cx, cy)
                 return True
@@ -4433,6 +4443,7 @@ class LLMAgent:
             _new_y = (_found["bbox"][1] + _found["bbox"][3]) / 2
             _pixels_moved = _old_y - _new_y   # positive: field moved up toward/into view
             if _pixels_moved <= 1:
+                pyautogui.moveTo(orig.x, orig.y, duration=0.1)
                 logger.info("Scroll-form: scrolled down at form center (%.0f, %.0f) "
                             "— view barely moved, likely near the bottom already", cx, cy)
                 return True
@@ -4442,16 +4453,15 @@ class LLMAgent:
             _desired_y     = _viewport_top + 40   # small margin so it isn't flush against any header
             _remaining_px  = _new_y - _desired_y
             if _remaining_px <= 0:
+                pyautogui.moveTo(orig.x, orig.y, duration=0.1)
                 logger.info("Scroll-form: scrolled down at form center (%.0f, %.0f) "
                             "— next unfilled field already near the top after the nudge", cx, cy)
                 return True
 
             _more_units = min(round(_remaining_px / _pixels_per_unit), 60)   # capped, safety margin
             if _more_units > 0:
-                orig2 = pyautogui.position()
-                pyautogui.moveTo(cx, cy, duration=0.1)
-                pyautogui.scroll(-_more_units)
-                pyautogui.moveTo(orig2.x, orig2.y, duration=0.1)
+                pyautogui.scroll(-_more_units)   # cursor is already at (cx, cy) -- no re-move needed
+            pyautogui.moveTo(orig.x, orig.y, duration=0.1)
             logger.info("Scroll-form: scrolled down at form center (%.0f, %.0f) — "
                         "calibrated %.1fpx/unit, +%d more units to land %r near the top",
                         cx, cy, _pixels_per_unit, _more_units,
