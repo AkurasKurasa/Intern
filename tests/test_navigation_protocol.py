@@ -16,7 +16,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "components"))
 from agent.navigation_protocol import (
     NavAction, decide, has_visible_empty_target, visible_field_signature,
-    find_visible_empty_target, optimal_view_counts,
+    find_visible_empty_target, optimal_view_counts, find_scroll_target_element,
 )
 
 VIEWPORT_BOTTOM = 1000.0
@@ -225,6 +225,62 @@ class TestOptimalViewCounts:
     def test_zero_and_zero_when_nothing_fillable_remains(self):
         state = {"elements": [_field("Done", value="filled")]}
         assert optimal_view_counts(state, VIEWPORT_BOTTOM) == (0, 0)
+
+
+class TestFindScrollTargetElement:
+    """Added 2026-08-08 per direct user request: "scroll on it once and
+    then boom" -- not an iterative small-step search. This function
+    answers WHICH element to bring into view (via a single native UIA
+    ScrollItemPattern.ScrollIntoView call, owned by the caller) using the
+    exact same sliding-window density calculation optimal_view_counts
+    already performs, so the two can never disagree about what "optimal"
+    means -- it's the DEEPEST element in the densest reachable cluster."""
+
+    def test_returns_the_deepest_element_in_the_densest_cluster(self):
+        """Three fields fit in one window (all within VIEWPORT_BOTTOM of
+        each other); a fourth is much further below, alone. The densest
+        cluster is the group of three -- its deepest member should be
+        returned, not the lone far-below field."""
+        a = _field("Street Address 1", bbox=(100, 1000, 300, 1030))
+        b = _field("City", bbox=(100, 1200, 300, 1230))
+        c = _field("Prior Expiry Date", bbox=(100, 1900, 300, 1930))  # deepest of the dense trio
+        d = _field("Far Below Alone", bbox=(100, 5000, 300, 5030))
+        state = {"elements": [a, b, c, d]}
+        target = find_scroll_target_element(state, VIEWPORT_BOTTOM)
+        assert target is c
+
+    def test_returns_none_when_nothing_fillable_remains(self):
+        state = {"elements": [_field("Done", value="filled")]}
+        assert find_scroll_target_element(state, VIEWPORT_BOTTOM) is None
+
+    def test_excludes_already_attempted_targets(self):
+        attempted = _field("Suffix", bbox=(100, 100, 300, 130))
+        wanted = _field("Marital Status", bbox=(100, 140, 300, 170))
+        state = {"elements": [attempted, wanted]}
+        target = find_scroll_target_element(
+            state, VIEWPORT_BOTTOM,
+            attempted_keys={"suffix"},
+            attempt_key_fn=lambda e, els: (e.get("label") or "").lower(),
+        )
+        assert target is wanted
+
+    def test_a_single_remaining_target_is_its_own_scroll_target(self):
+        state = {"elements": [_field("Only Field", bbox=(100, 2000, 300, 2030))]}
+        target = find_scroll_target_element(state, VIEWPORT_BOTTOM)
+        assert target["label"] == "Only Field"
+
+    def test_agrees_with_optimal_view_counts_about_which_cluster_is_densest(self):
+        """The same scenario used to test optimal_view_counts's best=2 case
+        -- the returned element must belong to the winning window, proving
+        the two functions can't disagree."""
+        state = {"elements": [
+            _field("Underwriter", bbox=(100, 1010, 300, 1040)),
+            _field("Adjuster", bbox=(100, 1060, 300, 1090)),
+        ]}
+        cur, best = optimal_view_counts(state, VIEWPORT_BOTTOM)
+        assert best == 2
+        target = find_scroll_target_element(state, VIEWPORT_BOTTOM)
+        assert target["label"] == "Adjuster"   # the deeper of the two
 
 
 class TestDecideActsOnWhateverIsAlreadyVisible:

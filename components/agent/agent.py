@@ -4793,26 +4793,76 @@ class LLMAgent:
         never goes through screen coordinates at all, just the control
         object UIA already knows about.
         """
-        try:
-            import uiautomation as _uia
-            import win32gui as _w32g
-        except Exception:
+        _ctrl = self._find_uia_control_by_name(label)
+        if _ctrl is None:
             return False
         try:
-            hwnd = self._locked_hwnd or _w32g.GetForegroundWindow()
-            root = _uia.ControlFromHandle(hwnd)
-            _ctrl = None
-            for _finder in (root.EditControl, root.ComboBoxControl, root.CheckBoxControl):
-                _c = _finder(searchDepth=25, Name=label)
-                if _c.Exists(maxSearchSeconds=0.3):
-                    _ctrl = _c
-                    break
-            if _ctrl is None:
-                return False
             _ctrl.SetFocus()
             return True
         except Exception as exc:
             logger.debug("UIA SetFocus on %r failed — %s", label, exc)
+            return False
+
+    def _find_uia_control_by_name(self, label: str):
+        """
+        Shared lookup used by _focus_element_via_uia and
+        _scroll_into_view_via_uia -- finds a live UIA control by its
+        accessible Name among Edit/ComboBox/CheckBox controls in the
+        locked form window. Returns None if UIA is unavailable or nothing
+        matches; never raises.
+        """
+        try:
+            import uiautomation as _uia
+            import win32gui as _w32g
+        except Exception:
+            return None
+        try:
+            hwnd = self._locked_hwnd or _w32g.GetForegroundWindow()
+            root = _uia.ControlFromHandle(hwnd)
+            for _finder in (root.EditControl, root.ComboBoxControl, root.CheckBoxControl):
+                _c = _finder(searchDepth=25, Name=label)
+                if _c.Exists(maxSearchSeconds=0.3):
+                    return _c
+            return None
+        except Exception as exc:
+            logger.debug("UIA control lookup for %r failed — %s", label, exc)
+            return None
+
+    def _scroll_into_view_via_uia(self, label: str) -> bool:
+        """
+        Bring a specific control into view via UIA's
+        ScrollItemPattern.ScrollIntoView() -- ONE native call, no pixel
+        distance, no calibration, no loop of repeated scroll increments.
+        UIA itself figures out exactly how far its container needs to move
+        to make the control visible. Returns True if the control was found
+        and the call succeeded, False otherwise (caller should fall back
+        to the increment-based _scroll_form_down_uia).
+
+        Added 2026-08-08, live, direct user request: "scroll on it once
+        and then boom" -- rejected an earlier plan to measure a
+        pixels-per-scroll-increment ratio and fire a computed number of
+        SmallIncrement calls in a tight loop, on the grounds that it was
+        still fundamentally guessing (a ratio that could be wrong under
+        different DPI/window states) dressed up as one action. The user's
+        own question -- "don't you have the UI Accessibility Tree to just
+        find what isn't in focus" -- pointed at the actually-correct
+        primitive: ask UIA to bring a specific control into view directly,
+        the same way any accessibility-aware application would. The target
+        element itself is chosen by navigation_protocol.find_scroll_target_
+        element -- the deepest element in the densest reachable cluster,
+        so bringing IT into view should reveal the whole cluster above it.
+        """
+        _ctrl = self._find_uia_control_by_name(label)
+        if _ctrl is None:
+            return False
+        try:
+            _sip = _ctrl.GetScrollItemPattern()
+            if _sip is None:
+                return False
+            _sip.ScrollIntoView()
+            return True
+        except Exception as exc:
+            logger.debug("UIA ScrollIntoView on %r failed — %s", label, exc)
             return False
 
     def _scroll_form_down_uia(self, state: Dict[str, Any]) -> bool:
@@ -4916,13 +4966,33 @@ class LLMAgent:
     def _scroll_form_down(self, state: Dict[str, Any]) -> bool:
         """
         Scroll the active form window down to reveal fields hidden below the
-        visible area. Tries the native UIA ScrollPattern route first
-        (_scroll_form_down_uia — one page-scroll call on the real scrollable
-        pane); falls back to the mouse-wheel approach below if UIA's
-        ScrollPattern isn't exposed on this pane (e.g. a custom-drawn scroll
-        area) or raises for any reason.
-        Returns True if scroll was attempted.
+        visible area. THREE routes, tried in order:
+
+        1. _scroll_into_view_via_uia on navigation_protocol's own computed
+           scroll target (the deepest element in the densest reachable
+           cluster below) — ONE native ScrollIntoView call, lands exactly
+           on the optimal cluster, no pixel math, no repeated increments.
+           Added 2026-08-08 per direct user request ("scroll on it once
+           and then boom") after rejecting an increment-counting approach
+           for still fundamentally being a guess (a pixels-per-increment
+           ratio) dressed up as one action.
+        2. _scroll_form_down_uia — one native SmallIncrement page-scroll,
+           used if no scroll target was computable or ScrollIntoView isn't
+           supported on this pane.
+        3. _scroll_form_down_wheel — simulated mouse-wheel, the original
+           fallback, if UIA isn't available at all.
+
+        Returns True if a scroll was attempted.
         """
+        _target = self._navproto.find_scroll_target_element(
+            state, 1e9, attempted_keys=self._attempted_keys, attempt_key_fn=self._attempt_key)
+        if _target is not None:
+            _target_label = (_target.get("label") or _target.get("text") or "").strip()
+            if _target_label and self._scroll_into_view_via_uia(_target_label):
+                logger.info(
+                    "Scroll-form: UIA ScrollIntoView landed on %r — one motion, no increments.",
+                    _target_label[:30])
+                return True
         if self._scroll_form_down_uia(state):
             return True
         return self._scroll_form_down_wheel(state)

@@ -172,6 +172,37 @@ def _max_points_in_window(cys: List[float], width: float) -> int:
     return best
 
 
+def _fillable_candidates(
+    state: Dict[str, Any],
+    attempted_keys: Optional[Set[Any]] = None,
+    attempt_key_fn: Optional[Callable[[Dict[str, Any], List[Dict[str, Any]]], Any]] = None,
+) -> List[tuple]:
+    """
+    (cy, element) pairs for every remaining empty, not-yet-attempted,
+    fillable target reachable by scrolling DOWN (bbox top >= 0 — a target
+    already scrolled past can't be recovered this module only scrolls
+    down). Shared by optimal_view_counts and find_scroll_target_element so
+    both compute the exact same candidate set.
+    """
+    elements = state.get("elements", [])
+    attempted_keys = attempted_keys or set()
+    out: List[tuple] = []
+    for e in elements:
+        if e.get("window_role") == "background":
+            continue
+        if (e.get("type") or "").lower() not in _FILLABLE_TYPES:
+            continue
+        if (e.get("value") or "").strip():
+            continue
+        if attempt_key_fn is not None and attempt_key_fn(e, elements) in attempted_keys:
+            continue
+        b = e.get("bbox")
+        if not b or len(b) != 4 or b[1] < 0:
+            continue
+        out.append(((b[1] + b[3]) / 2, e))
+    return out
+
+
 def optimal_view_counts(
     state: Dict[str, Any],
     viewport_bottom: float,
@@ -200,28 +231,50 @@ def optimal_view_counts(
     rendered right now, whereas the position used for `best` is a
     hypothetical future scroll offset the visible flag can't speak to.
     """
-    elements = state.get("elements", [])
-    attempted_keys = attempted_keys or set()
-    cys: List[float] = []
-    cur = 0
-    for e in elements:
-        if e.get("window_role") == "background":
-            continue
-        if (e.get("type") or "").lower() not in _FILLABLE_TYPES:
-            continue
-        if (e.get("value") or "").strip():
-            continue
-        if attempt_key_fn is not None and attempt_key_fn(e, elements) in attempted_keys:
-            continue
-        b = e.get("bbox")
-        if not b or len(b) != 4 or b[1] < 0:
-            continue
-        cy = (b[1] + b[3]) / 2
-        cys.append(cy)
-        if cy <= viewport_bottom and e.get("visible", True):
-            cur += 1
+    candidates = _fillable_candidates(state, attempted_keys, attempt_key_fn)
+    cys = [cy for cy, _ in candidates]
+    cur = sum(1 for cy, e in candidates if cy <= viewport_bottom and e.get("visible", True))
     best = _max_points_in_window(cys, viewport_bottom) if cys else 0
     return cur, best
+
+
+def find_scroll_target_element(
+    state: Dict[str, Any],
+    viewport_bottom: float,
+    attempted_keys: Optional[Set[Any]] = None,
+    attempt_key_fn: Optional[Callable[[Dict[str, Any], List[Dict[str, Any]]], Any]] = None,
+) -> Optional[Dict[str, Any]]:
+    """
+    The DEEPEST (highest bbox-center-y) element in the densest reachable
+    window of targets — i.e. the one element that, if scrolled into view,
+    should bring the whole optimal cluster above it into view too, since
+    the window's own height was computed to match viewport_bottom.
+
+    Added 2026-08-08 per direct user request: "scroll on it once and then
+    boom" — not an iterative small-step search. The caller is expected to
+    bring this element into view via a native, single UIA call
+    (ScrollItemPattern.ScrollIntoView) rather than computing a pixel
+    distance or firing repeated scroll increments — this function only
+    answers WHICH element to target, using the exact same sliding-window
+    density calculation optimal_view_counts already performs (so the two
+    never disagree about what "optimal" means), not HOW FAR to move.
+
+    Returns None if there's nothing left to scroll to.
+    """
+    candidates = _fillable_candidates(state, attempted_keys, attempt_key_fn)
+    if not candidates:
+        return None
+    candidates.sort(key=lambda pair: pair[0])
+    best_count = 0
+    best_right_idx = 0
+    left = 0
+    for right in range(len(candidates)):
+        while candidates[right][0] - candidates[left][0] > viewport_bottom:
+            left += 1
+        if right - left + 1 > best_count:
+            best_count = right - left + 1
+            best_right_idx = right
+    return candidates[best_right_idx][1]
 
 
 def decide(

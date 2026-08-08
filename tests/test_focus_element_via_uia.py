@@ -26,13 +26,30 @@ from unittest.mock import MagicMock
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "components"))
 
 
+def _fake_self():
+    """A stand-in for `self` that binds the REAL _find_uia_control_by_name
+    method (agent.py refactored _focus_element_via_uia and
+    _scroll_into_view_via_uia to share it) -- a bare MagicMock would auto-
+    generate a mock for that attribute instead of running the real lookup
+    logic under test, silently making every test pass for the wrong reason."""
+    from agent.agent import LLMAgent
+    fake = MagicMock()
+    fake._find_uia_control_by_name = types.MethodType(LLMAgent._find_uia_control_by_name, fake)
+    fake._locked_hwnd = 12345
+    return fake
+
+
 class _FakeControl:
-    def __init__(self, exists=True):
+    def __init__(self, exists=True, scroll_item_pattern=None):
         self._exists = exists
         self.SetFocus = MagicMock()
+        self._scroll_item_pattern = scroll_item_pattern
 
     def Exists(self, maxSearchSeconds=0.3):
         return self._exists
+
+    def GetScrollItemPattern(self):
+        return self._scroll_item_pattern
 
 
 class _FakeRoot:
@@ -78,8 +95,7 @@ class TestFocusElementViaUia:
         root = _FakeRoot(edit=edit)
         _install_fake_uia_modules(root)
 
-        fake_self = MagicMock()
-        fake_self._locked_hwnd = 12345
+        fake_self = _fake_self()
 
         result = LLMAgent._focus_element_via_uia(fake_self, "Street Address 1")
 
@@ -94,8 +110,7 @@ class TestFocusElementViaUia:
         root = _FakeRoot(edit=_FakeControl(exists=False), combo=combo)
         _install_fake_uia_modules(root)
 
-        fake_self = MagicMock()
-        fake_self._locked_hwnd = 12345
+        fake_self = _fake_self()
 
         result = LLMAgent._focus_element_via_uia(fake_self, "Marital Status")
 
@@ -108,8 +123,7 @@ class TestFocusElementViaUia:
         root = _FakeRoot()  # all three finders report not-exists
         _install_fake_uia_modules(root)
 
-        fake_self = MagicMock()
-        fake_self._locked_hwnd = 12345
+        fake_self = _fake_self()
 
         result = LLMAgent._focus_element_via_uia(fake_self, "Nonexistent Field")
 
@@ -128,8 +142,7 @@ class TestFocusElementViaUia:
             return real_import(name, *a, **kw)
 
         import builtins
-        fake_self = MagicMock()
-        fake_self._locked_hwnd = 12345
+        fake_self = _fake_self()
 
         orig = builtins.__import__
         builtins.__import__ = _blocked_import
@@ -137,5 +150,60 @@ class TestFocusElementViaUia:
             result = LLMAgent._focus_element_via_uia(fake_self, "First Name")
         finally:
             builtins.__import__ = orig
+
+        assert result is False
+
+
+class TestScrollIntoViewViaUia:
+    """Regression test for _scroll_into_view_via_uia -- brings a control
+    into view via UIA's ScrollItemPattern.ScrollIntoView(), the actual
+    "scroll once and boom" primitive. Added 2026-08-08, live, direct user
+    request, after rejecting an earlier plan that computed a
+    pixels-per-scroll-increment ratio and fired a calculated number of
+    increments (still fundamentally a guess). The user's own question --
+    "don't you have the UI Accessibility Tree to just find what isn't in
+    focus" -- pointed at this primitive directly: ask UIA to bring a
+    specific control into view, no pixel math involved at all."""
+
+    def test_calls_scroll_into_view_on_the_matching_control(self):
+        from agent.agent import LLMAgent
+
+        sip = MagicMock()
+        edit = _FakeControl(exists=True, scroll_item_pattern=sip)
+        root = _FakeRoot(edit=edit)
+        _install_fake_uia_modules(root)
+
+        fake_self = _fake_self()
+
+        result = LLMAgent._scroll_into_view_via_uia(fake_self, "Prior Expiry Date")
+
+        assert result is True
+        sip.ScrollIntoView.assert_called_once()
+
+    def test_returns_false_when_control_has_no_scroll_item_pattern(self):
+        """Some controls (e.g. checkboxes on certain custom panes) may not
+        expose ScrollItemPattern at all -- must fail cleanly, not raise, so
+        the caller falls back to the increment-based route."""
+        from agent.agent import LLMAgent
+
+        edit = _FakeControl(exists=True, scroll_item_pattern=None)
+        root = _FakeRoot(edit=edit)
+        _install_fake_uia_modules(root)
+
+        fake_self = _fake_self()
+
+        result = LLMAgent._scroll_into_view_via_uia(fake_self, "Prior Expiry Date")
+
+        assert result is False
+
+    def test_returns_false_when_no_control_matches(self):
+        from agent.agent import LLMAgent
+
+        root = _FakeRoot()  # nothing exists
+        _install_fake_uia_modules(root)
+
+        fake_self = _fake_self()
+
+        result = LLMAgent._scroll_into_view_via_uia(fake_self, "Nonexistent Field")
 
         assert result is False
