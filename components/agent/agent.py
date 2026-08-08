@@ -3406,8 +3406,47 @@ class LLMAgent:
                         if _hwnd2:
                             _already = (_wa2.SendMessage(_hwnd2, BM_GETCHECK, 0, 0) == BST_CHECKED)
                             if _chk_label in self._checked_fields or _already:
-                                logger.warning("Checkbox %r already checked — Tab instead.", _chk_label)
-                                prediction = {"action_type": "keyboard", "key_count": 1, "keystrokes": ["tab"]}
+                                # Found 2026-08-09, live, direct user report
+                                # ("Navigation error"): the transformer's own
+                                # click prediction landed on this SAME
+                                # already-checked checkbox 10 CONSECUTIVE
+                                # steps in a row ('Uninsured/Underinsured
+                                # Motorist'). This guard correctly blocked
+                                # every one of those clicks (never
+                                # accidentally unchecked it), but its
+                                # fallback was a blind Tab -- a fourth spot
+                                # using Tab-as-navigation that got missed in
+                                # tonight's broader sweep (this path is
+                                # completely separate from the reclick-streak
+                                # guard, which only covers edit/combobox
+                                # fields, not this specific "block re-
+                                # clicking a checked checkbox" check). Blind
+                                # Tab happened to still work here since a
+                                # plain Tab through a checklist naturally
+                                # lands on the next checkbox most of the
+                                # time -- but it's the same gamble on OS
+                                # focus order this project has repeatedly
+                                # found unreliable elsewhere. Redirect to a
+                                # known visible target instead, same
+                                # principle as every other guard tonight.
+                                logger.warning("Checkbox %r already checked — redirecting instead of blind Tab.",
+                                                _chk_label)
+                                _chk_next = self._navproto.find_visible_empty_target(
+                                    state, self._form_viewport_bottom(state) - 8,
+                                    attempted_keys=self._attempted_keys, attempt_key_fn=self._attempt_key)
+                                if _chk_next and _chk_next.get("bbox"):
+                                    _chk_next_label = (_chk_next.get("label") or _chk_next.get("text") or "").strip()
+                                    if _chk_next_label and self._focus_element_via_uia(_chk_next_label):
+                                        # "no_op", not None -- prediction.get(...) is
+                                        # called unconditionally a few lines below
+                                        # this block; None would crash there.
+                                        prediction = {"action_type": "no_op"}
+                                    else:
+                                        _cnb = _chk_next["bbox"]
+                                        prediction = {"action_type": "click",
+                                                      "click_position": [(_cnb[0] + _cnb[2]) / 2, (_cnb[1] + _cnb[3]) / 2]}
+                                else:
+                                    prediction = {"action_type": "keyboard", "key_count": 1, "keystrokes": ["tab"]}
                             else:
                                 _wa2.SendMessage(_hwnd2, BM_SETCHECK, BST_CHECKED, 0)
                                 logger.info("Checkbox %r checked via Win32 BM_SETCHECK.", _chk_label)
