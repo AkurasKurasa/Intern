@@ -63,6 +63,22 @@ logging.basicConfig(
 logger = logging.getLogger("run_task")
 logger.info("Logging to %s (also mirrored to %s)", _LOG_FILE, _LATEST_LOG)
 
+# Any exception that reaches the top of the script without being caught
+# (e.g. during LLMAgent(...) construction, which sits outside the run()
+# try/except below) used to print only to the console and never reach the
+# log file -- the log would just stop mid-stream with no record of why.
+# Found 2026-08-08: a live run's log cut off right after "Perception: UIA",
+# before agent construction's own try/except even starts, with nothing
+# telling you what killed it. sys.excepthook fires for ANY uncaught
+# exception anywhere in the script, so this guarantees the log always has
+# the real traceback regardless of where the crash happens.
+def _log_uncaught_exception(exc_type, exc_value, exc_tb):
+    logger.error("Unhandled exception — process is crashing:", exc_info=(exc_type, exc_value, exc_tb))
+    sys.__excepthook__(exc_type, exc_value, exc_tb)
+
+
+sys.excepthook = _log_uncaught_exception
+
 # ── config ────────────────────────────────────────────────────────────────────
 GOAL          = "Fill the car insurance form using data from the open text file"
 PROVIDER      = "lmstudio"    # anthropic | groq | gemini | lmstudio | none
@@ -177,9 +193,12 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         results = list(agent._results)
         logger.info("Run interrupted by user at step %d.", len(results))
-    except Exception as exc:
+    except Exception:
         results = list(agent._results)
-        logger.error("Run crashed at step %d: %s", len(results), exc)
+        # exc_info=True logs the full traceback, not just the message -- a
+        # crash step number and "IndexError" alone weren't enough to
+        # actually diagnose anything without knowing WHERE it happened.
+        logger.error("Run crashed at step %d:", len(results), exc_info=True)
     finally:
         logger.info("Run ended — %d steps", len(results))
 
