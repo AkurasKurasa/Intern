@@ -920,6 +920,15 @@ class LLMAgent:
         # this session, fed to the transformer so it stops re-targeting them (the
         # principled fix for empty-optional-field loops). Reset per record.
         self._attempted_keys: set            = set()
+        # Subset of _attempted_keys where the attempt was a genuine keyboard
+        # action carrying real text -- not a bare navigation click, not a
+        # housekeeping "tab"/"ctrl+a" keystroke. Needed because
+        # _attempted_keys deliberately includes undecided navigation clicks
+        # too (see self._leave_blank_keys' own comment) -- a set that can't
+        # tell "typed into" apart from "merely clicked past" is unsafe to
+        # trust for editcontrol/comboboxcontrol's "already filled" checks,
+        # since a stray click there is pure navigation, not a decision.
+        self._typed_keys: set                = set()
         self._attempted_record_num: int      = record_num
         # Form-window lock: captured on the first observe (the window the user
         # clicks at "GO"), re-asserted foreground every step so a stray click can
@@ -2160,9 +2169,36 @@ class LLMAgent:
                 # time but kept re-entering the fill branch forever, since their `value`
                 # can never become non-empty by design.
                 _fe2_confirmed_blank = bool(_fe2) and _fe2_key in self._leave_blank_keys
+                # Trust a genuine-typed-text record over a live "is it empty"
+                # read when they conflict, for ANY type -- not just checkboxes
+                # (_fe2_chk_attempted, above, already did this but only there,
+                # since checkboxes never expose a real value at all). Found
+                # 2026-08-08, live: 'Years Continuously Insured' -- typed and
+                # CONFIRMED filled once already, several steps earlier in the
+                # same run -- got navigated back to, read as empty by this
+                # exact live snapshot, and re-entered the fill branch fully:
+                # a real LLM lookup, a real paste, a real 2-retry verify-at-
+                # fill cycle, 4 times in a row. Same "two sources of truth
+                # disagreeing, trust the one already proven right" lesson as
+                # every other fix tonight: a live value read has proven
+                # unreliable for at least this one field.
+                #
+                # Deliberately checks self._typed_keys, NOT self._attempted_
+                # keys -- the general attempted set also includes fields
+                # merely CLICKED for navigation with no value ever typed
+                # (see self._leave_blank_keys' own comment, and execution_
+                # payment_tab_oscillation_fix's regression two comment blocks
+                # above this one). Using the general set here would silently
+                # reintroduce that exact bug: a stray navigation click onto a
+                # genuinely-empty editcontrol/comboboxcontrol would mark it
+                # "already attempted" and exclude it from ever being filled.
+                # _typed_keys only gains an entry when a keyboard action
+                # carried real text, so a bare click can never trip this.
+                _fe2_already_attempted = bool(_fe2) and _fe2_key in self._typed_keys
                 _t_is_type = (_fe2_ty in ("editcontrol", "input", "comboboxcontrol",
                                           "checkboxcontrol", "checkbox")
-                              and not _fe2_val and not _fe2_chk_attempted and not _fe2_confirmed_blank)
+                              and not _fe2_val and not _fe2_chk_attempted and not _fe2_confirmed_blank
+                              and not _fe2_already_attempted)
 
                 if _t_is_type and self._llm_client:
                     _lowconf_fallback_streak = 0   # real progress — a fillable target is focused
@@ -2364,10 +2400,18 @@ class LLMAgent:
                         _reclick_ty = (_reclick_elem.get("type") or "").lower() if _reclick_elem else ""
                         _reclick_key = (self._attempt_key(_reclick_elem, elements=state.get("elements", []))
                                         if _reclick_elem else None)
+                        # Was: value-truthy AND in self._attempted_keys. Changed
+                        # 2026-08-08 to self._typed_keys alone, same reasoning as
+                        # the editcontrol case below (_reclick_edit_filled) --
+                        # a live value read has proven unreliable (stale-empty)
+                        # for at least one field this same night, and
+                        # self._typed_keys is already scoped to genuine
+                        # keyboard+text actions, so it doesn't need the value
+                        # check to avoid the click-only-marks-attempted
+                        # regression either.
                         _reclick_combobox_filled = (
                             _reclick_ty in ("comboboxcontrol", "combobox")
-                            and bool((_reclick_elem.get("value") or "").strip())
-                            and _reclick_key in self._attempted_keys
+                            and _reclick_key in self._typed_keys
                         )
                         # Checkboxes extended in here 2026-08-07: even after the fill-click
                         # anchoring fix (execution_fill_click_anchored_to_focused_bbox), the
@@ -2403,14 +2447,32 @@ class LLMAgent:
                         # general navigation dynamics... not a special-cased loop
                         # anymore"). That reasoning covered a single stray click,
                         # not a genuine, repeating, multi-field OSCILLATION -- the
-                        # cumulative cost across dozens of steps is real. Same
-                        # value+attempted logic as the combobox case (a plain
-                        # field's `value` accurately reflects real state, unlike a
-                        # checkbox, so it needs the same non-empty check).
+                        # cumulative cost across dozens of steps is real.
+                        #
+                        # Used to also require a non-empty live value read (on
+                        # the theory that unlike a checkbox, a plain field's
+                        # `value` accurately reflects real state). Found
+                        # 2026-08-08, live, same run as the OPT2 fill-gate fix
+                        # above: 'Years Continuously Insured' read back EMPTY
+                        # from a live snapshot moments after being typed and
+                        # verify-at-fill-confirmed -- the same stale-read
+                        # issue, not unique to the fill-decision gate. This
+                        # guard would have failed to catch a stray re-click on
+                        # that exact field for the identical reason. Dropped
+                        # the value check -- but checks self._typed_keys, NOT
+                        # self._attempted_keys (unlike the checkbox case just
+                        # above, where click IS the fill action so the general
+                        # attempted set is correct). For an editcontrol, the
+                        # general attempted set also includes fields merely
+                        # clicked for navigation with no value ever typed;
+                        # trusting it here would block a genuinely-empty field
+                        # from ever being re-clicked/filled after one stray
+                        # navigation click landed on it — see _typed_keys' own
+                        # comment and execution_payment_tab_oscillation_fix's
+                        # original regression.
                         _reclick_edit_filled = (
                             _reclick_ty in ("editcontrol", "input")
-                            and bool((_reclick_elem.get("value") or "").strip())
-                            and _reclick_key in self._attempted_keys
+                            and _reclick_key in self._typed_keys
                         )
                         if _reclick_combobox_filled or _reclick_checkbox_attempted or _reclick_edit_filled:
                             _reclick_label = (_reclick_elem.get("label") or _reclick_elem.get("text") or "?")[:30]
@@ -3656,6 +3718,7 @@ class LLMAgent:
             # this one.
             if self._record_num != self._attempted_record_num:
                 self._attempted_keys.clear()
+                self._typed_keys.clear()
                 self._advance_blacklist_pos.clear()
                 self._leave_blank_keys.clear()
                 # car_insurance_form_wx.py's own _on_submit() always calls
@@ -5541,6 +5604,12 @@ class LLMAgent:
             elem = self._elem_at(state, prediction.get("click_position") or [])
         if elem is not None:
             self._mark_attempted(elem, elements=elements)
+            # Real typed text (not a bare "tab"/"ctrl+a" housekeeping
+            # keystroke) is the only signal strong enough to trust over a
+            # live "is it empty" read for edit/combobox fields — see
+            # self._typed_keys' own comment.
+            if at == "keyboard" and (prediction.get("text") or "").strip():
+                self._typed_keys.add(self._attempt_key(elem, elements=elements))
 
     def _stamp_attempted_live(self, state: Dict[str, Any]) -> None:
         """Stamp attempted=1 on observed elements acted on earlier this session."""
