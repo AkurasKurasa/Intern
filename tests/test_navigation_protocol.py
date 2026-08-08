@@ -193,4 +193,56 @@ class TestFindVisibleEmptyTarget:
         assert has_visible_empty_target(state_with, VIEWPORT_BOTTOM) is True
         assert find_visible_empty_target(state_with, VIEWPORT_BOTTOM) is not None
         assert has_visible_empty_target(state_without, VIEWPORT_BOTTOM) is False
-        assert find_visible_empty_target(state_without, VIEWPORT_BOTTOM) is None
+
+
+class TestVisibleFlagTrustsUiaOverGeometry:
+    """Found 2026-08-08, live: a run needed zero explicit SCROLL decisions
+    from decide() at all (every field's bbox y-coordinate fell within the
+    guessed window-rect viewport_bottom), yet the user watched the on-screen
+    view visibly creep down one field at a time as each field got clicked --
+    the target app's own scroll panel auto-scrolling a newly-focused control
+    into view, invisible to this module because it only ever had a
+    geometric ESTIMATE of what's on-screen, never the real answer.
+
+    ui_observer.py now reads UIA's own IsOffscreen property into each
+    element's "visible" key instead of hardcoding it True. has_visible_
+    empty_target / find_visible_empty_target / visible_field_signature now
+    all also require e["visible"] (default True, so any state/test that
+    doesn't set it is unaffected) -- trusting the authoritative signal
+    instead of estimating a second time from window geometry."""
+
+    def test_field_within_geometric_bounds_but_marked_not_visible_is_excluded(self):
+        e = _field("Street Address 1", bbox=(100, 500, 300, 530))
+        e["visible"] = False
+        state = {"elements": [e]}
+        assert has_visible_empty_target(state, VIEWPORT_BOTTOM) is False
+        assert find_visible_empty_target(state, VIEWPORT_BOTTOM) is None
+
+    def test_field_marked_visible_true_is_still_found(self):
+        e = _field("Street Address 1", bbox=(100, 500, 300, 530))
+        e["visible"] = True
+        state = {"elements": [e]}
+        assert has_visible_empty_target(state, VIEWPORT_BOTTOM) is True
+
+    def test_field_with_no_visible_key_defaults_to_visible(self):
+        """Existing states/tests that never set 'visible' at all must behave
+        exactly as before this fix -- geometry alone still decides."""
+        state = {"elements": [_field("First Name")]}
+        assert "visible" not in state["elements"][0]
+        assert has_visible_empty_target(state, VIEWPORT_BOTTOM) is True
+
+    def test_decide_scrolls_instead_of_waiting_when_the_only_candidate_is_offscreen(self):
+        e = _field("Street Address 1", bbox=(100, 500, 300, 530))
+        e["visible"] = False
+        state = {"elements": [e]}
+        d = decide(state, VIEWPORT_BOTTOM, dead_scroll_count=0)
+        assert d.action == NavAction.SCROLL
+
+    def test_visible_field_signature_excludes_not_visible_fields(self):
+        visible_e = _field("First Name", bbox=(100, 100, 300, 130))
+        hidden_e  = _field("Middle Name", bbox=(100, 140, 300, 170))
+        hidden_e["visible"] = False
+        sig = visible_field_signature({"elements": [visible_e, hidden_e]}, VIEWPORT_BOTTOM)
+        labels = {s[0] for s in sig}
+        assert "first name" in labels
+        assert "middle name" not in labels

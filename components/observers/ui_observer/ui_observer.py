@@ -356,6 +356,24 @@ class UIAutomationObserver(Observer):
             auto_id    = ctrl.AutomationId or ""
             class_name = ctrl.ClassName or ""
             enabled    = bool(ctrl.IsEnabled)
+            # UIA's own authoritative "is this actually scrolled into view"
+            # signal (IsOffscreenProperty) -- was never read here; "visible"
+            # below was hardcoded True unconditionally instead, so every
+            # caller trying to answer "is this really on-screen without
+            # scrolling" had to reconstruct that from raw bbox y-coordinates
+            # against a guessed window-rect viewport bound. Found 2026-08-08,
+            # live: a run needed zero explicit scrolls from agent.py's own
+            # Navigation Protocol yet the user watched the view visibly creep
+            # down one field at a time as each field got clicked -- the wx
+            # ScrolledPanel auto-scrolling a newly-focused control into view
+            # on its own, which agent.py had no way to see coming because it
+            # believed (via the geometric estimate) that everything was
+            # already visible. UIA already knows the real answer; use it
+            # instead of estimating it a third time.
+            try:
+                is_offscreen = bool(ctrl.IsOffscreen)
+            except Exception:
+                is_offscreen = False
 
             value = ""
             try:
@@ -490,7 +508,7 @@ class UIAutomationObserver(Observer):
                     "automation_id": auto_id,
                     "class_name":    class_name,
                     "enabled":       enabled,
-                    "visible":       True,
+                    "visible":       not is_offscreen,
                     "focused":       is_focused,
                     "confidence":    1.0,
                     "source":        "uia",

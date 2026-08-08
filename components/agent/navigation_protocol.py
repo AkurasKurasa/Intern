@@ -75,6 +75,19 @@ def find_visible_empty_target(
     powers) so a caller struggling to hit a target via the learned
     transformer's own low-confidence pointer has something deterministic to
     fall back to — the ELEMENT itself, not just a yes/no.
+
+    Also checks e["visible"] (default True, so callers/tests that don't set
+    it are unaffected) alongside the geometric bbox/viewport_bottom check.
+    Found 2026-08-08, live: a run needed zero explicit SCROLL decisions from
+    this module at all, yet the user watched the on-screen view visibly
+    creep down one field at a time as each field got clicked — the target
+    app's own scroll panel auto-scrolling a newly-focused control into view,
+    invisible to this module because viewport_bottom (a window-rect
+    estimate, necessarily approximate) judged those fields "visible" when
+    they weren't really on-screen yet without that per-field auto-scroll.
+    UIA exposes the real answer directly (IsOffscreen); ui_observer.py now
+    reads it into "visible" instead of hardcoding True. Trusting it here
+    replaces a second geometric estimate with the authoritative one.
     """
     elements = state.get("elements", [])
     attempted_keys = attempted_keys or set()
@@ -84,6 +97,8 @@ def find_visible_empty_target(
         if (e.get("type") or "").lower() not in _FILLABLE_TYPES:
             continue
         if (e.get("value") or "").strip():
+            continue
+        if not e.get("visible", True):
             continue
         if attempt_key_fn is not None:
             if attempt_key_fn(e, elements) in attempted_keys:
@@ -122,6 +137,8 @@ def visible_field_signature(state: Dict[str, Any], viewport_bottom: float) -> Fr
         if e.get("window_role") == "background":
             continue
         if (e.get("type") or "").lower() not in _SIG_TYPES:
+            continue
+        if not e.get("visible", True):
             continue
         b = e.get("bbox")
         if not b or len(b) != 4:
