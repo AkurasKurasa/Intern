@@ -4667,8 +4667,14 @@ class LLMAgent:
             # the UIA child enumeration order (which differs from creation order
             # on wxPython ScrolledPanel controls).
             _candidates: list = []
+            _diag_seen_target_type  = 0   # Edit/ComboBox controls seen at all
+            _diag_filtered_filled   = 0   # excluded: name already in _filled_this_tab
+            _diag_filtered_unnamed  = 0   # excluded: no Name at all
+            _diag_filtered_offscreen = 0  # excluded: bbox not on-screen
 
             def _walk(ctrl, depth=0):
+                nonlocal _diag_seen_target_type, _diag_filtered_filled
+                nonlocal _diag_filtered_unnamed, _diag_filtered_offscreen
                 if depth > 12:
                     return
                 try:
@@ -4676,8 +4682,13 @@ class LLMAgent:
                 except Exception:
                     ctn = ""
                 if ctn in _TARGET_NAMES:
+                    _diag_seen_target_type += 1
                     name = (ctrl.Name or "").strip()
-                    if name and name.lower() not in _filled_lower:
+                    if not name:
+                        _diag_filtered_unnamed += 1
+                    elif name.lower() in _filled_lower:
+                        _diag_filtered_filled += 1
+                    else:
                         try:
                             rect = ctrl.BoundingRectangle
                             # Only include controls that are actually on-screen
@@ -4686,6 +4697,8 @@ class LLMAgent:
                             if (rect.left >= 0 and rect.top >= 0
                                     and rect.width > 0 and rect.height > 0):
                                 _candidates.append((rect.top, rect.left, ctrl))
+                            else:
+                                _diag_filtered_offscreen += 1
                         except Exception:
                             pass
                 for child in ctrl.GetChildren():
@@ -4693,6 +4706,21 @@ class LLMAgent:
 
             _walk(_search_root)
             if not _candidates:
+                # Found 2026-08-08, live: this returned False silently, with NO
+                # log line, right after navigation_protocol.has_visible_empty_
+                # target() had JUST confirmed something actionable was on
+                # screen -- a caller couldn't tell WHY this and that function
+                # disagreed (they use two different "already handled" trackers:
+                # this one filters via self._filled_this_tab, that one via
+                # attempted_keys). Log the actual breakdown instead of nothing,
+                # so the next occurrence has real evidence instead of a guess.
+                logger.warning(
+                    "_uia_focus_first_field: zero candidates (saw %d Edit/ComboBox "
+                    "controls total: %d filtered as already-filled, %d unnamed, "
+                    "%d off-screen) — but navigation protocol thought something "
+                    "was actionable here.",
+                    _diag_seen_target_type, _diag_filtered_filled,
+                    _diag_filtered_unnamed, _diag_filtered_offscreen)
                 return False
             _candidates.sort(key=lambda t: (t[0], t[1]))
             target = _candidates[0][2]
