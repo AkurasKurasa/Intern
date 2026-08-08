@@ -4382,11 +4382,35 @@ class LLMAgent:
                     cx = max(bx1 - 40, 10)
                     logger.debug("Scroll-form: shifted cx=%.0f to avoid combobox", cx)
                     break
+            # Scroll amount scales with how much unattempted fillable content is
+            # still off-screen below the viewport -- found 2026-08-08, live,
+            # direct user report: a fixed small scroll ("-5 units") only ever
+            # revealed one field at a time, not an "optimal view" (as many
+            # actionable targets visible at once as possible, the original
+            # spec this whole module was built against). Can't precisely
+            # calibrate scroll-units-to-pixels for this specific app/machine
+            # without live testing (only the user runs live GUI actions), so
+            # this scales conservatively by COUNT of remaining off-screen
+            # targets rather than computing an exact target position: more
+            # unfilled fields still waiting below -> scroll further to surface
+            # more of them at once; few remaining -> smaller scroll so it
+            # doesn't overshoot past the end of the tab's content.
+            _vb = self._form_viewport_bottom(state)
+            _remaining_below = sum(
+                1 for e in elements
+                if e.get("type") in ("editcontrol", "comboboxcontrol", "checkboxcontrol")
+                and e.get("window_role") != "background"
+                and not (e.get("value") or "").strip()
+                and e.get("bbox") and e["bbox"][1] > _vb
+            )
+            _scroll_units = -5 if _remaining_below <= 1 else -15 if _remaining_below <= 4 else -25
             orig = pyautogui.position()
             pyautogui.moveTo(cx, cy, duration=0.15)
-            pyautogui.scroll(-5)   # 5 scroll units down
+            pyautogui.scroll(_scroll_units)
             pyautogui.moveTo(orig.x, orig.y, duration=0.1)
-            logger.info("Scroll-form: scrolled down at form center (%.0f, %.0f)", cx, cy)
+            logger.info("Scroll-form: scrolled down %d units at form center (%.0f, %.0f) "
+                        "— %d unfilled fields still below viewport",
+                        -_scroll_units, cx, cy, _remaining_below)
             return True
         except Exception as exc:
             logger.warning("Scroll-form: failed — %s", exc)
