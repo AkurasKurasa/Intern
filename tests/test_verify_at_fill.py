@@ -270,3 +270,53 @@ class TestRetryReclicksBeforeRetyping:
         click_calls = [c for c in executor.execute.call_args_list
                        if c.args[0].get("action_type") == "click"]
         assert len(click_calls) == 0
+
+
+def _run_settle_poll(observe, expected_text, budget=0.4, poll=0.1):
+    """Mirrors the settle-poll block added to agent.py's run() right before
+    verify-at-fill's own check (2026-08-08 fix): poll a few times instead of
+    one fixed sleep, breaking the moment the value actually shows up."""
+    waited = 0.0
+    while waited < budget:
+        waited += poll
+        state = observe()
+        fid = state.get("focused_element_id")
+        if _verify_fill_matches(state.get("elements", []), fid, expected_text):
+            return True, waited
+    return False, waited
+
+
+class TestVerifyAtFillSettlePoll:
+    """Found live 2026-08-08: 'Years Continuously Insured' failed
+    verify-at-fill's check 100% of the time across 4 separate visits --
+    always exactly empty on the first check AND both retries, never partial
+    or differently-wrong -- yet held the correct value by the end of the
+    run. Classic race: the paste hadn't landed in the control's buffer yet
+    when the (zero-delay) snapshot was taken. A single fixed delay isn't
+    reliable either -- the existing retry path already sleeps before its
+    own re-check and still read empty twice in the live log, so the real
+    settle time varies. Poll instead of guessing one constant."""
+
+    def test_returns_true_as_soon_as_the_value_appears(self):
+        # First poll still empty, second poll shows the real value -- proves
+        # it breaks EARLY rather than always burning the full budget.
+        observe = MagicMock(side_effect=[
+            {"focused_element_id": "e1", "elements": _elements("", "e1")},
+            {"focused_element_id": "e1", "elements": _elements("9", "e1")},
+        ])
+        matched, waited = _run_settle_poll(observe, "9", budget=0.4, poll=0.1)
+        assert matched is True
+        assert observe.call_count == 2
+        assert waited < 0.4   # broke early, didn't exhaust the budget
+
+    def test_returns_false_after_exhausting_the_budget_if_it_never_appears(self):
+        observe = MagicMock(return_value={"focused_element_id": "e1", "elements": _elements("", "e1")})
+        matched, waited = _run_settle_poll(observe, "9", budget=0.3, poll=0.1)
+        assert matched is False
+        assert observe.call_count == 3   # 0.3 budget / 0.1 poll
+
+    def test_no_polling_needed_when_correct_on_the_very_first_check(self):
+        observe = MagicMock(return_value={"focused_element_id": "e1", "elements": _elements("9", "e1")})
+        matched, waited = _run_settle_poll(observe, "9", budget=0.4, poll=0.1)
+        assert matched is True
+        assert observe.call_count == 1

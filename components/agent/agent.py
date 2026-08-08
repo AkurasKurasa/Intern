@@ -3072,6 +3072,36 @@ class LLMAgent:
                 self._executor.execute(tab_pred)
                 logger.info("Auto-Tab after type.")
 
+            # A typed/pasted value can take a beat to actually land in the
+            # control's text buffer before UIA will report it -- taking one
+            # snapshot immediately (zero delay) can read the field as still-
+            # empty even though the paste genuinely succeeded. Found
+            # 2026-08-08, live: 'Years Continuously Insured' failed
+            # verify-at-fill 100% of the time across 4 separate visits (always
+            # exactly '' on the first check AND both retries -- never partial
+            # or differently-wrong) yet held the correct value by the end of
+            # the run -- the signature of a race, not a real typing failure.
+            # A single fixed delay isn't reliable either: the retry path
+            # already sleeps 0.3*step_delay before its own re-check and STILL
+            # read empty both times, so the real settle time varies and can
+            # exceed a guessed constant. Poll instead -- short checks, break
+            # the moment the value actually shows up, so fast fields aren't
+            # slowed down and slow ones aren't given up on prematurely.
+            # Scoped to keyboard actions only (clicks' "focus moved" check
+            # isn't reading typed content, so it isn't exposed to this race).
+            if prediction.get("action_type") == "keyboard" and prediction.get("text"):
+                _settle_text   = prediction["text"].strip()
+                _settle_budget = self.step_delay * 0.4
+                _settle_waited = 0.0
+                _settle_poll   = 0.1
+                while _settle_waited < _settle_budget:
+                    time.sleep(_settle_poll)
+                    _settle_waited += _settle_poll
+                    _settle_state = self._observe()
+                    _settle_fid = _settle_state.get("focused_element_id")
+                    if _verify_fill_matches(_settle_state.get("elements", []), _settle_fid, _settle_text):
+                        break
+
             # 4. Validate
             state_after = self._observe()
 
