@@ -1244,6 +1244,18 @@ class LLMAgent:
         # transformer's own pointer is stuck guessing. Reset on any confident click.
         _lowconf_fallback_streak: int    = 0
         _LOWCONF_FALLBACK_LIMIT: int     = 3   # matches _REPEAT_LIMIT's existing convention
+        # Same idea as _lowconf_fallback_streak, but for the reclick guard
+        # specifically. Found 2026-08-08, live, direct user report ("still
+        # not finding the right view"): the transformer's own pointer aimed
+        # at the exact same already-filled field's screen position on 3
+        # CONSECUTIVE steps in a row (caught safely each time -- no wasted
+        # click, no data corruption -- just a blind Tab and hope) before
+        # finally moving on, and this repeated dozens of times across one
+        # run. A blind Tab gambles on OS focus-traversal order landing
+        # somewhere useful; when the SAME stuck position keeps recurring,
+        # that gamble keeps failing. Reset on any real fill/click.
+        _reclick_streak: int             = 0
+        _RECLICK_REDIRECT_LIMIT: int     = 2
         _heuristic_steps:        int      = 0      # steps decided by auto-handlers (not LLM/transformer)
         _manual_interventions:   int      = 0      # DAgger corrections the human had to make — cognitive-load proxy
         _llm_unavailable_streak: int      = 0      # consecutive "llm unavailable" — infra failure, NOT "value is blank"
@@ -2321,6 +2333,7 @@ class LLMAgent:
 
                 if _t_is_type and self._llm_client:
                     _lowconf_fallback_streak = 0   # real progress — a fillable target is focused
+                    _reclick_streak = 0
                     # transformer chose to FILL → LLM supplies the value (the WHAT).
                     # LLM owns value-filling per the architecture.
                     llm_action = self._ask_llm(state)
@@ -2597,6 +2610,36 @@ class LLMAgent:
                             _reclick_label = (_reclick_elem.get("label") or _reclick_elem.get("text") or "?")[:30]
                             _reclick_reason = ("filled" if (_reclick_combobox_filled or _reclick_edit_filled)
                                                else "checked")
+                            _reclick_streak += 1
+                            # Found 2026-08-08, live, direct user report ("still not
+                            # finding the right view"): the pointer aimed at THIS
+                            # SAME already-filled field's screen position on 3
+                            # consecutive steps before finally moving on -- a plain
+                            # Tab each time gambles on OS focus-traversal order
+                            # landing somewhere useful, and that gamble kept
+                            # failing. Once the SAME stuck position recurs, stop
+                            # gambling: redirect straight to a known-good target,
+                            # the same deterministic fallback the low-confidence
+                            # streak escalation already uses.
+                            if _reclick_streak >= _RECLICK_REDIRECT_LIMIT:
+                                _nav_vb_rc = self._form_viewport_bottom(state) - 8
+                                _rc_target = self._navproto.find_visible_empty_target(
+                                    state, _nav_vb_rc, attempted_keys=self._attempted_keys,
+                                    attempt_key_fn=self._attempt_key)
+                                if _rc_target and _rc_target.get("bbox"):
+                                    _rcb = _rc_target["bbox"]
+                                    _rc_label = (_rc_target.get("label") or _rc_target.get("text") or "?")[:30]
+                                    logger.info(
+                                        "[OPT2] pointer stuck on already-%s %s %r %d times in a row "
+                                        "— redirecting to known target %r instead of another blind Tab.",
+                                        _reclick_reason, _reclick_ty, _reclick_label, _reclick_streak, _rc_label)
+                                    self._executor.execute({
+                                        "action_type": "click",
+                                        "click_position": [(_rcb[0] + _rcb[2]) / 2, (_rcb[1] + _rcb[3]) / 2],
+                                    })
+                                    time.sleep(self.step_delay * 0.4)
+                                    _reclick_streak = 0
+                                    continue
                             logger.info(
                                 "[OPT2] pointer drifted back onto already-%s %s %r — Tab instead "
                                 "of a wasted re-click.",
@@ -2805,6 +2848,7 @@ class LLMAgent:
                             logger.info("[OPT2] TRANSFORMER navigates → click @ (%.0f,%.0f)  ptr_conf=%.2f",
                                         _snap2[0], _snap2[1], t_pred.get("_click_conf", 0.0))
                             _lowconf_fallback_streak = 0
+                            _reclick_streak = 0
                     else:
                         # Found live 2026-08-07, directly from the user watching a run:
                         # "Too much wasted steps. Whenever there are no longer any
@@ -2832,6 +2876,7 @@ class LLMAgent:
                                     _lowconf_fallback_streak, _tlabel, _tcx, _tcy)
                                 prediction = {"action_type": "click", "click_position": [_tcx, _tcy]}
                                 _lowconf_fallback_streak = 0
+                                _reclick_streak = 0
                             else:
                                 # Nothing left visible either — this IS the "no
                                 # targets on screen" case. Scroll (or advance the
@@ -2849,6 +2894,7 @@ class LLMAgent:
                                     self._try_advance_tab(state)
                                     _tab_scroll_count = 0
                                 _lowconf_fallback_streak = 0
+                                _reclick_streak = 0
                                 _last_auto_step = step_idx
                                 time.sleep(self.step_delay * 0.5)
                                 continue
