@@ -4852,17 +4852,30 @@ class LLMAgent:
         element -- the deepest element in the densest reachable cluster,
         so bringing IT into view should reveal the whole cluster above it.
         """
+        # DIAGNOSTIC, added 2026-08-08: found live, immediately after
+        # shipping this route, that it was silently falling back to
+        # _scroll_form_down_uia every time (log showed "SmallIncrement
+        # issued", never "ScrollIntoView landed on..."), with the actual
+        # reason swallowed at debug level. Log EVERY failure branch at
+        # info/warning so the next run says definitively why -- control not
+        # found vs. no ScrollItemPattern support vs. an actual exception --
+        # instead of guessing a fix blind.
         _ctrl = self._find_uia_control_by_name(label)
         if _ctrl is None:
+            logger.info("[SCROLL-INTO-VIEW-DIAG] no UIA control found for %r — falling back.", label)
             return False
         try:
             _sip = _ctrl.GetScrollItemPattern()
             if _sip is None:
+                logger.info(
+                    "[SCROLL-INTO-VIEW-DIAG] control %r found but does not expose "
+                    "ScrollItemPattern — falling back.", label)
                 return False
             _sip.ScrollIntoView()
             return True
         except Exception as exc:
-            logger.debug("UIA ScrollIntoView on %r failed — %s", label, exc)
+            logger.warning("[SCROLL-INTO-VIEW-DIAG] ScrollIntoView on %r raised — %s — falling back.",
+                            label, exc)
             return False
 
     def _scroll_form_down_uia(self, state: Dict[str, Any]) -> bool:
@@ -4894,53 +4907,11 @@ class LLMAgent:
         caller re-observes once and checks the visible-field signature to
         confirm the scroll actually took effect.
         """
-        try:
-            import uiautomation as _uia
-            import win32gui as _w32g
-        except Exception:
+        _panel = self._find_scrollable_pane_uia(state)
+        if _panel is None:
             return False
         try:
-            hwnd = self._locked_hwnd or _w32g.GetForegroundWindow()
-            root = _uia.ControlFromHandle(hwnd)
-
-            elements = state.get("elements", [])
-            _anchor_names = [
-                (e.get("label") or e.get("text") or "").strip()
-                for e in elements
-                if e.get("type") == "editcontrol"
-                and e.get("window_role") != "background"
-                and (e.get("label") or e.get("text"))
-            ]
-            _anchor = None
-            for _nm in _anchor_names:
-                _c = root.EditControl(searchDepth=25, Name=_nm)
-                if _c.Exists(maxSearchSeconds=0.2):
-                    _anchor = _c
-                    break
-            if _anchor is None:
-                _anchor = _uia.GetFocusedControl()
-            if _anchor is None:
-                return False
-
-            _panel, _cur = None, _anchor
-            for _ in range(15):
-                if _cur is None:
-                    break
-                try:
-                    _sp = _cur.GetScrollPattern()
-                    if _sp is not None and _sp.VerticallyScrollable:
-                        _panel = _cur
-                        break
-                except Exception:
-                    pass
-                try:
-                    _cur = _cur.GetParentControl()
-                except Exception:
-                    break
-
-            if _panel is None:
-                return False
-
+            import uiautomation as _uia
             # SmallIncrement, not LargeIncrement -- found 2026-08-08, live,
             # immediately after reviving this route: LargeIncrement is a full
             # native "page jump," much bigger than the old wheel-fallback's
@@ -4963,6 +4934,124 @@ class LLMAgent:
             logger.debug("Scroll-form: UIA ScrollPattern route unavailable — %s", exc)
             return False
 
+    def _find_scrollable_pane_uia(self, state: Dict[str, Any]):
+        """
+        Shared by _scroll_form_down_uia (SmallIncrement) and
+        _scroll_form_down_uia_percent (absolute jump): walks UP from a real
+        on-screen field through the UIA parent chain to find the pane whose
+        ScrollPattern.VerticallyScrollable is True. Returns the UIA control
+        or None if UIA is unavailable or no scrollable ancestor was found.
+        """
+        try:
+            import uiautomation as _uia
+            import win32gui as _w32g
+        except Exception:
+            return None
+        try:
+            hwnd = self._locked_hwnd or _w32g.GetForegroundWindow()
+            root = _uia.ControlFromHandle(hwnd)
+
+            elements = state.get("elements", [])
+            _anchor_names = [
+                (e.get("label") or e.get("text") or "").strip()
+                for e in elements
+                if e.get("type") == "editcontrol"
+                and e.get("window_role") != "background"
+                and (e.get("label") or e.get("text"))
+            ]
+            _anchor = None
+            for _nm in _anchor_names:
+                _c = root.EditControl(searchDepth=25, Name=_nm)
+                if _c.Exists(maxSearchSeconds=0.2):
+                    _anchor = _c
+                    break
+            if _anchor is None:
+                _anchor = _uia.GetFocusedControl()
+            if _anchor is None:
+                return None
+
+            _panel, _cur = None, _anchor
+            for _ in range(15):
+                if _cur is None:
+                    break
+                try:
+                    _sp = _cur.GetScrollPattern()
+                    if _sp is not None and _sp.VerticallyScrollable:
+                        _panel = _cur
+                        break
+                except Exception:
+                    pass
+                try:
+                    _cur = _cur.GetParentControl()
+                except Exception:
+                    break
+            return _panel
+        except Exception as exc:
+            logger.debug("Scroll-form: pane lookup failed — %s", exc)
+            return None
+
+    def _scroll_form_down_uia_percent(self, state: Dict[str, Any], target_bbox_top: float) -> bool:
+        """
+        Jump the scrollable pane DIRECTLY to a computed absolute position
+        via ScrollPattern.SetScrollPercent() -- one call, no repeated
+        increments, no measured pixels-per-call ratio.
+
+        The trick: ScrollPattern.VerticalViewSize is a REQUIRED, standard
+        property (not optional like ScrollItemPattern) reporting what
+        fraction of the total scrollable content the current viewport shows
+        (e.g. 30 means "30% of the content is visible right now"). Combined
+        with the pane's own on-screen pixel height, that gives an exact
+        total-content-height figure, and from there an exact pixels-per-
+        scroll-percent ratio -- computed from ONE read of self-reported UIA
+        data, not measured by scrolling and observing the result. No
+        calibration nudge, no internal observe-and-adjust cycle.
+
+        Added 2026-08-08, live, immediately after _scroll_into_view_via_uia
+        (ScrollItemPattern-based) turned out to not be supported by this
+        form's controls -- falling back to SmallIncrement every time, which
+        only ever revealed one field per call ("it only revealed one
+        input"). ScrollPattern itself (as opposed to ScrollItemPattern) is
+        already proven working on this pane -- SmallIncrement uses the same
+        object successfully -- so SetScrollPercent is far more likely to
+        actually be implemented here too.
+
+        Returns True if the jump was issued, False if the pane doesn't
+        expose the needed properties (falls back to SmallIncrement).
+        """
+        _panel = self._find_scrollable_pane_uia(state)
+        if _panel is None:
+            return False
+        try:
+            import uiautomation as _uia
+            _sp = _panel.GetScrollPattern()
+            if _sp is None or not _sp.VerticallyScrollable:
+                return False
+            _view_size = _sp.VerticalViewSize     # % of content currently visible
+            _cur_percent = _sp.VerticalScrollPercent
+            if not _view_size or _view_size <= 0 or _cur_percent < 0:
+                logger.info(
+                    "[SCROLL-PERCENT-DIAG] pane %r reports VerticalViewSize=%r "
+                    "VerticalScrollPercent=%r — can't compute a ratio, falling back.",
+                    getattr(_panel, "Name", "?"), _view_size, _cur_percent)
+                return False
+            _rect = _panel.BoundingRectangle
+            _panel_height_px = _rect.bottom - _rect.top
+            if _panel_height_px <= 0:
+                return False
+            _total_content_px = _panel_height_px / (_view_size / 100.0)
+            _px_per_percent = _total_content_px / 100.0
+            _target_percent = _cur_percent + (target_bbox_top / _px_per_percent)
+            _target_percent = max(0.0, min(100.0, _target_percent))
+            _sp.SetScrollPercent(_uia.ScrollPattern.NoScrollValue, _target_percent)
+            logger.info(
+                "Scroll-form: UIA SetScrollPercent jumped pane %r from %.1f%% to %.1f%% "
+                "(one absolute motion, target %.0fpx below current top).",
+                getattr(_panel, "Name", "?"), _cur_percent, _target_percent, target_bbox_top)
+            return True
+        except Exception as exc:
+            logger.info("[SCROLL-PERCENT-DIAG] SetScrollPercent route failed — %s — falling back.", exc)
+            return False
+
     def _scroll_form_down(self, state: Dict[str, Any]) -> bool:
         """
         Scroll the active form window down to reveal fields hidden below the
@@ -4976,22 +5065,32 @@ class LLMAgent:
            and then boom") after rejecting an increment-counting approach
            for still fundamentally being a guess (a pixels-per-increment
            ratio) dressed up as one action.
-        2. _scroll_form_down_uia — one native SmallIncrement page-scroll,
-           used if no scroll target was computable or ScrollIntoView isn't
-           supported on this pane.
-        3. _scroll_form_down_wheel — simulated mouse-wheel, the original
+        2. _scroll_form_down_uia_percent — jumps the pane directly via
+           SetScrollPercent(), computed from the pane's own self-reported
+           VerticalViewSize (one read, no calibration nudge). Added
+           2026-08-08, live, immediately after route 1 turned out to not be
+           supported here (ScrollItemPattern is optional; ScrollPattern
+           itself, which this uses, is already proven working via route 3).
+        3. _scroll_form_down_uia — one native SmallIncrement page-scroll,
+           used if neither of the above computed a usable jump.
+        4. _scroll_form_down_wheel — simulated mouse-wheel, the original
            fallback, if UIA isn't available at all.
 
         Returns True if a scroll was attempted.
         """
         _target = self._navproto.find_scroll_target_element(
             state, 1e9, attempted_keys=self._attempted_keys, attempt_key_fn=self._attempt_key)
-        if _target is not None:
+        if _target is None:
+            logger.info("[SCROLL-INTO-VIEW-DIAG] find_scroll_target_element returned nothing to target — falling back.")
+        else:
             _target_label = (_target.get("label") or _target.get("text") or "").strip()
-            if _target_label and self._scroll_into_view_via_uia(_target_label):
+            if self._scroll_into_view_via_uia(_target_label):
                 logger.info(
                     "Scroll-form: UIA ScrollIntoView landed on %r — one motion, no increments.",
                     _target_label[:30])
+                return True
+            _target_bbox = _target.get("bbox")
+            if _target_bbox and self._scroll_form_down_uia_percent(state, _target_bbox[1]):
                 return True
         if self._scroll_form_down_uia(state):
             return True
