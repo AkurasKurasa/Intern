@@ -2642,17 +2642,47 @@ class LLMAgent:
                                         "— the click isn't sticking, not just a stray pointer guess.",
                                         _rc_label, _redirect_stall_count, _REDIRECT_STALL_LIMIT)
                                     if _redirect_stall_count >= _REDIRECT_STALL_LIMIT:
-                                        logger.warning(
-                                            "[OPT2] %d consecutive redirects failed to stick — this tab's "
-                                            "remaining content isn't reachable right now, advancing.",
-                                            _redirect_stall_count)
+                                        # Found 2026-08-08, live, direct user report ("What
+                                        # the fuck was that why did it go to Vehicle?"): this
+                                        # used to blame the WHOLE TAB and advance past it the
+                                        # instant ONE target failed to stick twice -- but the
+                                        # failure was specific to 'Street Address 1' (its
+                                        # exact click coordinates, twice), not evidence the
+                                        # tab itself was exhausted. A dozen other genuinely
+                                        # fillable Policyholder fields (City, State, ZIP,
+                                        # County, DL info, ...) never even got tried before
+                                        # the tab got abandoned -- twice in a row, compounding
+                                        # into a 2-tab jump straight to Vehicle. Fixed: mark
+                                        # ONLY the specific unreachable target attempted (so
+                                        # it stops getting re-offered) and look for a
+                                        # DIFFERENT target before concluding the tab itself is
+                                        # exhausted. Known, accepted trade-off: the unreachable
+                                        # field itself will not get filled this run -- better
+                                        # than either looping on it forever or discarding
+                                        # every other real field alongside it.
                                         _redirect_stall_count = 0
-                                        if self._try_advance_tab(state):
-                                            _tab_just_switched = True
-                                            _tab_scroll_count  = 0
-                                            _last_auto_step    = step_idx
-                                            self._refresh_record_cache(self._observe())
-                                            time.sleep(self.step_delay)
+                                        self._attempted_keys.add(_rc_key)
+                                        _nav_vb_alt = self._form_viewport_bottom(_rc_check) - 8
+                                        _alt_target = self._navproto.find_visible_empty_target(
+                                            _rc_check, _nav_vb_alt, attempted_keys=self._attempted_keys,
+                                            attempt_key_fn=self._attempt_key)
+                                        if _alt_target is None:
+                                            logger.warning(
+                                                "[OPT2] %r unreachable and no other target visible either "
+                                                "— this tab's remaining content isn't reachable right now, "
+                                                "advancing.", _rc_label)
+                                            if self._try_advance_tab(state):
+                                                _tab_just_switched = True
+                                                _tab_scroll_count  = 0
+                                                _last_auto_step    = step_idx
+                                                self._refresh_record_cache(self._observe())
+                                                time.sleep(self.step_delay)
+                                        else:
+                                            logger.info(
+                                                "[OPT2] %r unreachable, but %r is still visible and "
+                                                "reachable — staying on this tab instead of advancing.",
+                                                _rc_label,
+                                                (_alt_target.get("label") or _alt_target.get("text") or "?")[:30])
                                     continue
                             logger.info(
                                 "[OPT2] pointer drifted back onto already-%s %s %r — Tab instead "
@@ -2743,13 +2773,32 @@ class LLMAgent:
                                         continue
                                     _redirect_stall_count += 1
                                     if _redirect_stall_count >= _REDIRECT_STALL_LIMIT:
+                                        # Same fix as the sibling guard above: don't blame the
+                                        # whole tab for one unreachable target, try a
+                                        # different one first.
                                         _redirect_stall_count = 0
-                                        if self._try_advance_tab(state):
-                                            _tab_just_switched = True
-                                            _tab_scroll_count  = 0
-                                            _last_auto_step    = step_idx
-                                            self._refresh_record_cache(self._observe())
-                                            time.sleep(self.step_delay)
+                                        self._attempted_keys.add(_cb_rc_key)
+                                        _nav_vb_cbalt = self._form_viewport_bottom(_cb_rc_check) - 8
+                                        _cb_alt_target = self._navproto.find_visible_empty_target(
+                                            _cb_rc_check, _nav_vb_cbalt, attempted_keys=self._attempted_keys,
+                                            attempt_key_fn=self._attempt_key)
+                                        if _cb_alt_target is None:
+                                            logger.warning(
+                                                "[OPT2] %r unreachable and no other target visible either "
+                                                "— this tab's remaining content isn't reachable right now, "
+                                                "advancing.", _cb_rc_label)
+                                            if self._try_advance_tab(state):
+                                                _tab_just_switched = True
+                                                _tab_scroll_count  = 0
+                                                _last_auto_step    = step_idx
+                                                self._refresh_record_cache(self._observe())
+                                                time.sleep(self.step_delay)
+                                        else:
+                                            logger.info(
+                                                "[OPT2] %r unreachable, but %r is still visible and "
+                                                "reachable — staying on this tab instead of advancing.",
+                                                _cb_rc_label,
+                                                (_cb_alt_target.get("label") or _cb_alt_target.get("text") or "?")[:30])
                                     continue
                             logger.info("[OPT2] combobox %r already attempted (known blank) — Tab, no re-click.",
                                         _cb_label_skip[:30])

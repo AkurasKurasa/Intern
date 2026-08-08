@@ -70,17 +70,24 @@ def _run_reclick_guard(state, reclick_streak, redirect_limit, executor):
 
 def _run_reclick_guard_verified(state, post_redirect_focused_id, reclick_streak,
                                  stall_count, redirect_limit, stall_limit,
-                                 executor, advance_tab_fn):
+                                 executor, advance_tab_fn, attempted_keys=None):
     """Mirrors the CURRENT (2026-08-08) reclick-guard block in agent.py's
     run(): redirect to a known target, then VERIFY (via the post-click
     observation's focused_element_id) that focus actually landed there
-    before trusting it -- repeated failures to land escalate to advancing
-    the tab instead of repeating the same failed redirect forever."""
+    before trusting it. On repeated stalls, marks ONLY the specific
+    unreachable target attempted (so it stops being re-offered) and looks
+    for a DIFFERENT target before concluding the tab itself is exhausted --
+    added after a live regression where one unreachable field ('Street
+    Address 1') caused the WHOLE remaining tab to be abandoned, skipping
+    several other genuinely fillable fields that were never even tried."""
+    attempted_keys = attempted_keys if attempted_keys is not None else set()
+    _key_fn = lambda e, els: e.get("element_id")
     reclick_streak += 1
     if reclick_streak < redirect_limit:
         executor.execute({"action_type": "keyboard", "key_count": 1, "keystrokes": ["tab"]})
         return reclick_streak, stall_count
-    target = find_visible_empty_target(state, VIEWPORT_BOTTOM)
+    target = find_visible_empty_target(state, VIEWPORT_BOTTOM,
+                                        attempted_keys=attempted_keys, attempt_key_fn=_key_fn)
     if not (target and target.get("bbox")):
         executor.execute({"action_type": "keyboard", "key_count": 1, "keystrokes": ["tab"]})
         return reclick_streak, stall_count
@@ -93,8 +100,12 @@ def _run_reclick_guard_verified(state, post_redirect_focused_id, reclick_streak,
         return reclick_streak, 0
     stall_count += 1
     if stall_count >= stall_limit:
-        advance_tab_fn()
         stall_count = 0
+        attempted_keys.add(target["element_id"])
+        alt = find_visible_empty_target(state, VIEWPORT_BOTTOM,
+                                         attempted_keys=attempted_keys, attempt_key_fn=_key_fn)
+        if alt is None:
+            advance_tab_fn()
     return reclick_streak, stall_count
 
 
@@ -189,6 +200,55 @@ class TestRedirectIsVerifiedNotAssumed:
             reclick_streak=0, stall_count=1, redirect_limit=1, stall_limit=2,
             executor=executor, advance_tab_fn=advance_tab_fn)
         assert (streak, stall) == (0, 0)   # stall resets after escalating
+        advance_tab_fn.assert_called_once()
+
+
+class TestStalledRedirectTriesADifferentTargetBeforeAbandoningTheTab:
+    """Found 2026-08-08, live, direct user report ("What the fuck was that
+    why did it go to Vehicle?"): 'Street Address 1' failed to receive focus
+    twice in a row (its own click coordinates specifically), which the OLD
+    escalation treated as proof the whole tab was exhausted -- advancing
+    past a dozen other genuinely fillable Policyholder fields (City, State,
+    ZIP, County, DL info, ...) that were never even tried, and the SAME
+    thing happened again one tab later, compounding into a 2-tab jump
+    straight to Vehicle. One unreachable field is not evidence the tab
+    itself has nothing left."""
+
+    def test_a_different_reachable_target_is_tried_before_advancing(self):
+        """The actual live regression: 'Street Address 1' stalls twice, but
+        'City' is also visible and empty -- must try it instead of jumping
+        tabs."""
+        executor = MagicMock()
+        advance_tab_fn = MagicMock()
+        state = {"elements": [
+            _field("Years Continuously Insured", value="9", bbox=(100, 100, 300, 130)),
+            _field("Street Address 1", value="", bbox=(100, 200, 300, 230)),
+            _field("City", value="", bbox=(100, 300, 300, 330)),
+        ]}
+        attempted = set()
+        streak, stall = _run_reclick_guard_verified(
+            state, post_redirect_focused_id="Years Continuously Insured",  # Street Address 1 never actually focused
+            reclick_streak=0, stall_count=1, redirect_limit=1, stall_limit=2,
+            executor=executor, advance_tab_fn=advance_tab_fn, attempted_keys=attempted)
+        assert (streak, stall) == (0, 0)
+        advance_tab_fn.assert_not_called()
+        assert "Street Address 1" in attempted, "the unreachable field must be excluded from future offers"
+
+    def test_advances_the_tab_only_when_truly_nothing_else_is_reachable(self):
+        """No alternative exists once the stalled target is excluded --
+        THIS is genuine tab exhaustion, so advancing is still correct."""
+        executor = MagicMock()
+        advance_tab_fn = MagicMock()
+        state = {"elements": [
+            _field("Years at Address", value="6", bbox=(100, 100, 300, 130)),
+            _field("Prior Insurer", value="", bbox=(100, 200, 300, 230)),
+        ]}
+        attempted = set()
+        streak, stall = _run_reclick_guard_verified(
+            state, post_redirect_focused_id="Years at Address",
+            reclick_streak=0, stall_count=1, redirect_limit=1, stall_limit=2,
+            executor=executor, advance_tab_fn=advance_tab_fn, attempted_keys=attempted)
+        assert (streak, stall) == (0, 0)
         advance_tab_fn.assert_called_once()
 
 
