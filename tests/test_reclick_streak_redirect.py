@@ -42,7 +42,7 @@ from pathlib import Path
 from unittest.mock import MagicMock
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "components"))
-from agent.navigation_protocol import find_visible_empty_target
+from agent.navigation_protocol import find_visible_empty_target, find_scroll_target_element
 
 VIEWPORT_BOTTOM = 1000.0
 
@@ -55,10 +55,26 @@ def _field(label, value="", bbox=(100, 100, 300, 130), ftype="editcontrol"):
 def _run_reclick_guard(state, reclick_streak, redirect_limit, executor):
     """Mirrors the pre-verify (2026-08-07) reclick-guard shape -- kept for
     the "first drift, plain Tab" and "nothing visible to redirect to" cases,
-    which the verify addition below doesn't change."""
+    which the verify addition below doesn't change.
+
+    Target search switched to find_scroll_target_element 2026-08-09, live,
+    direct user report ("it's still revealing them one at a time"): the
+    redirect's actual action is UIA SetFocus, not a click -- and this wx
+    form auto-scrolls whatever gets focused into view as its own native
+    behavior. Searching only the CURRENT viewport for a redirect target
+    meant every redirect's SetFocus revealed exactly ONE field via that
+    side effect, before Navigation Protocol's own explicit "scroll to the
+    densest cluster" logic ever got a turn. Aiming the redirect at the
+    deepest field in the next dense CLUSTER instead makes that same auto-
+    scroll side effect reveal the whole cluster at once. Uses the REAL
+    viewport height (VIEWPORT_BOTTOM), not unbounded -- the width
+    parameter IS the density calculation; an effectively-infinite width
+    would degenerate it into "just the single deepest field on the whole
+    tab," losing the "fits in one screen" concept entirely (caught while
+    writing this very test, before it ever reached a live run)."""
     reclick_streak += 1
     if reclick_streak >= redirect_limit:
-        target = find_visible_empty_target(state, VIEWPORT_BOTTOM)
+        target = find_scroll_target_element(state, VIEWPORT_BOTTOM)
         if target and target.get("bbox"):
             b = target["bbox"]
             executor.execute({"action_type": "click",
@@ -89,8 +105,11 @@ def _run_reclick_guard_verified(state, post_redirect_focused_id, reclick_streak,
     if reclick_streak < redirect_limit:
         executor.execute({"action_type": "keyboard", "key_count": 1, "keystrokes": ["tab"]})
         return reclick_streak, stall_count
-    target = find_visible_empty_target(state, VIEWPORT_BOTTOM,
-                                        attempted_keys=attempted_keys, attempt_key_fn=_key_fn)
+    # Real viewport height, same reasoning as _run_reclick_guard above --
+    # aim at the densest cluster's deepest field, not just the nearest
+    # visible one, and not an unbounded "just the last field on the tab."
+    target = find_scroll_target_element(state, VIEWPORT_BOTTOM,
+                                         attempted_keys=attempted_keys, attempt_key_fn=_key_fn)
     if not (target and target.get("bbox")):
         executor.execute({"action_type": "keyboard", "key_count": 1, "keystrokes": ["tab"]})
         return reclick_streak, stall_count
@@ -110,6 +129,41 @@ def _run_reclick_guard_verified(state, post_redirect_focused_id, reclick_streak,
         if alt is None:
             advance_tab_fn()
     return reclick_streak, stall_count
+
+
+class TestRedirectAimsAtTheDensestClusterNotJustTheNearestField:
+    """Added 2026-08-09, live, direct user report ("it's still revealing
+    them one at a time"): the redirect's real action is UIA SetFocus, and
+    this wx form auto-scrolls whatever gets focused into view as its own
+    native behavior -- previously undiagnosed. Searching only the current
+    viewport for a redirect target meant every redirect's SetFocus
+    revealed exactly ONE field via that side effect, so Navigation
+    Protocol's own explicit "scroll to the densest cluster" logic never
+    got a turn -- decide() never saw cur==0 because a redirect target was
+    always found nearby first. Proves the redirect now aims at the
+    deepest field of the densest reachable cluster instead of the nearest
+    single empty field, so the same auto-scroll side effect reveals the
+    whole cluster at once."""
+
+    def test_redirects_to_the_deepest_field_of_the_densest_cluster_not_the_nearest_one(self):
+        """A lone field is closer, but three fields further below form a
+        denser cluster -- the redirect must aim at the deepest member of
+        that cluster (matching find_scroll_target_element), not the
+        nearer lone field."""
+        executor = MagicMock()
+        state = {"elements": [
+            _field("Years Continuously Insured", value="9", bbox=(100, 100, 300, 130)),
+            _field("Lonely Nearby Field", value="", bbox=(100, 200, 300, 230)),
+            _field("Street Address 1", value="", bbox=(100, 900, 300, 930)),
+            _field("Street Address 2", value="", bbox=(100, 940, 300, 970)),
+            _field("City", value="", bbox=(100, 980, 300, 1010)),
+        ]}
+        streak = _run_reclick_guard(state, reclick_streak=0, redirect_limit=1, executor=executor)
+        assert streak == 0
+        calls = [c.args[0] for c in executor.execute.call_args_list]
+        # City's bbox center -- the deepest member of the 3-field cluster,
+        # not "Lonely Nearby Field" (closer, but alone).
+        assert calls == [{"action_type": "click", "click_position": [200.0, 995.0]}]
 
 
 class TestReclickStreakRedirectsInsteadOfBlindTabbing:
@@ -218,9 +272,14 @@ class TestStalledRedirectTriesADifferentTargetBeforeAbandoningTheTab:
     itself has nothing left."""
 
     def test_a_different_reachable_target_is_tried_before_advancing(self):
-        """The actual live regression: 'Street Address 1' stalls twice, but
-        'City' is also visible and empty -- must try it instead of jumping
-        tabs."""
+        """The actual live regression, shape preserved: a stalled target
+        must not be retried, and there must be a different one to try
+        instead of advancing. With the target search now aiming at the
+        deepest field in the cluster (find_scroll_target_element,
+        2026-08-09), 'City' (the deeper of the two empty fields) is what
+        actually gets picked and stalls here -- 'Street Address 1' is the
+        remaining alternative found afterward, the reverse of the original
+        scenario's field names but the identical mechanism."""
         executor = MagicMock()
         advance_tab_fn = MagicMock()
         state = {"elements": [
@@ -230,12 +289,12 @@ class TestStalledRedirectTriesADifferentTargetBeforeAbandoningTheTab:
         ]}
         attempted = set()
         streak, stall = _run_reclick_guard_verified(
-            state, post_redirect_focused_id="Years Continuously Insured",  # Street Address 1 never actually focused
+            state, post_redirect_focused_id="Years Continuously Insured",  # City never actually focused
             reclick_streak=0, stall_count=1, redirect_limit=1, stall_limit=2,
             executor=executor, advance_tab_fn=advance_tab_fn, attempted_keys=attempted)
         assert (streak, stall) == (0, 0)
         advance_tab_fn.assert_not_called()
-        assert "Street Address 1" in attempted, "the unreachable field must be excluded from future offers"
+        assert "City" in attempted, "the unreachable field must be excluded from future offers"
 
     def test_an_off_screen_alternate_target_also_counts_as_reachable(self):
         """The SECOND round of this same live bug: the alternate-target

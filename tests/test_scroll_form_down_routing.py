@@ -38,6 +38,10 @@ def _make_fake_self(scroll_into_view_result, percent_result, uia_result, wheel_r
     fake._navproto = navigation_protocol
     fake._attempted_keys = set()
     fake._attempt_key = lambda e, elements=None: (e.get("label") or "").lower()
+    # find_scroll_target_element's width parameter must be a real number
+    # (it's the density-window width, not a bound) -- a bare MagicMock
+    # attribute would blow up the comparison inside it.
+    fake._form_viewport_bottom = MagicMock(return_value=1000.0)
     fake._scroll_into_view_via_uia = MagicMock(return_value=scroll_into_view_result)
     fake._scroll_form_down_uia_percent = MagicMock(return_value=percent_result)
     fake._scroll_form_down_uia = MagicMock(return_value=uia_result)

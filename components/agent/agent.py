@@ -2588,10 +2588,32 @@ class LLMAgent:
                             # the same deterministic fallback the low-confidence
                             # streak escalation already uses.
                             if _reclick_streak >= _RECLICK_REDIRECT_LIMIT:
-                                _nav_vb_rc = self._form_viewport_bottom(state) - 8
-                                _rc_target = self._navproto.find_visible_empty_target(
-                                    state, _nav_vb_rc, attempted_keys=self._attempted_keys,
-                                    attempt_key_fn=self._attempt_key)
+                                # Found 2026-08-09, live, direct user report ("it's
+                                # still revealing them one at a time"): this used to
+                                # search only the CURRENT viewport
+                                # (find_visible_empty_target) for a redirect target --
+                                # but the actual action taken is _focus_element_via_uia
+                                # (UIA SetFocus, not a click), and this wx form auto-
+                                # scrolls whatever gets focused into view as its own
+                                # native behavior (established earlier this session).
+                                # That meant every redirect quietly revealed exactly
+                                # ONE field via that side effect, before Navigation
+                                # Protocol's own explicit "scroll to the densest
+                                # cluster" logic ever got a chance to run -- decide()
+                                # never saw cur==0 because the redirect kept finding
+                                # SOMETHING nearby first. Switched to
+                                # find_scroll_target_element so a redirect aims at the
+                                # DEEPEST field in the next dense CLUSTER -- the same
+                                # auto-scroll side effect then reveals the whole
+                                # cluster at once instead of one field at a time.
+                                # REAL viewport height, not unbounded -- the window
+                                # width IS the density calculation; passing an
+                                # effectively-infinite width degenerates it into "just
+                                # the single deepest field on the whole tab," losing
+                                # the "fits in one screen" density concept entirely.
+                                _rc_target = self._navproto.find_scroll_target_element(
+                                    state, self._form_viewport_bottom(state) - 8,
+                                    attempted_keys=self._attempted_keys, attempt_key_fn=self._attempt_key)
                                 if _rc_target and _rc_target.get("bbox"):
                                     _rcb = _rc_target["bbox"]
                                     _rc_label = (_rc_target.get("label") or _rc_target.get("text") or "?")[:30]
@@ -2767,10 +2789,16 @@ class LLMAgent:
                             # of two separate, inconsistently-capable copies of it.
                             _reclick_streak += 1
                             if _reclick_streak >= _RECLICK_REDIRECT_LIMIT:
-                                _nav_vb_cb = self._form_viewport_bottom(state) - 8
-                                _cb_rc_target = self._navproto.find_visible_empty_target(
-                                    state, _nav_vb_cb, attempted_keys=self._attempted_keys,
-                                    attempt_key_fn=self._attempt_key)
+                                # Same fix as the sibling guard above: aim at the
+                                # deepest field of the densest cluster (REAL viewport
+                                # height, not unbounded -- see that guard's comment for
+                                # why an infinite window width breaks the density
+                                # calculation) instead of the nearest single field, so
+                                # this redirect's own SetFocus auto-scrolls the whole
+                                # next cluster into view.
+                                _cb_rc_target = self._navproto.find_scroll_target_element(
+                                    state, self._form_viewport_bottom(state) - 8,
+                                    attempted_keys=self._attempted_keys, attempt_key_fn=self._attempt_key)
                                 if _cb_rc_target and _cb_rc_target.get("bbox"):
                                     _cbrcb = _cb_rc_target["bbox"]
                                     _cb_rc_label = (_cb_rc_target.get("label") or _cb_rc_target.get("text") or "?")[:30]
@@ -5078,8 +5106,15 @@ class LLMAgent:
 
         Returns True if a scroll was attempted.
         """
+        # REAL viewport height, not unbounded -- find_scroll_target_element's
+        # width parameter IS the density calculation itself; an effectively-
+        # infinite width degenerates it into "just the single deepest field
+        # on the whole tab," losing the "fits in one screen" concept this
+        # whole module exists to compute. Found 2026-08-09 while writing
+        # tests for the redirect-guard version of this exact call.
         _target = self._navproto.find_scroll_target_element(
-            state, 1e9, attempted_keys=self._attempted_keys, attempt_key_fn=self._attempt_key)
+            state, self._form_viewport_bottom(state) - 8,
+            attempted_keys=self._attempted_keys, attempt_key_fn=self._attempt_key)
         if _target is None:
             logger.info("[SCROLL-INTO-VIEW-DIAG] find_scroll_target_element returned nothing to target — falling back.")
         else:
