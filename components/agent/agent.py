@@ -1997,12 +1997,44 @@ class LLMAgent:
                 # cross the threshold and return ADVANCE_TAB. NO SetFocus here — it
                 # yanks the view back and fights the scroll (the old 6x spin bug).
                 _sig_before = self._navproto.visible_field_signature(state, _nav_vb)
+                # DIAGNOSTIC, added 2026-08-08: direct user report ("didn't find
+                # the optimal view") plus log evidence of a real, bounded stall
+                # (steps 31-34 of a live run: -25-unit scroll, "8 unfilled fields
+                # below viewport" identical on all 4 checks, same click position
+                # (1452,870) repeated 4x, nothing ever filled, until a DIFFERENT
+                # scroll on the 5th try finally landed a fill elsewhere). Not
+                # enough evidence yet to know WHY -- guessing (again) risks
+                # burning another round the way the self-calibrating scroll did.
+                # Track one specific off-screen field across this scroll and
+                # measure its ACTUAL pixel movement, using the SAME observation
+                # this branch already takes (no second observe cycle) -- turns
+                # "the count didn't change" into a real, quotable number instead
+                # of an inference.
+                _diag_track_el = self._navproto.find_visible_empty_target(
+                    state, 1e9, attempted_keys=self._attempted_keys, attempt_key_fn=self._attempt_key)
+                _diag_track_key = (self._attempt_key(_diag_track_el, elements=state.get("elements", []))
+                                    if _diag_track_el else None)
+                _diag_track_y0  = (_diag_track_el["bbox"][1] if _diag_track_el and _diag_track_el.get("bbox") else None)
                 _scrolled   = self._scroll_form_down(state)
                 time.sleep(self.step_delay * 0.6)
                 _state_after = self._observe()
                 _vb_after    = self._form_viewport_bottom(_state_after)
                 _view_moved  = (_scrolled and
                                 self._navproto.visible_field_signature(_state_after, _vb_after) != _sig_before)
+                if _diag_track_key is not None and _diag_track_y0 is not None:
+                    _diag_track_after = next(
+                        (e for e in _state_after.get("elements", [])
+                         if self._attempt_key(e, elements=_state_after.get("elements", [])) == _diag_track_key
+                         and e.get("bbox")), None)
+                    if _diag_track_after is not None:
+                        _diag_dy = _diag_track_y0 - _diag_track_after["bbox"][1]
+                        logger.info(
+                            "[SCROLL-DIAG] tracked target %r: bbox_top %.0f → %.0f  (moved %.0f px up)",
+                            (_diag_track_el.get("label") or _diag_track_el.get("text") or "?")[:30],
+                            _diag_track_y0, _diag_track_after["bbox"][1], _diag_dy)
+                    else:
+                        logger.info("[SCROLL-DIAG] tracked target %r vanished from the post-scroll snapshot.",
+                                    (_diag_track_el.get("label") or _diag_track_el.get("text") or "?")[:30])
                 if _view_moved:
                     # visible_field_signature only proves the view PHYSICALLY moved
                     # (its own docstring: "not that nothing is left to fill") --
@@ -2060,7 +2092,10 @@ class LLMAgent:
                         # data source that already proved reliable for the
                         # check, used for the action too, so there's nothing
                         # left to disagree with.
-                        logger.info("Navigation Protocol: scroll moved the view — actionable field revealed.")
+                        _rt_label = (_revealed_target.get("label") or _revealed_target.get("text") or "?")[:30]
+                        logger.info(
+                            "Navigation Protocol: scroll moved the view — actionable field revealed: "
+                            "[%s] %r @ %s", _revealed_target.get("type", "?"), _rt_label, _revealed_target.get("bbox"))
                         _tab_scroll_count = 0
                         _rt_bbox = _revealed_target.get("bbox")
                         if _rt_bbox:
