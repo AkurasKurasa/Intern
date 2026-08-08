@@ -435,6 +435,22 @@ _LISTITEM_TYPES = {"listitem", "listitemcontrol"}
 # anywhere else in the file; this is the one shared, reusable set.
 _SUBMIT_KW = {"submit", "save", "ok", "accept", "done", "finish", "new"}
 
+# Generic destructive-button keywords — any button whose visible text/label
+# contains one of these must NEVER be clicked as an incidental side effect of
+# navigation. Found 2026-08-08, live: the transformer's own low-confidence
+# navigate-pointer (ptr_conf=0.53, no different from dozens of other
+# navigation clicks) happened to land on a 'Clear All' button, which popped a
+# real Windows confirmation dialog (confirmed via its class name, '#32770' —
+# a genuine dialog box, not a misidentified sibling window) that then got
+# dismissed with Escape every subsequent step for the rest of the run,
+# blocking all further progress. The existing _SUBMIT_KW guard (below) only
+# covers accidentally FINISHING early, not accidentally DESTROYING data, and
+# was gated off entirely in this run's mode anyway (self._no_autohandlers) --
+# this set/check applies unconditionally, in every mode, since clicking a
+# destructive button is never an acceptable side effect of the model being
+# unsure where to click next.
+_DESTRUCTIVE_KW = {"clear", "reset", "delete", "erase", "discard", "cancel"}
+
 
 def _find_submit_button(elements: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
     """First button-type element whose text/label matches _SUBMIT_KW, or None.
@@ -446,6 +462,24 @@ def _find_submit_button(elements: List[Dict[str, Any]]) -> Optional[Dict[str, An
          if e.get("type") in ("buttoncontrol", "button")
          and e.get("bbox")
          and any(kw in (e.get("text") or e.get("label") or "").lower() for kw in _SUBMIT_KW)),
+        None,
+    )
+
+
+def _find_destructive_button_at(elements: List[Dict[str, Any]], pos) -> Optional[Dict[str, Any]]:
+    """Button-type element at `pos` whose text/label matches _DESTRUCTIVE_KW,
+    or None. Same "don't filter by window_role" reasoning as
+    _find_submit_button — a Clear/Reset button lives on the main window too."""
+    if not pos or len(pos) < 2:
+        return None
+    px, py = pos[0], pos[1]
+    return next(
+        (e for e in elements
+         if e.get("type") in ("buttoncontrol", "button")
+         and e.get("bbox")
+         and any(kw in (e.get("text") or e.get("label") or "").lower() for kw in _DESTRUCTIVE_KW)
+         and e["bbox"][0] <= px <= e["bbox"][2]
+         and e["bbox"][1] <= py <= e["bbox"][3]),
         None,
     )
 
@@ -2702,6 +2736,27 @@ class LLMAgent:
                                 # the focused field into view).
                                 logger.warning("[GUARD] target (%.0f,%.0f) OUTSIDE form window — Tab instead of drifting.",
                                                _snap2[0], _snap2[1])
+                                self._executor.execute({"action_type": "keyboard",
+                                                        "key_count": 1, "keystrokes": ["tab"]})
+                                time.sleep(self.step_delay * 0.5)
+                                continue
+                            # Found 2026-08-08, live: this branch's low-confidence
+                            # navigate-pointer landed on a real 'Clear All' button
+                            # (ptr_conf=0.53 -- unremarkable, no different from
+                            # dozens of other navigation clicks), popping a genuine
+                            # Windows confirmation dialog that then blocked the rest
+                            # of the run. Unconditional, every mode -- see
+                            # _DESTRUCTIVE_KW's own comment for why this can't wait
+                            # for a legacy-only guard the way the Submit check does.
+                            _destructive_btn = _find_destructive_button_at(
+                                state.get("elements", []), _snap2)
+                            if _destructive_btn is not None:
+                                _db_name = (_destructive_btn.get("text")
+                                            or _destructive_btn.get("label") or "button")
+                                logger.warning(
+                                    "[GUARD] pointer target (%.0f,%.0f) lands on destructive "
+                                    "button %r — Tab instead of risking data loss.",
+                                    _snap2[0], _snap2[1], _db_name)
                                 self._executor.execute({"action_type": "keyboard",
                                                         "key_count": 1, "keystrokes": ["tab"]})
                                 time.sleep(self.step_delay * 0.5)
