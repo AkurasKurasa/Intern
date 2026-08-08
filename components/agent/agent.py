@@ -3060,6 +3060,30 @@ class LLMAgent:
                                "Key.return", "Key.enter", "Key.escape"}
                 _is_nav_only = not _pred_text and all(k in _nav_keys for k in _pred_keys)
                 if not _is_nav_only and _focused_el:
+                    # Click the field's own bbox before typing into it. Found
+                    # 2026-08-08, live: even with verify-at-fill's settle-poll
+                    # fix (which waits for the UI to catch up), one field
+                    # ('Years Continuously Insured', a plain editcontrol, no
+                    # different from any working field) kept failing verify
+                    # for multiple REAL seconds -- too long to be settle time.
+                    # But verify-at-fill's own RETRY path, which re-clicks the
+                    # field before retyping, reliably fixed it every time.
+                    # That's evidence the type had reached the field UIA
+                    # reports as focused, but real OS keyboard focus hadn't
+                    # actually landed there yet -- a focus-transition race,
+                    # not a value-settle race. The retry recovers by force;
+                    # doing the same click before the FIRST attempt (which
+                    # this project's own click-anchoring fix already
+                    # establishes is safe -- "we already know exactly where
+                    # the focused field is, no reason to trust a second,
+                    # independent guess") should prevent needing the retry at
+                    # all. Universal for any typed field, not specific to one.
+                    if _focused_el.get("bbox"):
+                        _fcb = _focused_el["bbox"]
+                        self._executor.execute({"action_type": "click",
+                                                "click_position": [(_fcb[0] + _fcb[2]) / 2,
+                                                                    (_fcb[1] + _fcb[3]) / 2]})
+                        time.sleep(0.1)
                     _foc_val = (_focused_el.get("value") or "").strip()
                     if _foc_val:
                         logger.info("Pre-type clear: field has %r — ctrl+a.", _foc_val[:40])
