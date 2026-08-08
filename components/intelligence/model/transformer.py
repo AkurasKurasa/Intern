@@ -484,10 +484,41 @@ class TrajectoryDataset(Dataset):
         hist_len: int = 4,
         glob: str = "*.json",
         aug_drop_prob: float = 0.0,   # probability of zeroing a UI element row
+        disambiguate_attempted: bool = False,
+        rare_weight_basis: str = "type",
     ):
+        """
+        disambiguate_attempted : bool (default False)
+            Controls whether _attempt_key's repeated-label rank disambiguation
+            (Driver 1/2/3 "First Name" etc.) is used for the 'attempted' input
+            feature. Introduced in 7999efc7 alongside field-level rare-action
+            weighting; when tested ALONE (weighting reverted to type-level) it
+            still regressed val_click_acc to 46.9% (from a 68.9% baseline) —
+            accessibility-tree list order isn't stable enough across snapshots
+            to be a clean training signal (see DEVELOPERS.md). Defaults to False
+            (matching the un-regressed baseline) until a stable, non-rank-based
+            disambiguation mechanism replaces it. The live agent (agent.py)
+            keeps its own always-disambiguated copy for real-time tracking —
+            this flag only affects TRAINING data derivation.
+        rare_weight_basis : "none" | "type" | "field" (default "type")
+            What _wmap's rare-action loss up-weighting groups clicks by:
+            "type"  — clicked element's control type (editcontrol, etc.) —
+                      the original, pre-7999efc7 basis.
+            "field" — clicked element's specific identity (_attempt_key) —
+                      finer-grained; 7999efc7 made this the ONLY basis and
+                      bundled it with disambiguate_attempted=True, so it was
+                      never tested in isolation. Uses disambiguate_attempted
+                      to decide whether same-labeled repeated fields (Driver
+                      1/2/3) are counted as one identity or split by rank.
+            "none"  — uniform weight 1.0, no reweighting.
+        """
         self.max_elements  = max_elements
         self.hist_len      = hist_len
         self.aug_drop_prob = aug_drop_prob
+        if rare_weight_basis not in ("none", "type", "field"):
+            raise ValueError(f"rare_weight_basis must be 'none'/'type'/'field', got {rare_weight_basis!r}")
+        self._disambiguate_attempted = disambiguate_attempted
+        self._rare_weight_basis      = rare_weight_basis
         # Toggled by train() around the val_loader pass so validation is scored on
         # clean, unaugmented samples — element dropout makes the click choice easier
         # (fewer confusable candidates on screen), which inflates val_click_acc if
@@ -505,7 +536,21 @@ class TrajectoryDataset(Dataset):
         # directories (e.g. combining the curated tasks/form_filling/traces set
         # with a freshly-recorded data/demos/<name> batch) — each is scanned the
         # same way and their groups are pooled together.
-        roots = [Path(d) for d in data_dir] if isinstance(data_dir, (list, tuple)) else [Path(data_dir)]
+        # Resolved to absolute immediately: the on-disk cache below pickles
+        # whatever Path objects glob() produces under these roots, and a
+        # relative root makes every cached path implicitly cwd-relative.
+        # A later run from a different working directory (or a background
+        # process with a different cwd than the one that first built the
+        # cache) then loads those paths, resolves them against the WRONG
+        # cwd, and every file "not found" — _load_trace() catches that and
+        # returns None, which silently becomes an empty {} state rather than
+        # a crash. Found 2026-08-08: a from-components/ sanity check and a
+        # from-repo-root background training run shared one cache (same
+        # resolved hash) but disagreed on what the relative paths inside it
+        # meant, corrupting ~100% of a training run into empty-state noise
+        # with no error, no traceback — just silently wrong data.
+        roots = [Path(d).resolve() for d in data_dir] if isinstance(data_dir, (list, tuple)) \
+            else [Path(data_dir).resolve()]
         print(f"[Dataset] Scanning {', '.join(str(r) for r in roots)} for trace files...", flush=True)
         file_groups: List[List[Path]] = []
         for root in roots:
@@ -535,7 +580,8 @@ class TrajectoryDataset(Dataset):
         _cache_path = roots[0] / _cache_name
         # ELEM_FEATURES in the key → a change in the feature layout invalidates
         # any stale cache built with a different one.
-        _cache_key  = (max_elements, hist_len, aug_drop_prob, ELEM_FEATURES, "v7_disambiguated_attempt_key")
+        _cache_key  = (max_elements, hist_len, aug_drop_prob, ELEM_FEATURES,
+                       "v8_configurable_weighting", disambiguate_attempted, rare_weight_basis)
 
         def _cache_valid() -> bool:
             if not _cache_path.exists():
@@ -672,7 +718,8 @@ class TrajectoryDataset(Dataset):
                 # type both get up-weighted, no hardcoded class/field name).
                 click_type = ((elems[click_idx].get("type") or "").lower()
                               if 0 <= click_idx < len(elems) else "")
-                click_key  = (_attempt_key(elems[click_idx], elements=elems)
+                click_key  = (_attempt_key(elems[click_idx],
+                                            elements=(elems if self._disambiguate_attempted else None))
                               if 0 <= click_idx < len(elems) else "")
                 # 'attempted' derivation: this step SEES every field acted on in
                 # PRIOR steps (snapshot before adding the current target). Then
@@ -684,7 +731,8 @@ class TrajectoryDataset(Dataset):
                 elif action[0] == ACTION_KEYBOARD and 0 <= src_idx < len(elems):
                     _tgt_elem = elems[src_idx]
                 if _tgt_elem is not None:
-                    g_acted.add(_attempt_key(_tgt_elem, elements=elems))
+                    g_acted.add(_attempt_key(_tgt_elem,
+                                              elements=(elems if self._disambiguate_attempted else None)))
                 valid_files.append(fpath)
                 g_actions.append(action)
                 g_src_idx.append(src_idx)
@@ -737,6 +785,7 @@ class TrajectoryDataset(Dataset):
                     [[a[1], a[2], a[3]] for a in ctx], # past cont (cx, cy, key_norm)
                     tgt[0], click_idx, tgt[3], src_idx,
                     click_key,                          # 9th (temp): clicked target's specific identity
+                    click_type,                         # 10th (temp): clicked target's control type
                 ))
 
         # ── Rare-action loss weighting (general, inverse-frequency) ──────────────
@@ -758,14 +807,20 @@ class TrajectoryDataset(Dataset):
         # Deductible"). (DEVELOPERS.md -> Concepts: rare-action handling.)
         from collections import Counter as _Counter
         _RARE_W_CAP = 8.0
-        _tc = _Counter(s[8] for s in self._samples if s[8])
-        _n_click, _n_types = sum(_tc.values()), max(len(_tc), 1)
-        _wmap = {ty: min(_n_click / (_n_types * c), _RARE_W_CAP) for ty, c in _tc.items()}
-        self._sample_weights: List[float] = [_wmap.get(s[8], 1.0) for s in self._samples]
-        self._samples = [s[:8] for s in self._samples]   # strip the temp type field
-        if _wmap:
-            _top = sorted(_wmap.items(), key=lambda kv: -kv[1])[:4]
-            print(f"[Dataset] rare-action weights (top): {[(t, round(w, 1)) for t, w in _top]}")
+        _basis_idx = {"field": 8, "type": 9}.get(self._rare_weight_basis)
+        if _basis_idx is None:
+            self._sample_weights: List[float] = [1.0] * len(self._samples)
+            print("[Dataset] rare-action weighting disabled (rare_weight_basis='none').")
+        else:
+            _tc = _Counter(s[_basis_idx] for s in self._samples if s[_basis_idx])
+            _n_click, _n_types = sum(_tc.values()), max(len(_tc), 1)
+            _wmap = {ty: min(_n_click / (_n_types * c), _RARE_W_CAP) for ty, c in _tc.items()}
+            self._sample_weights = [_wmap.get(s[_basis_idx], 1.0) for s in self._samples]
+            if _wmap:
+                _top = sorted(_wmap.items(), key=lambda kv: -kv[1])[:4]
+                print(f"[Dataset] rare-action weights (basis={self._rare_weight_basis!r}, top): "
+                      f"{[(t, round(w, 1)) for t, w in _top]}")
+        self._samples = [s[:8] for s in self._samples]   # strip the temp fields
 
         if total_traces < hist_len:
             raise ValueError(
@@ -868,7 +923,7 @@ class TrajectoryDataset(Dataset):
             return
         elements = state.get("elements", [])
         for e in elements:
-            if _attempt_key(e, elements=elements) in keys:
+            if _attempt_key(e, elements=(elements if self._disambiguate_attempted else None)) in keys:
                 e["attempted"] = 1.0
 
     def _get_tensor(self, fpath: "Path") -> torch.Tensor:
@@ -1310,6 +1365,8 @@ def train(
     dropout: float = 0.1,
     class_weight_mode: str = "none",          # "none" | "inverse" | "sqrt_inverse"
     balanced_sampler: bool = True,             # WeightedRandomSampler for type imbalance (default on — see Run 6)
+    disambiguate_attempted: bool = False,      # see TrajectoryDataset docstring
+    rare_weight_basis: str = "type",           # "none" | "type" | "field" — see TrajectoryDataset docstring
     device_str: str = "auto",
     verbose: bool = True,
 ) -> TransformerAgentNetwork:
@@ -1343,6 +1400,8 @@ def train(
     dataset = TrajectoryDataset(
         data_dir, max_elements=max_elements, hist_len=hist_len,
         aug_drop_prob=aug_drop_prob,
+        disambiguate_attempted=disambiguate_attempted,
+        rare_weight_basis=rare_weight_basis,
     )
     if verbose:
         print(f"[train] {dataset}")
@@ -1450,12 +1509,21 @@ def train(
                 f"({_epoch_time:.1f}s)"
             )
 
-        # Checkpoint on best COMBINED acc (action-type + click targeting) — the
-        # metrics we actually deploy on. Saving best val_LOSS picked an early,
-        # underfit, scroll-biased model even though val_acc kept climbing.
+        # Checkpoint on best click_acc alone -- the metric actually deployed on.
+        # History: pure val_LOSS picked an early, underfit, scroll-biased model
+        # even though val_acc kept climbing, so that was replaced with combined
+        # acc (val_acc + click_acc). That in turn has its OWN failure mode,
+        # found 2026-08-08 comparing two A/B runs: ~95% of actions are type
+        # "click", so val_acc (action-TYPE accuracy) saturates near-ceiling by
+        # epoch 1 just from "always guess click" -- it's noise after that, not
+        # signal. Summing it with click_acc let a lucky early-epoch val_acc
+        # spike outvote every later epoch's real click_acc improvement (a run
+        # saved epoch 1, val_acc=0.914 click_acc=0.171, over epoch 44's
+        # val_acc=0.747 click_acc=0.396 -- the WORST click-targeting epoch beat
+        # the best one). click_acc alone can't be gamed by the dominant class.
         save_loss   = val_m["loss"] if not math.isnan(val_m["loss"]) else train_m["loss"]
-        _val_score  = val_m["accuracy"] + val_m["click_acc"]
-        _best_score = best_val_acc + best_val_click_acc
+        _val_score  = val_m["click_acc"]
+        _best_score = best_val_click_acc
         if _val_score > _best_score:
             best_val_loss      = save_loss
             best_val_acc       = val_m["accuracy"]
@@ -1700,6 +1768,15 @@ def _parse_args() -> argparse.Namespace:
     p.add_argument("--balanced_sampler", action=argparse.BooleanOptionalAction, default=True,
                    help="Use WeightedRandomSampler to balance click vs keyboard per epoch "
                         "(default: on — disable with --no-balanced_sampler)")
+    p.add_argument("--disambiguate_attempted", action="store_true", default=False,
+                   help="Use rank-based repeated-label disambiguation (Driver 1/2/3) for the "
+                        "'attempted' feature. Default off — tested alone it regressed val_click_acc "
+                        "to 46.9%% from a 68.9%% baseline (unstable across snapshots).")
+    p.add_argument("--rare_weight_basis", default="type",
+                   choices=["none", "type", "field"],
+                   help="Rare-action loss up-weighting basis: 'type' (control type, original "
+                        "pre-regression basis, default), 'field' (specific field identity, "
+                        "never tested in isolation before), 'none' (disabled).")
     # Predict args
     p.add_argument("--trace_path",      default=None)
     return p.parse_args()
@@ -1717,6 +1794,8 @@ if __name__ == "__main__":
             dim_feedforward=args.dim_feedforward, dropout=args.dropout,
             class_weight_mode=args.class_weight_mode,
             balanced_sampler=args.balanced_sampler,
+            disambiguate_attempted=args.disambiguate_attempted,
+            rare_weight_basis=args.rare_weight_basis,
             device_str=args.device_str,
         )
     else:

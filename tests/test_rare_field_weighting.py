@@ -65,7 +65,12 @@ def _write_session(directory: Path) -> None:
 
 def test_rare_field_gets_higher_weight_than_common_field_of_same_type(tmp_path):
     _write_session(tmp_path)
-    ds = TrajectoryDataset(str(tmp_path), max_elements=8, hist_len=4)
+    # rare_weight_basis="field" is explicit here: "type" (the default since the
+    # basis became configurable) can't distinguish these two samples at all —
+    # both targets share the same control type, which is exactly the gap this
+    # test exists to cover. See TrajectoryDataset's docstring for why "type" is
+    # the default and "field" has to be opted into.
+    ds = TrajectoryDataset(str(tmp_path), max_elements=8, hist_len=4, rare_weight_basis="field")
 
     assert ds._sample_weights is not None
     common_weights, rare_weights = [], []
