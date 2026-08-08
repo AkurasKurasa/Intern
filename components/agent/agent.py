@@ -4625,7 +4625,103 @@ class LLMAgent:
         should_check = ev.startswith("yes") or ev in {"check", "true", "1", "checked"}
         return (field_name, should_check)
 
+    def _scroll_form_down_uia(self, state: Dict[str, Any]) -> bool:
+        """
+        Fire ONE native UIA ScrollPattern.Scroll(LargeIncrement) on the active
+        form's scrollable pane, found by walking UP from a real on-screen
+        field through the UIA parent chain. Returns True once the call was
+        ISSUED, False if no scrollable pane was found or UIA isn't available
+        — callers should fall back to the mouse-wheel route in that case.
+
+        Revived 2026-08-08 from this repo's own history (commit 0ec5688a's
+        _scrollbar_drag, later removed as dead code) after the user asked
+        whether a single precise scroll — like a separate, since-deleted
+        "old Intern" project reportedly had — was possible here too. The
+        historical version hardcoded a list of field names to anchor on
+        ("Last Name", "Email Address", ...) which would violate the
+        no-hardcoding-for-specific-tasks rule; this version anchors on
+        whatever editcontrol labels are actually present in the CURRENT
+        state, so it works on any form.
+
+        Deliberately does NOT verify the pane actually moved here — that
+        would be a second, internal observe-and-decide cycle stacked on the
+        caller's own (in the SCROLL branch of the Navigation Protocol
+        block), which already caused a "two systems, two chances to
+        disagree" regression once this same session (see the self-
+        calibrating-scroll comment on the wheel-scroll fallback below). The
+        caller re-observes once and checks the visible-field signature to
+        confirm the scroll actually took effect.
+        """
+        try:
+            import uiautomation as _uia
+            import win32gui as _w32g
+        except Exception:
+            return False
+        try:
+            hwnd = self._locked_hwnd or _w32g.GetForegroundWindow()
+            root = _uia.ControlFromHandle(hwnd)
+
+            elements = state.get("elements", [])
+            _anchor_names = [
+                (e.get("label") or e.get("text") or "").strip()
+                for e in elements
+                if e.get("type") == "editcontrol"
+                and e.get("window_role") != "background"
+                and (e.get("label") or e.get("text"))
+            ]
+            _anchor = None
+            for _nm in _anchor_names:
+                _c = root.EditControl(searchDepth=25, Name=_nm)
+                if _c.Exists(maxSearchSeconds=0.2):
+                    _anchor = _c
+                    break
+            if _anchor is None:
+                _anchor = _uia.GetFocusedControl()
+            if _anchor is None:
+                return False
+
+            _panel, _cur = None, _anchor
+            for _ in range(15):
+                if _cur is None:
+                    break
+                try:
+                    _sp = _cur.GetScrollPattern()
+                    if _sp is not None and _sp.VerticallyScrollable:
+                        _panel = _cur
+                        break
+                except Exception:
+                    pass
+                try:
+                    _cur = _cur.GetParentControl()
+                except Exception:
+                    break
+
+            if _panel is None:
+                return False
+
+            _panel.GetScrollPattern().Scroll(_uia.ScrollAmount.NoAmount, _uia.ScrollAmount.LargeIncrement)
+            logger.info("Scroll-form: UIA ScrollPattern LargeIncrement issued on pane %r",
+                        getattr(_panel, "Name", "?"))
+            return True
+        except Exception as exc:
+            logger.debug("Scroll-form: UIA ScrollPattern route unavailable — %s", exc)
+            return False
+
     def _scroll_form_down(self, state: Dict[str, Any]) -> bool:
+        """
+        Scroll the active form window down to reveal fields hidden below the
+        visible area. Tries the native UIA ScrollPattern route first
+        (_scroll_form_down_uia — one page-scroll call on the real scrollable
+        pane); falls back to the mouse-wheel approach below if UIA's
+        ScrollPattern isn't exposed on this pane (e.g. a custom-drawn scroll
+        area) or raises for any reason.
+        Returns True if scroll was attempted.
+        """
+        if self._scroll_form_down_uia(state):
+            return True
+        return self._scroll_form_down_wheel(state)
+
+    def _scroll_form_down_wheel(self, state: Dict[str, Any]) -> bool:
         """
         Scroll the active form window down to reveal fields hidden below the visible area.
         Uses pyautogui.scroll over the center of the active window elements.

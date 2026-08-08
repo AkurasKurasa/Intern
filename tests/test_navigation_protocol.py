@@ -16,7 +16,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "components"))
 from agent.navigation_protocol import (
     NavAction, decide, has_visible_empty_target, visible_field_signature,
-    find_visible_empty_target,
+    find_visible_empty_target, optimal_view_counts,
 )
 
 VIEWPORT_BOTTOM = 1000.0
@@ -138,13 +138,30 @@ class TestDecide:
         d = decide(state, VIEWPORT_BOTTOM, dead_scroll_count=0)
         assert d.action == NavAction.WAIT
 
-    def test_scrolls_when_nothing_visible_and_under_the_dead_scroll_cap(self):
-        state = {"elements": []}
+    def test_scrolls_when_nothing_visible_but_a_target_exists_below_the_fold(self):
+        """Redesigned 2026-08-08 for the "optimal view" decision (see
+        optimal_view_counts): an empty state ({"elements": []}) has best=0
+        (nothing reachable anywhere), so it now correctly means ADVANCE_TAB,
+        not SCROLL — scrolling can never help if there's genuinely nothing
+        below either. SCROLL is only correct when a real target exists
+        off-screen (best > 0) but isn't visible yet (cur < best)."""
+        state = {"elements": [_field("Underwriter", bbox=(100, 2000, 300, 2030))]}
         d = decide(state, VIEWPORT_BOTTOM, dead_scroll_count=0, max_dead_scrolls=2)
         assert d.action == NavAction.SCROLL
 
-    def test_advances_tab_once_dead_scroll_cap_reached(self):
+    def test_advances_tab_when_nothing_is_reachable_anywhere(self):
+        """No elements at all -> best=0 -> immediately ADVANCE_TAB, even with
+        dead_scroll_count=0. Scrolling would never reveal anything, so there's
+        no reason to burn a dead-scroll attempt finding that out first."""
         state = {"elements": []}
+        d = decide(state, VIEWPORT_BOTTOM, dead_scroll_count=0, max_dead_scrolls=2)
+        assert d.action == NavAction.ADVANCE_TAB
+
+    def test_advances_tab_once_dead_scroll_cap_reached_despite_a_target_below(self):
+        """A real target exists below the fold (best > 0) but scrolling has
+        repeatedly failed to reach it (e.g. the pane can't move that far) —
+        give up once the dead-scroll cap trips instead of spinning forever."""
+        state = {"elements": [_field("Underwriter", bbox=(100, 2000, 300, 2030))]}
         d = decide(state, VIEWPORT_BOTTOM, dead_scroll_count=2, max_dead_scrolls=2)
         assert d.action == NavAction.ADVANCE_TAB
 
@@ -153,6 +170,91 @@ class TestDecide:
         a field is visible) — decide() itself doesn't cap total scrolls."""
         state = {"elements": [_field("Field 40")]}
         d = decide(state, VIEWPORT_BOTTOM, dead_scroll_count=39, max_dead_scrolls=2)
+        assert d.action == NavAction.WAIT
+
+
+class TestOptimalViewCounts:
+    """Added 2026-08-08 per direct user correction: "nothing's visible ->
+    scroll down once. Wrong... Literally find the optimal view." cur is how
+    many actionable targets are visible right now; best is the most that
+    could EVER be simultaneously visible at some scroll position — the
+    stopping condition for scrolling is cur == best, not cur > 0."""
+
+    def test_cur_equals_best_when_all_targets_already_fit_on_screen(self):
+        state = {"elements": [
+            _field("First Name", bbox=(100, 100, 300, 130)),
+            _field("Last Name", bbox=(100, 140, 300, 170)),
+        ]}
+        cur, best = optimal_view_counts(state, VIEWPORT_BOTTOM)
+        assert (cur, best) == (2, 2)
+
+    def test_best_counts_off_screen_targets_by_position_not_current_visibility(self):
+        """Two targets are stacked 50px apart just below the fold — they'd
+        both fit in one viewport-sized window once scrolled to, so best
+        should be 2 even though cur (what's visible right now) is 0."""
+        state = {"elements": [
+            _field("Underwriter", bbox=(100, 1010, 300, 1040)),
+            _field("Adjuster", bbox=(100, 1060, 300, 1090)),
+        ]}
+        cur, best = optimal_view_counts(state, VIEWPORT_BOTTOM)
+        assert cur == 0
+        assert best == 2
+
+    def test_best_is_less_than_total_when_targets_are_spread_too_far_apart(self):
+        """Three targets, each pair further apart than one viewport height —
+        no single scroll position can ever show more than one at a time."""
+        state = {"elements": [
+            _field("A", bbox=(100, 100, 300, 130)),
+            _field("B", bbox=(100, 100 + VIEWPORT_BOTTOM * 2, 300, 130 + VIEWPORT_BOTTOM * 2)),
+            _field("C", bbox=(100, 100 + VIEWPORT_BOTTOM * 4, 300, 130 + VIEWPORT_BOTTOM * 4)),
+        ]}
+        cur, best = optimal_view_counts(state, VIEWPORT_BOTTOM)
+        assert best == 1
+
+    def test_targets_already_scrolled_past_are_excluded_from_best(self):
+        """bbox top < 0 means the target is above the current fold — this
+        module only scrolls DOWN, so it can never be brought back into view
+        and shouldn't inflate the "best achievable" count."""
+        state = {"elements": [
+            _field("Scrolled Past", bbox=(100, -200, 300, -170)),
+            _field("Still Reachable", bbox=(100, 100, 300, 130)),
+        ]}
+        cur, best = optimal_view_counts(state, VIEWPORT_BOTTOM)
+        assert best == 1
+
+    def test_zero_and_zero_when_nothing_fillable_remains(self):
+        state = {"elements": [_field("Done", value="filled")]}
+        assert optimal_view_counts(state, VIEWPORT_BOTTOM) == (0, 0)
+
+
+class TestDecidePrefersMaximizingSimultaneousTargets:
+    """The core behavioral change: decide() must keep scrolling toward the
+    view with the MOST actionable targets, not stop at the first view with
+    ANY target — directly what the user asked for over the old "nothing's
+    visible -> scroll once" logic."""
+
+    def test_keeps_scrolling_past_a_single_visible_target_toward_a_denser_view(self):
+        """One target is already visible (old logic would WAIT here), but
+        two more are just below the fold and would ALSO fit in view if
+        scrolled to — decide() should prefer reaching that denser view."""
+        state = {"elements": [
+            _field("Lonely Field", bbox=(100, 50, 300, 80)),
+            _field("Packed A", bbox=(100, 1010, 300, 1040)),
+            _field("Packed B", bbox=(100, 1060, 300, 1090)),
+        ]}
+        d = decide(state, VIEWPORT_BOTTOM, dead_scroll_count=0)
+        assert d.action == NavAction.SCROLL
+
+    def test_waits_once_the_current_view_already_matches_the_best_achievable(self):
+        """Same field count on screen as anywhere else achievable — this IS
+        the optimal view, so decide() must stop scrolling and let the
+        transformer act, even though more targets exist further below."""
+        state = {"elements": [
+            _field("Visible A", bbox=(100, 50, 300, 80)),
+            _field("Visible B", bbox=(100, 100, 300, 130)),
+            _field("Far Below", bbox=(100, 3000, 300, 3030)),
+        ]}
+        d = decide(state, VIEWPORT_BOTTOM, dead_scroll_count=0)
         assert d.action == NavAction.WAIT
 
 

@@ -150,6 +150,80 @@ def visible_field_signature(state: Dict[str, Any], viewport_bottom: float) -> Fr
     return frozenset(sig)
 
 
+def _max_points_in_window(cys: List[float], width: float) -> int:
+    """
+    Given every remaining target's y-position (in CURRENT, unscrolled
+    coordinates), the most that could ever be simultaneously on-screen at
+    once, if the pane could scroll to any offset >= 0.
+
+    Scrolling down by S moves every element's y up by S; a viewport window
+    of [0, width] at scroll-offset S is therefore the same set of points as
+    a fixed window of width `width` starting at y=S in CURRENT coordinates.
+    So "best achievable simultaneous count" is just the classic max-points-
+    in-a-fixed-width-window problem — two pointers over the sorted y's.
+    """
+    pts = sorted(cys)
+    best = 0
+    left = 0
+    for right in range(len(pts)):
+        while pts[right] - pts[left] > width:
+            left += 1
+        best = max(best, right - left + 1)
+    return best
+
+
+def optimal_view_counts(
+    state: Dict[str, Any],
+    viewport_bottom: float,
+    attempted_keys: Optional[Set[Any]] = None,
+    attempt_key_fn: Optional[Callable[[Dict[str, Any], List[Dict[str, Any]]], Any]] = None,
+) -> tuple:
+    """
+    (cur, best) — cur is how many actionable empty targets are visible
+    RIGHT NOW; best is the most that could EVER be simultaneously visible
+    at some scroll position, counting every remaining target's known
+    position (including ones currently off-screen below the viewport —
+    ui_observer.py reports their real bbox regardless of current
+    visibility).
+
+    Added 2026-08-08 per direct user correction: "nothing's visible ->
+    scroll down once" is the wrong question. The right one is "is this
+    already the BEST view available, or does scrolling get us to a view
+    with MORE actionable targets on it at once." cur >= best is the
+    stopping condition for scrolling, not "cur > 0".
+
+    A target counts toward `best` only if its bbox top is >= 0 (i.e. not
+    already scrolled past — this module only scrolls DOWN, so a target
+    above the current fold can't be brought back by scrolling further
+    down). `cur` additionally requires e["visible"] (real IsOffscreen
+    signal, not just geometry) since that reflects what's ACTUALLY
+    rendered right now, whereas the position used for `best` is a
+    hypothetical future scroll offset the visible flag can't speak to.
+    """
+    elements = state.get("elements", [])
+    attempted_keys = attempted_keys or set()
+    cys: List[float] = []
+    cur = 0
+    for e in elements:
+        if e.get("window_role") == "background":
+            continue
+        if (e.get("type") or "").lower() not in _FILLABLE_TYPES:
+            continue
+        if (e.get("value") or "").strip():
+            continue
+        if attempt_key_fn is not None and attempt_key_fn(e, elements) in attempted_keys:
+            continue
+        b = e.get("bbox")
+        if not b or len(b) != 4 or b[1] < 0:
+            continue
+        cy = (b[1] + b[3]) / 2
+        cys.append(cy)
+        if cy <= viewport_bottom and e.get("visible", True):
+            cur += 1
+    best = _max_points_in_window(cys, viewport_bottom) if cys else 0
+    return cur, best
+
+
 def decide(
     state: Dict[str, Any],
     viewport_bottom: float,
@@ -160,19 +234,35 @@ def decide(
 ) -> NavDecision:
     """
     The single decision point: given the current state and how many
-    consecutive scrolls have failed to reveal anything new on this tab,
-    what should happen next?
+    consecutive scrolls have failed to reach the optimal view, what should
+    happen next?
 
-    dead_scroll_count is caller-tracked (increments only on a scroll that
-    didn't change visible_field_signature — resets the moment a field is
-    visible again), so a long tab can scroll as many times as it genuinely
-    has content, while a tab that's truly exhausted gives up promptly.
+    "Optimal view" = the scroll position showing the MOST simultaneously-
+    visible actionable targets (see optimal_view_counts), not merely "is
+    anything visible at all." Scrolling continues only while the current
+    view (cur) has fewer targets than the best achievable (best) — once
+    cur == best, this IS the best view reachable and there's nothing to
+    gain by scrolling further, even if best is small.
+
+    dead_scroll_count is caller-tracked (increments only when a scroll
+    didn't improve cur — resets the moment cur == best again), so a long
+    tab can scroll as many times as it genuinely has content, while a
+    scroll that isn't actually reaching the computed optimum (e.g. the
+    pane can't move that far, or best was thrown off by a stale/covered
+    element) gives up promptly instead of spinning forever.
     """
-    if has_visible_empty_target(state, viewport_bottom, attempted_keys, attempt_key_fn):
-        return NavDecision(NavAction.WAIT, "actionable empty field visible")
+    cur, best = optimal_view_counts(state, viewport_bottom, attempted_keys, attempt_key_fn)
+    if best == 0:
+        return NavDecision(NavAction.ADVANCE_TAB, "no empty, not-yet-attempted targets remain on this tab")
+    if cur >= best:
+        return NavDecision(NavAction.WAIT, f"already at the optimal view — {cur} of {best} possible targets visible")
     if dead_scroll_count >= max_dead_scrolls:
         return NavDecision(
             NavAction.ADVANCE_TAB,
-            f"{dead_scroll_count} consecutive scrolls revealed nothing new — tab exhausted",
+            f"{dead_scroll_count} consecutive scrolls failed to reach the optimal view "
+            f"({cur}/{best} targets visible) — giving up, tab exhausted",
         )
-    return NavDecision(NavAction.SCROLL, "no empty target visible — scrolling to reveal more")
+    return NavDecision(
+        NavAction.SCROLL,
+        f"optimal view has {best} targets visible at once, only {cur} visible now — scrolling to reach it",
+    )
