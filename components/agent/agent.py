@@ -4382,35 +4382,80 @@ class LLMAgent:
                     cx = max(bx1 - 40, 10)
                     logger.debug("Scroll-form: shifted cx=%.0f to avoid combobox", cx)
                     break
-            # Scroll amount scales with how much unattempted fillable content is
-            # still off-screen below the viewport -- found 2026-08-08, live,
-            # direct user report: a fixed small scroll ("-5 units") only ever
-            # revealed one field at a time, not an "optimal view" (as many
-            # actionable targets visible at once as possible, the original
-            # spec this whole module was built against). Can't precisely
-            # calibrate scroll-units-to-pixels for this specific app/machine
-            # without live testing (only the user runs live GUI actions), so
-            # this scales conservatively by COUNT of remaining off-screen
-            # targets rather than computing an exact target position: more
-            # unfilled fields still waiting below -> scroll further to surface
-            # more of them at once; few remaining -> smaller scroll so it
-            # doesn't overshoot past the end of the tab's content.
+            # Land the NEXT unfilled field at the TOP of the viewport in one
+            # motion, instead of nudging by a fixed/guessed amount -- found
+            # 2026-08-08, live: a fixed small scroll only ever revealed one
+            # field, not the "optimal view" (max actionable targets visible
+            # at once) this module exists to maximize. A first attempt scaled
+            # scroll magnitude by a guessed count-based heuristic; told
+            # directly by the user this can be done precisely instead, and it
+            # can -- the scroll-units-to-pixels ratio isn't known in advance,
+            # but it doesn't need to be guessed: scroll a small known amount,
+            # measure how far the SAME element actually moved on screen
+            # (elements report real bboxes even off-screen, and _attempt_key
+            # already gives a stable cross-snapshot identity, both used
+            # throughout this project already), then compute exactly how much
+            # further to scroll from that measured ratio. Self-calibrating
+            # per call, no hardcoded pixel/unit constant to keep re-tuning.
             _vb = self._form_viewport_bottom(state)
-            _remaining_below = sum(
-                1 for e in elements
+            _fillable_below = [
+                e for e in elements
                 if e.get("type") in ("editcontrol", "comboboxcontrol", "checkboxcontrol")
                 and e.get("window_role") != "background"
                 and not (e.get("value") or "").strip()
                 and e.get("bbox") and e["bbox"][1] > _vb
-            )
-            _scroll_units = -5 if _remaining_below <= 1 else -15 if _remaining_below <= 4 else -25
+            ]
+            _target = min(_fillable_below, key=lambda e: e["bbox"][1]) if _fillable_below else None
+
             orig = pyautogui.position()
             pyautogui.moveTo(cx, cy, duration=0.15)
-            pyautogui.scroll(_scroll_units)
+            pyautogui.scroll(-5)   # calibration nudge -- same safe amount as before
             pyautogui.moveTo(orig.x, orig.y, duration=0.1)
-            logger.info("Scroll-form: scrolled down %d units at form center (%.0f, %.0f) "
-                        "— %d unfilled fields still below viewport",
-                        -_scroll_units, cx, cy, _remaining_below)
+
+            if _target is None:
+                logger.info("Scroll-form: scrolled down at form center (%.0f, %.0f) "
+                            "— no more unfilled fields known below the viewport", cx, cy)
+                return True
+
+            _target_key = self._attempt_key(_target, elements=elements)
+            _old_y = (_target["bbox"][1] + _target["bbox"][3]) / 2
+            time.sleep(self.step_delay * 0.4)
+            _new_state = self._observe()
+            _new_elems = _new_state.get("elements", [])
+            _found = next((e for e in _new_elems
+                           if self._attempt_key(e, elements=_new_elems) == _target_key
+                           and e.get("bbox")), None)
+            if _found is None:
+                logger.info("Scroll-form: scrolled down at form center (%.0f, %.0f) "
+                            "— calibration target no longer identifiable, stopping at the nudge", cx, cy)
+                return True
+
+            _new_y = (_found["bbox"][1] + _found["bbox"][3]) / 2
+            _pixels_moved = _old_y - _new_y   # positive: field moved up toward/into view
+            if _pixels_moved <= 1:
+                logger.info("Scroll-form: scrolled down at form center (%.0f, %.0f) "
+                            "— view barely moved, likely near the bottom already", cx, cy)
+                return True
+
+            _pixels_per_unit = _pixels_moved / 5.0
+            _viewport_top = self._form_rect(_new_state)[1]
+            _desired_y     = _viewport_top + 40   # small margin so it isn't flush against any header
+            _remaining_px  = _new_y - _desired_y
+            if _remaining_px <= 0:
+                logger.info("Scroll-form: scrolled down at form center (%.0f, %.0f) "
+                            "— next unfilled field already near the top after the nudge", cx, cy)
+                return True
+
+            _more_units = min(round(_remaining_px / _pixels_per_unit), 60)   # capped, safety margin
+            if _more_units > 0:
+                orig2 = pyautogui.position()
+                pyautogui.moveTo(cx, cy, duration=0.1)
+                pyautogui.scroll(-_more_units)
+                pyautogui.moveTo(orig2.x, orig2.y, duration=0.1)
+            logger.info("Scroll-form: scrolled down at form center (%.0f, %.0f) — "
+                        "calibrated %.1fpx/unit, +%d more units to land %r near the top",
+                        cx, cy, _pixels_per_unit, _more_units,
+                        (_target.get("label") or _target.get("text") or "?")[:30])
             return True
         except Exception as exc:
             logger.warning("Scroll-form: failed — %s", exc)
