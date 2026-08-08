@@ -227,35 +227,57 @@ class TestOptimalViewCounts:
         assert optimal_view_counts(state, VIEWPORT_BOTTOM) == (0, 0)
 
 
-class TestDecidePrefersMaximizingSimultaneousTargets:
-    """The core behavioral change: decide() must keep scrolling toward the
-    view with the MOST actionable targets, not stop at the first view with
-    ANY target — directly what the user asked for over the old "nothing's
-    visible -> scroll once" logic."""
+class TestDecideActsOnWhateverIsAlreadyVisible:
+    """REPLACED 2026-08-08 -- the previous version of this class (and of
+    decide() itself) required cur == best before returning WAIT, on the
+    theory that decide() should chase the densest possible view. Live
+    evidence proved that actively harmful: a real run's very first view
+    already had 16 of 22 total targets visible (cur=16, best=22) --
+    genuinely plenty to act on -- but decide() kept returning SCROLL,
+    chasing the last few fields one at a time for 8 consecutive scrolls.
+    Worse, 22-simultaneously-visible turned out to be physically
+    unreachable (scrolling to bring the last field in pushed an earlier one
+    off the top), so cur capped at 21, dead_scroll_count maxed out, and the
+    ENTIRE tab got abandoned via ADVANCE_TAB having filled ZERO fields --
+    despite 16-21 targets sitting on screen the whole time. Direct user
+    correction: "why are we optimizing when the initial view is already
+    optimized?" decide() now WAITs the moment ANYTHING is actionable,
+    full stop -- see optimal_view_counts's `best` is still computed and
+    used for the ADVANCE_TAB/SCROLL choice when cur == 0, just never as a
+    bar for stopping once something's already there."""
 
-    def test_keeps_scrolling_past_a_single_visible_target_toward_a_denser_view(self):
-        """One target is already visible (old logic would WAIT here), but
-        two more are just below the fold and would ALSO fit in view if
-        scrolled to — decide() should prefer reaching that denser view."""
+    def test_a_single_visible_target_is_enough_to_wait_not_a_reason_to_keep_scrolling(self):
+        """The exact scenario the old design got backwards: one target is
+        already visible, more exist further below -- decide() must act on
+        what's here NOW rather than holding out for a denser view."""
         state = {"elements": [
             _field("Lonely Field", bbox=(100, 50, 300, 80)),
             _field("Packed A", bbox=(100, 1010, 300, 1040)),
             _field("Packed B", bbox=(100, 1060, 300, 1090)),
         ]}
         d = decide(state, VIEWPORT_BOTTOM, dead_scroll_count=0)
-        assert d.action == NavAction.SCROLL
+        assert d.action == NavAction.WAIT
 
-    def test_waits_once_the_current_view_already_matches_the_best_achievable(self):
-        """Same field count on screen as anywhere else achievable — this IS
-        the optimal view, so decide() must stop scrolling and let the
-        transformer act, even though more targets exist further below."""
+    def test_sixteen_of_twenty_two_visible_still_waits_instead_of_chasing_the_last_six(self):
+        """Reproduces the actual live regression at scale: most of a tab's
+        content is already visible -- decide() must not hold out for the
+        remaining few, since (as the live run proved) the theoretical
+        maximum isn't even guaranteed to be reachable."""
+        elements = [_field(f"Visible {i}", bbox=(100, i * 40, 300, i * 40 + 30)) for i in range(16)]
+        elements += [_field(f"BelowFold {i}", bbox=(100, VIEWPORT_BOTTOM + i * 40, 300, VIEWPORT_BOTTOM + i * 40 + 30))
+                     for i in range(6)]
+        state = {"elements": elements}
+        d = decide(state, VIEWPORT_BOTTOM, dead_scroll_count=0)
+        assert d.action == NavAction.WAIT
+
+    def test_still_scrolls_when_the_current_view_is_genuinely_empty(self):
+        """cur == 0 is the only condition that should trigger SCROLL --
+        nothing actionable on screen, but something reachable below."""
         state = {"elements": [
-            _field("Visible A", bbox=(100, 50, 300, 80)),
-            _field("Visible B", bbox=(100, 100, 300, 130)),
             _field("Far Below", bbox=(100, 3000, 300, 3030)),
         ]}
         d = decide(state, VIEWPORT_BOTTOM, dead_scroll_count=0)
-        assert d.action == NavAction.WAIT
+        assert d.action == NavAction.SCROLL
 
 
 class TestFindVisibleEmptyTarget:

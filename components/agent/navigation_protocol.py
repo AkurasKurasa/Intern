@@ -234,35 +234,53 @@ def decide(
 ) -> NavDecision:
     """
     The single decision point: given the current state and how many
-    consecutive scrolls have failed to reach the optimal view, what should
-    happen next?
+    consecutive scrolls have failed to reveal anything actionable, what
+    should happen next?
 
-    "Optimal view" = the scroll position showing the MOST simultaneously-
-    visible actionable targets (see optimal_view_counts), not merely "is
-    anything visible at all." Scrolling continues only while the current
-    view (cur) has fewer targets than the best achievable (best) — once
-    cur == best, this IS the best view reachable and there's nothing to
-    gain by scrolling further, even if best is small.
+    WAIT the moment ANYTHING actionable is visible (cur > 0) — do not hold
+    out for a denser view. `best` (see optimal_view_counts) is still
+    computed and used to decide whether scrolling is worth trying at all
+    (best == 0 means nothing is reachable anywhere) and to size the
+    ADVANCE_TAB give-up message, but it is deliberately NOT a condition for
+    acting.
+
+    Found 2026-08-08, live, immediately after a version of this function
+    that DID require cur == best: the very first view of a tab already had
+    16 of 22 total targets visible (cur=16, best=22) — genuinely plenty to
+    act on — but decide() kept returning SCROLL, chasing the last few
+    fields one at a time (16→17→18→...) for 8 consecutive scrolls. Worse,
+    the mathematical maximum (22 simultaneously visible) turned out to be
+    physically unreachable: scrolling far enough to bring the last field
+    into view pushed an earlier one off the top, so cur capped out at 21
+    and never equalled best. dead_scroll_count then hit its cap and handed
+    off to ADVANCE_TAB — abandoning the ENTIRE tab having filled zero
+    fields, despite 16-21 of them sitting on screen the whole time. Direct
+    user correction: "There is nothing to improve yet because we haven't
+    even filled up anything yet at all, why are we optimizing when the
+    initial view is already optimized?" Right call — chasing a global
+    maximum is both pointless (a good-enough view is already actionable)
+    and fragile (the maximum isn't always achievable at all). `best` is
+    still useful context for deciding whether it's worth scrolling to find
+    something when the CURRENT view has nothing (cur == 0), just not a bar
+    for stopping once something's already there.
 
     dead_scroll_count is caller-tracked (increments only when a scroll
-    didn't improve cur — resets the moment cur == best again), so a long
-    tab can scroll as many times as it genuinely has content, while a
-    scroll that isn't actually reaching the computed optimum (e.g. the
-    pane can't move that far, or best was thrown off by a stale/covered
-    element) gives up promptly instead of spinning forever.
+    didn't bring cur above 0 — resets the moment it does), so a tab with
+    real content further down still gets a bounded number of tries to find
+    it, while one that's truly exhausted gives up promptly.
     """
     cur, best = optimal_view_counts(state, viewport_bottom, attempted_keys, attempt_key_fn)
+    if cur > 0:
+        return NavDecision(NavAction.WAIT, f"{cur} actionable target(s) already visible — act now")
     if best == 0:
         return NavDecision(NavAction.ADVANCE_TAB, "no empty, not-yet-attempted targets remain on this tab")
-    if cur >= best:
-        return NavDecision(NavAction.WAIT, f"already at the optimal view — {cur} of {best} possible targets visible")
     if dead_scroll_count >= max_dead_scrolls:
         return NavDecision(
             NavAction.ADVANCE_TAB,
-            f"{dead_scroll_count} consecutive scrolls failed to reach the optimal view "
-            f"({cur}/{best} targets visible) — giving up, tab exhausted",
+            f"{dead_scroll_count} consecutive scrolls revealed nothing actionable "
+            f"({best} target(s) exist somewhere below) — giving up, tab exhausted",
         )
     return NavDecision(
         NavAction.SCROLL,
-        f"optimal view has {best} targets visible at once, only {cur} visible now — scrolling to reach it",
+        f"nothing actionable visible yet, but {best} target(s) exist below — scrolling to reach them",
     )
