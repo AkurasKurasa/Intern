@@ -15,10 +15,18 @@ times across one run, which is what the "not sweeping cleanly, feels
 scattered" complaint was actually about once the earlier scroll/reveal fix
 was confirmed working.
 
-Mirrors the SAME deterministic-redirect mechanism already used by the
-low-confidence-fallback streak escalation a few lines below it in agent.py
--- find_visible_empty_target() gives a known, currently-empty, currently-
-visible target to click instead of hoping Tab's default order helps.
+REWRITTEN 2026-08-08, SAME NIGHT, after a second live regression: the
+original redirect just clicked the known target and assumed it worked,
+`continue`-ing straight back to the loop top. Direct user report ("It's
+not working... it's using Tab to fucking navigate"): a run got stuck
+oscillating between this redirect and a plain Tab for 25+ consecutive
+steps, zero new fields filled, because the redirect click wasn't actually
+moving OS focus to the target -- the exact "assume it worked instead of
+verifying" mistake this project has hit and fixed multiple times already
+(verify-at-fill, the scroll branch). Fixed by re-observing after the
+redirect click and checking whether focus genuinely landed on the target;
+repeated failures to land now escalate to advancing the tab instead of
+retrying the identical failed maneuver forever.
 """
 import sys
 from pathlib import Path
@@ -36,9 +44,9 @@ def _field(label, value="", bbox=(100, 100, 300, 130), ftype="editcontrol"):
 
 
 def _run_reclick_guard(state, reclick_streak, redirect_limit, executor):
-    """Mirrors the CURRENT reclick-guard block in agent.py's run(): once
-    reclick_streak reaches redirect_limit, redirect to a known target
-    instead of a blind Tab."""
+    """Mirrors the pre-verify (2026-08-07) reclick-guard shape -- kept for
+    the "first drift, plain Tab" and "nothing visible to redirect to" cases,
+    which the verify addition below doesn't change."""
     reclick_streak += 1
     if reclick_streak >= redirect_limit:
         target = find_visible_empty_target(state, VIEWPORT_BOTTOM)
@@ -49,6 +57,36 @@ def _run_reclick_guard(state, reclick_streak, redirect_limit, executor):
             return 0   # streak resets
     executor.execute({"action_type": "keyboard", "key_count": 1, "keystrokes": ["tab"]})
     return reclick_streak
+
+
+def _run_reclick_guard_verified(state, post_redirect_focused_id, reclick_streak,
+                                 stall_count, redirect_limit, stall_limit,
+                                 executor, advance_tab_fn):
+    """Mirrors the CURRENT (2026-08-08) reclick-guard block in agent.py's
+    run(): redirect to a known target, then VERIFY (via the post-click
+    observation's focused_element_id) that focus actually landed there
+    before trusting it -- repeated failures to land escalate to advancing
+    the tab instead of repeating the same failed redirect forever."""
+    reclick_streak += 1
+    if reclick_streak < redirect_limit:
+        executor.execute({"action_type": "keyboard", "key_count": 1, "keystrokes": ["tab"]})
+        return reclick_streak, stall_count
+    target = find_visible_empty_target(state, VIEWPORT_BOTTOM)
+    if not (target and target.get("bbox")):
+        executor.execute({"action_type": "keyboard", "key_count": 1, "keystrokes": ["tab"]})
+        return reclick_streak, stall_count
+    b = target["bbox"]
+    executor.execute({"action_type": "click",
+                       "click_position": [(b[0] + b[2]) / 2, (b[1] + b[3]) / 2]})
+    reclick_streak = 0
+    landed = post_redirect_focused_id == target["element_id"]
+    if landed:
+        return reclick_streak, 0
+    stall_count += 1
+    if stall_count >= stall_limit:
+        advance_tab_fn()
+        stall_count = 0
+    return reclick_streak, stall_count
 
 
 class TestReclickStreakRedirectsInsteadOfBlindTabbing:
@@ -94,3 +132,62 @@ class TestReclickStreakRedirectsInsteadOfBlindTabbing:
         assert streak == 2
         calls = [c.args[0] for c in executor.execute.call_args_list]
         assert calls == [{"action_type": "keyboard", "key_count": 1, "keystrokes": ["tab"]}]
+
+
+class TestRedirectIsVerifiedNotAssumed:
+    """The second-round fix: a redirect click that doesn't actually move
+    focus must not be silently trusted. Live evidence: 13 consecutive
+    redirect-click/plain-Tab cycles onto the exact same target, zero real
+    progress -- the click plainly wasn't landing, but the old code had no
+    way to notice and kept repeating it."""
+
+    def test_redirect_that_lands_resets_both_counters(self):
+        """focused_element_id matches the target after re-observing --
+        genuine success, both the reclick streak and stall count reset."""
+        executor = MagicMock()
+        advance_tab_fn = MagicMock()
+        state = {"elements": [
+            _field("Years at Address", value="6", bbox=(100, 100, 300, 130)),
+            _field("Prior Insurer", value="", bbox=(100, 200, 300, 230)),
+        ]}
+        streak, stall = _run_reclick_guard_verified(
+            state, post_redirect_focused_id="Prior Insurer",
+            reclick_streak=1, stall_count=0, redirect_limit=2, stall_limit=2,
+            executor=executor, advance_tab_fn=advance_tab_fn)
+        assert (streak, stall) == (0, 0)
+        advance_tab_fn.assert_not_called()
+
+    def test_redirect_that_does_not_land_increments_stall_without_advancing_yet(self):
+        """The click was issued, but the post-click observation shows focus
+        never actually moved to the target -- record the failure, but don't
+        give up on the tab after just one miss."""
+        executor = MagicMock()
+        advance_tab_fn = MagicMock()
+        state = {"elements": [
+            _field("Years at Address", value="6", bbox=(100, 100, 300, 130)),
+            _field("Prior Insurer", value="", bbox=(100, 200, 300, 230)),
+        ]}
+        streak, stall = _run_reclick_guard_verified(
+            state, post_redirect_focused_id="Years at Address",   # still stuck there
+            reclick_streak=1, stall_count=0, redirect_limit=2, stall_limit=2,
+            executor=executor, advance_tab_fn=advance_tab_fn)
+        assert (streak, stall) == (0, 1)
+        advance_tab_fn.assert_not_called()
+
+    def test_repeated_failed_redirects_advance_the_tab_instead_of_looping_forever(self):
+        """The actual live regression, reproduced: the redirect keeps
+        failing to stick -- once that's happened stall_limit times in a
+        row, stop repeating it and move on to the next tab instead of an
+        infinite click/Tab oscillation with zero fields filled."""
+        executor = MagicMock()
+        advance_tab_fn = MagicMock()
+        state = {"elements": [
+            _field("Years at Address", value="6", bbox=(100, 100, 300, 130)),
+            _field("Prior Insurer", value="", bbox=(100, 200, 300, 230)),
+        ]}
+        streak, stall = _run_reclick_guard_verified(
+            state, post_redirect_focused_id="Years at Address",   # still stuck there, AGAIN
+            reclick_streak=1, stall_count=1, redirect_limit=2, stall_limit=2,
+            executor=executor, advance_tab_fn=advance_tab_fn)
+        assert (streak, stall) == (0, 0)   # stall resets after escalating
+        advance_tab_fn.assert_called_once()

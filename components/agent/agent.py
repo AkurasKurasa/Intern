@@ -1256,6 +1256,8 @@ class LLMAgent:
         # that gamble keeps failing. Reset on any real fill/click.
         _reclick_streak: int             = 0
         _RECLICK_REDIRECT_LIMIT: int     = 2
+        _redirect_stall_count:   int     = 0
+        _REDIRECT_STALL_LIMIT:   int     = 2
         _heuristic_steps:        int      = 0      # steps decided by auto-handlers (not LLM/transformer)
         _manual_interventions:   int      = 0      # DAgger corrections the human had to make — cognitive-load proxy
         _llm_unavailable_streak: int      = 0      # consecutive "llm unavailable" — infra failure, NOT "value is blank"
@@ -2580,6 +2582,7 @@ class LLMAgent:
                                 if _rc_target and _rc_target.get("bbox"):
                                     _rcb = _rc_target["bbox"]
                                     _rc_label = (_rc_target.get("label") or _rc_target.get("text") or "?")[:30]
+                                    _rc_key = self._attempt_key(_rc_target, elements=state.get("elements", []))
                                     logger.info(
                                         "[OPT2] pointer stuck on already-%s %s %r %d times in a row "
                                         "— redirecting to known target %r instead of another blind Tab.",
@@ -2590,6 +2593,53 @@ class LLMAgent:
                                     })
                                     time.sleep(self.step_delay * 0.4)
                                     _reclick_streak = 0
+                                    # VERIFY the redirect actually moved focus, don't
+                                    # just assume it worked and `continue` blind.
+                                    #
+                                    # Found 2026-08-08, live, direct user report ("It's
+                                    # not working... it's using Tab to fucking
+                                    # navigate"): a run got stuck oscillating between
+                                    # this redirect and a plain Tab for 25+ consecutive
+                                    # steps, zero new fields filled. The transformer's
+                                    # own raw pointer prediction never changed step to
+                                    # step (frozen at the same coordinate) -- if the
+                                    # redirect click HAD actually focused the target,
+                                    # the next step's own auto-fill fast path (which
+                                    # checks state["focused_element_id"], independent
+                                    # of the transformer's pointer entirely) should
+                                    # have fired immediately. It never did across 13
+                                    # consecutive attempts, meaning the click wasn't
+                                    # actually landing focus on the target -- the same
+                                    # "assume it worked" mistake this project has hit
+                                    # and fixed multiple times already (verify-at-fill,
+                                    # the scroll branch), just in a new spot.
+                                    _rc_check = self._observe()
+                                    _rc_landed = self._attempt_key(
+                                        next((e for e in _rc_check.get("elements", [])
+                                              if e.get("element_id") == _rc_check.get("focused_element_id")), {}),
+                                        elements=_rc_check.get("elements", []),
+                                    ) == _rc_key
+                                    if _rc_landed:
+                                        _redirect_stall_count = 0
+                                        state = _rc_check
+                                        continue
+                                    _redirect_stall_count += 1
+                                    logger.warning(
+                                        "[OPT2] redirect click on %r did NOT move focus there (stall %d/%d) "
+                                        "— the click isn't sticking, not just a stray pointer guess.",
+                                        _rc_label, _redirect_stall_count, _REDIRECT_STALL_LIMIT)
+                                    if _redirect_stall_count >= _REDIRECT_STALL_LIMIT:
+                                        logger.warning(
+                                            "[OPT2] %d consecutive redirects failed to stick — this tab's "
+                                            "remaining content isn't reachable right now, advancing.",
+                                            _redirect_stall_count)
+                                        _redirect_stall_count = 0
+                                        if self._try_advance_tab(state):
+                                            _tab_just_switched = True
+                                            _tab_scroll_count  = 0
+                                            _last_auto_step    = step_idx
+                                            self._refresh_record_cache(self._observe())
+                                            time.sleep(self.step_delay)
                                     continue
                             logger.info(
                                 "[OPT2] pointer drifted back onto already-%s %s %r — Tab instead "
