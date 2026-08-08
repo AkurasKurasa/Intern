@@ -1303,6 +1303,25 @@ class LLMAgent:
         for step_idx in range(n):
           try:
             _step_t0 = time.time()
+            # Found 2026-08-09, live, direct user report ("We're in a loop
+            # and we're missing certain steps"): the generic repeat-action
+            # guard further down fingerprints whatever `prediction` ends up
+            # being right before execution -- but several checkbox-check
+            # code paths execute the REAL action (BM_SETCHECK on a genuinely
+            # different checkbox each time) and then reassign `prediction`
+            # to a boilerplate "tab to move on" just to advance focus
+            # afterward. Three checks of three DIFFERENT checkboxes in a row
+            # all end up with the identical trailing "keyboard: tab"
+            # prediction, so the guard saw "same action 3x" and force-Tabbed
+            # AGAIN through a path that skips the normal ExecutionResult/
+            # Validator logging -- confirmed in logs/latest.log around
+            # 02:08:19 (step 111): 'New Car Replacement' was checked via
+            # BM_SETCHECK, then the repeat guard immediately fired anyway.
+            # Real progress WAS happening every step -- the guard just
+            # couldn't see it. This flag lets any code path that performs a
+            # genuine state-changing action this step say so, so the guard
+            # (checked later this same step) knows not to second-guess it.
+            _real_progress_this_step = False
             # 1. Observe — but first re-assert the locked form as foreground so a
             # stray click last step can't leave us observing/acting on a drifted
             # window. Lock is captured on the first observe (form is in front at GO).
@@ -3347,6 +3366,7 @@ class LLMAgent:
                                         logger.info("Checkbox %r checked via BM_SETCHECK (type intercept).", _flabel_full)
                                         self._checked_fields.add(_flabel_full)
                                         self._filled_this_tab.add(_flabel_full)
+                                        _real_progress_this_step = True
                                         # Belt-and-suspenders alongside the
                                         # ui_observer.py TogglePattern fix
                                         # (2026-08-09): mark it attempted
@@ -3463,6 +3483,7 @@ class LLMAgent:
                                 self._checked_fields.add(_chk_label)
                                 self._filled_this_tab.add(_chk_label)
                                 self._mark_attempted(_chk_at_cp, elements=state.get("elements", []))
+                                _real_progress_this_step = True
                                 _no_change_streak = 0
                                 _last_auto_step   = step_idx
                                 prediction = {"action_type": "keyboard", "key_count": 1, "keystrokes": ["tab"]}
@@ -3667,23 +3688,41 @@ class LLMAgent:
             # Repeat-action guard: fingerprint this prediction; if last N identical → Tab
             if self._pure_transformer:
                 _action_history.clear()  # don't accumulate in pure-transformer mode
-            _atype = prediction.get("action_type", "no_op")
-            if _atype == "keyboard":
-                _fp = ("keyboard", (prediction.get("text") or "".join(prediction.get("keystrokes", [])))[:40])
-            elif _atype == "click":
-                _cp2 = prediction.get("click_position", [0, 0])
-                _fp  = ("click", round(_cp2[0] / 20) * 20, round(_cp2[1] / 20) * 20)
-            else:
-                _fp = (_atype,)
-            _action_history.append(_fp)
-            if (len(_action_history) >= _REPEAT_LIMIT
-                    and len(set(_action_history)) == 1):
-                logger.warning("Repeat-action guard: same action %dx in a row — forcing Tab.", _REPEAT_LIMIT)
+            if _real_progress_this_step:
+                # Found 2026-08-09, live, direct user report ("We're in a
+                # loop and we're missing certain steps"): a checkbox-check
+                # code path already made real, distinguishable progress this
+                # step (a genuinely different checkbox, confirmed via
+                # BM_SETCHECK) and only reassigned `prediction` afterward to
+                # a boilerplate "tab to move on." Fingerprinting THAT
+                # compares bookkeeping, not the actual decision -- three
+                # DIFFERENT successful checks in a row all end with the
+                # identical trailing tab, so this guard used to fire anyway,
+                # forcing an extra Tab through a path that skips the normal
+                # ExecutionResult/Validator logging (confirmed missing from
+                # logs/latest.log around step 111). Skip the guard entirely
+                # and let the normal keyboard-tab path below run instead,
+                # with its usual logging -- and clear history, since real
+                # progress legitimately breaks any actual stuck streak too.
                 _action_history.clear()
-                _no_change_streak = 0
-                self._executor.execute({"action_type": "keyboard", "key_count": 1, "keystrokes": ["tab"]})
-                time.sleep(self.step_delay * 0.5)
-                continue
+            else:
+                _atype = prediction.get("action_type", "no_op")
+                if _atype == "keyboard":
+                    _fp = ("keyboard", (prediction.get("text") or "".join(prediction.get("keystrokes", [])))[:40])
+                elif _atype == "click":
+                    _cp2 = prediction.get("click_position", [0, 0])
+                    _fp  = ("click", round(_cp2[0] / 20) * 20, round(_cp2[1] / 20) * 20)
+                else:
+                    _fp = (_atype,)
+                _action_history.append(_fp)
+                if (len(_action_history) >= _REPEAT_LIMIT
+                        and len(set(_action_history)) == 1):
+                    logger.warning("Repeat-action guard: same action %dx in a row — forcing Tab.", _REPEAT_LIMIT)
+                    _action_history.clear()
+                    _no_change_streak = 0
+                    self._executor.execute({"action_type": "keyboard", "key_count": 1, "keystrokes": ["tab"]})
+                    time.sleep(self.step_delay * 0.5)
+                    continue
 
             if prediction.get("action_type") == "keyboard":
                 self._ensure_form_foreground(state)
