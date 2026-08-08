@@ -2664,6 +2664,44 @@ class LLMAgent:
                                     if _rc_landed:
                                         _redirect_stall_count = 0
                                         state = _rc_check
+                                        # Found 2026-08-09, live, direct user
+                                        # report ("Marital Status was not
+                                        # even filled up until Cell Phone" /
+                                        # "it navigated away after filling
+                                        # SSN"): landing SetFocus on the
+                                        # DEEPEST field of a cluster (to
+                                        # reveal the whole cluster via its
+                                        # auto-scroll side effect) also makes
+                                        # THAT deepest field the next thing
+                                        # that gets filled -- the auto-fill
+                                        # fast path always acts on whatever is
+                                        # currently focused. Every shallower
+                                        # field in the SAME newly-revealed
+                                        # cluster (Marital Status, Occupation,
+                                        # Education Level, Credit Score) got
+                                        # silently skipped, since none of THEM
+                                        # ever became focused -- only the deep
+                                        # target used to trigger the reveal
+                                        # did. Re-focus onto the SHALLOWEST
+                                        # now-visible unattempted field before
+                                        # continuing, so revealing the cluster
+                                        # and filling it happen on different
+                                        # fields -- top to bottom, not
+                                        # bottom-first.
+                                        _shallow_target = self._navproto.find_visible_empty_target(
+                                            state, self._form_viewport_bottom(state) - 8,
+                                            attempted_keys=self._attempted_keys, attempt_key_fn=self._attempt_key)
+                                        if _shallow_target and _shallow_target.get("bbox"):
+                                            _shallow_key = self._attempt_key(
+                                                _shallow_target, elements=state.get("elements", []))
+                                            if _shallow_key != _rc_key:
+                                                _shallow_label = (_shallow_target.get("label")
+                                                                   or _shallow_target.get("text") or "").strip()
+                                                if _shallow_label and self._focus_element_via_uia(_shallow_label):
+                                                    logger.info(
+                                                        "[OPT2] revealed cluster via %r — refocusing shallower "
+                                                        "target %r to fill top-down.", _rc_label, _shallow_label[:30])
+                                                    state = self._observe()
                                         continue
                                     _redirect_stall_count += 1
                                     logger.warning(
@@ -2826,6 +2864,24 @@ class LLMAgent:
                                     if _cb_rc_landed:
                                         _redirect_stall_count = 0
                                         state = _cb_rc_check
+                                        # Same "refocus shallowest before
+                                        # filling" fix as the sibling guard
+                                        # above.
+                                        _cb_shallow_target = self._navproto.find_visible_empty_target(
+                                            state, self._form_viewport_bottom(state) - 8,
+                                            attempted_keys=self._attempted_keys, attempt_key_fn=self._attempt_key)
+                                        if _cb_shallow_target and _cb_shallow_target.get("bbox"):
+                                            _cb_shallow_key = self._attempt_key(
+                                                _cb_shallow_target, elements=state.get("elements", []))
+                                            if _cb_shallow_key != _cb_rc_key:
+                                                _cb_shallow_label = (_cb_shallow_target.get("label")
+                                                                      or _cb_shallow_target.get("text") or "").strip()
+                                                if _cb_shallow_label and self._focus_element_via_uia(_cb_shallow_label):
+                                                    logger.info(
+                                                        "[OPT2] revealed cluster via %r — refocusing shallower "
+                                                        "target %r to fill top-down.",
+                                                        _cb_rc_label, _cb_shallow_label[:30])
+                                                    state = self._observe()
                                         continue
                                     _redirect_stall_count += 1
                                     if _redirect_stall_count >= _REDIRECT_STALL_LIMIT:
