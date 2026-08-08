@@ -76,10 +76,13 @@ def _run_reclick_guard_verified(state, post_redirect_focused_id, reclick_streak,
     observation's focused_element_id) that focus actually landed there
     before trusting it. On repeated stalls, marks ONLY the specific
     unreachable target attempted (so it stops being re-offered) and looks
-    for a DIFFERENT target before concluding the tab itself is exhausted --
-    added after a live regression where one unreachable field ('Street
-    Address 1') caused the WHOLE remaining tab to be abandoned, skipping
-    several other genuinely fillable fields that were never even tried."""
+    for a DIFFERENT target ANYWHERE on the tab -- on- or off-screen,
+    viewport-UNBOUNDED (1e9) -- before concluding the tab itself is
+    exhausted. Was viewport-bounded at first; found live, same night, that
+    a viewport-limited search still wrongly advanced the tab when a
+    different target existed just one scroll away (the search only asked
+    "is anything else visible RIGHT NOW", not "does anything else exist
+    anywhere on this tab"), compounding into the reported jump to Vehicle."""
     attempted_keys = attempted_keys if attempted_keys is not None else set()
     _key_fn = lambda e, els: e.get("element_id")
     reclick_streak += 1
@@ -102,7 +105,7 @@ def _run_reclick_guard_verified(state, post_redirect_focused_id, reclick_streak,
     if stall_count >= stall_limit:
         stall_count = 0
         attempted_keys.add(target["element_id"])
-        alt = find_visible_empty_target(state, VIEWPORT_BOTTOM,
+        alt = find_visible_empty_target(state, 1e9,   # unbounded -- on- or off-screen
                                          attempted_keys=attempted_keys, attempt_key_fn=_key_fn)
         if alt is None:
             advance_tab_fn()
@@ -233,6 +236,29 @@ class TestStalledRedirectTriesADifferentTargetBeforeAbandoningTheTab:
         assert (streak, stall) == (0, 0)
         advance_tab_fn.assert_not_called()
         assert "Street Address 1" in attempted, "the unreachable field must be excluded from future offers"
+
+    def test_an_off_screen_alternate_target_also_counts_as_reachable(self):
+        """The SECOND round of this same live bug: the alternate-target
+        search was viewport-bounded, so it only asked 'is anything else
+        visible RIGHT NOW' -- 'Street Address 2' existed but was just below
+        the fold, not yet scrolled to, so the search wrongly concluded
+        nothing else remained and advanced anyway. Fixed: search
+        unbounded (on- or off-screen). This test's 'City' sits at y=5000,
+        far outside any normal viewport -- must still be found."""
+        executor = MagicMock()
+        advance_tab_fn = MagicMock()
+        state = {"elements": [
+            _field("Years Continuously Insured", value="9", bbox=(100, 100, 300, 130)),
+            _field("Street Address 1", value="", bbox=(100, 200, 300, 230)),
+            _field("City", value="", bbox=(100, 5000, 300, 5030)),   # far below any real viewport
+        ]}
+        attempted = set()
+        streak, stall = _run_reclick_guard_verified(
+            state, post_redirect_focused_id="Years Continuously Insured",
+            reclick_streak=0, stall_count=1, redirect_limit=1, stall_limit=2,
+            executor=executor, advance_tab_fn=advance_tab_fn, attempted_keys=attempted)
+        assert (streak, stall) == (0, 0)
+        advance_tab_fn.assert_not_called()
 
     def test_advances_the_tab_only_when_truly_nothing_else_is_reachable(self):
         """No alternative exists once the stalled target is excluded --

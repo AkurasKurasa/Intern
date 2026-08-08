@@ -2600,10 +2600,17 @@ class LLMAgent:
                                         "[OPT2] pointer stuck on already-%s %s %r %d times in a row "
                                         "— redirecting to known target %r instead of another blind Tab.",
                                         _reclick_reason, _reclick_ty, _reclick_label, _reclick_streak, _rc_label)
-                                    self._executor.execute({
-                                        "action_type": "click",
-                                        "click_position": [(_rcb[0] + _rcb[2]) / 2, (_rcb[1] + _rcb[3]) / 2],
-                                    })
+                                    # UIA SetFocus first -- no screen coordinates, no
+                                    # "semantic positioning" guess about where this
+                                    # visually sits (see _focus_element_via_uia's own
+                                    # docstring for why). Falls back to the click only if
+                                    # UIA can't find/focus the control at all.
+                                    _rc_full_label = (_rc_target.get("label") or _rc_target.get("text") or "").strip()
+                                    if not self._focus_element_via_uia(_rc_full_label):
+                                        self._executor.execute({
+                                            "action_type": "click",
+                                            "click_position": [(_rcb[0] + _rcb[2]) / 2, (_rcb[1] + _rcb[3]) / 2],
+                                        })
                                     time.sleep(self.step_delay * 0.4)
                                     _reclick_streak = 0
                                     # VERIFY the redirect actually moved focus, don't
@@ -2660,17 +2667,35 @@ class LLMAgent:
                                         # field itself will not get filled this run -- better
                                         # than either looping on it forever or discarding
                                         # every other real field alongside it.
+                                        #
+                                        # Found 2026-08-08, live, SAME night, immediately
+                                        # after shipping the fix above: it fired exactly as
+                                        # designed ("'Street Address 1' unreachable and no
+                                        # other target visible either -- advancing") and
+                                        # STILL jumped past the tab wrongly. Why: the search
+                                        # below was viewport-limited (_form_viewport_bottom),
+                                        # so it only asked "is anything else visible RIGHT
+                                        # NOW" -- and at that exact moment, nothing else
+                                        # happened to be on screen yet. The very next scroll
+                                        # immediately revealed 'Street Address 2' sitting just
+                                        # below the fold, which then failed the SAME way,
+                                        # compounding into the reported jump straight to
+                                        # Vehicle. Search the WHOLE tab (1e9, unbounded --
+                                        # same pattern already used by the SCROLL-DIAG
+                                        # tracking above), not just the current viewport: if
+                                        # something exists anywhere on this tab, even
+                                        # off-screen, `continue` and let Navigation Protocol's
+                                        # own decide() scroll to it naturally next iteration --
+                                        # only advance when truly nothing is left anywhere.
                                         _redirect_stall_count = 0
                                         self._attempted_keys.add(_rc_key)
-                                        _nav_vb_alt = self._form_viewport_bottom(_rc_check) - 8
                                         _alt_target = self._navproto.find_visible_empty_target(
-                                            _rc_check, _nav_vb_alt, attempted_keys=self._attempted_keys,
+                                            _rc_check, 1e9, attempted_keys=self._attempted_keys,
                                             attempt_key_fn=self._attempt_key)
                                         if _alt_target is None:
                                             logger.warning(
-                                                "[OPT2] %r unreachable and no other target visible either "
-                                                "— this tab's remaining content isn't reachable right now, "
-                                                "advancing.", _rc_label)
+                                                "[OPT2] %r unreachable and nothing else remains anywhere on "
+                                                "this tab (checked on- and off-screen) — advancing.", _rc_label)
                                             if self._try_advance_tab(state):
                                                 _tab_just_switched = True
                                                 _tab_scroll_count  = 0
@@ -2754,10 +2779,13 @@ class LLMAgent:
                                         "[OPT2] combobox %r already attempted (known blank) %d times in a "
                                         "row — redirecting to known target %r instead of another blind Tab.",
                                         _cb_label_skip[:30], _reclick_streak, _cb_rc_label)
-                                    self._executor.execute({
-                                        "action_type": "click",
-                                        "click_position": [(_cbrcb[0] + _cbrcb[2]) / 2, (_cbrcb[1] + _cbrcb[3]) / 2],
-                                    })
+                                    # Same UIA SetFocus-first fix as the sibling guard above.
+                                    _cb_rc_full_label = (_cb_rc_target.get("label") or _cb_rc_target.get("text") or "").strip()
+                                    if not self._focus_element_via_uia(_cb_rc_full_label):
+                                        self._executor.execute({
+                                            "action_type": "click",
+                                            "click_position": [(_cbrcb[0] + _cbrcb[2]) / 2, (_cbrcb[1] + _cbrcb[3]) / 2],
+                                        })
                                     time.sleep(self.step_delay * 0.4)
                                     _reclick_streak = 0
                                     # Same verify-don't-assume fix as the sibling guard.
@@ -4744,6 +4772,48 @@ class LLMAgent:
         ev = expected.lower().strip()
         should_check = ev.startswith("yes") or ev in {"check", "true", "1", "checked"}
         return (field_name, should_check)
+
+    def _focus_element_via_uia(self, label: str) -> bool:
+        """
+        Focus a control directly via UIA's SetFocus(), bypassing simulated
+        mouse clicks at computed screen coordinates entirely -- no bbox
+        center, no pixel math, no guessing where something visually sits.
+        Returns True if a matching control was found and SetFocus() was
+        issued without error.
+
+        Added 2026-08-08, live, direct user instruction ("Don't use
+        semantic positioning") immediately after 'Street Address 1' and
+        then 'Street Address 2' -- two different fields, click coordinates
+        only 10px apart -- both failed to receive focus via a simulated
+        click at their bbox center, twice each, confirmed by re-observing
+        afterward. A pixel-coordinate click can miss for reasons that have
+        nothing to do with WHICH field is being targeted (edge clipping
+        near the viewport boundary, visual occlusion, a few pixels of bbox
+        drift) -- SetFocus() sidesteps that whole class of failure since it
+        never goes through screen coordinates at all, just the control
+        object UIA already knows about.
+        """
+        try:
+            import uiautomation as _uia
+            import win32gui as _w32g
+        except Exception:
+            return False
+        try:
+            hwnd = self._locked_hwnd or _w32g.GetForegroundWindow()
+            root = _uia.ControlFromHandle(hwnd)
+            _ctrl = None
+            for _finder in (root.EditControl, root.ComboBoxControl, root.CheckBoxControl):
+                _c = _finder(searchDepth=25, Name=label)
+                if _c.Exists(maxSearchSeconds=0.3):
+                    _ctrl = _c
+                    break
+            if _ctrl is None:
+                return False
+            _ctrl.SetFocus()
+            return True
+        except Exception as exc:
+            logger.debug("UIA SetFocus on %r failed — %s", label, exc)
+            return False
 
     def _scroll_form_down_uia(self, state: Dict[str, Any]) -> bool:
         """
