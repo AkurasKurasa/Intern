@@ -4627,11 +4627,13 @@ class LLMAgent:
 
     def _scroll_form_down_uia(self, state: Dict[str, Any]) -> bool:
         """
-        Fire ONE native UIA ScrollPattern.Scroll(LargeIncrement) on the active
+        Fire ONE native UIA ScrollPattern.Scroll(SmallIncrement) on the active
         form's scrollable pane, found by walking UP from a real on-screen
         field through the UIA parent chain. Returns True once the call was
         ISSUED, False if no scrollable pane was found or UIA isn't available
         — callers should fall back to the mouse-wheel route in that case.
+        SmallIncrement, not LargeIncrement — see the comment at the actual
+        Scroll() call below for why.
 
         Revived 2026-08-08 from this repo's own history (commit 0ec5688a's
         _scrollbar_drag, later removed as dead code) after the user asked
@@ -4699,8 +4701,22 @@ class LLMAgent:
             if _panel is None:
                 return False
 
-            _panel.GetScrollPattern().Scroll(_uia.ScrollAmount.NoAmount, _uia.ScrollAmount.LargeIncrement)
-            logger.info("Scroll-form: UIA ScrollPattern LargeIncrement issued on pane %r",
+            # SmallIncrement, not LargeIncrement -- found 2026-08-08, live,
+            # immediately after reviving this route: LargeIncrement is a full
+            # native "page jump," much bigger than the old wheel-fallback's
+            # small -5/-15/-25 unit nudges. Combined with the new optimal-view
+            # decide() (which already loops, re-scrolling as many times as
+            # needed until cur==best), one LargeIncrement call overshot so far
+            # that the very first field on the tab ('First Name') vanished
+            # from the post-scroll snapshot entirely -- confirmed by
+            # [SCROLL-DIAG] in the log. Since this protocol only scrolls DOWN,
+            # never back up, overshooting permanently loses access to
+            # whatever got skipped -- directly responsible for a 2.3% task
+            # completion rate that run. decide()'s loop is exactly what makes
+            # several small scrolls fine (and expected) instead of needing one
+            # large one.
+            _panel.GetScrollPattern().Scroll(_uia.ScrollAmount.NoAmount, _uia.ScrollAmount.SmallIncrement)
+            logger.info("Scroll-form: UIA ScrollPattern SmallIncrement issued on pane %r",
                         getattr(_panel, "Name", "?"))
             return True
         except Exception as exc:
