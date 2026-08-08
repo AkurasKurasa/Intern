@@ -469,6 +469,23 @@ def _detect_active_tab_idx_raw(tabs: List[Dict[str, Any]],
     see LLMAgent.run()'s own startup-verification block for why that case
     needs the OPPOSITE trust rule from _try_advance_tab's mid-run one (this
     function itself is neutral — callers decide what "disagreement" means).
+
+    Also requires e["visible"] (default True). Found 2026-08-08, live,
+    immediately after wiring UIA's real IsOffscreen signal into ui_observer.py
+    for the scroll-visibility fix: THIS function's own "wx moves inactive
+    panels to negative coordinates" assumption turned out to be wrong for
+    this form — tab index 0's (Policy) panel elements kept reporting
+    bbox[1] >= 0 even long after switching away from it, so this loop
+    (checking tabs in order, returning the FIRST match) returned 0 on every
+    single call for the rest of the run, no matter which tab was actually
+    showing. _try_advance_tab's own drift-guard correctly distrusted that
+    and fell back to its tracker each time — but the tracker has no way to
+    confirm a click actually landed, so it just kept incrementing blindly,
+    cycling through all 8 tabs repeatedly without ever confirming a real
+    switch or filling anything. IsOffscreen is UIA's own authoritative
+    "is this actually rendered right now" answer — Policy's covered-over
+    panel content reports IsOffscreen=True even though its raw bbox never
+    moved, which the geometric check alone couldn't see.
     """
     for _tii, _tab_el in enumerate(tabs):
         _tbbox = _tab_el.get("bbox")
@@ -481,6 +498,7 @@ def _detect_active_tab_idx_raw(tabs: List[Dict[str, Any]],
             and e.get("bbox")
             and e["bbox"][1] >= 0
             and e["bbox"][1] > _tab_cy   # below the tab strip
+            and e.get("visible", True)
             and e.get("type") in _TAB_PANEL_TYPES
         ]
         if _panel_elems:
@@ -4115,9 +4133,35 @@ class LLMAgent:
                 _, form_pid = win32process.GetWindowThreadProcessId(self._locked_hwnd)
                 _, fg_pid   = win32process.GetWindowThreadProcessId(fg)
                 if fg and fg_pid == form_pid:
+                    # DIAGNOSTIC, added 2026-08-08: direct user report, "still
+                    # going one field at a time" — log evidence showed THIS
+                    # warning firing on every single _try_advance_tab click,
+                    # unconditionally, for the rest of a run that never
+                    # recovered (SCROLL-DIAG kept tracking the SAME field
+                    # across 7+ supposedly-different tabs, meaning the real
+                    # on-screen tab likely never actually changed). Two
+                    # competing explanations, both unconfirmed: (a) this really
+                    # is a modal dialog and Escaping it is correct, but
+                    # something else is separately preventing the tab switch
+                    # from sticking; or (b) wx's Notebook implementation gives
+                    # each tab panel its own child HWND, so a plain tab switch
+                    # legitimately changes GetForegroundWindow() to a normal
+                    # sibling window (same PID, not a dialog at all) — and
+                    # THIS code's own Escape + forced SetForegroundWindow back
+                    # to the ORIGINAL locked hwnd is what's undoing/blocking
+                    # the switch, every single time. Class name distinguishes
+                    # them for certain: "#32770" is a real Windows dialog box;
+                    # anything else is very likely just a sibling content
+                    # window, not something that needs dismissing at all.
+                    try:
+                        _fg_cls   = win32gui.GetClassName(fg)
+                        _fg_title = win32gui.GetWindowText(fg)
+                    except Exception:
+                        _fg_cls, _fg_title = "?", "?"
                     logger.warning(
                         "Foreign window from the form's own process is blocking it "
-                        "(hwnd=%s) — likely a modal dialog. Dismissing with Escape.", fg)
+                        "(hwnd=%s, class=%r, title=%r) — likely a modal dialog. "
+                        "Dismissing with Escape.", fg, _fg_cls, _fg_title)
                     import pyautogui
                     pyautogui.press("escape")
                     time.sleep(0.15)

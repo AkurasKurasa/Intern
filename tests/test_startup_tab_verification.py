@@ -69,6 +69,41 @@ class TestDetectActiveTabIdxRaw:
         all_elems = [_panel_elem(150)]
         assert _detect_active_tab_idx_raw(tabs, all_elems) == 0
 
+    def test_covered_panel_content_is_not_mistaken_for_an_active_tab(self):
+        """Found 2026-08-08, live, immediately after wiring UIA's real
+        IsOffscreen into ui_observer.py: this function's own "wx moves
+        inactive panels to negative coordinates" assumption was wrong for
+        this form -- tab 0's (Policy) panel elements kept reporting
+        bbox[1] >= 0 even long after switching away, so this loop matched
+        tab 0 on every call for the rest of the run. A panel element that's
+        geometrically "below the tab strip" but marked visible=False (UIA's
+        real, covered-over-content signal) must not count as proof its tab
+        is active -- if it's the ONLY candidate, detection must correctly
+        come back empty (None) rather than trusting stale geometry.
+
+        Note: because every tab header shares one horizontal strip (same
+        tab_cy for all of them, confirmed live -- 7 tab clicks in one run
+        all landed at the same y=136), this function can only ever tell
+        "nothing is genuinely visible" from "something is" -- it can't
+        discriminate WHICH tab among several simultaneously-visible
+        candidates, a real, separate limitation this fix doesn't claim to
+        solve. _try_advance_tab's own mid-run mismatch handling already
+        treats any detected-vs-tracked disagreement as noise and trusts its
+        tracker instead, which is why that limitation hasn't been fatal on
+        its own."""
+        tabs = [_tab("Policy", (0, 100, 100, 130))]
+        policy_panel_covered = _panel_elem(150)
+        policy_panel_covered["visible"] = False
+        assert _detect_active_tab_idx_raw(tabs, [policy_panel_covered]) is None
+
+    def test_panel_with_no_visible_key_still_counts(self):
+        """Elements/tests that never set 'visible' at all must behave exactly
+        as before this fix -- geometry alone still decides."""
+        tabs = [_tab("Policy", (0, 100, 100, 130))]
+        panel = _panel_elem(200)
+        assert "visible" not in panel
+        assert _detect_active_tab_idx_raw(tabs, [panel]) == 0
+
 
 def _run_startup_check(assumed_idx, detected_idx):
     """Mirrors the CURRENT startup-verification block in agent.py's run()
