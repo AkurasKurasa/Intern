@@ -212,16 +212,40 @@ class StateValidator:
         # position, the same "don't trust the churny id" principle already
         # applied above -- and the same (label, type) shape agent.py's own
         # _attempt_key already uses for exactly this reason.
+        #
+        # EXTENDED 2026-08-09, live, direct user report ("Error on
+        # Drivers"): plain (label, type) collides on any form with
+        # repeated sections (Driver 1/2/3 here all have their OWN 'Gender',
+        # 'First Name', etc., under the identical bare label) -- multiple
+        # elements sharing one key meant elems_before's FIRST match under
+        # that key got compared against whichever driver's field happened
+        # to be scanned in elems_after, cross-contaminating unrelated
+        # drivers' fields. Live evidence: three DIFFERENT actions on three
+        # DIFFERENT fields (Date of Birth, an SR-22 checkbox, an Excluded
+        # Driver checkbox) all reported the identical, nonsensical
+        # "Field value changed: '' -> 'Female'" -- 'Female' was some OTHER
+        # driver's Gender value, never touched by any of those three
+        # actions. This is the exact repeated-section collision class
+        # agent.py's own _attempt_key already disambiguates (by rank among
+        # same-labeled elements, documented in its own docstring) --
+        # mirrored here the same way, since this file hadn't needed it
+        # until a check that scans every element, not just one at a time,
+        # was added.
         if action_type == "keyboard" and self.value_matters:
-            def _stable_key(e):
-                return ((e.get("label") or e.get("text") or "").strip().lower(), e.get("type"))
+            def _stable_key(e, ranks: Dict[tuple, int]):
+                base = ((e.get("label") or e.get("text") or "").strip().lower(), e.get("type"))
+                rank = ranks.get(base, 0)
+                ranks[base] = rank + 1
+                return (base[0], base[1], rank)
 
+            _before_ranks: Dict[tuple, int] = {}
             _before_by_stable: Dict[tuple, dict] = {}
             for e in elems_before.values():
-                _before_by_stable.setdefault(_stable_key(e), e)
+                _before_by_stable[_stable_key(e, _before_ranks)] = e
 
+            _after_ranks: Dict[tuple, int] = {}
             for elem_after in elems_after.values():
-                elem_before = _before_by_stable.get(_stable_key(elem_after))
+                elem_before = _before_by_stable.get(_stable_key(elem_after, _after_ranks))
                 if elem_before is None:
                     continue
                 val_before = (elem_before.get("value") or "").strip()

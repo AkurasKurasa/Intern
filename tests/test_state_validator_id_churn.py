@@ -133,3 +133,56 @@ class TestKeyboardValueChangeIgnoresChurnedIds:
         result = validator.validate(state_before, state_after, {"action_type": "keyboard"})
         assert result.status == "ok"
         assert result.reason == "Field value changed: '' → '9'"
+
+
+class TestKeyboardValueChangeDisambiguatesRepeatedSections:
+    """Found live 2026-08-09, direct user report ("Error on Drivers"): plain
+    (label, type) matching collides on any form with repeated sections --
+    the Drivers tab has Driver 1/2/3, each with its OWN 'Gender', 'First
+    Name', etc. under the identical bare label. Live evidence: three
+    DIFFERENT actions on three DIFFERENT fields (Date of Birth, an SR-22
+    checkbox, an Excluded Driver checkbox) all reported the identical,
+    nonsensical "Field value changed: '' -> 'Female'" -- 'Female' was some
+    OTHER driver's Gender value, never touched by any of those three
+    actions. The exact same class of bug agent.py's own _attempt_key
+    already disambiguates (by rank among same-labeled elements) -- mirrored
+    here the same way."""
+
+    def test_three_drivers_sharing_the_same_labels_do_not_cross_contaminate(self):
+        """The actual live bug, reproduced: three 'Gender' comboboxes (one
+        per driver). Only Driver 2's genuinely changed -- Driver 1's and
+        Driver 3's must not be reported as having changed too."""
+        validator = StateValidator()
+        state_before = {"elements": [
+            _field("elem_1", "Gender", "Male", etype="comboboxcontrol"),    # Driver 1
+            _field("elem_2", "Gender", "",     etype="comboboxcontrol"),    # Driver 2 -- about to be filled
+            _field("elem_3", "Gender", "Male", etype="comboboxcontrol"),    # Driver 3
+        ]}
+        state_after = {"elements": [
+            _field("elem_1", "Gender", "Male",   etype="comboboxcontrol"),   # Driver 1 -- unchanged
+            _field("elem_2", "Gender", "Female", etype="comboboxcontrol"),   # Driver 2 -- genuinely changed
+            _field("elem_3", "Gender", "Male",   etype="comboboxcontrol"),   # Driver 3 -- unchanged
+        ]}
+        result = validator.validate(state_before, state_after, {"action_type": "keyboard"})
+        assert result.status == "ok"
+        assert result.reason == "Field value changed: '' → 'Female'"
+
+    def test_an_unrelated_field_change_is_not_misattributed_to_a_same_labeled_sibling(self):
+        """The precise live symptom: a checkbox action on 'Driver 3
+        Excluded Driver' must not get reported as some OTHER driver's
+        'Gender' changing to 'Female', just because both labels recur."""
+        validator = StateValidator()
+        state_before = {"elements": [
+            _field("elem_1", "Gender", "Male",  etype="comboboxcontrol"),      # Driver 1
+            _field("elem_2", "Gender", "Female", etype="comboboxcontrol"),     # Driver 2 -- already filled, unrelated
+            _field("elem_3", "Excluded Driver", "", etype="checkboxcontrol"),  # Driver 3 -- about to be checked
+        ]}
+        state_after = {"elements": [
+            _field("elem_1", "Gender", "Male",  etype="comboboxcontrol"),
+            _field("elem_2", "Gender", "Female", etype="comboboxcontrol"),     # unchanged
+            _field("elem_3", "Excluded Driver", "Checked", etype="checkboxcontrol"),  # the real change
+        ]}
+        result = validator.validate(state_before, state_after, {"action_type": "keyboard"})
+        assert result.status == "ok"
+        assert result.reason != "Field value changed: '' → 'Female'"
+        assert result.reason == "Field value changed: '' → 'Checked'"
