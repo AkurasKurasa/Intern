@@ -273,17 +273,22 @@ class TestRetryReclicksBeforeRetyping:
 
 
 def _run_settle_poll(observe, expected_text, budget=0.4, poll=0.1):
-    """Mirrors the settle-poll block added to agent.py's run() right before
-    verify-at-fill's own check (2026-08-08 fix): poll a few times instead of
-    one fixed sleep, breaking the moment the value actually shows up."""
+    """Mirrors the settle-poll block in agent.py's run() (2026-08-08 fix,
+    tightened same day to avoid slowing down the common case): check
+    IMMEDIATELY first -- zero extra cost for the many fields/step that never
+    hit the race -- and only sleep-then-recheck if that first read isn't
+    correct yet, up to a bounded budget."""
     waited = 0.0
+    state = observe()
     while waited < budget:
-        waited += poll
-        state = observe()
         fid = state.get("focused_element_id")
         if _verify_fill_matches(state.get("elements", []), fid, expected_text):
             return True, waited
-    return False, waited
+        waited += poll
+        state = observe()
+    fid = state.get("focused_element_id")
+    matched = _verify_fill_matches(state.get("elements", []), fid, expected_text)
+    return matched, waited
 
 
 class TestVerifyAtFillSettlePoll:
@@ -295,11 +300,27 @@ class TestVerifyAtFillSettlePoll:
     when the (zero-delay) snapshot was taken. A single fixed delay isn't
     reliable either -- the existing retry path already sleeps before its
     own re-check and still read empty twice in the live log, so the real
-    settle time varies. Poll instead of guessing one constant."""
+    settle time varies. Poll instead of guessing one constant.
+
+    SAME-DAY FOLLOW-UP: the first version polled unconditionally (sleep
+    first, then check) on every keyboard action, adding real overhead to
+    every one of the ~175 fields/run that never had this problem, and then
+    the caller took a SEPARATE redundant observe() right after regardless.
+    User reported the run got noticeably slower. Fixed: check immediately
+    (no sleep) first, and reuse the poll loop's own last observation instead
+    of observing again right after -- the common (already-correct) case now
+    costs exactly one observe(), same as before this fix existed at all."""
+
+    def test_returns_true_immediately_with_no_polling_when_already_correct(self):
+        observe = MagicMock(return_value={"focused_element_id": "e1", "elements": _elements("9", "e1")})
+        matched, waited = _run_settle_poll(observe, "9", budget=0.4, poll=0.1)
+        assert matched is True
+        assert observe.call_count == 1   # zero extra cost for the common case
+        assert waited == 0.0
 
     def test_returns_true_as_soon_as_the_value_appears(self):
-        # First poll still empty, second poll shows the real value -- proves
-        # it breaks EARLY rather than always burning the full budget.
+        # First check (immediate) still empty, second (after one poll) shows
+        # the real value -- proves it breaks EARLY, not always the full budget.
         observe = MagicMock(side_effect=[
             {"focused_element_id": "e1", "elements": _elements("", "e1")},
             {"focused_element_id": "e1", "elements": _elements("9", "e1")},
@@ -313,10 +334,4 @@ class TestVerifyAtFillSettlePoll:
         observe = MagicMock(return_value={"focused_element_id": "e1", "elements": _elements("", "e1")})
         matched, waited = _run_settle_poll(observe, "9", budget=0.3, poll=0.1)
         assert matched is False
-        assert observe.call_count == 3   # 0.3 budget / 0.1 poll
-
-    def test_no_polling_needed_when_correct_on_the_very_first_check(self):
-        observe = MagicMock(return_value={"focused_element_id": "e1", "elements": _elements("9", "e1")})
-        matched, waited = _run_settle_poll(observe, "9", budget=0.4, poll=0.1)
-        assert matched is True
-        assert observe.call_count == 1
+        assert observe.call_count == 4   # 1 immediate + 3 polls (0.3 budget / 0.1 poll)

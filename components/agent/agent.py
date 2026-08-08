@@ -1992,12 +1992,35 @@ class LLMAgent:
                 time.sleep(self.step_delay * 0.6)
                 _state_after = self._observe()
                 _vb_after    = self._form_viewport_bottom(_state_after)
-                if _scrolled and self._navproto.visible_field_signature(_state_after, _vb_after) != _sig_before:
-                    logger.info("Navigation Protocol: scroll moved the view — new fields revealed.")
-                    state             = _state_after
-                    _tab_scroll_count = 0
-                    _last_auto_step   = step_idx
+                _view_moved  = (_scrolled and
+                                self._navproto.visible_field_signature(_state_after, _vb_after) != _sig_before)
+                if _view_moved:
+                    # visible_field_signature only proves the view PHYSICALLY moved
+                    # (its own docstring: "not that nothing is left to fill") --
+                    # scrolling shifts nearly every element's y-position, so this
+                    # was true on almost every scroll regardless of whether
+                    # anything ACTIONABLE was revealed. Resetting the dead-scroll
+                    # counter on that alone meant it could never reach
+                    # max_dead_scrolls and hand off to ADVANCE_TAB. Found
+                    # 2026-08-08, live: 11 consecutive pure-scroll steps in a row,
+                    # each logging "new fields revealed", none of them stopping to
+                    # fill anything. Only reset the counter when has_visible_empty_
+                    # target confirms there's actually something to act on now --
+                    # a scroll that reveals new-but-non-actionable content (a
+                    # section header, an already-filled field scrolling into view)
+                    # still counts toward "still nothing to do here."
+                    state           = _state_after
+                    _last_auto_step = step_idx
                     _heuristic_steps += 1
+                    if self._navproto.has_visible_empty_target(
+                            _state_after, _vb_after,
+                            attempted_keys=self._attempted_keys, attempt_key_fn=self._attempt_key):
+                        logger.info("Navigation Protocol: scroll moved the view — actionable field revealed.")
+                        _tab_scroll_count = 0
+                    else:
+                        _tab_scroll_count += 1
+                        logger.info("Navigation Protocol: scroll moved the view but nothing actionable yet (%d/2).",
+                                    _tab_scroll_count)
                     continue
                 _tab_scroll_count += 1
                 logger.info("Navigation Protocol: view unchanged after scroll (%d) — at bottom of tab.",
@@ -3089,21 +3112,28 @@ class LLMAgent:
             # slowed down and slow ones aren't given up on prematurely.
             # Scoped to keyboard actions only (clicks' "focus moved" check
             # isn't reading typed content, so it isn't exposed to this race).
+            # 4. Validate
+            # For keyboard actions, check IMMEDIATELY first (zero extra cost
+            # for the ~175 fields/step that were never affected by the race
+            # above) and only poll with short sleeps if that first read isn't
+            # correct yet -- avoids paying the settle-wait on every single
+            # typed field just to cover the rare one that actually needs it.
+            state_after = None
             if prediction.get("action_type") == "keyboard" and prediction.get("text"):
                 _settle_text   = prediction["text"].strip()
                 _settle_budget = self.step_delay * 0.4
                 _settle_waited = 0.0
                 _settle_poll   = 0.1
+                state_after = self._observe()
                 while _settle_waited < _settle_budget:
+                    _settle_fid = state_after.get("focused_element_id")
+                    if _verify_fill_matches(state_after.get("elements", []), _settle_fid, _settle_text):
+                        break
                     time.sleep(_settle_poll)
                     _settle_waited += _settle_poll
-                    _settle_state = self._observe()
-                    _settle_fid = _settle_state.get("focused_element_id")
-                    if _verify_fill_matches(_settle_state.get("elements", []), _settle_fid, _settle_text):
-                        break
-
-            # 4. Validate
-            state_after = self._observe()
+                    state_after = self._observe()
+            if state_after is None:
+                state_after = self._observe()
 
             # ── Verify-at-fill: catch a WRONG value the moment it's typed, not later ──
             # StateValidator (right below) only checks whether SOMETHING changed —
