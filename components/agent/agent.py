@@ -3160,6 +3160,35 @@ class LLMAgent:
                             # element at the position, not a keyword list) — just
                             # extended to the other call site sharing the same risky
                             # input, instead of only the one already caught live.
+                            # Found 2026-08-09, live, direct user report ("It closed
+                            # the fucking Terminal", TWICE, deterministically
+                            # reproduced across 3 separate runs -- always at the same
+                            # field, 'Payment Frequency', always right after this
+                            # exact unconditional click and nothing else). Traced end
+                            # to end: the earlier alt+f4-prompt/hotkey-allowlist fix
+                            # addressed a real but DIFFERENT vulnerability -- this
+                            # crash has no keyboard action anywhere near it, it's a
+                            # bare CLICK. The sibling navigate-click branch (a few
+                            # hundred lines below) already refuses to click outside
+                            # the locked form window via self._point_in_form -- this
+                            # combobox-open branch reuses the SAME _snap2 target but
+                            # never got that check, only _find_destructive_button_at
+                            # (which only catches known BUTTON elements inside the
+                            # form's own accessibility tree -- it has no idea a point
+                            # lands in a completely different window, like the
+                            # terminal, because that window's controls were never
+                            # scanned into state['elements'] at all). Same class of
+                            # gap _find_destructive_button_at itself was generalized
+                            # for once already -- one more copy of the same missing
+                            # guard, not a new mechanism.
+                            if not self._point_in_form(_snap2, state):
+                                logger.warning(
+                                    "[GUARD] combobox-open target (%.0f,%.0f) OUTSIDE form window — "
+                                    "Tab instead of drifting into another window.", _snap2[0], _snap2[1])
+                                self._executor.execute({"action_type": "keyboard",
+                                                        "key_count": 1, "keystrokes": ["tab"]})
+                                time.sleep(self.step_delay * 0.5)
+                                continue
                             _cb_open_btn = _find_destructive_button_at(state.get("elements", []), _snap2)
                             if _cb_open_btn is not None:
                                 _cb_btn_name = (_cb_open_btn.get("text") or _cb_open_btn.get("label") or "button")
