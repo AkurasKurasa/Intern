@@ -3995,7 +3995,7 @@ class LLMAgent:
 
             # Record the field acted on this step (attempted feature) — mirrors the
             # train-time derivation (every click/type target becomes 'attempted').
-            self._record_attempt(state, prediction)
+            self._record_attempt(state, prediction, state_after=state_after)
 
             if validation.status == "done":
                 logger.info("StateValidator: task appears complete.")
@@ -6658,9 +6658,37 @@ class LLMAgent:
                     best, best_d = e, d
         return best
 
-    def _record_attempt(self, state: Dict[str, Any], prediction: Dict[str, Any]) -> None:
+    def _record_attempt(self, state: Dict[str, Any], prediction: Dict[str, Any],
+                         state_after: Optional[Dict[str, Any]] = None) -> None:
         """Mark the element this step acted on — keyboard→focused, click→element
-        under the cursor — so the transformer sees it as attempted next frame."""
+        under the cursor — so the transformer sees it as attempted next frame.
+
+        Found 2026-08-09, live, direct user report ("skipped most fields in
+        Vehicle after Current Mileage"), confirmed on a second run via the
+        new [FOCUS-DIAG] diagnostic: a plain navigate click aimed at
+        'Annual Miles Est.' (its own bbox matched the click position in the
+        PRE-click `state`) resulted in real focus landing on the 'Submit'
+        button instead — yet this function was always called with that
+        stale pre-click `state`, so the position-based lookup below still
+        matched 'Annual Miles Est.' and marked THAT field attempted,
+        permanently excluding it from ever being offered as a target again
+        even though it was never actually focused or typed into. The
+        caller already takes a fresh `state_after` observation for
+        validation a few lines above this call — it just was never passed
+        through. For CLICK actions only (keyboard/type intentionally left
+        alone — see below), prefer `state_after`'s own focused_element_id,
+        the verified post-action reality, over trusting the click landed
+        where it was aimed. Same "verify what actually happened, don't
+        assume the intended target was hit" principle already proven
+        elsewhere in this file (verify-at-fill, the redirect-verify fix).
+
+        Deliberately NOT applied to the keyboard branch: a type action can
+        legitimately trail a Tab/commit keystroke within the same step
+        (e.g. combobox selection), which could leave state_after focused on
+        the NEXT field rather than the one just typed into — the pre-action
+        `state`'s focused_element_id (captured before typing began) stays
+        the more reliable signal there.
+        """
         at = prediction.get("action_type")
         elements = state.get("elements", [])
         elem = None
@@ -6668,7 +6696,14 @@ class LLMAgent:
             fid = state.get("focused_element_id")
             elem = next((e for e in elements if e.get("element_id") == fid), None)
         elif at == "click":
-            elem = self._elem_at(state, prediction.get("click_position") or [])
+            _after_fid = state_after.get("focused_element_id") if state_after else None
+            if _after_fid:
+                _after_elements = state_after.get("elements", [])
+                elem = next((e for e in _after_elements if e.get("element_id") == _after_fid), None)
+                if elem is not None:
+                    elements = _after_elements
+            if elem is None:
+                elem = self._elem_at(state, prediction.get("click_position") or [])
         if elem is not None:
             self._mark_attempted(elem, elements=elements)
             # Real typed text (not a bare "tab"/"ctrl+a" housekeeping
