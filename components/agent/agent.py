@@ -129,7 +129,11 @@ Action rules:
              target = EXACT string from SCREEN. Never guess or paraphrase.
 - "type"   → types into the focused field. text = value from DATA SOURCES only.
 - "hotkey" → keyboard shortcut. keys: ["tab"] advances focus, ["return"] confirms,
-             ["ctrl+c"] copies, ["alt+f4"] closes, etc.
+             ["escape"] dismisses a dialog. Only ["tab"], ["return"], ["escape"],
+             ["ctrl+a"], ["ctrl+c"], ["ctrl+v"] are ever executed — anything else
+             is refused. NEVER use a window-closing combo like "alt+f4" or "ctrl+w"
+             for ANY reason, including a stuck or confusing field — use ["tab"]
+             instead.
 - "scroll" → scroll in any direction. target = element to scroll near.
 - "done"   → goal is fully achieved. Only use when certain.
 - "wait"   → UI is loading or animating. Use sparingly.

@@ -42,6 +42,30 @@ try:
 except ImportError:
     _PYAUTOGUI_AVAILABLE = False
 
+# Found 2026-08-09, live, direct user report ("It closed the fucking
+# Terminal holy shit") -- the process died silently mid-run, no traceback,
+# no "interrupted by user" line, consistent with the TERMINAL window
+# itself receiving an OS-level close signal. The log offered no direct
+# proof of which specific keystroke was involved (it cuts off before
+# whatever was attempted next), but a real, independently-serious gap was
+# confirmed by reading this file: _press_key's hotkey branch
+# (`pyautogui.hotkey(*key.split("+"))`) executes ANY "modifier+key" string
+# completely unfiltered -- and this module's own docstring even lists
+# `["alt+f4"] closes` as a recognized example. Every keystroke list this
+# codebase's OWN code currently hardcodes is small and known-safe (tab,
+# escape, space, ctrl+a) -- but nothing stops a future code path, an LLM
+# response, or a bad transformer decode from producing something like
+# "alt+f4" and having it executed verbatim, with real, severe consequences
+# (closing whatever window happens to have focus at that instant -- which,
+# per the user's own report, was the terminal running this very process,
+# not the target form). A destructive-CLICK guard already exists for
+# mouse actions (_find_destructive_button_at, agent.py) on exactly this
+# reasoning; nothing equivalent existed for the keyboard. Allowlist,
+# not a blocklist -- refusing by default is far more robust than trying to
+# name every dangerous combo (the same lesson _find_destructive_button_at's
+# own history already taught this project once).
+_SAFE_HOTKEY_COMBOS = {"ctrl+a", "ctrl+c", "ctrl+v", "ctrl+x", "ctrl+z", "shift+tab"}
+
 
 # ══════════════════════════════════════════════════════════════════════════════
 #  ExecutionResult
@@ -206,6 +230,14 @@ class ActionExecutor:
         if key.startswith("Key."):
             pyautogui.press(key.split("Key.", 1)[1])
         elif "+" in key:
+            # Allowlist, not a blocklist -- see _SAFE_HOTKEY_COMBOS' own
+            # comment for why. Anything not explicitly known-safe is
+            # refused outright rather than executed on trust.
+            if key.lower() not in _SAFE_HOTKEY_COMBOS:
+                logger.warning(
+                    "KEYBOARD  hotkey %r refused — not in the known-safe allowlist %s.",
+                    key, sorted(_SAFE_HOTKEY_COMBOS))
+                return
             pyautogui.hotkey(*key.split("+"))
         elif len(key) == 1:
             pyautogui.typewrite(key, interval=0.0)
