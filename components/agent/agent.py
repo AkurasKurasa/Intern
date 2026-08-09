@@ -2336,6 +2336,33 @@ class LLMAgent:
                               and not _fe2_val and not _fe2_chk_attempted and not _fe2_confirmed_blank
                               and not _fe2_already_attempted)
 
+                # DIAGNOSTIC, added 2026-08-09: direct user report ("skipped
+                # most fields in Vehicle after Current Mileage") -- log
+                # evidence showed a plain navigate click land somewhere
+                # ("Focus moved after click" = ok) right where 'Annual Miles
+                # Est.' should sit by field order, but the very next step
+                # never once logged "LLM focused-field lookup" for it --
+                # meaning _t_is_type was False, but nothing in the log says
+                # WHY: _fe2 could be None (a focused_element_id that doesn't
+                # match anything in this fresh scan -- the same element-id-
+                # churn bug class already fixed twice elsewhere in this file,
+                # for state_validator.py and _attempt_key), or _fe2 could be
+                # found but excluded for a real reason (wrong type, already
+                # non-empty, already attempted). Rather than guess which,
+                # log the exact case so the next live run answers it
+                # directly. No behavior change -- logging only.
+                if _fid2 and not _t_is_type and not (_fe2 and _fe2_ty in ("checkboxcontrol", "checkbox")):
+                    if _fe2 is None:
+                        logger.info(
+                            "[FOCUS-DIAG] focused_element_id=%r not found among %d scanned elements "
+                            "after a navigate click -- possible id churn.", _fid2, len(state.get("elements", [])))
+                    else:
+                        logger.info(
+                            "[FOCUS-DIAG] focused %r type=%r value=%r not treated as fillable: "
+                            "chk_attempted=%s confirmed_blank=%s already_attempted=%s",
+                            (_fe2.get("label") or _fe2.get("text") or "?")[:40], _fe2_ty, _fe2_val[:40],
+                            _fe2_chk_attempted, _fe2_confirmed_blank, _fe2_already_attempted)
+
                 if _t_is_type and self._llm_client:
                     _lowconf_fallback_streak = 0   # real progress — a fillable target is focused
                     _reclick_streak = 0
