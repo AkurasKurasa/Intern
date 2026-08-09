@@ -3279,9 +3279,56 @@ class LLMAgent:
                                     "[OPT2] %d low-confidence fallbacks in a row — Navigation "
                                     "Protocol taking over: known target %r @ (%.0f,%.0f).",
                                     _lowconf_fallback_streak, _tlabel, _tcx, _tcy)
-                                prediction = {"action_type": "click", "click_position": [_tcx, _tcy]}
+                                # Found 2026-08-09, live, direct user report ("Agent
+                                # is stuck"): this branch fell through to a plain
+                                # coordinate click on the pipeline's normal
+                                # execution path below, with NO verification that
+                                # it actually landed -- unlike every sibling
+                                # redirect guard in this file (the reclick-streak
+                                # guard, the combobox-attempted guard, the
+                                # checkbox-already-checked guard), all of which use
+                                # _focus_element_via_uia + re-observe-and-verify.
+                                # Log evidence: 'ZIP Code' stayed the focused
+                                # element for 6+ consecutive steps while this
+                                # branch kept "successfully" finding 'Occupation'
+                                # as a target, clicking its coordinates, and
+                                # getting no_change every single time -- because
+                                # finding a target reset _lowconf_fallback_streak
+                                # to 0 regardless of whether the click actually
+                                # worked, this exact cycle could repeat forever
+                                # with nothing ever noticing. Same "verify what
+                                # actually happened, don't assume the click
+                                # landed" fix already proven on every sibling
+                                # guard, just never carried into this one.
+                                _tlabel_full = (_target.get("label") or _target.get("text") or "").strip()
+                                _t_key = self._attempt_key(_target, elements=state.get("elements", []))
+                                if not self._focus_element_via_uia(_tlabel_full, expected_bbox=_tb):
+                                    self._executor.execute({
+                                        "action_type": "click",
+                                        "click_position": [_tcx, _tcy],
+                                    })
+                                time.sleep(self.step_delay * 0.4)
                                 _lowconf_fallback_streak = 0
                                 _reclick_streak = 0
+                                _lc_check = self._observe()
+                                _lc_landed = self._attempt_key(
+                                    next((e for e in _lc_check.get("elements", [])
+                                          if e.get("element_id") == _lc_check.get("focused_element_id")), {}),
+                                    elements=_lc_check.get("elements", []),
+                                ) == _t_key
+                                if _lc_landed:
+                                    _redirect_stall_count = 0
+                                    prediction = {"action_type": "no_op"}
+                                else:
+                                    _redirect_stall_count += 1
+                                    logger.warning(
+                                        "[OPT2] low-confidence-fallback redirect to %r did NOT move "
+                                        "focus there (stall %d/%d) — the click isn't sticking.",
+                                        _tlabel, _redirect_stall_count, _REDIRECT_STALL_LIMIT)
+                                    if _redirect_stall_count >= _REDIRECT_STALL_LIMIT:
+                                        _redirect_stall_count = 0
+                                        self._attempted_keys.add(_t_key)
+                                    prediction = {"action_type": "no_op"}
                             else:
                                 # Nothing left visible either — this IS the "no
                                 # targets on screen" case. Scroll (or advance the

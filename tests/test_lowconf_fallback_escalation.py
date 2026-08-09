@@ -25,6 +25,18 @@ or invalid pointer now goes straight to Navigation Protocol's known target
 via click -- no Tab-and-hope tolerated at all. Tab is still used elsewhere
 for its own legitimate job (committing a just-selected combobox value,
 moving off a just-filled field) -- only removed here as a navigation guess.
+
+REWRITTEN AGAIN 2026-08-09, live, direct user report ("Agent is stuck"):
+this branch's own redirect click was NEVER verified -- it just executed a
+raw coordinate click and assumed it worked, unlike every sibling redirect
+guard in this file (all of which use UIA SetFocus + verify-and-escalate).
+Log evidence: 'ZIP Code' stayed focused for 6+ consecutive steps while
+this branch kept "successfully" finding 'Occupation' as a target and
+resetting its own streak to 0 each time (since finding a target was
+treated as success regardless of whether the click landed), clicking its
+coordinates, getting no_change, forever. Fixed with the same
+UIA-SetFocus-first + verify-and-escalate shape already proven on the
+reclick-streak guard.
 """
 import sys
 from pathlib import Path
@@ -34,6 +46,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "components"))
 from agent.navigation_protocol import find_visible_empty_target
 
 _LOWCONF_FALLBACK_LIMIT = 1
+_REDIRECT_STALL_LIMIT = 2
 
 
 def _field(label, value="", bbox=(1400, 500, 1600, 530)):
@@ -67,6 +80,129 @@ def _run_updated_fallback_branch(executor, streak, state, viewport_bottom,
         return "scrolled", 0, tab_scroll_count + 1
     (advance_fn or (lambda s: None))(state)
     return "advanced_tab", 0, 0
+
+
+def _run_lowconf_fallback_verified(state, post_redirect_focused_id, streak,
+                                    stall_count, fallback_limit, stall_limit,
+                                    executor, focus_via_uia_fn, attempted_keys=None,
+                                    tab_scroll_count=0, max_tab_scrolls=6,
+                                    scroll_fn=None, advance_fn=None):
+    """Mirrors the CURRENT (2026-08-09) low-confidence-fallback branch:
+    redirect via UIA SetFocus first (falling back to a coordinate click
+    only if that fails), then VERIFY -- via the post-action observation's
+    focused_element_id -- that focus actually landed there, instead of
+    assuming the sibling redirect guards' own already-proven verify
+    mechanism.
+
+    Found 2026-08-09, live, direct user report ("Agent is stuck"): this
+    branch was the one sibling redirect guard in the file that never
+    got the reclick-streak guard's own verify-and-escalate upgrade -- it
+    fell through to a plain, unverified coordinate click on the shared
+    execution pipeline below. Log evidence: 'ZIP Code' stayed the focused
+    element for 6+ consecutive steps while this branch kept "successfully"
+    finding 'Occupation' as a target (resetting its own streak to 0 every
+    time, since finding a target was treated as success regardless of
+    whether the click actually landed), clicking its coordinates, and
+    getting no_change every single time. Nothing ever noticed."""
+    attempted_keys = attempted_keys if attempted_keys is not None else set()
+    streak += 1
+    if streak < fallback_limit:
+        executor.execute({"action_type": "keyboard", "key_count": 1, "keystrokes": ["tab"]})
+        return "blind_tab", streak, stall_count, tab_scroll_count
+
+    target = find_visible_empty_target(
+        state, 1000.0, attempted_keys=attempted_keys,
+        attempt_key_fn=lambda e, els: e.get("element_id"))
+    if not (target and target.get("bbox")):
+        if tab_scroll_count < max_tab_scrolls:
+            (scroll_fn or (lambda s: None))(state)
+            return "scrolled", 0, stall_count, tab_scroll_count + 1
+        (advance_fn or (lambda s: None))(state)
+        return "advanced_tab", 0, stall_count, 0
+
+    b = target["bbox"]
+    label = target.get("label") or target.get("text") or ""
+    if not focus_via_uia_fn(label):
+        executor.execute({"action_type": "click",
+                           "click_position": [(b[0] + b[2]) / 2, (b[1] + b[3]) / 2]})
+    streak = 0
+    landed = post_redirect_focused_id == target["element_id"]
+    if landed:
+        return "landed", streak, 0, tab_scroll_count
+    stall_count += 1
+    if stall_count >= stall_limit:
+        stall_count = 0
+        attempted_keys.add(target["element_id"])
+    return "stalled", streak, stall_count, tab_scroll_count
+
+
+class TestLowConfFallbackRedirectIsVerifiedNotAssumed:
+    """The actual live regression: the redirect must confirm focus landed
+    before trusting it, and must prefer UIA SetFocus over a raw coordinate
+    click -- matching every sibling redirect guard in this file."""
+
+    def test_uses_setfocus_first_not_a_raw_coordinate_click(self):
+        executor = MagicMock()
+        focus_via_uia = MagicMock(return_value=True)
+        target = _field("Occupation", bbox=(1400, 0, 1600, 40))
+        state = {"elements": [target]}
+        outcome, streak, stall, _ = _run_lowconf_fallback_verified(
+            state, post_redirect_focused_id="Occupation", streak=0, stall_count=0,
+            fallback_limit=_LOWCONF_FALLBACK_LIMIT, stall_limit=_REDIRECT_STALL_LIMIT,
+            executor=executor, focus_via_uia_fn=focus_via_uia)
+        assert outcome == "landed"
+        assert streak == 0
+        assert stall == 0
+        focus_via_uia.assert_called_once_with("Occupation")
+        click_calls = [c for c in executor.execute.call_args_list
+                       if c.args[0].get("action_type") == "click"]
+        assert click_calls == [], "SetFocus succeeded -- no coordinate click should fire"
+
+    def test_falls_back_to_coordinate_click_when_setfocus_fails(self):
+        executor = MagicMock()
+        focus_via_uia = MagicMock(return_value=False)
+        target = _field("Occupation", bbox=(1400, 0, 1600, 40))
+        state = {"elements": [target]}
+        _run_lowconf_fallback_verified(
+            state, post_redirect_focused_id="Occupation", streak=0, stall_count=0,
+            fallback_limit=_LOWCONF_FALLBACK_LIMIT, stall_limit=_REDIRECT_STALL_LIMIT,
+            executor=executor, focus_via_uia_fn=focus_via_uia)
+        click_calls = [c for c in executor.execute.call_args_list
+                       if c.args[0].get("action_type") == "click"]
+        assert len(click_calls) == 1
+
+    def test_the_actual_live_regression_stuck_on_zip_code_targeting_occupation(self):
+        """Reproduces the exact log sequence: focus never actually leaves
+        'ZIP Code' even though the redirect keeps 'succeeding' at finding
+        'Occupation' -- must be recognized as a stall, not silently reset
+        as if it worked."""
+        executor = MagicMock()
+        focus_via_uia = MagicMock(return_value=True)
+        occupation = _field("Occupation", bbox=(1400, 0, 1600, 40))
+        state = {"elements": [occupation]}
+        # post_redirect_focused_id stays "ZIP Code" -- the click/SetFocus
+        # never actually moved real focus, exactly like the live log.
+        outcome, streak, stall, _ = _run_lowconf_fallback_verified(
+            state, post_redirect_focused_id="ZIP Code", streak=0, stall_count=0,
+            fallback_limit=_LOWCONF_FALLBACK_LIMIT, stall_limit=_REDIRECT_STALL_LIMIT,
+            executor=executor, focus_via_uia_fn=focus_via_uia)
+        assert outcome == "stalled"
+        assert stall == 1
+
+    def test_repeated_stalls_mark_the_target_attempted_so_it_stops_being_reoffered(self):
+        executor = MagicMock()
+        focus_via_uia = MagicMock(return_value=True)
+        occupation = _field("Occupation", bbox=(1400, 0, 1600, 40))
+        state = {"elements": [occupation]}
+        attempted = set()
+        outcome, streak, stall, _ = _run_lowconf_fallback_verified(
+            state, post_redirect_focused_id="ZIP Code", streak=0,
+            stall_count=_REDIRECT_STALL_LIMIT - 1,
+            fallback_limit=_LOWCONF_FALLBACK_LIMIT, stall_limit=_REDIRECT_STALL_LIMIT,
+            executor=executor, focus_via_uia_fn=focus_via_uia, attempted_keys=attempted)
+        assert outcome == "stalled"
+        assert stall == 0  # reset after escalating
+        assert "Occupation" in attempted
 
 
 class TestEveryLowConfidenceGuessEscalatesImmediately:
