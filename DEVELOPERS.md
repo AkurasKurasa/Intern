@@ -1047,6 +1047,14 @@ framework.
 
   Regression tests: `tests/test_combobox_blank_skip_requires_real_lookup.py` (new, 3 tests — a field merely touched by a stray click still gets a real fill attempt; a field genuinely looked up and confirmed empty still skips correctly; an untouched field with no entry at all is never skipped). Full suite 436 passed / 9 skipped / same 2 pre-existing unrelated tesseract failures. Not yet re-verified live.
 
+  **Found and fixed in the SAME session, direct user report: "Agent is stuck please check most recent logs."** Log showed a genuinely severe run — 54.1% wasted-step rate (46 no_change / 85 actionable), the worst of the night. The tell: `[FOCUS-DIAG]` showed `'ZIP Code'` as the focused element for 6+ CONSECUTIVE steps in a row, while every one of those steps logged `"[OPT2] 1 low-confidence fallbacks in a row — Navigation Protocol taking over: known target 'Occupation'"`, clicked, and got `"Validator → no_change"` — every single time, with the streak counter resetting to 0 on each "successful" target-find regardless of whether the click actually landed.
+
+  **Root cause: this was the ONE sibling redirect guard in the file that never received the verify-and-escalate upgrade the others got earlier this session.** The reclick-streak guard, the combobox-attempted guard, and the checkbox-already-checked guard all use UIA `SetFocus` (via `_focus_element_via_uia`) and then re-observe to confirm focus genuinely landed before trusting it. This low-confidence-fallback branch — structurally identical in purpose, just triggered by low pointer confidence instead of a repeated drift — still fell through to a raw, unverified coordinate click on the shared execution pipeline below. Because "found a target" and "the click worked" were treated as the same thing, a click that silently failed to move focus (exactly the same class of click-targeting failure already found and worked around for Street Address 1/2, 'Annual Miles Est.', and others) could repeat identically forever with nothing ever noticing.
+
+  **Fixed by extending the exact same proven pattern, not inventing a new one.** `_focus_element_via_uia(label, expected_bbox=...)` first, falling back to a coordinate click only if SetFocus fails; re-observe and verify via `_attempt_key` match; on a stall, escalate via the same shared `_redirect_stall_count`/`_REDIRECT_STALL_LIMIT` counters the sibling guards already use, marking the specific unreachable target attempted so it stops being re-offered.
+
+  Regression tests: `tests/test_lowconf_fallback_escalation.py` extended with `TestLowConfFallbackRedirectIsVerifiedNotAssumed` (4 new tests — prefers SetFocus over a raw click; falls back to a coordinate click when SetFocus fails; reproduces the exact live 'ZIP Code'/'Occupation' stall; repeated stalls mark the target attempted). Full suite 440 passed / 9 skipped / same 2 pre-existing unrelated tesseract failures. Not yet re-verified live.
+
 ---
 
 ### Evaluation
