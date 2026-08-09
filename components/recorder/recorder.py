@@ -1373,7 +1373,23 @@ class DemoRecorder:
 
     def _request_snapshot(self, action_type: str = "", timeout: float = 2.0) -> dict:
         """Ask the subprocess for ONE fresh snapshot (+ Notepad context for the
-        given action_type). Blocks the worker (not the input listener)."""
+        given action_type). Blocks the worker (not the input listener).
+
+        Found 2026-08-10, live: if the snapshot subprocess stops responding
+        (for any reason -- it died, it's stuck, anything), _req_q (bounded,
+        maxsize=4) fills up after 4 unanswered requests. put() had no
+        timeout, so every request after that BLOCKED FOREVER -- not this one
+        call, the entire worker thread, permanently. Once that happens
+        nothing ever recovers: no more steps commit, and Stop can never
+        finish either (its own drain loop calls this same method). Matches
+        exactly what was observed: 3 real steps recorded with empty state
+        (the subprocess was already not answering from step 0), then a
+        total, permanent hang once the queue filled. Giving put() the same
+        timeout get() already had makes this method's own documented
+        contract -- return {} on any failure -- actually hold in every
+        case, instead of silently assuming put() could never be the one
+        that blocks.
+        """
         if not self._use_subprocess:
             try:
                 return self._observer.snapshot()
@@ -1385,7 +1401,7 @@ class DemoRecorder:
                     self._res_q.get_nowait()
             except Exception:
                 pass
-            self._req_q.put(action_type or 1)
+            self._req_q.put(action_type or 1, timeout=timeout)
             return self._res_q.get(timeout=timeout) or {}
         except Exception:
             return {}
