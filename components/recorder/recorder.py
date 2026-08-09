@@ -1371,9 +1371,25 @@ class DemoRecorder:
         self._worker_thread = threading.Thread(target=self._worker, daemon=True)
         self._worker_thread.start()
 
-    def _request_snapshot(self, action_type: str = "", timeout: float = 2.0) -> dict:
+    def _request_snapshot(self, action_type: str = "", timeout: float = 4.0) -> dict:
         """Ask the subprocess for ONE fresh snapshot (+ Notepad context for the
         given action_type). Blocks the worker (not the input listener).
+
+        Timeout raised 2.0 -> 4.0s, 2026-08-10: profiled a single real
+        UIAutomationObserver.snapshot() at 0.9-1.2s baseline, no other load
+        (cProfile: ~13 separate UIA/COM property calls per element, inherent
+        to the uiautomation library's per-property-call design, not a bug
+        here -- a real fix means adopting UIA's cache-request batching API,
+        a substantial rewrite not attempted tonight without the ability to
+        live-test it). A 2.0s timeout left almost no margin above that
+        baseline -- any real load (this machine syncs the whole repo via
+        OneDrive in real time; a concurrent test run; anything) tips a
+        marginal snapshot over the timeout, and the request comes back as
+        `{}` -- recorded as a real, empty-state step. Every step in a full
+        live session showed exactly this. Raising the timeout doesn't make
+        snapshots faster, but it stops turning "slightly slow" into
+        "silently wrong, empty data saved" -- worse for training data than
+        the extra wait.
 
         Found 2026-08-10, live: if the snapshot subprocess stops responding
         (for any reason -- it died, it's stuck, anything), _req_q (bounded,

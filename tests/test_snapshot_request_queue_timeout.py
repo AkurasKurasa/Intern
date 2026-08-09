@@ -67,3 +67,25 @@ class TestRequestSnapshotNeverBlocksForever:
 
         rec._req_q.close()
         rec._res_q.close()
+
+
+class TestSnapshotTimeoutHasRealMargin:
+    """Found 2026-08-10: a real UIAutomationObserver.snapshot() profiled at
+    0.9-1.2s baseline with zero other load (cProfile showed ~13 separate
+    UIA/COM property calls per element -- inherent library cost, not a bug
+    here). The old 2.0s default left almost no margin -- any real system
+    load (this repo syncs live via OneDrive; a concurrent process; anything)
+    tips a marginal snapshot over the timeout, and the request silently
+    comes back as {} -- recorded as a real, empty-state step. Every step in
+    a live session showed exactly this. Raised to 4.0s for real headroom."""
+
+    def test_default_timeout_has_real_margin_above_profiled_baseline(self):
+        import inspect
+        sig = inspect.signature(recorder_module.DemoRecorder._request_snapshot)
+        default_timeout = sig.parameters["timeout"].default
+        profiled_baseline_sec = 1.2
+        assert default_timeout >= profiled_baseline_sec * 2, (
+            f"default timeout ({default_timeout}s) leaves less than 2x margin "
+            f"above the profiled baseline ({profiled_baseline_sec}s) -- too thin, "
+            f"will spuriously time out under any real load"
+        )
