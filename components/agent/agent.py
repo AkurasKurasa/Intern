@@ -3944,6 +3944,54 @@ class LLMAgent:
                         time.sleep(self.step_delay)
                         continue
                     if _hit_idx != self._current_tab_idx:
+                        # Found 2026-08-09, live, direct user report ("that
+                        # was a good Policyholder -> Payment, problem is we
+                        # skipped so much fucking input fields"): the
+                        # forward-skip guard above only blocks a click
+                        # landing MORE than one tab ahead -- a click on the
+                        # very NEXT tab was always allowed through
+                        # unconditionally, with no check that the CURRENT
+                        # tab was actually finished. Log evidence: on
+                        # Coverage, only 8 fields got filled (Bodily Injury,
+                        # Property Damage, MedPay Limit, Collision/
+                        # Comprehensive Deductible, Rental Limit, UM/UIM
+                        # Limit, one checkbox) before the transformer's own
+                        # raw pointer happened to click the Drivers tab
+                        # header directly -- Roadside Assistance, GAP
+                        # Insurance, Accident Forgiveness, Diminishing
+                        # Deductible, Total Premium, and others were still
+                        # sitting there, never touched. The ONLY path that
+                        # already verifies "is this tab actually done" is
+                        # the separate stuck-guard/Navigation-Protocol
+                        # advance flow (used correctly for every OTHER tab
+                        # transition in this same run) -- this raw-pointer
+                        # path bypassed that check entirely. Same principle
+                        # as _find_destructive_button_at (never trust the
+                        # uncertain raw pointer for a structural, high-
+                        # consequence action) and the backward/forward-skip
+                        # guards above -- extended to cover "leaving a tab
+                        # early" too. Search the WHOLE current tab
+                        # (unbounded, on- or off-screen -- same 1e9 pattern
+                        # already used elsewhere tonight for "is there
+                        # truly nothing left") before trusting the switch;
+                        # if something remains, redirect to IT instead.
+                        _remaining = self._navproto.find_visible_empty_target(
+                            state, 1e9, attempted_keys=self._attempted_keys, attempt_key_fn=self._attempt_key)
+                        if _remaining and _remaining.get("bbox"):
+                            _rem_label = (_remaining.get("label") or _remaining.get("text") or "").strip()
+                            _rem_bbox = _remaining["bbox"]
+                            logger.info(
+                                "[GUARD] pointer clicked tab %r (idx %d) but %r is still unfilled on "
+                                "the current tab — redirecting there instead of leaving early.",
+                                _hit_name, _hit_idx, _rem_label[:30])
+                            if not (_rem_label and self._focus_element_via_uia(_rem_label, expected_bbox=_rem_bbox)):
+                                self._executor.execute({
+                                    "action_type": "click",
+                                    "click_position": [(_rem_bbox[0] + _rem_bbox[2]) / 2,
+                                                        (_rem_bbox[1] + _rem_bbox[3]) / 2],
+                                })
+                            time.sleep(self.step_delay * 0.4)
+                            continue
                         x1, y1, x2, y2 = _tab_hit["bbox"]
                         logger.info("Tab-click → navigating to %r (idx %d).", _hit_name, _hit_idx)
                         self._executor.execute({"action_type": "click",
