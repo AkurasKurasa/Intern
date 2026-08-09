@@ -484,17 +484,22 @@ def _find_destructive_button_at(elements: List[Dict[str, Any]], pos) -> Optional
     trap that would need a new entry every time a form added one more
     button with an unanticipated label.
 
-    The actually-generalizing fix: this function is only ever called from
-    the NAVIGATE branch (moving the pointer between FIELDS to fill them) —
-    that branch has no legitimate reason to ever click a button-type
-    element at all, regardless of its label. The one place a button SHOULD
-    get clicked deliberately (Submit, once a record is genuinely finished)
-    already goes through its own separate, dedicated path
-    (_find_submit_button, called directly by the stuck-guard's "last tab
-    exhausted" branch) — it never flows through the uncertain click_position
-    this function checks. So instead of trying to name every button that
-    must not be clicked, this simply refuses ALL of them here; the one that
-    legitimately should get clicked already bypasses this check entirely.
+    The actually-generalizing fix: this function is called from any branch
+    that clicks a raw, transformer-derived screen position rather than a
+    position already known (by construction) to belong to a fillable field
+    — originally just the NAVIGATE branch (moving the pointer between
+    FIELDS to fill them), extended 2026-08-09 to the combobox-open-dropdown
+    branch once live evidence showed it shares the exact same risky input
+    (_snap2) without the same check. Neither branch has a legitimate reason
+    to ever click a button-type element at all, regardless of its label.
+    The one place a button SHOULD get clicked deliberately (Submit, once a
+    record is genuinely finished) already goes through its own separate,
+    dedicated path (_find_submit_button, called directly by the
+    stuck-guard's "last tab exhausted" branch) — it never flows through the
+    uncertain click_position this function checks. So instead of trying to
+    name every button that must not be clicked, this simply refuses ALL of
+    them here; the one that legitimately should get clicked already
+    bypasses this check entirely.
 
     _DESTRUCTIVE_KW is kept (unused by this function now) since it still
     documents which specific buttons the ORIGINAL incident involved and
@@ -2958,6 +2963,36 @@ class LLMAgent:
                             continue
                         if _cbox is not None:
                             _cb_label = (_cbox.get("label") or _cbox.get("text") or "").strip()
+                            # Found 2026-08-09, live, direct user report ("you were
+                            # doing so well until the Clear All modal"): this branch
+                            # clicks _snap2 directly -- the SAME raw
+                            # transformer-position variable the sibling navigate
+                            # branch (a few hundred lines below) already guards
+                            # against landing on a footer action button, via
+                            # _find_destructive_button_at. That guard was only ever
+                            # wired into the navigate branch; this branch reuses the
+                            # identical variable but never got the same check. Log
+                            # evidence: right after a failed 'Payment Frequency'
+                            # dropdown-open click (a field that sits near the bottom
+                            # of its tab, close to the fixed footer row), a 'Clear
+                            # All' confirmation dialog (class '#32770', the real
+                            # Windows dialog class -- not a false positive) turned
+                            # up open on the very next step, with no other click in
+                            # between. Same generalization already applied once
+                            # (_find_destructive_button_at matches ANY button-type
+                            # element at the position, not a keyword list) — just
+                            # extended to the other call site sharing the same risky
+                            # input, instead of only the one already caught live.
+                            _cb_open_btn = _find_destructive_button_at(state.get("elements", []), _snap2)
+                            if _cb_open_btn is not None:
+                                _cb_btn_name = (_cb_open_btn.get("text") or _cb_open_btn.get("label") or "button")
+                                logger.warning(
+                                    "[GUARD] combobox-open target (%.0f,%.0f) lands on button %r — "
+                                    "Tab instead of clicking an action button.", _snap2[0], _snap2[1], _cb_btn_name)
+                                self._executor.execute({"action_type": "keyboard",
+                                                        "key_count": 1, "keystrokes": ["tab"]})
+                                time.sleep(self.step_delay * 0.5)
+                                continue
                             logger.info("[OPT2] CLICK on empty combobox %r → treat as FILL", _cb_label[:30])
                             _cb_sec = self._detect_section(state, _cbox)
                             _cb_val = self._lookup_field(_cb_label, section=_cb_sec)

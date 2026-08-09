@@ -129,3 +129,48 @@ class TestNavigateBranchRefusesAnyButtonClick:
         assert clicked is True
         calls = [c.args[0] for c in executor.execute.call_args_list]
         assert calls == [{"action_type": "click", "click_position": [200, 115]}]
+
+
+def _run_combobox_open_click_guard(elements, click_pos, executor):
+    """Mirrors the CURRENT guard added to agent.py's 'CLICK on empty
+    combobox -> treat as FILL' branch (2026-08-09) -- the SAME check as the
+    navigate branch above, applied to the sibling code path that reuses the
+    identical raw _snap2 position without ever having had this guard."""
+    btn = _find_destructive_button_at(elements, click_pos)
+    if btn is not None:
+        executor.execute({"action_type": "keyboard", "key_count": 1, "keystrokes": ["tab"]})
+        return False
+    executor.execute({"action_type": "click", "click_position": click_pos})
+    return True
+
+
+class TestComboboxOpenBranchAlsoRefusesAnyButtonClick:
+    """Found 2026-08-09, live, direct user report ("you were doing so well
+    until the Clear All modal"): logs/latest.log showed a 'Clear All'
+    confirmation dialog (class '#32770') open on the very next step right
+    after a failed 'Payment Frequency' dropdown-open click -- a field that
+    sits near the bottom of its tab, close to the fixed footer button row
+    -- with no other click in between. _find_destructive_button_at already
+    existed and was already proven correct for the sibling navigate branch
+    (see TestNavigateBranchRefusesAnyButtonClick above) — it was simply
+    never wired into this second branch, even though both branches click
+    the exact same unverified _snap2 position."""
+
+    def test_tabs_instead_of_opening_a_dropdown_that_lands_on_clear_all(self):
+        from unittest.mock import MagicMock
+        executor = MagicMock()
+        btn = _button("Clear All", (1400, 830, 1520, 870))
+        clicked = _run_combobox_open_click_guard([btn], [1458, 850], executor)
+        assert clicked is False
+        calls = [c.args[0] for c in executor.execute.call_args_list]
+        assert calls == [{"action_type": "keyboard", "key_count": 1, "keystrokes": ["tab"]}]
+
+    def test_still_opens_a_normal_combobox_dropdown(self):
+        from unittest.mock import MagicMock
+        executor = MagicMock()
+        combo = {"type": "comboboxcontrol", "text": "Payment Frequency", "label": "Payment Frequency",
+                 "bbox": [1300, 820, 1600, 870]}
+        clicked = _run_combobox_open_click_guard([combo], [1458, 850], executor)
+        assert clicked is True
+        calls = [c.args[0] for c in executor.execute.call_args_list]
+        assert calls == [{"action_type": "click", "click_position": [1458, 850]}]
