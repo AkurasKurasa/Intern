@@ -66,7 +66,8 @@ class TestScrollFormDownTriesScrollIntoViewFirst:
         result = scroll_form_down(fake_self, state)
 
         assert result is True
-        fake_self._scroll_into_view_via_uia.assert_called_once_with("Prior Expiry Date")
+        fake_self._scroll_into_view_via_uia.assert_called_once_with(
+            "Prior Expiry Date", expected_bbox=[100, 2000, 300, 2030])
         fake_self._scroll_form_down_uia_percent.assert_not_called()
         fake_self._scroll_form_down_uia.assert_not_called()
         fake_self._scroll_form_down_wheel.assert_not_called()

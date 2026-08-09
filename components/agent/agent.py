@@ -2662,7 +2662,7 @@ class LLMAgent:
                                     # docstring for why). Falls back to the click only if
                                     # UIA can't find/focus the control at all.
                                     _rc_full_label = (_rc_target.get("label") or _rc_target.get("text") or "").strip()
-                                    if not self._focus_element_via_uia(_rc_full_label):
+                                    if not self._focus_element_via_uia(_rc_full_label, expected_bbox=_rcb):
                                         self._executor.execute({
                                             "action_type": "click",
                                             "click_position": [(_rcb[0] + _rcb[2]) / 2, (_rcb[1] + _rcb[3]) / 2],
@@ -2731,7 +2731,9 @@ class LLMAgent:
                                             if _shallow_key != _rc_key:
                                                 _shallow_label = (_shallow_target.get("label")
                                                                    or _shallow_target.get("text") or "").strip()
-                                                if _shallow_label and self._focus_element_via_uia(_shallow_label):
+                                                _shallow_bbox = _shallow_target["bbox"]
+                                                if _shallow_label and self._focus_element_via_uia(
+                                                        _shallow_label, expected_bbox=_shallow_bbox):
                                                     logger.info(
                                                         "[OPT2] revealed cluster via %r — refocusing shallower "
                                                         "target %r to fill top-down.", _rc_label, _shallow_label[:30])
@@ -2881,7 +2883,7 @@ class LLMAgent:
                                         _cb_label_skip[:30], _reclick_streak, _cb_rc_label)
                                     # Same UIA SetFocus-first fix as the sibling guard above.
                                     _cb_rc_full_label = (_cb_rc_target.get("label") or _cb_rc_target.get("text") or "").strip()
-                                    if not self._focus_element_via_uia(_cb_rc_full_label):
+                                    if not self._focus_element_via_uia(_cb_rc_full_label, expected_bbox=_cbrcb):
                                         self._executor.execute({
                                             "action_type": "click",
                                             "click_position": [(_cbrcb[0] + _cbrcb[2]) / 2, (_cbrcb[1] + _cbrcb[3]) / 2],
@@ -2910,7 +2912,9 @@ class LLMAgent:
                                             if _cb_shallow_key != _cb_rc_key:
                                                 _cb_shallow_label = (_cb_shallow_target.get("label")
                                                                       or _cb_shallow_target.get("text") or "").strip()
-                                                if _cb_shallow_label and self._focus_element_via_uia(_cb_shallow_label):
+                                                _cb_shallow_bbox = _cb_shallow_target["bbox"]
+                                                if _cb_shallow_label and self._focus_element_via_uia(
+                                                        _cb_shallow_label, expected_bbox=_cb_shallow_bbox):
                                                     logger.info(
                                                         "[OPT2] revealed cluster via %r — refocusing shallower "
                                                         "target %r to fill top-down.",
@@ -3068,8 +3072,8 @@ class LLMAgent:
                                         attempted_keys=self._attempted_keys, attempt_key_fn=self._attempt_key)
                                     if _cd_target and _cd_target.get("bbox"):
                                         _cd_label = (_cd_target.get("label") or _cd_target.get("text") or "").strip()
-                                        if not (_cd_label and self._focus_element_via_uia(_cd_label)):
-                                            _cdb = _cd_target["bbox"]
+                                        _cdb = _cd_target["bbox"]
+                                        if not (_cd_label and self._focus_element_via_uia(_cd_label, expected_bbox=_cdb)):
                                             self._executor.execute({
                                                 "action_type": "click",
                                                 "click_position": [(_cdb[0] + _cdb[2]) / 2, (_cdb[1] + _cdb[3]) / 2],
@@ -3466,7 +3470,8 @@ class LLMAgent:
                                     attempted_keys=self._attempted_keys, attempt_key_fn=self._attempt_key)
                                 if _chk_next and _chk_next.get("bbox"):
                                     _chk_next_label = (_chk_next.get("label") or _chk_next.get("text") or "").strip()
-                                    if _chk_next_label and self._focus_element_via_uia(_chk_next_label):
+                                    if _chk_next_label and self._focus_element_via_uia(
+                                            _chk_next_label, expected_bbox=_chk_next["bbox"]):
                                         # "no_op", not None -- prediction.get(...) is
                                         # called unconditionally a few lines below
                                         # this block; None would crash there.
@@ -5017,7 +5022,7 @@ class LLMAgent:
         should_check = ev.startswith("yes") or ev in {"check", "true", "1", "checked"}
         return (field_name, should_check)
 
-    def _focus_element_via_uia(self, label: str) -> bool:
+    def _focus_element_via_uia(self, label: str, expected_bbox=None) -> bool:
         """
         Focus a control directly via UIA's SetFocus(), bypassing simulated
         mouse clicks at computed screen coordinates entirely -- no bbox
@@ -5036,8 +5041,12 @@ class LLMAgent:
         drift) -- SetFocus() sidesteps that whole class of failure since it
         never goes through screen coordinates at all, just the control
         object UIA already knows about.
+
+        `expected_bbox` (optional, from the caller's own already-picked
+        target element) disambiguates repeated-section forms -- see
+        _find_uia_control_by_name's own docstring for why this matters.
         """
-        _ctrl = self._find_uia_control_by_name(label)
+        _ctrl = self._find_uia_control_by_name(label, expected_bbox=expected_bbox)
         if _ctrl is None:
             return False
         try:
@@ -5047,13 +5056,49 @@ class LLMAgent:
             logger.debug("UIA SetFocus on %r failed — %s", label, exc)
             return False
 
-    def _find_uia_control_by_name(self, label: str):
+    def _find_uia_control_by_name(self, label: str, expected_bbox=None):
         """
         Shared lookup used by _focus_element_via_uia and
         _scroll_into_view_via_uia -- finds a live UIA control by its
         accessible Name among Edit/ComboBox/CheckBox controls in the
         locked form window. Returns None if UIA is unavailable or nothing
         matches; never raises.
+
+        Found 2026-08-09, live, direct user report ("another loop in the
+        Drivers, why do you hate me?"): logs/latest.log showed a redirect
+        repeatedly picking 'First Name' as the shallowest target in Driver
+        3's newly-revealed cluster, calling SetFocus() on it, then the VERY
+        NEXT step's fresh observation showing the transformer's pointer
+        already back on an unrelated already-filled field -- as if the
+        SetFocus never landed on the field that was actually chosen.
+        Root cause: this lookup searched by accessible Name ALONE, with no
+        way to tell apart the SAME bare label repeated across Driver 1/2/3
+        sections (no section prefix in the raw UIA Name property) -- the
+        exact repeated-section collision class already fixed twice
+        elsewhere in this file (state_validator.py's stable-key matching,
+        agent.py's own _attempt_key rank disambiguation), just never
+        carried into this UIA-level lookup. `EditControl(Name="First
+        Name")` always returns the FIRST match in the UIA tree -- Driver
+        1's, already filled and usually off-screen -- regardless of which
+        driver's cluster the caller actually meant. SetFocus happily
+        succeeded every time, just on the wrong element: the auto-fill fast
+        path then saw an already-filled field focused, took the "navigate"
+        branch instead of filling anything, and the transformer's learned
+        pointer (frozen on an unrelated coordinate) re-triggered the exact
+        same "already-filled, redirect" guard next step -- a tight loop
+        with no field ever actually getting typed into.
+
+        Fixed by disambiguating on position when the caller can supply one:
+        every existing caller already has the specific target ELEMENT (with
+        its own bbox) in hand before calling this, from
+        navigation_protocol's own scan -- they were just discarding that
+        bbox and passing the bare label through. When `expected_bbox` is
+        given and more than one control shares the Name, walk all matches
+        (via UIA's own `foundIndex`) and return whichever one's own
+        BoundingRectangle center is closest to the expected position,
+        instead of blindly trusting tree order. `expected_bbox` is optional
+        and defaults to the old first-match behavior when omitted, so any
+        future caller without a specific position in hand still works.
         """
         try:
             import uiautomation as _uia
@@ -5064,15 +5109,33 @@ class LLMAgent:
             hwnd = self._locked_hwnd or _w32g.GetForegroundWindow()
             root = _uia.ControlFromHandle(hwnd)
             for _finder in (root.EditControl, root.ComboBoxControl, root.CheckBoxControl):
-                _c = _finder(searchDepth=25, Name=label)
-                if _c.Exists(maxSearchSeconds=0.3):
-                    return _c
+                if expected_bbox is None:
+                    _c = _finder(searchDepth=25, Name=label)
+                    if _c.Exists(maxSearchSeconds=0.3):
+                        return _c
+                    continue
+                _ecx = (expected_bbox[0] + expected_bbox[2]) / 2
+                _ecy = (expected_bbox[1] + expected_bbox[3]) / 2
+                _best, _best_dist = None, None
+                for _idx in range(1, 11):  # generous cap; real forms never repeat a label 10x
+                    _c = _finder(searchDepth=25, Name=label, foundIndex=_idx)
+                    if not _c.Exists(maxSearchSeconds=0.3):
+                        break
+                    try:
+                        _r = _c.BoundingRectangle
+                        _dist = ((_r.left + _r.right) / 2 - _ecx) ** 2 + ((_r.top + _r.bottom) / 2 - _ecy) ** 2
+                    except Exception:
+                        continue
+                    if _best_dist is None or _dist < _best_dist:
+                        _best, _best_dist = _c, _dist
+                if _best is not None:
+                    return _best
             return None
         except Exception as exc:
             logger.debug("UIA control lookup for %r failed — %s", label, exc)
             return None
 
-    def _scroll_into_view_via_uia(self, label: str) -> bool:
+    def _scroll_into_view_via_uia(self, label: str, expected_bbox=None) -> bool:
         """
         Bring a specific control into view via UIA's
         ScrollItemPattern.ScrollIntoView() -- ONE native call, no pixel
@@ -5104,7 +5167,7 @@ class LLMAgent:
         # info/warning so the next run says definitively why -- control not
         # found vs. no ScrollItemPattern support vs. an actual exception --
         # instead of guessing a fix blind.
-        _ctrl = self._find_uia_control_by_name(label)
+        _ctrl = self._find_uia_control_by_name(label, expected_bbox=expected_bbox)
         if _ctrl is None:
             logger.info("[SCROLL-INTO-VIEW-DIAG] no UIA control found for %r — falling back.", label)
             return False
@@ -5335,7 +5398,7 @@ class LLMAgent:
             logger.info("[SCROLL-INTO-VIEW-DIAG] find_scroll_target_element returned nothing to target — falling back.")
         else:
             _target_label = (_target.get("label") or _target.get("text") or "").strip()
-            if self._scroll_into_view_via_uia(_target_label):
+            if self._scroll_into_view_via_uia(_target_label, expected_bbox=_target.get("bbox")):
                 logger.info(
                     "Scroll-form: UIA ScrollIntoView landed on %r — one motion, no increments.",
                     _target_label[:30])
