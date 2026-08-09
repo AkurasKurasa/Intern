@@ -174,7 +174,7 @@ def main():
     n_click_labels_valid = 0   # tgt_click_idx != -1
     n_click_labels_ignored = 0 # tgt_click_idx == -1 on rows where tgt_type == CLICK
     with torch.no_grad():
-        for states, p_types, p_cont, tgt_types, tgt_click_idx, tgt_keys, tgt_src in val_loader:
+        for states, p_types, p_cont, tgt_types, tgt_click_idx, tgt_keys, tgt_src, _sample_weight in val_loader:
             states, p_types, p_cont = states.to(device), p_types.to(device), p_cont.to(device)
             tgt_types = tgt_types.to(device)
             tgt_click_idx = tgt_click_idx.to(device)
