@@ -3896,6 +3896,53 @@ class LLMAgent:
                                                 "key_count": 1, "keystrokes": ["tab"]})
                         time.sleep(self.step_delay * 0.4)
                         continue
+                    # Found 2026-08-09, live, direct user report ("Coverage
+                    # was skipped"): the backward-block guard above stops a
+                    # click landing BEHIND the current tab, but nothing
+                    # stopped one landing more than one tab AHEAD either.
+                    # Log evidence: while on Vehicle (idx 2), the
+                    # transformer's own raw pointer clicked directly on
+                    # Drivers (idx 4) -- "Tab-click -> navigating to
+                    # 'Drivers' (idx 4)" -- and since idx 4 is not LESS than
+                    # idx 2, the backward guard never triggered. Coverage
+                    # (idx 3) was never visited at all this run; not one of
+                    # its fields (Bodily Injury, MedPay Limit, UM/UIM Limit,
+                    # ...) appears anywhere before this jump. The comment
+                    # above this block explains why the code deliberately
+                    # goes to whichever tab the model ACTUALLY clicked
+                    # rather than always current+1 -- that was fixing a
+                    # real, different bug (repeated clicks landing on one
+                    # tab racing through every tab in between). Preserving
+                    # that fix for the legitimate case (_hit_idx ==
+                    # current+1, or re-clicking the current tab) while
+                    # blocking the specific case neither guard covered: a
+                    # jump skipping one or more entirely unvisited tabs.
+                    # Redirect to the immediately NEXT tab instead of either
+                    # blind-Tabbing (the backward guard's response, which
+                    # doesn't apply here since this isn't a stray guess --
+                    # the model clearly intended SOME forward click) or
+                    # trusting the skip.
+                    if _hit_idx > self._current_tab_idx + 1:
+                        logger.info(
+                            "[GUARD] pointer clicked forward past unvisited tab(s) to %r "
+                            "(idx %d, currently on idx %d) — going to idx %d instead, "
+                            "this workflow never skips a tab.",
+                            _hit_name, _hit_idx, self._current_tab_idx, self._current_tab_idx + 1)
+                        _next_tab = _sorted_tabs[self._current_tab_idx + 1]
+                        _nx1, _ny1, _nx2, _ny2 = _next_tab["bbox"]
+                        _next_name = (_next_tab.get("text") or _next_tab.get("label") or "?").strip()
+                        self._executor.execute({"action_type": "click",
+                                                "click_position": [(_nx1 + _nx2) / 2, (_ny1 + _ny2) / 2]})
+                        self._current_tab_idx = self._current_tab_idx + 1
+                        _no_change_streak  = 0
+                        _tab_just_switched = True
+                        _tab_scroll_count  = 0
+                        _last_auto_step    = step_idx
+                        self._filled_this_tab.clear()
+                        _confirmed_blank_fields.clear()
+                        self._refresh_record_cache(state)
+                        time.sleep(self.step_delay)
+                        continue
                     if _hit_idx != self._current_tab_idx:
                         x1, y1, x2, y2 = _tab_hit["bbox"]
                         logger.info("Tab-click → navigating to %r (idx %d).", _hit_name, _hit_idx)
