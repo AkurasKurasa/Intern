@@ -42,6 +42,7 @@ navWorkflows.addEventListener("click", () => showMain("workflows"));
 const statusDot   = document.getElementById("statusDot");
 const statStatus  = document.getElementById("statStatus");
 const statFrames  = document.getElementById("statFrames");
+const statPending = document.getElementById("statPending");
 const statSessions= document.getElementById("statSessions");
 const outDirInput = document.getElementById("outDir");
 const btnStart    = document.getElementById("btnStart");
@@ -81,6 +82,7 @@ function setRecording(isRecording) {
 btnStart.addEventListener("click", () => {
   window.recorderAPI.start(outDirInput.value.trim() || null);
   statFrames.textContent = "0";
+  statPending.hidden = true;
   log("Recording — fill the form, then click Stop & Save.", "dim");
 });
 
@@ -106,12 +108,14 @@ window.recorderAPI.onEvent((event) => {
       break;
     case "frame_count":
       statFrames.textContent = String(event.value);
+      statPending.hidden = !event.pending;
       break;
     case "saved":
       setRecording(false);
       sessions += 1;
       statSessions.textContent = String(sessions);
       statFrames.textContent = String(event.steps);
+      statPending.hidden = true;
       log(`Saved — ${event.steps} frames. Now click Replay ×N to repeat it.`, "ok");
       break;
     case "replay_progress":

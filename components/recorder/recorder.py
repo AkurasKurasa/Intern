@@ -1400,7 +1400,6 @@ class DemoRecorder:
         print("=" * 60)
         print("\nRecording started. Fill the form, then press F10 or click Stop.\n")
 
-        self._quit_event = threading.Event()
         if auto_start:
             self._recording = True
 

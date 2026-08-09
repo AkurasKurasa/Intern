@@ -18,7 +18,7 @@ Events (stdout, one per line)
 -------------------------------
   {"event": "ready"}
   {"event": "started", "output_dir": "..."}
-  {"event": "frame_count", "value": 42}
+  {"event": "frame_count", "value": 42, "pending": true}
   {"event": "saved", "steps": 42, "session_dir": "..."}
   {"event": "replay_progress", "current": 3, "total": 10}
   {"event": "replay_done", "made": 10, "steps_each": 42, "dest": "..."}
@@ -105,7 +105,17 @@ class Bridge:
             if self._recorder is not None:
                 with self._recorder._lock:
                     n = len(self._recorder._steps)
-                emit("frame_count", value=n)
+                # A frame only commits when a field is left (Tab/Enter/click
+                # elsewhere) -- individual keystrokes accumulate silently in
+                # _pending_text/_pending_keys with no queue push (see
+                # DemoRecorder._on_key_press). That's intentional: one step
+                # per committed field, not one per keystroke, is what every
+                # trained checkpoint's data has always assumed. But it made
+                # the counter look frozen while actively typing -- reporting
+                # whether there's live pending input lets the UI show real
+                # activity without changing what actually gets saved.
+                pending = bool(self._recorder._pending_text or self._recorder._pending_keys)
+                emit("frame_count", value=n, pending=pending)
             time.sleep(0.3)
 
     def stop(self) -> None:
