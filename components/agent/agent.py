@@ -3446,6 +3446,56 @@ class LLMAgent:
                                 ) == _t_key
                                 if _lc_landed:
                                     _redirect_stall_count = 0
+                                    # Found 2026-08-09, live, direct user report
+                                    # ("it did it again in the Navigation
+                                    # Protocol, one input field at a time"):
+                                    # this is a THIRD sibling redirect guard
+                                    # with the exact same shape as the reclick-
+                                    # streak guard and the combobox-attempted-
+                                    # blank guard -- but it never got either of
+                                    # their "complete an accidental partial
+                                    # reveal" or "refocus to the shallowest
+                                    # revealed field" fixes. Log evidence:
+                                    # this exact branch fired repeatedly on the
+                                    # Vehicle tab (Annual Miles Est., Primary
+                                    # Use, Purchase Date, Purchase Price...),
+                                    # each redirect occasionally growing the
+                                    # element count ("3 new interactive
+                                    # element(s) appeared", "1 new interactive
+                                    # element(s) appeared") with nothing ever
+                                    # noticing or exploiting it -- one field
+                                    # revealed and filled per redirect, never
+                                    # a cluster. Same fix as the two sibling
+                                    # guards, applied here for the first time.
+                                    _n_before_lc_land = len(state.get("elements", []))
+                                    state = _lc_check
+                                    if len(state.get("elements", [])) > _n_before_lc_land:
+                                        _lc_deep = self._navproto.find_scroll_target_element(
+                                            state, self._form_viewport_bottom(state) - 8,
+                                            attempted_keys=self._attempted_keys, attempt_key_fn=self._attempt_key)
+                                        if _lc_deep and _lc_deep.get("bbox"):
+                                            _lc_deep_key = self._attempt_key(_lc_deep, elements=state.get("elements", []))
+                                            _lc_deep_label = (_lc_deep.get("label") or _lc_deep.get("text") or "").strip()
+                                            if _lc_deep_key != _t_key and _lc_deep_label and self._focus_element_via_uia(
+                                                    _lc_deep_label, expected_bbox=_lc_deep["bbox"]):
+                                                logger.info(
+                                                    "[OPT2] %r's landing already revealed more content — "
+                                                    "completing the reveal via %r before refocusing shallow.",
+                                                    _tlabel, _lc_deep_label[:30])
+                                                state = self._observe()
+                                    _lc_shallow = self._navproto.find_visible_empty_target(
+                                        state, self._form_viewport_bottom(state) - 8,
+                                        attempted_keys=self._attempted_keys, attempt_key_fn=self._attempt_key)
+                                    if _lc_shallow and _lc_shallow.get("bbox"):
+                                        _lc_shallow_key = self._attempt_key(_lc_shallow, elements=state.get("elements", []))
+                                        if _lc_shallow_key != _t_key:
+                                            _lc_shallow_label = (_lc_shallow.get("label") or _lc_shallow.get("text") or "").strip()
+                                            if _lc_shallow_label and self._focus_element_via_uia(
+                                                    _lc_shallow_label, expected_bbox=_lc_shallow["bbox"]):
+                                                logger.info(
+                                                    "[OPT2] revealed cluster via %r — refocusing shallower "
+                                                    "target %r to fill top-down.", _tlabel, _lc_shallow_label[:30])
+                                                state = self._observe()
                                     prediction = {"action_type": "no_op"}
                                 else:
                                     _redirect_stall_count += 1
