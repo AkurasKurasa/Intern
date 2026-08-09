@@ -2776,7 +2776,51 @@ class LLMAgent:
                                     ) == _rc_key
                                     if _rc_landed:
                                         _redirect_stall_count = 0
+                                        # Found 2026-08-09, live, direct user
+                                        # report ("revealing one input field
+                                        # one-by-one again"): the SAME night's
+                                        # earlier "prefer an already-visible
+                                        # target" fix means this redirect now
+                                        # usually lands via find_visible_empty_
+                                        # target (nearest reachable field) --
+                                        # but "reachable per the geometric
+                                        # viewport estimate" isn't the same as
+                                        # "genuinely on screen already." If
+                                        # landing here STILL grew the element
+                                        # count, the near target wasn't
+                                        # actually risk-free -- it required a
+                                        # real reveal, same as the deep-aim
+                                        # strategy would have needed, just a
+                                        # smaller, incomplete one. Log
+                                        # evidence: element count crept
+                                        # 162->169->170 across separate
+                                        # redirects, each one exploiting only
+                                        # a sliver of whatever got revealed,
+                                        # with zero "revealed cluster via" or
+                                        # "Scroll-form" lines anywhere in the
+                                        # run -- the deliberate big-reveal
+                                        # strategy essentially never fired.
+                                        # When a reveal DID happen, finish
+                                        # what it started: aim the SAME
+                                        # deep-cluster search at the NEW state
+                                        # once, completing the reveal instead
+                                        # of leaving it half-done.
+                                        _n_before_land = len(state.get("elements", []))
                                         state = _rc_check
+                                        if len(state.get("elements", [])) > _n_before_land:
+                                            _rc_deep = self._navproto.find_scroll_target_element(
+                                                state, self._form_viewport_bottom(state) - 8,
+                                                attempted_keys=self._attempted_keys, attempt_key_fn=self._attempt_key)
+                                            if _rc_deep and _rc_deep.get("bbox"):
+                                                _rc_deep_key = self._attempt_key(_rc_deep, elements=state.get("elements", []))
+                                                _rc_deep_label = (_rc_deep.get("label") or _rc_deep.get("text") or "").strip()
+                                                if _rc_deep_key != _rc_key and _rc_deep_label and self._focus_element_via_uia(
+                                                        _rc_deep_label, expected_bbox=_rc_deep["bbox"]):
+                                                    logger.info(
+                                                        "[OPT2] %r's landing already revealed more content — "
+                                                        "completing the reveal via %r before refocusing shallow.",
+                                                        _rc_label, _rc_deep_label[:30])
+                                                    state = self._observe()
                                         # Found 2026-08-09, live, direct user
                                         # report ("Marital Status was not
                                         # even filled up until Cell Phone" /
@@ -3013,7 +3057,27 @@ class LLMAgent:
                                     ) == _cb_rc_key
                                     if _cb_rc_landed:
                                         _redirect_stall_count = 0
+                                        # Same "complete an accidental partial
+                                        # reveal" fix as the sibling guard
+                                        # above -- found 2026-08-09, live,
+                                        # direct user report ("revealing one
+                                        # input field one-by-one again").
+                                        _cb_n_before_land = len(state.get("elements", []))
                                         state = _cb_rc_check
+                                        if len(state.get("elements", [])) > _cb_n_before_land:
+                                            _cb_deep = self._navproto.find_scroll_target_element(
+                                                state, self._form_viewport_bottom(state) - 8,
+                                                attempted_keys=self._attempted_keys, attempt_key_fn=self._attempt_key)
+                                            if _cb_deep and _cb_deep.get("bbox"):
+                                                _cb_deep_key = self._attempt_key(_cb_deep, elements=state.get("elements", []))
+                                                _cb_deep_label = (_cb_deep.get("label") or _cb_deep.get("text") or "").strip()
+                                                if _cb_deep_key != _cb_rc_key and _cb_deep_label and self._focus_element_via_uia(
+                                                        _cb_deep_label, expected_bbox=_cb_deep["bbox"]):
+                                                    logger.info(
+                                                        "[OPT2] %r's landing already revealed more content — "
+                                                        "completing the reveal via %r before refocusing shallow.",
+                                                        _cb_rc_label, _cb_deep_label[:30])
+                                                    state = self._observe()
                                         # Same "refocus shallowest before
                                         # filling" fix as the sibling guard
                                         # above.
