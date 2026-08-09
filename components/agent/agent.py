@@ -525,6 +525,34 @@ def _find_destructive_button_at(elements: List[Dict[str, Any]], pos) -> Optional
     )
 
 
+def _is_leave_blank_value(v: Optional[str]) -> bool:
+    """True if a record value means 'leave this field empty' -- robust to
+    parens and trailing notes: '(leave blank)', 'leave blank — liability
+    only', '(none)', 'none', 'n/a' all count as blank.
+
+    Found 2026-08-10: SIX separate call sites each carried their own
+    hardcoded {'(leave blank)', 'none', ...} set, checked via
+    `value.lower().strip('()')` on the VALUE being looked up but never
+    applied to the SET itself -- so a stripped 'leave blank' could never
+    match an unstripped '(leave blank)' set member, and the literal
+    placeholder text got typed into the field instead of being skipped.
+    One already-correct implementation existed the whole time
+    (_lookup_field's own local _is_blank, a prefix match immune to this
+    exact bug since it never relied on exact-set-membership against an
+    unstripped literal) -- promoted to module level so every call site
+    shares it instead of maintaining its own copy that can silently drift
+    out of sync, the same generalization already applied to
+    _find_destructive_button_at and _SAFE_HOTKEY_COMBOS elsewhere in this
+    file.
+    """
+    if not v:
+        return True
+    n = v.lower().strip().strip("()").strip()
+    return (n in {"none", "n/a", "na", ""}
+            or n.startswith("leave blank")
+            or n.startswith("none "))
+
+
 _TAB_PANEL_TYPES = {"editcontrol", "comboboxcontrol", "checkboxcontrol",
                      "buttoncontrol", "button", "panecontrol"}
 
@@ -1565,14 +1593,12 @@ class LLMAgent:
                         _fn_key_tc = _sec_lower + " first name"
                         _fn_val_tc = next((rv for rk, rv in self._cached_record.items()
                                            if rk.lower() == _fn_key_tc), "")
-                        _skip_pl_tc = {"(none)", "none", "(leave blank)", "n/a"}
-                        if not (_fn_val_tc and _fn_val_tc.lower().strip("()") not in _skip_pl_tc):
+                        if not (_fn_val_tc and not _is_leave_blank_value(_fn_val_tc)):
                             continue  # section has no real person — not pending
                     _known = self._lookup_field(_fn, section=_sec)
                     _val   = (_e.get("value") or "").strip()
                     if _known:
-                        _skip_vals = {"(none)", "none", "(leave blank)", "n/a"}
-                        if _known.lower().strip("()") in _skip_vals:
+                        if _is_leave_blank_value(_known):
                             continue  # field should be blank — not pending
                         # Pending only if empty OR value doesn't match expected
                         if not _val or _val.lower() != _known.lower():
@@ -1708,8 +1734,7 @@ class LLMAgent:
                     _fn_key   = _ps_lower + " first name"
                     _fn_val   = next((rv for rk, rv in self._cached_record.items()
                                       if rk.lower() == _fn_key), "")
-                    _skip_pl  = {"(none)", "none", "(leave blank)", "n/a"}
-                    _sec_has_real = bool(_fn_val and _fn_val.lower().strip("()") not in _skip_pl)
+                    _sec_has_real = bool(_fn_val and not _is_leave_blank_value(_fn_val))
                     if not _sec_has_real:
                         logger.info("Pane-escape: section %r has no real data — advancing tab.", _pane_sec)
                         if self._try_advance_tab(state):
@@ -4723,9 +4748,7 @@ class LLMAgent:
             return False   # field not in record — let LLM decide
 
         # (leave blank) / (none) in data → leave field as-is regardless of current value
-        _leave_blank_raws = {"(none)", "none", "(leave blank)", "n/a",
-                             "leave blank — liability only", "leave blank — owned outright"}
-        if expected.lower().strip("()") in {s.strip("()") for s in _leave_blank_raws}:
+        if _is_leave_blank_value(expected):
             logger.info("Auto-skip: '%s' = (leave blank) — Tab.", filled_key)
             self._filled_this_tab.add(filled_key)
             return True
@@ -5343,16 +5366,7 @@ class LLMAgent:
 
         import re as _re
 
-        def _is_blank(v: str) -> bool:
-            """A record value that means 'leave the field empty'. Robust to parens
-            and trailing notes: '(leave blank)', 'leave blank — liability only',
-            '(none)', 'none', 'n/a' all count as blank → field is skipped."""
-            if not v:
-                return True
-            n = v.lower().strip().strip("()").strip()
-            return (n in {"none", "n/a", "na", ""}
-                    or n.startswith("leave blank")
-                    or n.startswith("none "))
+        _is_blank = _is_leave_blank_value
 
         def _get(key: str) -> str:
             kl = key.lower()
@@ -5417,10 +5431,9 @@ class LLMAgent:
             # Field has a value — check if it's wrong (leftover from a previous run).
             # If wrong, return it flagged for overwrite (Ctrl+A before typing).
             expected_check = self._lookup_field(field_name, section=section)
-            _skip_check = {"(none)", "none", "(leave blank)", "n/a", "yes (check)",
-                           "leave blank — liability only", "leave blank — owned outright"}
             if (expected_check
-                    and expected_check.lower().strip("()") not in _skip_check
+                    and not _is_leave_blank_value(expected_check)
+                    and expected_check.lower().strip("()") != "yes (check)"
                     and current.lower() != expected_check.lower()):
                 logger.info("Auto-fill: '%s' has wrong value %r — will overwrite with %r",
                             filled_key, current, expected_check)
@@ -5453,9 +5466,7 @@ class LLMAgent:
         if not expected:
             return None
 
-        _skip_vals = {"(none)", "none", "(leave blank)", "n/a", "yes (check)",
-                      "leave blank — liability only", "leave blank — owned outright"}
-        if expected.lower().strip("()") in _skip_vals:
+        if _is_leave_blank_value(expected) or expected.lower().strip("()") == "yes (check)":
             return None
 
         # Return filled_key (section-prefixed if in a driver/vehicle section) as the
@@ -5487,8 +5498,6 @@ class LLMAgent:
 
         # Check raw record value so we can detect "(leave blank)" sentinels that
         # _lookup_field strips out.
-        _leave_blank_raws = {"(none)", "none", "(leave blank)", "n/a",
-                             "leave blank — liability only", "leave blank — owned outright"}
         if self._cached_record:
             _rec = self._cached_record
             _sec_key = f"{section} {field_name}" if section else ""
@@ -5499,7 +5508,7 @@ class LLMAgent:
             if not _raw:
                 _raw = _rec.get(field_name) or next(
                     (v for k, v in _rec.items() if k.lower() == field_name.lower()), "")
-            if _raw and _raw.lower().strip("()") in {s.strip("()") for s in _leave_blank_raws}:
+            if _raw and _is_leave_blank_value(_raw):
                 if current:
                     # Non-empty combobox should be cleared — select the blank option
                     return (field_name, current, "")
@@ -6756,8 +6765,8 @@ class LLMAgent:
         fl = field_name.lower()
         for k, v in rec.items():
             if k.lower() == fl:
-                skip = {"(none)", "none", "(leave blank)", "n/a", "no", "yes (check)"}
-                return "" if v.lower().strip("()") in skip else v
+                _skip_other = {"no", "yes (check)"}
+                return "" if (_is_leave_blank_value(v) or v.lower().strip("()") in _skip_other) else v
         return ""
 
     # ── LLM dispatch ─────────────────────────────────────────────────────────
