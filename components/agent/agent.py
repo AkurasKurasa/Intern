@@ -1327,6 +1327,18 @@ class LLMAgent:
             # genuine state-changing action this step say so, so the guard
             # (checked later this same step) knows not to second-guess it.
             _real_progress_this_step = False
+            # Found 2026-08-09, live, direct user request ("stop wasting
+            # steps"): a plain "navigate to the next field" click and the
+            # fill that follows it were always two separate step_idx
+            # iterations -- the click lands this step, the top-of-loop
+            # fillable-check only notices the newly-focused field on the
+            # NEXT step. Confirmed against real logs tonight: nearly every
+            # field took exactly this click-step/fill-step pair. This flag
+            # marks "the prediction this step is a plain navigate click, no
+            # redirect/combobox/checkbox logic involved" so the collapse
+            # check after execution (below) only fires for the one
+            # unambiguous case it's designed for.
+            _is_plain_navigate_click = False
             # 1. Observe — but first re-assert the locked form as foreground so a
             # stray click last step can't leave us observing/acting on a drifted
             # window. Lock is captured on the first observe (form is in front at GO).
@@ -3301,6 +3313,7 @@ class LLMAgent:
                                 time.sleep(self.step_delay * 0.5)
                                 continue
                             prediction = {"action_type": "click", "click_position": _snap2}
+                            _is_plain_navigate_click = True
                             logger.info("[OPT2] TRANSFORMER navigates → click @ (%.0f,%.0f)  ptr_conf=%.2f",
                                         _snap2[0], _snap2[1], t_pred.get("_click_conf", 0.0))
                             _lowconf_fallback_streak = 0
@@ -4058,6 +4071,65 @@ class LLMAgent:
                     state_after = self._observe()
             if state_after is None:
                 state_after = self._observe()
+
+            # ── Collapse navigate+fill into one step ──────────────────────────
+            # Found 2026-08-09, live, direct user request ("stop wasting
+            # steps... look up a lot at once"): a plain navigate click and
+            # the fill that follows were always two separate step_idx
+            # iterations, even though by the time this line runs, state_after
+            # already shows exactly what got focused as a direct result of
+            # THIS step's own click -- there's no reason to wait a full extra
+            # step just to notice it. Scoped deliberately narrow: only a
+            # plain navigate click (_is_plain_navigate_click, not a redirect/
+            # combobox-open/checkbox click, all of which have their own
+            # already-correct multi-step mechanics), only editcontrol/input
+            # (combobox/checkbox fills are multi-click sequences of their
+            # own, not a simple collapse candidate), and only when a real
+            # record value is found (a genuinely-blank field is left for the
+            # next step's own established blank-handling logic, not
+            # duplicated here). Reassigning `prediction` to a keyboard/text
+            # shape and re-observing `state_after` means every check below
+            # this point (verify-at-fill, validation, _record_attempt) runs
+            # exactly as it already does for a normal type action -- no
+            # separate verification path to build or trust.
+            if (_is_plain_navigate_click and prediction.get("action_type") == "click"
+                    and state_after.get("focused_element_id")
+                    and state_after.get("focused_element_id") != state.get("focused_element_id")):
+                _cn_fid = state_after["focused_element_id"]
+                _cn_els = state_after.get("elements", [])
+                _cn_el = next((e for e in _cn_els if e.get("element_id") == _cn_fid), None)
+                if (_cn_el and (_cn_el.get("type") or "").lower() in ("editcontrol", "input")
+                        and not (_cn_el.get("value") or "").strip()):
+                    _cn_label = (_cn_el.get("label") or _cn_el.get("text") or "").strip()
+                    _cn_key = self._attempt_key(_cn_el, elements=_cn_els)
+                    if (_cn_label and _cn_key not in self._typed_keys
+                            and _cn_key not in self._leave_blank_keys):
+                        _cn_sec = self._detect_section(state_after, _cn_el)
+                        _cn_val = self._lookup_field(_cn_label, section=_cn_sec)
+                        if _cn_val and _cn_el.get("bbox"):
+                            logger.info(
+                                "[OPT2] collapsing navigate+fill: %r focused this step, "
+                                "known value %r — typing now instead of next step.",
+                                _cn_label, _cn_val[:40])
+                            _cnb = _cn_el["bbox"]
+                            self._executor.execute({"action_type": "click",
+                                                    "click_position": [(_cnb[0] + _cnb[2]) / 2,
+                                                                        (_cnb[1] + _cnb[3]) / 2]})
+                            self._executor.execute({"action_type": "keyboard", "text": _cn_val})
+                            prediction = {"action_type": "keyboard", "text": _cn_val}
+                            state_after = self._observe()
+                            # _record_attempt()'s keyboard branch (called
+                            # further below) reads state["focused_element_id"]
+                            # -- the field focused BEFORE this step began, since
+                            # that's the correct signal for a normal type
+                            # action. Here the target field only became
+                            # focused DURING this same step (via the click
+                            # just above), so that lookup would find the
+                            # WRONG (previous) field. Mark the real target
+                            # directly instead of relying on that downstream
+                            # call for this one case.
+                            self._mark_attempted(_cn_el, elements=_cn_els)
+                            self._typed_keys.add(_cn_key)
 
             # ── Verify-at-fill: catch a WRONG value the moment it's typed, not later ──
             # StateValidator (right below) only checks whether SOMETHING changed —
