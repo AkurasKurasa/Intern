@@ -71,10 +71,28 @@ def _run_reclick_guard(state, reclick_streak, redirect_limit, executor):
     parameter IS the density calculation; an effectively-infinite width
     would degenerate it into "just the single deepest field on the whole
     tab," losing the "fits in one screen" concept entirely (caught while
-    writing this very test, before it ever reached a live run)."""
+    writing this very test, before it ever reached a live run).
+
+    CORRECTED 2026-08-09, SAME NIGHT, live, direct user report ("it skipped
+    a lot of Policyholder tabs"): always reaching for the deep-cluster
+    target overshot when a real, already-visible, zero-scroll-needed
+    target existed nearby. Log + source cross-check: 'Suffix' (known
+    blank) sat right next to 'Marital Status'/'Occupation'/etc -- already
+    on screen -- but the redirect reached past all twelve of them for 'DL
+    Number', and the resulting auto-scroll pushed them off the TOP of the
+    viewport (element count dropped 162->155). Since this module only ever
+    scrolls DOWN, they were gone for the rest of the run. Now tries the
+    nearest already-visible target FIRST (zero overshoot risk by
+    construction); only falls back to the deep-cluster strategy when
+    nothing is visible in the current viewport at all -- preserving the
+    original fix's actual intent (don't stop at the FIRST reveal when nothing
+    closer exists) without letting it discard perfectly good, already-visible
+    fields to get there."""
     reclick_streak += 1
     if reclick_streak >= redirect_limit:
-        target = find_scroll_target_element(state, VIEWPORT_BOTTOM)
+        target = find_visible_empty_target(state, VIEWPORT_BOTTOM)
+        if target is None:
+            target = find_scroll_target_element(state, VIEWPORT_BOTTOM)
         if target and target.get("bbox"):
             b = target["bbox"]
             executor.execute({"action_type": "click",
@@ -131,25 +149,29 @@ def _run_reclick_guard_verified(state, post_redirect_focused_id, reclick_streak,
     return reclick_streak, stall_count
 
 
-class TestRedirectAimsAtTheDensestClusterNotJustTheNearestField:
-    """Added 2026-08-09, live, direct user report ("it's still revealing
-    them one at a time"): the redirect's real action is UIA SetFocus, and
-    this wx form auto-scrolls whatever gets focused into view as its own
-    native behavior -- previously undiagnosed. Searching only the current
-    viewport for a redirect target meant every redirect's SetFocus
-    revealed exactly ONE field via that side effect, so Navigation
-    Protocol's own explicit "scroll to the densest cluster" logic never
-    got a turn -- decide() never saw cur==0 because a redirect target was
-    always found nearby first. Proves the redirect now aims at the
-    deepest field of the densest reachable cluster instead of the nearest
-    single empty field, so the same auto-scroll side effect reveals the
-    whole cluster at once."""
+class TestRedirectPrefersAnAlreadyVisibleTargetOverADistantCluster:
+    """CORRECTED 2026-08-09, SAME NIGHT as the original cluster-aim fix,
+    live, direct user report ("it skipped a lot of Policyholder tabs").
+    The original fix (below, `TestFallsBackToTheDensestClusterOnlyWhenNothingIsVisible`)
+    was right that a redirect must not settle for revealing just one field
+    when scrolling further would reveal a whole cluster -- but ALWAYS
+    reaching for the deep-cluster target, even when a real, already-
+    visible, zero-scroll-needed target existed, went too far the other
+    direction. Log + source cross-check: 'Suffix' (known blank) sat right
+    next to 'Marital Status'/'Occupation'/'Education Level'/'Credit Score'
+    -- already on screen -- but the redirect reached past ALL of them
+    (plus eight more fields further down) for 'DL Number'. The resulting
+    auto-scroll pushed the skipped fields off the TOP of the viewport
+    (element count dropped 162->155 in the live log) -- and since this
+    module only ever scrolls DOWN, they were gone for the rest of the run.
+    A field sitting right there, already visible, needing zero scroll,
+    must never be skipped in favor of a farther cluster."""
 
-    def test_redirects_to_the_deepest_field_of_the_densest_cluster_not_the_nearest_one(self):
-        """A lone field is closer, but three fields further below form a
-        denser cluster -- the redirect must aim at the deepest member of
-        that cluster (matching find_scroll_target_element), not the
-        nearer lone field."""
+    def test_a_nearby_already_visible_field_is_preferred_over_a_farther_cluster(self):
+        """The exact live regression, reproduced: a lone empty field is
+        already visible nearby; a denser 3-field cluster sits further
+        below. The redirect must take the nearby field -- it needs no
+        scroll at all, so there is zero risk of overshooting past it."""
         executor = MagicMock()
         state = {"elements": [
             _field("Years Continuously Insured", value="9", bbox=(100, 100, 300, 130)),
@@ -161,9 +183,40 @@ class TestRedirectAimsAtTheDensestClusterNotJustTheNearestField:
         streak = _run_reclick_guard(state, reclick_streak=0, redirect_limit=1, executor=executor)
         assert streak == 0
         calls = [c.args[0] for c in executor.execute.call_args_list]
+        assert calls == [{"action_type": "click", "click_position": [200.0, 215.0]}]
+
+
+class TestFallsBackToTheDensestClusterOnlyWhenNothingIsVisible:
+    """Added 2026-08-09, live, direct user report ("it's still revealing
+    them one at a time"): the redirect's real action is UIA SetFocus, and
+    this wx form auto-scrolls whatever gets focused into view as its own
+    native behavior -- previously undiagnosed. Searching only the current
+    viewport for a redirect target meant every redirect's SetFocus
+    revealed exactly ONE field via that side effect, so Navigation
+    Protocol's own explicit "scroll to the densest cluster" logic never
+    got a turn -- decide() never saw cur==0 because a redirect target was
+    always found nearby first. Still valid for the genuine "nothing
+    visible right now at all" case -- the fix above only narrows WHEN
+    this strategy applies, it doesn't remove it."""
+
+    def test_falls_back_to_the_deepest_field_of_the_densest_cluster_when_nothing_is_visible(self):
+        """Nothing is currently visible in the viewport at all -- only
+        then does the redirect reach for the deep-cluster strategy,
+        aiming at the deepest member of the densest reachable cluster
+        below the fold."""
+        executor = MagicMock()
+        state = {"elements": [
+            _field("Years Continuously Insured", value="9", bbox=(100, 100, 300, 130)),
+            _field("Street Address 1", value="", bbox=(100, 1100, 300, 1130)),
+            _field("Street Address 2", value="", bbox=(100, 1140, 300, 1170)),
+            _field("City", value="", bbox=(100, 1180, 300, 1210)),
+        ]}
+        streak = _run_reclick_guard(state, reclick_streak=0, redirect_limit=1, executor=executor)
+        assert streak == 0
+        calls = [c.args[0] for c in executor.execute.call_args_list]
         # City's bbox center -- the deepest member of the 3-field cluster,
-        # not "Lonely Nearby Field" (closer, but alone).
-        assert calls == [{"action_type": "click", "click_position": [200.0, 995.0]}]
+        # none of which fit within VIEWPORT_BOTTOM=1000 (all off-screen).
+        assert calls == [{"action_type": "click", "click_position": [200.0, 1195.0]}]
 
 
 class TestReclickStreakRedirectsInsteadOfBlindTabbing:

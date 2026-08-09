@@ -2677,9 +2677,44 @@ class LLMAgent:
                                 # effectively-infinite width degenerates it into "just
                                 # the single deepest field on the whole tab," losing
                                 # the "fits in one screen" density concept entirely.
-                                _rc_target = self._navproto.find_scroll_target_element(
+                                #
+                                # Found 2026-08-09, live, direct user report ("it
+                                # skipped a lot of Policyholder tabs"): always
+                                # reaching for the deepest field of the cluster
+                                # overshot when a real, currently-visible, zero-
+                                # scroll-needed target already existed. Log +
+                                # source cross-check: 'Suffix' (known blank) sat
+                                # right next to 'Marital Status'/'Occupation'/etc
+                                # -- already on screen, no scroll required -- but
+                                # the redirect reached past them for 'DL Number'
+                                # (12 real fields further down: Marital Status,
+                                # Occupation, Education Level, Credit Score,
+                                # Email, Home/Cell/Work Phone, Street Address 1/2,
+                                # City, State, ZIP, County, Country, Years at
+                                # Address). SetFocus's native auto-scroll landed
+                                # DL Number in view but scrolled PAST all twelve
+                                # -- element count dropped 162->155, confirming
+                                # things scrolled off the TOP, not just revealed
+                                # below. Since this module only ever scrolls DOWN,
+                                # never back up, those twelve fields were gone for
+                                # the rest of the run -- real, silent data loss.
+                                # Try the NEAREST already-visible target FIRST
+                                # (zero scroll, zero overshoot risk by
+                                # construction); only reach for the deep-cluster
+                                # strategy when nothing is visible right now at
+                                # all -- preserving the original 2026-08-08 fix
+                                # (a redirect must not settle for revealing just
+                                # one field when scrolling further would reveal a
+                                # whole cluster) without letting it discard
+                                # perfectly good, already-visible fields to get
+                                # there.
+                                _rc_target = self._navproto.find_visible_empty_target(
                                     state, self._form_viewport_bottom(state) - 8,
                                     attempted_keys=self._attempted_keys, attempt_key_fn=self._attempt_key)
+                                if _rc_target is None:
+                                    _rc_target = self._navproto.find_scroll_target_element(
+                                        state, self._form_viewport_bottom(state) - 8,
+                                        attempted_keys=self._attempted_keys, attempt_key_fn=self._attempt_key)
                                 if _rc_target and _rc_target.get("bbox"):
                                     _rcb = _rc_target["bbox"]
                                     _rc_label = (_rc_target.get("label") or _rc_target.get("text") or "?")[:30]
@@ -2921,9 +2956,25 @@ class LLMAgent:
                                 # calculation) instead of the nearest single field, so
                                 # this redirect's own SetFocus auto-scrolls the whole
                                 # next cluster into view.
-                                _cb_rc_target = self._navproto.find_scroll_target_element(
+                                #
+                                # Found 2026-08-09, live, direct user report ("it
+                                # skipped a lot of Policyholder tabs") -- this is
+                                # the EXACT incident: this guard fired on 'Suffix'
+                                # (correctly known blank), and reached past
+                                # 'Marital Status'/'Occupation'/etc -- already
+                                # visible, zero scroll needed -- for 'DL Number'
+                                # (12 real fields further down). Same fix as the
+                                # sibling guard above: try the nearest already-
+                                # visible target first (zero overshoot risk by
+                                # construction); only reach for the deep-cluster
+                                # strategy when nothing is visible right now.
+                                _cb_rc_target = self._navproto.find_visible_empty_target(
                                     state, self._form_viewport_bottom(state) - 8,
                                     attempted_keys=self._attempted_keys, attempt_key_fn=self._attempt_key)
+                                if _cb_rc_target is None:
+                                    _cb_rc_target = self._navproto.find_scroll_target_element(
+                                        state, self._form_viewport_bottom(state) - 8,
+                                        attempted_keys=self._attempted_keys, attempt_key_fn=self._attempt_key)
                                 if _cb_rc_target and _cb_rc_target.get("bbox"):
                                     _cbrcb = _cb_rc_target["bbox"]
                                     _cb_rc_label = (_cb_rc_target.get("label") or _cb_rc_target.get("text") or "?")[:30]
