@@ -2861,7 +2861,7 @@ class LLMAgent:
                                  and e["bbox"][1] - 2 <= _snap2[1] <= e["bbox"][3] + 2),
                                 None)
                         if _cbox is not None and self._attempt_key(
-                                _cbox, elements=state.get("elements", [])) in self._attempted_keys:
+                                _cbox, elements=state.get("elements", [])) in self._leave_blank_keys:
                             # Already confirmed blank earlier this record — don't repeat
                             # the click/check/escape dance. Found live 2026-08-07: the
                             # position-based dead-end blacklist (below) only catches 3
@@ -2872,10 +2872,29 @@ class LLMAgent:
                             # 10px bucket each time. 'Suffix' got the full click-open-
                             # check-escape-tab treatment 4 separate times in one
                             # Policyholder pass (10 wasted steps) despite being
-                            # _mark_attempted()'d after the first. attempted_keys is
-                            # label-based (stable regardless of pixel drift), so check
-                            # it FIRST and skip straight to Tab — no click needed, there's
-                            # nothing to open or verify about a field already known blank.
+                            # _mark_attempted()'d after the first. label-based (stable
+                            # regardless of pixel drift), so check it FIRST and skip
+                            # straight to Tab — no click needed, there's nothing to open
+                            # or verify about a field already known blank.
+                            #
+                            # Found 2026-08-09, live, direct user report ("we're
+                            # improving"): ground-truth check against
+                            # data_entry_intake.txt showed 'Primary Use' has a real
+                            # value ('Commute') that never got filled -- a bare
+                            # low-confidence-fallback navigate click had landed on it
+                            # earlier (no lookup ever attempted, just passing through),
+                            # which still marked it in the GENERAL self._attempted_keys
+                            # via _record_attempt. This check used to read that SAME
+                            # general set, concluding "confirmed blank" for a field
+                            # that was never actually looked up. Switched to
+                            # self._leave_blank_keys — populated ONLY when
+                            # self._lookup_field was genuinely called and genuinely
+                            # found nothing (a few hundred lines below, the "combobox
+                            # %r — no value, Tab" branch) — the same distinction
+                            # self._leave_blank_keys already exists to make elsewhere
+                            # in this file (see its own comment), just not yet applied
+                            # here. A field merely touched by a stray click now
+                            # correctly still gets a real fill attempt.
                             _cb_label_skip = (_cbox.get("label") or _cbox.get("text") or "").strip()
                             # Found 2026-08-08, live, direct user report ("It's using Tab
                             # to navigate. Its not finding the actual optimal view."):
@@ -3041,6 +3060,30 @@ class LLMAgent:
                                 self._executor.execute({"action_type": "keyboard",
                                                         "key_count": 1, "keystrokes": ["escape"]})
                                 self._mark_attempted(_cbox, elements=state.get("elements", []))
+                                # Found 2026-08-09, live, direct user report ("we're
+                                # improving") -- ground-truth check against
+                                # data_entry_intake.txt showed 'Primary Use' has a
+                                # real value ('Commute') that never got filled.
+                                # Traced it: a bare low-confidence-fallback
+                                # navigate click landed on 'Primary Use' earlier
+                                # (no lookup ever attempted -- just passing
+                                # through), which still marked it in the GENERAL
+                                # self._attempted_keys via _record_attempt. The
+                                # sibling "combobox already attempted (known
+                                # blank)" skip-check a few hundred lines above
+                                # then read that SAME general set and concluded
+                                # "confirmed blank," permanently skipping a field
+                                # that was never actually looked up. _cb_val is
+                                # empty HERE specifically because self._lookup_field
+                                # was genuinely called and genuinely found nothing
+                                # -- the real "confirmed blank" signal, distinct
+                                # from _attempted_keys for exactly the same reason
+                                # self._leave_blank_keys already exists (see its
+                                # own comment a few hundred lines above). Reusing
+                                # that established set instead of inventing a new
+                                # one, and pointing the skip-check at it.
+                                self._leave_blank_keys.add(
+                                    self._attempt_key(_cbox, elements=state.get("elements", [])))
                                 self._executor.execute({"action_type": "keyboard",
                                                         "key_count": 1, "keystrokes": ["tab"]})
                                 # Fingerprint this exact outcome (position, not just
