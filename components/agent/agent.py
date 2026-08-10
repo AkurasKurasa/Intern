@@ -3349,10 +3349,20 @@ class LLMAgent:
                                     _cb_label, _POLL_TRIES, _POLL_TRIES * _POLL_INTERVAL)
                             _o = lambda e: (e.get("text") or e.get("label") or "").strip()
                             _hit = next((e for e in _items if _option_matches(_cb_val, _o(e))), None)
-                            if _hit:
-                                _b = _hit["bbox"]
-                                self._executor.execute({"action_type": "click",
-                                                        "click_position": [(_b[0]+_b[2])/2, (_b[1]+_b[3])/2]})
+                            # No dropdown ever rendered at all (not "rendered late" --
+                            # confirmed live this really can happen for some real,
+                            # working comboboxes, see _select_combobox_value_via_
+                            # keyboard's own docstring). Try real keyboard navigation
+                            # before falling into the escalate-and-give-up path below.
+                            _kb_filled = False
+                            if not _hit and not _items:
+                                _kb_filled = self._select_combobox_value_via_keyboard(
+                                    _cb_label, _cb_val, _snap2[0], _snap2[1])
+                            if _hit or _kb_filled:
+                                if _hit:
+                                    _b = _hit["bbox"]
+                                    self._executor.execute({"action_type": "click",
+                                                            "click_position": [(_b[0]+_b[2])/2, (_b[1]+_b[3])/2]})
                                 logger.info("Combobox(click-fill): %r → selected %r", _cb_label, _cb_val)
                                 time.sleep(0.25)
                                 self._executor.execute({"action_type": "keyboard",
@@ -4187,10 +4197,19 @@ class LLMAgent:
                 if not _match and _listitems:
                     logger.warning("Combobox: %r not in options %s",
                                    _combo_value, [_opt(e) for e in _listitems][:12])
-                if _match:
-                    _lx1, _ly1, _lx2, _ly2 = _match["bbox"]
-                    self._executor.execute({"action_type": "click",
-                                            "click_position": [(_lx1+_lx2)/2, (_ly1+_ly2)/2]})
+                # No dropdown ever rendered at all -- same real, verified-live
+                # fallback as the sibling click-fill branch above (see
+                # _select_combobox_value_via_keyboard's own docstring for why
+                # this can happen for a genuinely working combobox).
+                _kb_filled = False
+                if not _match and not _listitems:
+                    _kb_filled = self._select_combobox_value_via_keyboard(
+                        _flabel, _combo_value, _ccx, _ccy)
+                if _match or _kb_filled:
+                    if _match:
+                        _lx1, _ly1, _lx2, _ly2 = _match["bbox"]
+                        self._executor.execute({"action_type": "click",
+                                                "click_position": [(_lx1+_lx2)/2, (_ly1+_ly2)/2]})
                     logger.info("Combobox: selected %r", _combo_value)
                     _no_change_streak = 0
                     _last_auto_step   = step_idx
@@ -5328,6 +5347,92 @@ class LLMAgent:
             logger.info("Re-asserted form foreground (focus had drifted off the form).")
         except Exception as exc:
             logger.debug("Re-assert form failed: %s", exc)
+
+    def _select_combobox_value_via_keyboard(
+        self, cb_label: str, cb_val: str, cx: float, cy: float, max_steps: int = 20,
+    ) -> bool:
+        """Selects a combobox's value with real keyboard navigation instead
+        of clicking to open a visual dropdown -- a fallback for comboboxes
+        that never open a real dropdown popup at all, tried only after the
+        existing click-and-poll path already failed.
+
+        Verified live 2026-08-10, directly, not guessed: after a real
+        click on this project's own car insurance form's 'Policy Status'
+        combobox, a full UIA tree walk found ZERO list-type elements
+        anywhere on screen -- the "still empty after N tries" warnings
+        were completely accurate, not a timing race (two earlier fixes
+        this same day both assumed a timing race and both turned out
+        wrong). This control also has no Invoke/Toggle/SelectionItem/
+        ExpandCollapse pattern at all, and its ValuePattern claims
+        writable (IsReadOnly=False) but SetValue() raises a raw COM error
+        -- a minimally, almost-brokenly UIA-exposed control, not something
+        any pattern-based shortcut can drive. What DOES work, confirmed
+        directly against the real live control: type-ahead (pressing the
+        target's first letter jumps straight to a matching option, same
+        as any standard Windows combobox) and Up/Down arrow navigation,
+        both of which visibly change ValuePattern.Value in real time even
+        though nothing about a "dropdown" ever becomes visible or
+        UIA-discoverable at any point.
+
+        This is a general fallback, not a fix for one field on one form:
+        any comboboxcontrol whose real dropdown genuinely never renders
+        (confirmed by the existing poll already coming up empty) gets this
+        tried next, regardless of which app it's in. Reads the live value
+        with a single, targeted UIA call after every keystroke -- NOT a
+        full self._observe() snapshot, which walks the whole visible UI
+        tree and would be far too slow to call after every single
+        keypress in a bounded search loop like this one.
+        """
+        try:
+            import uiautomation as _uia
+        except ImportError:
+            return False
+
+        def _live_value():
+            try:
+                ctrl = _uia.ControlFromPoint(int(cx), int(cy))
+                if ctrl is None:
+                    return None
+                vp = ctrl.GetPattern(_uia.PatternId.ValuePattern)
+                return vp.Value if vp else None
+            except Exception:
+                return None
+
+        try:
+            if cb_val and cb_val[0].isalnum():
+                self._executor.execute({"action_type": "keyboard", "key_count": 1,
+                                        "keystrokes": [cb_val[0].lower()]})
+                time.sleep(0.2)
+                _v = _live_value()
+                if _v is not None and _option_matches(cb_val, _v):
+                    logger.info("Combobox(keyboard): %r → %r via type-ahead", cb_label, _v)
+                    return True
+
+            # Type-ahead alone can't reach every option (ambiguous first
+            # letters, or a control that doesn't support it at all) -- walk
+            # the real option list with arrow keys next. Confirmed live this
+            # list does NOT wrap around (stops at the last item rather than
+            # cycling back to the first), so Down alone can miss anything
+            # positioned "before" wherever the control currently sits;
+            # walking back Up from wherever Down stopped covers the rest.
+            for _ in range(max_steps):
+                self._executor.execute({"action_type": "keyboard", "key_count": 1, "keystrokes": ["down"]})
+                time.sleep(0.15)
+                _v = _live_value()
+                if _v is not None and _option_matches(cb_val, _v):
+                    logger.info("Combobox(keyboard): %r → %r via Down-arrow", cb_label, _v)
+                    return True
+
+            for _ in range(max_steps):
+                self._executor.execute({"action_type": "keyboard", "key_count": 1, "keystrokes": ["up"]})
+                time.sleep(0.15)
+                _v = _live_value()
+                if _v is not None and _option_matches(cb_val, _v):
+                    logger.info("Combobox(keyboard): %r → %r via Up-arrow", cb_label, _v)
+                    return True
+        except Exception as exc:
+            logger.debug("Combobox keyboard-navigation fallback failed for %r: %s", cb_label, exc)
+        return False
 
     def _form_rect(self, state: Dict[str, Any]):
         """Live (l, t, r, b) of the locked form window."""
