@@ -213,7 +213,25 @@ class ActionExecutor:
         ui_observer.py already relies on for reading ValuePattern/
         TogglePattern, rather than assuming a specific typed Control
         subclass's named getters exist on whatever ControlFromPoint hands
-        back."""
+        back.
+
+        KNOWN LIMITATION, found live 2026-08-10, not fixed here: while the
+        ghost overlay (self.ghost) is running, ControlFromPoint(x, y) at a
+        point the overlay currently covers resolves to the overlay's own
+        window instead of the real target underneath -- confirmed directly
+        that neither ShowWindow(SW_HIDE) nor SetWindowPos (moving the
+        window off-screen) makes any difference to this, even fully
+        synchronous, even after a full second's wait; only actually
+        stopping (destroying) the overlay's window resolves it. That's far
+        too expensive to do around every single click in a run -- unlike
+        agent.py's _select_combobox_value_via_keyboard() (fixed this same
+        day by stopping/restarting the overlay ONCE for the whole
+        keyboard-fallback call, not per read), this method is called on
+        EVERY click throughout an entire run, so the same fix here would
+        add a real stop/restart delay per click. Left as a known,
+        documented gap: this optimization silently falls back to the
+        pyautogui path below whenever the overlay is active, which still
+        works correctly, just without the UIA-invoke speedup."""
         if not _UIA_AVAILABLE:
             return False
         try:

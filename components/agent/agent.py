@@ -5398,6 +5398,31 @@ class LLMAgent:
             except Exception:
                 return None
 
+        # Stop the ghost overlay for the ENTIRE duration of this call, not
+        # per-read -- found live 2026-08-10, directly, while diagnosing why
+        # this function always reported failure for a real form's 'Policy
+        # Status' combobox: this overlay covers the ENTIRE screen for its
+        # whole lifetime, and every _live_value() call above was silently
+        # resolving to the overlay's own window (ControlType=PaneControl,
+        # Name='tk', no ValuePattern at all) instead of the real combobox,
+        # so no keypress was ever recognized as changing the value -- not
+        # because the control genuinely doesn't respond to keyboard input
+        # (it does; confirmed live once the overlay was actually out of the
+        # way), but because every single read was silently looking at the
+        # wrong window. Two cheaper fixes were tried and directly disproven
+        # first (see GhostOverlay.hide_for_uia_read's own docstring for the
+        # evidence) before landing on "actually stop the overlay" as the
+        # only mechanism confirmed to work -- real but bounded overhead
+        # (thread teardown + a fresh window, roughly a few hundred ms),
+        # paid ONCE here rather than on every individual keystroke's read.
+        _ghost = getattr(self._executor, "ghost", None)
+        _ghost_was_stopped = False
+        if _ghost is not None:
+            try:
+                _ghost_was_stopped = _ghost.hide_for_uia_read()
+            except Exception:
+                _ghost_was_stopped = False
+
         try:
             if cb_val and cb_val[0].isalnum():
                 self._executor.execute({"action_type": "keyboard", "key_count": 1,
@@ -5451,6 +5476,12 @@ class LLMAgent:
                 _prev = _v
         except Exception as exc:
             logger.debug("Combobox keyboard-navigation fallback failed for %r: %s", cb_label, exc)
+        finally:
+            if _ghost_was_stopped:
+                try:
+                    _ghost.restore_after_uia_read()
+                except Exception:
+                    pass
         return False
 
     def _form_rect(self, state: Dict[str, Any]):
