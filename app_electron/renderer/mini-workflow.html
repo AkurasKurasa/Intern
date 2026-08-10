@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Intern — mini</title>
+<style>
+  :root {
+    --orange: #F97316;
+    --orange-dark: #C2410C;
+    --green: #16A34A;
+    --green-dark: #15803D;
+    --red: #DC2626;
+    --red-dark: #B91C1C;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; width: 100%; height: 100%;
+    background: transparent;
+    overflow: hidden;
+    font-family: "Segoe UI", -apple-system, sans-serif;
+  }
+
+  /* column-reverse so the FIRST child (the handle) sits at the bottom,
+     with Stop/Play revealing upward above it -- matches how a real
+     floating-action-button stack reads (anchor at the corner, options
+     fan out from it), and means the window can be anchored bottom-right
+     without any of the JS caring about layout direction. */
+  .stack {
+    display: flex; flex-direction: column-reverse;
+    align-items: center; justify-content: flex-end;
+    gap: 12px;
+    width: 100%; height: 100%;
+    padding: 12px 0;
+    -webkit-app-region: no-drag;
+  }
+
+  .circle {
+    width: 52px; height: 52px; min-height: 52px; border-radius: 50%;
+    border: none; cursor: pointer; padding: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 17px; color: #FFFFFF; line-height: 1;
+    box-shadow: 0 3px 10px rgba(0,0,0,.30);
+    transition: transform .12s ease, opacity .15s ease, background .12s ease;
+  }
+  .circle:active:not(:disabled) { transform: scale(0.90); }
+  .circle:disabled { opacity: .35; cursor: not-allowed; }
+
+  .handle { background: var(--orange); font-weight: 700; font-size: 15px; }
+  .handle:hover { background: var(--orange-dark); }
+  /* A soft, repeating ring pulse while a capsule is actually running --
+     the one thing worth noticing even while collapsed down to a single
+     circle with no room for a status label. */
+  .handle.running {
+    animation: pulse 1.5s ease-in-out infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { box-shadow: 0 3px 10px rgba(0,0,0,.30), 0 0 0 0 rgba(249,115,22,.55); }
+    50%      { box-shadow: 0 3px 10px rgba(0,0,0,.30), 0 0 0 9px rgba(249,115,22,0); }
+  }
+
+  /* Collapsed by default: Play/Stop are present in the DOM (so they can
+     still receive their disabled state updates while hidden) but scaled
+     to nothing and non-interactive. Expanding is purely a class toggle
+     on the container, animated via transform/opacity on each circle. */
+  .action {
+    opacity: 0; transform: scale(0.4);
+    pointer-events: none;
+  }
+  .stack.expanded .action {
+    opacity: 1; transform: scale(1);
+    pointer-events: auto;
+  }
+
+  .action-play { background: var(--green); }
+  .action-play:hover:not(:disabled) { background: var(--green-dark); }
+  .action-stop { background: var(--red); }
+  .action-stop:hover:not(:disabled) { background: var(--red-dark); }
+</style>
+</head>
+<body>
+  <div class="stack" id="stack">
+    <button class="circle handle" id="btnHandle" type="button"
+            title="Play / Stop" aria-label="Expand play controls" aria-expanded="false">I</button>
+    <button class="circle action action-stop" id="btnStop" type="button"
+            disabled title="Stop" aria-label="Stop the running capsule">■</button>
+    <button class="circle action action-play" id="btnPlay" type="button"
+            disabled title="Play" aria-label="Play the loaded capsule">▶</button>
+  </div>
+  <script src="mini-workflow.js"></script>
+</body>
+</html>

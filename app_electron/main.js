@@ -33,9 +33,26 @@ function resolvePython() {
 
 let mainWindow = null;
 let miniWindow = null;
+let miniWorkflowWindow = null;
 let bridge = null;
 let bridgeReady = false;
 const pendingCommands = [];
+
+// Which main-window section was last active ("home" = Recorder,
+// "workflows" = Workflows) -- decides which mini overlay minimizing
+// shows. Updated by the renderer via setActiveSection() every time the
+// user switches tabs, so this stays correct even if they never minimize
+// right after switching.
+let activeSection = "home";
+
+// The model_path currently loaded in the main window's Play panel, and
+// whether a capsule run is currently in flight -- mirrored here so the
+// mini Play/Stop widget (a separate, tiny window with no capsule-picker
+// UI of its own) can act on "whatever's loaded" and show correct
+// enabled/running state immediately on open, without round-tripping
+// through the main renderer for every click.
+let currentCapsuleModelPath = null;
+let capsuleIsRunning = false;
 
 function startBridge() {
   const pythonExe = resolvePython();
@@ -83,6 +100,13 @@ function startBridge() {
 function broadcast(channel, payload) {
   if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send(channel, payload);
   if (miniWindow && !miniWindow.isDestroyed()) miniWindow.webContents.send(channel, payload);
+  if (miniWorkflowWindow && !miniWorkflowWindow.isDestroyed()) {
+    miniWorkflowWindow.webContents.send(channel, payload);
+  }
+  if (payload && (payload.event === "capsule_started")) capsuleIsRunning = true;
+  if (payload && (payload.event === "capsule_done" || payload.event === "capsule_stopped")) {
+    capsuleIsRunning = false;
+  }
 }
 
 function sendCommand(cmd) {
@@ -120,15 +144,23 @@ function createWindow() {
   mainWindow.setMenuBarVisibility(false);
   mainWindow.loadFile(path.join(__dirname, "renderer", "index.html"));
 
-  // Minimizing the main window doesn't stop a recording — swap in a small
-  // always-on-top widget so Start/Stop/status stay reachable without the
-  // full window open.
+  // Minimizing the main window doesn't stop a recording (or a capsule
+  // run) — swap in a small always-on-top widget so the relevant controls
+  // stay reachable without the full window open. Which widget depends on
+  // which section was showing: Recorder -> the Start/Stop status card
+  // (unchanged); Workflows -> the round Play/Stop widget.
   mainWindow.on("minimize", () => {
-    if (!miniWindow || miniWindow.isDestroyed()) createMiniWindow();
-    miniWindow.show();
+    if (activeSection === "workflows") {
+      if (!miniWorkflowWindow || miniWorkflowWindow.isDestroyed()) createMiniWorkflowWindow();
+      miniWorkflowWindow.show();
+    } else {
+      if (!miniWindow || miniWindow.isDestroyed()) createMiniWindow();
+      miniWindow.show();
+    }
   });
   mainWindow.on("restore", () => {
     if (miniWindow && !miniWindow.isDestroyed()) miniWindow.hide();
+    if (miniWorkflowWindow && !miniWorkflowWindow.isDestroyed()) miniWorkflowWindow.hide();
   });
 }
 
@@ -157,6 +189,74 @@ function createMiniWindow() {
   miniWindow.setPosition(sw - 260, sh - 188);
 
   miniWindow.on("closed", () => { miniWindow = null; });
+}
+
+// The Workflows-tab mini widget: no card, no border, no frame -- just two
+// round buttons floating over the desktop. transparent:true is what makes
+// that possible (frame:false alone still paints an opaque rectangle);
+// hasShadow:false keeps Windows/macOS from drawing a drop-shadow rectangle
+// behind the transparent area, which would otherwise look like a faint
+// ghost square around the circles.
+//
+// Known, accepted tradeoff: Electron transparent windows still capture
+// mouse events across their FULL rectangle by default, not just the
+// visibly-drawn circles -- the empty space around them in this small
+// 92x216 window is technically click-blocking too, not truly
+// click-through the way ghost_overlay.py's ill-fated Python overlay
+// tried and failed to be (see DEVELOPERS.md's execution_ghost_cursor_
+// disabled_click_swallowing for that whole saga). Not fixed here:
+// unlike that overlay, this widget is small, stays in one corner, and is
+// never drawn on top of whatever the user is actually trying to click --
+// a real but much lower-stakes version of the same category of issue.
+// setIgnoreMouseEvents() with per-pixel forwarding would close this gap
+// if it ever turns out to matter in practice.
+function createMiniWorkflowWindow() {
+  miniWorkflowWindow = new BrowserWindow({
+    title: "Intern — mini",
+    width: 92,
+    height: 216,
+    resizable: false,
+    minimizable: false,
+    maximizable: false,
+    fullscreenable: false,
+    alwaysOnTop: true,
+    skipTaskbar: true,
+    frame: false,
+    transparent: true,
+    hasShadow: false,
+    backgroundColor: "#00000000",
+    webPreferences: {
+      preload: path.join(__dirname, "preload.js"),
+      contextIsolation: true,
+      nodeIntegration: false,
+    },
+  });
+  miniWorkflowWindow.loadFile(path.join(__dirname, "renderer", "mini-workflow.html"));
+
+  const { width: sw, height: sh } = require("electron").screen.getPrimaryDisplay().workAreaSize;
+  miniWorkflowWindow.setPosition(sw - 112, sh - 236);
+
+  // Push whatever state already exists (a capsule may already be loaded
+  // and/or running from before this widget was ever created) so it opens
+  // showing correct enabled/running state immediately, not "nothing
+  // loaded" until the next live event happens to fire.
+  miniWorkflowWindow.webContents.once("did-finish-load", pushMiniWorkflowState);
+
+  miniWorkflowWindow.on("closed", () => { miniWorkflowWindow = null; });
+}
+
+// Re-sends the widget's non-running state (which capsule is loaded) --
+// called on creation AND every time capsule-set-current changes, since
+// the widget can stay open (minimized, just hidden) across the user
+// loading a different workflow without ever being recreated. Running
+// state doesn't need this: it's already kept live via the same
+// recorder-event broadcast the widget listens to directly.
+function pushMiniWorkflowState() {
+  if (!miniWorkflowWindow || miniWorkflowWindow.isDestroyed()) return;
+  miniWorkflowWindow.webContents.send("mini-workflow-state", {
+    hasCapsule: !!currentCapsuleModelPath,
+    isRunning: capsuleIsRunning,
+  });
 }
 
 // Reads data/demos/<group>/session_*/ directly off disk — a static listing,
@@ -321,6 +421,19 @@ ipcMain.handle("capsule-run", (_evt, modelPath) => {
 ipcMain.handle("capsule-stop", () => {
   queueOrSend({ cmd: "stop_capsule" });
 });
+ipcMain.handle("capsule-set-current", (_evt, modelPath) => {
+  currentCapsuleModelPath = modelPath || null;
+  pushMiniWorkflowState();
+});
+// The mini Play/Stop widget has no capsule-picker UI of its own -- Play
+// always means "run whatever's currently loaded in the main window's
+// Play panel," tracked via capsule-set-current above.
+ipcMain.handle("capsule-run-current", () => {
+  if (currentCapsuleModelPath) queueOrSend({ cmd: "run_capsule", model_path: currentCapsuleModelPath });
+});
+ipcMain.handle("set-active-section", (_evt, section) => {
+  activeSection = section === "workflows" ? "workflows" : "home";
+});
 // "Open log file" / "Copy log" -- direct user request after a run that
 // looked totally silent in the Play panel even though it was genuinely
 // running: a way to actually see the full transcript, not just whatever
@@ -346,4 +459,5 @@ ipcMain.handle("restore-main", () => {
     mainWindow.focus();
   }
   if (miniWindow && !miniWindow.isDestroyed()) miniWindow.hide();
+  if (miniWorkflowWindow && !miniWorkflowWindow.isDestroyed()) miniWorkflowWindow.hide();
 });

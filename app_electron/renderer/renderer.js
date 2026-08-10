@@ -38,6 +38,10 @@ function showMain(name) {
   navRecorder.setAttribute("aria-current", toHome ? "page" : "false");
   navWorkflows.setAttribute("aria-current", !toHome ? "page" : "false");
   if (!toHome) loadWorkflows();
+  // Tells main.js which mini overlay to show if the window gets
+  // minimized from here -- recorder Start/Stop from Recorder, the round
+  // Play/Stop widget from Workflows.
+  window.recorderAPI.setActiveSection(toHome ? "home" : "workflows");
 }
 navRecorder.addEventListener("click", () => showMain("home"));
 navWorkflows.addEventListener("click", () => showMain("workflows"));
@@ -246,6 +250,13 @@ function hideCountdown() {
 function setCapsuleRunning(isRunning) {
   btnPlay.disabled = isRunning || !currentCapsule;
   btnStopCapsule.disabled = !isRunning;
+  // The mini Play/Stop widget has no capsule-picker UI of its own, so it
+  // needs to know which model_path "Play" should mean -- this is the one
+  // place that's called both right after a capsule loads/deploys AND on
+  // every run-state change, so it's the single spot that keeps main.js's
+  // copy in sync rather than duplicating this call at every currentCapsule
+  // assignment site.
+  window.capsulesAPI.setCurrent(currentCapsule ? currentCapsule.model_path : null);
 }
 
 function findCapsuleForGroup(groupName) {
