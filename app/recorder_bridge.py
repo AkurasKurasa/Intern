@@ -236,9 +236,50 @@ class Bridge:
                 # delayed bursts instead of as it actually happens.
                 [sys.executable, "-u", run_task_script, "--model", abs_model],
                 cwd=_ROOT,
+                # stdin=DEVNULL, explicit -- found live 2026-08-10: this
+                # Popen call never set stdin at all, so run_task.py
+                # inherited THIS bridge process's own stdin handle, which
+                # is itself a pipe Electron's main.js writes JSON commands
+                # into. A grandchild silently holding a handle onto a pipe
+                # two processes up, with no console of its own, is a
+                # known way to get a process that's genuinely blocked (not
+                # crashed, not busy) on standard-handle setup -- confirmed
+                # directly against real OS process state: two run_task.py
+                # processes launched via the real bridge chain before this
+                # fix stayed Responding=True with near-zero CPU for
+                # minutes and created no log file at all, meaning they
+                # never even reached logging.basicConfig(), the first real
+                # statement in the script. A direct terminal launch never
+                # has this problem because its stdin is a real console
+                # handle, not an inherited pipe. DEVNULL gives the child a
+                # clean, unambiguous stdin with no upstream process in the
+                # chain to block on.
+                stdin=subprocess.DEVNULL,
                 stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
                 bufsize=1,
-                creationflags=subprocess.CREATE_NEW_PROCESS_GROUP,  # needed for a graceful CTRL_BREAK stop
+                # CREATE_NEW_PROCESS_GROUP -- back to this (not
+                # CREATE_NEW_CONSOLE) as of 2026-08-10. CREATE_NEW_CONSOLE
+                # was tried as a fix for the hang below and, in the one
+                # live trial run through the real Electron bridge, the
+                # hang WAS gone -- but it also pops a real, visible
+                # console window on screen for every Play click, which is
+                # not acceptable for a GUI app and the user does not want.
+                # Reverted. Whether CREATE_NEW_CONSOLE was actually the
+                # ingredient that fixed the hang is still unknown: that
+                # same trial also (a) added stdin=DEVNULL below and (b)
+                # ran through a freshly relaunched Electron process tree,
+                # so more than one variable changed between the last
+                # confirmed hang and the first confirmed success -- sloppy,
+                # not the "one variable at a time" standard this project
+                # otherwise holds to. CREATE_NEW_PROCESS_GROUP is the
+                # value this flag had throughout the whole rest of this
+                # session, including every prior confirmed-working
+                # CTRL_BREAK_EVENT/Stop-button test -- keeping it is the
+                # smaller, better-understood change; stdin=DEVNULL below
+                # is the one new ingredient being kept and needs to be
+                # reverified live on its own before this can be called
+                # fixed.
+                creationflags=subprocess.CREATE_NEW_PROCESS_GROUP,
             )
         except Exception as exc:
             # Found live 2026-08-10: a capsule launch attempt left

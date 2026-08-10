@@ -121,6 +121,56 @@ class TestRunCapsuleSpawnsRunTaskCorrectly:
         assert args[4] == str(checkpoint)
         assert kwargs["cwd"] == rb._ROOT
 
+    def test_stdin_is_explicitly_devnull_not_inherited(self, monkeypatch, tmp_path):
+        """Found live 2026-08-10: this Popen call never set stdin at all, so
+        run_task.py inherited the bridge's OWN stdin handle -- a pipe
+        Electron's main.js writes JSON commands into. Two run_task.py
+        processes launched this way through the real Electron bridge sat
+        Responding=True with near-zero CPU for minutes and never created a
+        log file (meaning they hung before logging.basicConfig(), the very
+        first real statement in run_task.py). Confirmed fixed live, twice,
+        through the real bridge after setting stdin=DEVNULL: the log file
+        now appears within ~1s and the run proceeds normally. Not inheriting
+        an unused pipe handle two processes up is also just correct
+        subprocess hygiene independent of this specific bug."""
+        checkpoint = tmp_path / "model.pt"
+        checkpoint.write_bytes(b"fake")
+        popen_calls = []
+        monkeypatch.setattr(
+            rb.subprocess, "Popen",
+            lambda *a, **k: (popen_calls.append((a, k)), _FakeProc(lines=[]))[1],
+        )
+        monkeypatch.setattr(rb, "emit", lambda *a, **k: None)
+
+        rb.Bridge().run_capsule(str(checkpoint))
+
+        _, kwargs = popen_calls[0]
+        assert kwargs["stdin"] == rb.subprocess.DEVNULL
+
+    def test_creationflags_is_new_process_group_not_new_console(self, monkeypatch, tmp_path):
+        """CREATE_NEW_CONSOLE was tried as a fix for the same hang (giving
+        the child a real console instead of inheriting the console-less
+        windowsHide ancestry) and, in one live trial, the hang was gone --
+        but it also pops a real, visible console window on screen for every
+        Play click, which the user explicitly does not want for a GUI app.
+        Reverted to CREATE_NEW_PROCESS_GROUP (invisible, still supports
+        CTRL_BREAK_EVENT for Stop -- see TestStopCapsule) after confirming
+        live, twice, that stdin=DEVNULL alone -- without CREATE_NEW_CONSOLE
+        -- is sufficient to keep the hang fixed."""
+        checkpoint = tmp_path / "model.pt"
+        checkpoint.write_bytes(b"fake")
+        popen_calls = []
+        monkeypatch.setattr(
+            rb.subprocess, "Popen",
+            lambda *a, **k: (popen_calls.append((a, k)), _FakeProc(lines=[]))[1],
+        )
+        monkeypatch.setattr(rb, "emit", lambda *a, **k: None)
+
+        rb.Bridge().run_capsule(str(checkpoint))
+
+        _, kwargs = popen_calls[0]
+        assert kwargs["creationflags"] == rb.subprocess.CREATE_NEW_PROCESS_GROUP
+
     def test_capsule_started_emitted_synchronously(self, monkeypatch, tmp_path):
         events = _events(monkeypatch)
         bridge = rb.Bridge()
