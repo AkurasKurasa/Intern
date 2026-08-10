@@ -80,6 +80,27 @@ def _log_uncaught_exception(exc_type, exc_value, exc_tb):
 
 sys.excepthook = _log_uncaught_exception
 
+# recorder_bridge.py's stop_capsule() (Electron "Stop") sends
+# CTRL_BREAK_EVENT to this process, specifically because the run() loop
+# below already catches KeyboardInterrupt to save partial results and
+# write metrics/BC-fidelity/rule-extraction -- the same graceful path a
+# real terminal Ctrl+C would take. But on Windows, CTRL_BREAK_EVENT maps
+# to SIGBREAK, and unlike SIGINT (Ctrl+C), Python installs NO default
+# handler for SIGBREAK -- without one, the OS's default action just hard-
+# kills the process (exit code 0xC000013A / 3221225786) before a single
+# line of Python ever runs, silently skipping the entire finally: block
+# this was built for. Found live, directly from the user's own capsule
+# run: "Run ended (exit code 3221225786)" after clicking Stop -- verified
+# the mechanism, not guessed, with a standalone child-process test before
+# writing this (no SIGBREAK handler: hard kill, exit 3221225786; with one:
+# KeyboardInterrupt caught, exit 0). Installing this handler makes
+# CTRL_BREAK_EVENT behave exactly like Ctrl+C from here on.
+import signal as _signal
+if hasattr(_signal, "SIGBREAK"):
+    def _handle_ctrl_break(signum, frame):
+        raise KeyboardInterrupt
+    _signal.signal(_signal.SIGBREAK, _handle_ctrl_break)
+
 
 def print_countdown(seconds: int = 5, sleep_fn=None, print_fn=None) -> None:
     """Prints the pre-run 'switch to the target window' countdown.
