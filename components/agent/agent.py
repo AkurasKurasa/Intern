@@ -5283,11 +5283,36 @@ class LLMAgent:
                 self._reassert_foreign_hwnd   = fg
                 self._reassert_foreign_streak = 1
             if self._reassert_foreign_streak >= 2:
+                # DIAGNOSTIC, added 2026-08-10: direct live report, "clicked
+                # the form, literally nothing happened" -- the bare hwnd
+                # number this warning used to log is useless after the fact
+                # (the window may no longer exist, and a number alone can't
+                # distinguish "the user genuinely clicked away" from "some
+                # OTHER window -- the ghost overlay, an unrelated popup, or
+                # a same-process wx dialog our own modal-dismiss logic a few
+                # lines below never got a chance to run on, since THIS
+                # branch returns before reaching it -- is silently sitting
+                # on top". Best-effort title/class/same-process lookup so
+                # the NEXT occurrence gives a real answer instead of another
+                # guess. Never allowed to raise or block backing off, which
+                # is the actual safety-critical behavior here.
+                _fg_title = _fg_class = "?"
+                _fg_same_process = None
+                try:
+                    _fg_title = win32gui.GetWindowText(fg) or "(no title)"
+                    _fg_class = win32gui.GetClassName(fg) or "?"
+                    import win32process as _wp
+                    _, _fg_pid = _wp.GetWindowThreadProcessId(fg)
+                    _, _form_pid = _wp.GetWindowThreadProcessId(self._locked_hwnd)
+                    _fg_same_process = (_fg_pid == _form_pid)
+                except Exception:
+                    pass
                 logger.warning(
-                    "NOT re-stealing foreground -- hwnd=%s has held focus across "
-                    "%d consecutive steps despite being reclaimed; treating this "
+                    "NOT re-stealing foreground -- hwnd=%s title=%r class=%r "
+                    "same_process_as_form=%s has held focus across %d "
+                    "consecutive steps despite being reclaimed; treating this "
                     "as deliberate (e.g. the user reaching for Stop), not drift.",
-                    fg, self._reassert_foreign_streak)
+                    fg, _fg_title, _fg_class, _fg_same_process, self._reassert_foreign_streak)
                 return
 
             # A MODAL dialog owned by the SAME process as the locked form (e.g. a

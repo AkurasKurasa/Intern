@@ -33,11 +33,14 @@ def _make_agent():
     return agent
 
 
-def _install_fake_win32(monkeypatch, foreground_hwnd, form_pid=1234, fg_pid=9999):
+def _install_fake_win32(monkeypatch, foreground_hwnd, form_pid=1234, fg_pid=9999,
+                         fg_title="Some Other Window", fg_class="SomeClass"):
     fake_win32gui = types.SimpleNamespace(
         GetForegroundWindow=lambda: foreground_hwnd,
         IsWindow=lambda hwnd: True,
         SetForegroundWindow=MagicMock(),
+        GetWindowText=lambda hwnd: fg_title,
+        GetClassName=lambda hwnd: fg_class,
     )
 
     def _get_thread_pid(hwnd):
@@ -130,3 +133,73 @@ class TestStreakBreaker:
         agent._reassert_form_window()  # fresh window -- reclaimed once
 
         assert fake_win32gui_333.SetForegroundWindow.call_count == 1
+
+
+class TestBackoffDiagnosticLogging:
+    """Added 2026-08-10, direct live report: 'clicked the form, literally
+    nothing happened' -- the streak-breaker's own warning used to log only
+    a bare hwnd NUMBER, useless after the fact (the window may not even
+    exist anymore by the time anyone reads the log). Now looks up and logs
+    the foreign window's title, class, and whether it's owned by the SAME
+    process as the locked form -- the concrete evidence needed to tell
+    apart 'the user genuinely clicked away' from 'some other window (the
+    ghost overlay, an unrelated popup, or a same-process wx dialog our own
+    modal-dismiss logic never got a chance to run on) is silently sitting
+    on top'."""
+
+    def test_backoff_warning_includes_title_class_and_same_process_flag(self, monkeypatch, caplog):
+        import logging
+        _install_fake_win32(monkeypatch, foreground_hwnd=222, form_pid=1234, fg_pid=9999,
+                             fg_title="Mystery Window", fg_class="MysteryClass")
+        agent = _make_agent()
+
+        with caplog.at_level(logging.WARNING):
+            agent._reassert_form_window()  # reclaimed
+            agent._reassert_form_window()  # backs off -- this is the one that logs
+
+        backoff_lines = [r.message for r in caplog.records if "NOT re-stealing foreground" in r.message]
+        assert len(backoff_lines) == 1
+        assert "Mystery Window" in backoff_lines[0]
+        assert "MysteryClass" in backoff_lines[0]
+        assert "same_process_as_form=False" in backoff_lines[0]
+
+    def test_backoff_warning_flags_same_process_windows_true(self, monkeypatch, caplog):
+        """The case that matters most: a same-process window (e.g. a wx
+        dialog) should be clearly distinguishable in the log from an
+        unrelated third-party window."""
+        import logging
+        _install_fake_win32(monkeypatch, foreground_hwnd=222, form_pid=1234, fg_pid=1234,
+                             fg_title="Missing Required Fields", fg_class="wxDialogClassNR")
+        agent = _make_agent()
+
+        with caplog.at_level(logging.WARNING):
+            agent._reassert_form_window()
+            agent._reassert_form_window()
+
+        backoff_lines = [r.message for r in caplog.records if "NOT re-stealing foreground" in r.message]
+        assert len(backoff_lines) == 1
+        assert "same_process_as_form=True" in backoff_lines[0]
+
+    def test_a_lookup_failure_does_not_prevent_backing_off(self, monkeypatch):
+        """The diagnostic lookup is best-effort -- if GetWindowText/
+        GetClassName raise (window closed by the time we ask, etc.), the
+        actual safety-critical behavior (backing off, not fighting the
+        user for foreground) must still happen."""
+        fake_win32gui = types.SimpleNamespace(
+            GetForegroundWindow=lambda: 222,
+            IsWindow=lambda hwnd: True,
+            SetForegroundWindow=MagicMock(),
+            GetWindowText=MagicMock(side_effect=RuntimeError("window gone")),
+            GetClassName=MagicMock(side_effect=RuntimeError("window gone")),
+        )
+        fake_win32process = types.SimpleNamespace(
+            GetWindowThreadProcessId=lambda hwnd: (0, 1234 if hwnd == 111 else 9999))
+        monkeypatch.setitem(sys.modules, "win32gui", fake_win32gui)
+        monkeypatch.setitem(sys.modules, "win32process", fake_win32process)
+        monkeypatch.setitem(sys.modules, "pyautogui", types.SimpleNamespace(press=MagicMock()))
+        agent = _make_agent()
+
+        agent._reassert_form_window()  # must not raise
+        agent._reassert_form_window()  # must not raise, must still back off
+
+        assert fake_win32gui.SetForegroundWindow.call_count == 1
