@@ -282,15 +282,66 @@ btnDeploy.addEventListener("click", async () => {
   }
 });
 
-/* Loading a capsule into the (already-visible, fixed-position) panel is
-   instant -- a brief border/background pulse on the slot itself is enough
-   feedback that something changed, without an element flying across the
-   window. Re-triggerable: force a reflow so clicking a second group right
-   after the first restarts the animation instead of no-op'ing. */
+/* Brief border/background pulse on the panel, used as the "arrival" cue
+   once a flown chip lands. Re-triggerable: force a reflow so clicking a
+   second group right after the first restarts the animation instead of
+   no-op'ing (removing+re-adding the same class name back-to-back is a
+   no-op unless the browser is forced to notice the class was gone). */
 function flashPlaySlot() {
   ppSlot.classList.remove("pp-slot-flash");
   void ppSlot.offsetWidth;
   ppSlot.classList.add("pp-slot-flash");
+}
+
+/* Flies a small emoji bubble from the clicked group's emoji glyph to the
+   play panel -- real FLIP technique (First-Last-Invert-Play), not a naive
+   "set start position, rAF to end position": the clone is placed and
+   sized at its FINAL spot (matching .pp-capsule-icon exactly), then given
+   an inverse transform that makes it *look* like it's sitting at the
+   start position/size. Forcing a layout flush commits that starting
+   transform, then clearing it lets the CSS transition animate position
+   and scale together as ONE motion back to identity -- this is what the
+   browser can run smoothly on the compositor thread, unlike animating
+   left/top/width/height directly (which is what made the previous
+   version feel clunky: a wide row-shaped clone jumping to a guessed
+   midpoint via two separately-triggered style writes). */
+function flyToPlayPanel(fromEmojiEl, capsule) {
+  const fromRect = fromEmojiEl.getBoundingClientRect();
+  const toRect = ppSlot.getBoundingClientRect();
+  const FINAL = 30; // .pp-capsule-icon's own diameter -- keeps the landing seamless
+
+  const toCenterX = toRect.left + toRect.width / 2;
+  const toCenterY = toRect.top + toRect.height / 2;
+  const fromCenterX = fromRect.left + fromRect.width / 2;
+  const fromCenterY = fromRect.top + fromRect.height / 2;
+  const scale = Math.max(fromRect.height, 10) / FINAL;
+
+  const clone = document.createElement("div");
+  clone.className = "capsule-flying";
+  clone.textContent = capsule.emoji || PLACEHOLDER_EMOJI;
+  clone.style.left = `${toCenterX - FINAL / 2}px`;
+  clone.style.top = `${toCenterY - FINAL / 2}px`;
+  clone.style.opacity = "0";
+  clone.style.transform =
+    `translate(${fromCenterX - toCenterX}px, ${fromCenterY - toCenterY}px) scale(${scale})`;
+  document.body.appendChild(clone);
+
+  void clone.offsetWidth; // commit the starting transform before animating away from it
+  clone.style.opacity = "1";
+  clone.style.transform = "translate(0, 0) scale(1)";
+
+  let done = false;
+  const finish = () => {
+    if (done) return;
+    done = true;
+    clone.remove();
+    loadCapsuleIntoSlot(capsule);
+    flashPlaySlot();
+  };
+  clone.addEventListener("transitionend", (e) => {
+    if (e.propertyName === "transform") finish();
+  });
+  setTimeout(finish, 650); // fallback in case transitionend doesn't fire
 }
 
 /* Click-to-edit: the capsule's emoji bubble in the Play panel swaps to a
@@ -420,8 +471,9 @@ async function loadWorkflows() {
       workflowsListEl.querySelectorAll(".wf-group.capsule-selected")
         .forEach((el) => el.classList.remove("capsule-selected"));
       card.classList.add("capsule-selected");
-      loadCapsuleIntoSlot(capsule);
-      flashPlaySlot();
+      const emojiEl = head.querySelector(".wf-emoji");
+      if (emojiEl) flyToPlayPanel(emojiEl, capsule);
+      else { loadCapsuleIntoSlot(capsule); flashPlaySlot(); }
     });
     card.appendChild(head);
 

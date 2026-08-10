@@ -16,7 +16,8 @@
         "Data Entry"
       ],
       "trace_dir": "tasks/form_filling/traces",
-      "created": "2026-05-17T17:52:45"
+      "created": "2026-05-17T17:52:45",
+      "emoji": ""
     }
   ]
 }
