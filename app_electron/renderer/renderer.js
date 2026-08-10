@@ -130,13 +130,15 @@ window.recorderAPI.onEvent((event) => {
       log(`Replay done — ${event.made} copies (${event.steps_each} steps each) -> ${event.dest}`, "ok");
       break;
     case "capsule_started":
+      hideCountdown();
       capsuleLog(`▶ Running capsule — model=${event.model_path.split(/[\\/]/).pop()}`, "ok");
       setCapsuleRunning(true);
       break;
     case "capsule_progress":
-      capsuleLog(event.line, "dim");
+      handleCapsuleProgressLine(event.line);
       break;
     case "capsule_done":
+      hideCountdown();
       capsuleLog(`Run ended (exit code ${event.code}).`, event.code === 0 ? "ok" : "err");
       setCapsuleRunning(false);
       break;
@@ -152,6 +154,7 @@ window.recorderAPI.onEvent((event) => {
       sideStatusDot.classList.add("error");
       capsuleLog(event.message, "err");
       setCapsuleRunning(false);
+      hideCountdown();
       break;
     default:
       console.log("Unhandled event:", event);
@@ -184,6 +187,8 @@ const btnPlay        = document.getElementById("btnPlay");
 const btnStopCapsule = document.getElementById("btnStopCapsule");
 const btnDeploy      = document.getElementById("btnDeploy");
 const capsuleLogEl   = document.getElementById("capsuleLog");
+const ppCountdown       = document.getElementById("ppCountdown");
+const ppCountdownNumber = document.getElementById("ppCountdownNumber");
 
 const PLACEHOLDER_EMOJI = "🧩";
 
@@ -205,6 +210,35 @@ function capsuleLog(message, level = "dim") {
   row.innerHTML = `<span class="log-time">[${time}]</span> <span class="log-${level}">${escapeHtml(message)}</span>`;
   capsuleLogEl.appendChild(row);
   capsuleLogEl.scrollTop = capsuleLogEl.scrollHeight;
+}
+
+/* run_task.py's pre-run countdown prints structured COUNTDOWN_BEGIN /
+   COUNTDOWN N / COUNTDOWN_END lines specifically so this can render an
+   actual countdown indicator instead of 5 seconds of scrolling log text
+   -- everything else on capsule_progress still just logs normally. */
+function handleCapsuleProgressLine(line) {
+  if (line === "COUNTDOWN_BEGIN") {
+    ppCountdown.hidden = false;
+    return;
+  }
+  if (line === "COUNTDOWN_END") {
+    hideCountdown();
+    capsuleLog("Starting…", "ok");
+    return;
+  }
+  const tick = /^COUNTDOWN (\d+)$/.exec(line);
+  if (tick) {
+    ppCountdownNumber.textContent = tick[1];
+    ppCountdownNumber.classList.remove("pp-countdown-tick");
+    void ppCountdownNumber.offsetWidth; // restart the animation on every tick
+    ppCountdownNumber.classList.add("pp-countdown-tick");
+    return;
+  }
+  capsuleLog(line, "dim");
+}
+
+function hideCountdown() {
+  ppCountdown.hidden = true;
 }
 
 function setCapsuleRunning(isRunning) {

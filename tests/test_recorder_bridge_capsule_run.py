@@ -109,9 +109,16 @@ class TestRunCapsuleSpawnsRunTaskCorrectly:
         assert len(popen_calls) == 1
         args, kwargs = popen_calls[0]
         assert args[0] == sys.executable
-        assert args[1] == rb.os.path.join(rb._ROOT, "run_task.py")
-        assert args[2] == "--model"
-        assert args[3] == str(checkpoint)
+        # "-u" -- unbuffered stdout, same fix already used elsewhere in this
+        # project for GUI-launched subprocesses. Without it, a non-tty
+        # stdout is block-buffered by default and _pump()'s line-by-line
+        # read can sit dead for a while with real output already produced
+        # but not yet flushed to the pipe -- found live as part of the same
+        # "Play does nothing" report the countdown fix above addresses.
+        assert args[1] == "-u"
+        assert args[2] == rb.os.path.join(rb._ROOT, "run_task.py")
+        assert args[3] == "--model"
+        assert args[4] == str(checkpoint)
         assert kwargs["cwd"] == rb._ROOT
 
     def test_capsule_started_emitted_synchronously(self, monkeypatch, tmp_path):

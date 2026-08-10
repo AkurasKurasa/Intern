@@ -187,7 +187,14 @@ class Bridge:
         run_task_script = os.path.join(_ROOT, "run_task.py")
         try:
             self._capsule_proc = subprocess.Popen(
-                [sys.executable, run_task_script, "--model", abs_model],
+                # "-u" -- unbuffered stdout/stderr, same fix already applied
+                # elsewhere in this project for GUI-launched subprocesses
+                # (car_insurance_form_wx.py). Without it, a non-tty stdout
+                # is block-buffered by default -- print() output can sit in
+                # the child's own buffer well past when it's produced,
+                # arriving at _pump()'s `for line in proc.stdout` in
+                # delayed bursts instead of as it actually happens.
+                [sys.executable, "-u", run_task_script, "--model", abs_model],
                 cwd=_ROOT,
                 stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
                 bufsize=1,

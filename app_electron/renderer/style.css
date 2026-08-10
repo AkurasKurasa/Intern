@@ -284,6 +284,33 @@ html, body {
 }
 .pp-slot.pp-slot-flash { animation: pp-slot-flash .5s ease; }
 
+/* Pre-run countdown -- deliberately a plain in-place number, not
+   anything that travels or scales far: the fly-to-Play animation
+   elsewhere in this file was dropped specifically because fast motion
+   covering real screen distance was uncomfortable to look at, even once
+   smoothly implemented. Each tick just gets a brief, small pulse --
+   opacity/scale settling back to rest within .3s -- nothing moves
+   position at all. */
+.pp-countdown {
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  padding: 14px; border-radius: 10px;
+  background: var(--orange-tint); border: 1px solid var(--orange);
+}
+.pp-countdown[hidden] { display: none; }
+.pp-countdown-hint {
+  margin: 0; font-size: 11.5px; font-weight: 600;
+  color: var(--orange-dark); text-align: center;
+}
+.pp-countdown-number {
+  font-size: 34px; font-weight: 800; line-height: 1;
+  color: var(--orange); font-family: Consolas, monospace;
+}
+@keyframes pp-countdown-tick {
+  0%   { transform: scale(1.12); opacity: .55; }
+  100% { transform: scale(1); opacity: 1; }
+}
+.pp-countdown-number.pp-countdown-tick { animation: pp-countdown-tick .3s ease; }
+
 /* Emoji picker -- "a section that displays all the available emojis" to
    click, opened from .pp-capsule-icon. Positioned via inline left/top set
    in JS (anchored just under the bubble that opened it), not CSS, since

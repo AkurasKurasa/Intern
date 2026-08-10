@@ -27,6 +27,7 @@ except Exception:
 import json
 import logging
 import sys
+import time
 
 _ROOT     = os.path.dirname(os.path.abspath(__file__))
 _COMP_DIR = os.path.join(_ROOT, "components")
@@ -79,6 +80,35 @@ def _log_uncaught_exception(exc_type, exc_value, exc_tb):
 
 sys.excepthook = _log_uncaught_exception
 
+
+def print_countdown(seconds: int = 5, sleep_fn=None, print_fn=None) -> None:
+    """Prints the pre-run 'switch to the target window' countdown.
+
+    Each line ends with a real '\\n' and is flushed immediately -- the
+    previous version used `end="\\r"` (a terminal-only cursor trick) with
+    no newline at all between the 5 countdown lines. That's invisible to
+    anything reading this process's stdout line-by-line (e.g.
+    recorder_bridge.py's `for line in proc.stdout:`, used when "Play" in
+    the Electron app launches this exact script as a subprocess) --
+    without a '\\n', the line iterator can't yield ANYTHING until the
+    next real newline shows up, so the entire countdown window rendered
+    as total silence in the Play panel's Activity log. Found live,
+    directly from the user: "I pressed Play and it's not running at all"
+    -- during exactly this window, the process WAS running (or about to),
+    it just had nothing to show for it in the one place the user was
+    watching. Lines are also machine-parseable (COUNTDOWN_BEGIN /
+    COUNTDOWN N / COUNTDOWN_END) so the Electron UI can render an actual
+    big countdown indicator instead of scrolling log text -- the second,
+    separate request ("add a countdown too")."""
+    sleep_fn = sleep_fn or time.sleep
+    print_fn = print_fn or print
+    print_fn("COUNTDOWN_BEGIN", flush=True)
+    print_fn("Click on the target window NOW.", flush=True)
+    for i in range(seconds, 0, -1):
+        print_fn(f"COUNTDOWN {i}", flush=True)
+        sleep_fn(1)
+    print_fn("COUNTDOWN_END", flush=True)
+
 # ── config ────────────────────────────────────────────────────────────────────
 GOAL          = "Fill the car insurance form using data from the open text file"
 PROVIDER      = "lmstudio"    # anthropic | groq | gemini | lmstudio | none
@@ -107,7 +137,6 @@ CORRECTION_WATCH_SECONDS = 0.5  # DAgger correction-capture window per failed st
 # ── run ───────────────────────────────────────────────────────────────────────
 if __name__ == "__main__":
     import argparse
-    import time
     from agent.agent import LLMAgent
     from observers.vlm.visual_data_reader.visual_data_reader import VisualDataReader
 
@@ -136,11 +165,7 @@ if __name__ == "__main__":
     visual_cache  = {}
     logger.info("VLM pre-scan skipped — using Win32 Notepad read")
 
-    print("\nClick on the car insurance form window NOW.")
-    for i in range(5, 0, -1):
-        print(f"  Starting in {i}...", end="\r")
-        time.sleep(1)
-    print("  GO!                 ")
+    print_countdown(5)
 
     # ── Perception source ──────────────────────────────────────────────────────
     # UIA (default) reads the accessibility tree. VISION sees the form from pixels:

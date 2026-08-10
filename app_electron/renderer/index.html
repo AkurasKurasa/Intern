@@ -111,10 +111,10 @@
 
     <!-- Right — Play panel, shown only while viewing Workflows. One capsule
          at a time: click a workflow group on the left to load its capsule
-         here (with a transfer animation), then Play runs the REAL trained
-         agent for it live (same as run_task.py -- transformer decides
-         WHERE, LLM decides WHAT, the whole form, not a replay of one
-         recorded session). No per-row/per-session play buttons. -->
+         here, then Play runs the REAL trained agent for it live (same as
+         run_task.py -- transformer decides WHERE, LLM decides WHAT, the
+         whole form, not a replay of one recorded session). No per-row/
+         per-session play buttons. -->
     <aside class="play-panel" id="playPanel" aria-label="Play" hidden>
       <header class="rp-head">
         <h2>Play</h2>
@@ -138,6 +138,16 @@
       <div class="rp-btn-row">
         <button class="btn btn-primary" id="btnPlay" disabled>▶ Play</button>
         <button class="btn btn-danger" id="btnStopCapsule" disabled>■ Stop</button>
+      </div>
+
+      <!-- run_task.py's pre-run countdown ("click the target window now")
+           used to be invisible here -- it printed with no newline at all,
+           so nothing showed up in the log below for the whole 5 seconds.
+           Now driven off structured COUNTDOWN_BEGIN/COUNTDOWN N/
+           COUNTDOWN_END lines instead of scrolling as raw log text. -->
+      <div class="pp-countdown" id="ppCountdown" hidden>
+        <p class="pp-countdown-hint">Click the target window now</p>
+        <div class="pp-countdown-number" id="ppCountdownNumber">5</div>
       </div>
 
       <h3 class="rp-log-head">Activity</h3>
