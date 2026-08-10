@@ -241,6 +241,17 @@ class Bridge:
                 creationflags=subprocess.CREATE_NEW_PROCESS_GROUP,  # needed for a graceful CTRL_BREAK stop
             )
         except Exception as exc:
+            # Found live 2026-08-10: a capsule launch attempt left
+            # "Capsule run starting" as the ONLY line in
+            # logs/capsule_activity.log, no run_task.py process ever
+            # appeared, and this exact same invocation worked fine when
+            # reproduced directly moments later -- an intermittent failure
+            # in the long-lived bridge process itself, not the checkpoint
+            # or the command. This branch was the one place in run_capsule()
+            # that DIDN'T write to the persisted log, so there was no
+            # record of what Popen actually raised. Fixed so next time this
+            # happens, the real exception is captured, not just guessed at.
+            _log_capsule_line(f"Failed to start capsule run: {exc}")
             emit("error", message=f"Failed to start capsule run: {exc}")
             return
 
