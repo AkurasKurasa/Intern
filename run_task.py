@@ -183,18 +183,32 @@ CORRECTION_WATCH_SECONDS = 0.5  # DAgger correction-capture window per failed st
 # ── run ───────────────────────────────────────────────────────────────────────
 if __name__ == "__main__":
     import argparse
-    from agent.agent import LLMAgent
+    # emergency_stop imported and armed BEFORE `from agent.agent import
+    # LLMAgent` -- deliberately, and this order matters. The previous
+    # version imported LLMAgent first, then armed the hotkey -- and a
+    # `from X import Y` statement fully executes (runs X's own module-
+    # level code top to bottom) before the NEXT line of THIS script ever
+    # runs, regardless of where start_emergency_stop_listener() is
+    # *called*. agent.agent pulls in torch/transformers -- found live,
+    # directly, in logs/capsule_activity.log: a 23-SECOND silent gap
+    # between the process starting and anything else appearing, with the
+    # emergency-stop hotkey genuinely not armed for any of it despite this
+    # exact file's own earlier comment claiming "armed before anything
+    # else, even before the countdown." That comment was true of the code
+    # ORDER on the page, not the actual EXECUTION order -- an import
+    # listed first always finishes first, no matter what runs after it in
+    # the same block. Real safety gap (not just UX): if something needed
+    # the failsafe during those 23s, it flatly did not exist yet.
     from agent.emergency_stop import start_emergency_stop_listener, HOTKEY_LABEL
-    from observers.vlm.visual_data_reader.visual_data_reader import VisualDataReader
-
-    # Armed before anything else -- even before the countdown -- so the
-    # user always has an unconditional way out, independent of whatever
-    # the agent itself is doing. See emergency_stop.py for why this exists.
     start_emergency_stop_listener()
     # _flush_safe_print, not print(..., flush=True) directly -- this exact
     # call shape is what OSError: [Errno 22] Invalid argument was coming
     # from, in this exact windowsHide subprocess chain (see print_countdown).
     _flush_safe_print(f"[EMERGENCY STOP] Press {HOTKEY_LABEL} at any time to force-kill this run.")
+    # Also the first thing the user sees, period -- previously nothing
+    # printed at all until the heavy imports below finished, which is
+    # exactly what read as "stuck"/needing "shenanigans" to get going.
+    _flush_safe_print("Loading model and dependencies — this can take up to 20-30s the first time...")
 
     _parser = argparse.ArgumentParser()
     _parser.add_argument("--start_tab", type=int, default=0,
@@ -238,6 +252,20 @@ if __name__ == "__main__":
     agent = None
     results = []
     try:
+        # LLMAgent's own import pulls in torch/transformers -- 20-30s on a
+        # cold start (confirmed live: logs/capsule_activity.log showed a
+        # real 23-second gap here). Deliberately inside the try now, not
+        # before it: found live, directly, that interrupting DURING this
+        # exact import still hard-killed (exit 3221225786) even after the
+        # try/except was widened to cover print_countdown()+construction+
+        # run() -- because the import itself was still one step further
+        # out, above the try entirely. Nothing meaningful exists to save
+        # at this point (agent is still None either way), but the process
+        # should still exit cleanly via the same KeyboardInterrupt path as
+        # everywhere else, not hard-kill, if interrupted here.
+        from agent.agent import LLMAgent
+        from observers.vlm.visual_data_reader.visual_data_reader import VisualDataReader
+
         print_countdown(5)
 
         # ── Perception source ────────────────────────────────────────────────

@@ -5415,6 +5415,18 @@ class LLMAgent:
             # cycling back to the first), so Down alone can miss anything
             # positioned "before" wherever the control currently sits;
             # walking back Up from wherever Down stopped covers the rest.
+            #
+            # Stops the instant a keypress doesn't change the value, rather
+            # than always spending the full max_steps -- found live
+            # 2026-08-10: a real run pressed Down 18 times in a row with
+            # the value stuck at the list's last item after press #5,
+            # wasting ~2s of real time before ever trying Up at all
+            # (direct user report right after: "so fucking slow"). The
+            # list is confirmed non-wrapping, so a keypress that doesn't
+            # move the value at all means the boundary has been reached
+            # and every further press in that direction is guaranteed
+            # wasted, not just unlucky.
+            _prev = _live_value()
             for _ in range(max_steps):
                 self._executor.execute({"action_type": "keyboard", "key_count": 1, "keystrokes": ["down"]})
                 time.sleep(0.15)
@@ -5422,7 +5434,11 @@ class LLMAgent:
                 if _v is not None and _option_matches(cb_val, _v):
                     logger.info("Combobox(keyboard): %r → %r via Down-arrow", cb_label, _v)
                     return True
+                if _v is not None and _v == _prev:
+                    break  # hit the bottom of the (non-wrapping) list
+                _prev = _v
 
+            _prev = _live_value()
             for _ in range(max_steps):
                 self._executor.execute({"action_type": "keyboard", "key_count": 1, "keystrokes": ["up"]})
                 time.sleep(0.15)
@@ -5430,6 +5446,9 @@ class LLMAgent:
                 if _v is not None and _option_matches(cb_val, _v):
                     logger.info("Combobox(keyboard): %r → %r via Up-arrow", cb_label, _v)
                     return True
+                if _v is not None and _v == _prev:
+                    break  # hit the top of the (non-wrapping) list
+                _prev = _v
         except Exception as exc:
             logger.debug("Combobox keyboard-navigation fallback failed for %r: %s", cb_label, exc)
         return False

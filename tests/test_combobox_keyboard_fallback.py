@@ -135,6 +135,32 @@ class TestDownArrowFallback:
         assert result is True
         assert model.value == "Pending"
 
+    def test_stops_pressing_down_early_once_the_value_stops_changing(self, monkeypatch):
+        """Found live 2026-08-10: a real run pressed Down 18 times in a
+        row with the value stuck at the list's last item after press #5,
+        wasting real seconds before ever trying Up -- direct user report
+        right after: "so fucking slow." The list is non-wrapping, so a
+        keypress that doesn't move the value means the boundary is
+        reached and every further press in that direction is guaranteed
+        wasted, not just unlucky -- must stop immediately, not burn the
+        full max_steps budget."""
+        model = _FakeComboboxModel(["Inactive", "Cancelled", "Expired"])  # only 3 real options
+        _install_fake_uia(monkeypatch, model)
+        agent = _make_agent()
+        agent._executor = _make_executor_mock(model)
+
+        result = agent._select_combobox_value_via_keyboard(
+            "Policy Status", "Nonexistent", 100, 200, max_steps=20)
+
+        assert result is False
+        down_presses = [
+            c.args[0] for c in agent._executor.execute.call_args_list
+            if c.args[0].get("keystrokes") == ["down"]
+        ]
+        # 3 real options -> at most 3 presses to reach the end, plus the
+        # one that confirms no-change -- nowhere near the 20-step budget.
+        assert len(down_presses) <= 4, f"expected an early stop, got {len(down_presses)} Down presses"
+
 
 class TestUpArrowFallback:
     def test_walks_back_up_when_target_is_before_the_current_position(self, monkeypatch):
