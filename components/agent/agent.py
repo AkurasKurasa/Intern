@@ -5398,30 +5398,39 @@ class LLMAgent:
             except Exception:
                 return None
 
-        # Stop the ghost overlay for the ENTIRE duration of this call, not
-        # per-read -- found live 2026-08-10, directly, while diagnosing why
-        # this function always reported failure for a real form's 'Policy
-        # Status' combobox: this overlay covers the ENTIRE screen for its
-        # whole lifetime, and every _live_value() call above was silently
-        # resolving to the overlay's own window (ControlType=PaneControl,
-        # Name='tk', no ValuePattern at all) instead of the real combobox,
-        # so no keypress was ever recognized as changing the value -- not
-        # because the control genuinely doesn't respond to keyboard input
-        # (it does; confirmed live once the overlay was actually out of the
-        # way), but because every single read was silently looking at the
-        # wrong window. Two cheaper fixes were tried and directly disproven
-        # first (see GhostOverlay.hide_for_uia_read's own docstring for the
-        # evidence) before landing on "actually stop the overlay" as the
-        # only mechanism confirmed to work -- real but bounded overhead
-        # (thread teardown + a fresh window, roughly a few hundred ms),
-        # paid ONCE here rather than on every individual keystroke's read.
-        _ghost = getattr(self._executor, "ghost", None)
-        _ghost_was_stopped = False
-        if _ghost is not None:
-            try:
-                _ghost_was_stopped = _ghost.hide_for_uia_read()
-            except Exception:
-                _ghost_was_stopped = False
+        # NOT stopping/restarting the ghost overlay here anymore --
+        # reverted 2026-08-10, the same day it was added, after a real,
+        # severe live regression: "couldn't click a damn thing in the
+        # form." This function is called once per combobox whose dropdown
+        # never renders, and on a real run that happened twice in a row
+        # (two failed attempts on 'Policy Status' before the existing
+        # 2-strike back-off correctly gave up and moved on) -- meaning
+        # GhostOverlay.hide_for_uia_read()/restore_after_uia_read() (each
+        # a full stop()-then-start() of its Tkinter window/thread) fired
+        # twice in quick succession within the SAME live process. The very
+        # next combobox click after that logged "Tcl_AsyncDelete: async
+        # handler deleted by the wrong thread" -- the exact Tcl/Tk
+        # corruption signature this project's own test_ghost_overlay.py
+        # module docstring already documents as a precursor to a hard,
+        # process-wide crash when a Tk root's teardown doesn't stay
+        # strictly confined to a single, isolated process. The run then
+        # went completely silent for 17 seconds until the user force-killed
+        # it -- consistent with a corrupted, no-longer-click-through,
+        # full-screen topmost window left sitting over the whole desktop.
+        #
+        # This function's own _live_value() reads WILL still silently
+        # resolve to the ghost overlay instead of the real control while
+        # the overlay is running (the actual bug is real and still not
+        # fixed at the read level) -- but that only means this fallback
+        # reports failure more often than it should, which the ALREADY
+        # WORKING _combobox_dropdown_fail_counts 2-strike back-off in
+        # agent.py's OPT2 branch bounds to two ~17s attempts before moving
+        # on, confirmed live in the very same run that surfaced this crash.
+        # A wrong-but-bounded fallback beats a fix that can silently take
+        # over the user's entire screen input. A real fix (e.g. resizing
+        # the overlay to a small, positioned window instead of a
+        # full-screen one, so it stops needing to be destroyed at all) is
+        # a bigger, separate piece of work, not a same-day patch.
 
         try:
             if cb_val and cb_val[0].isalnum():
@@ -5476,12 +5485,6 @@ class LLMAgent:
                 _prev = _v
         except Exception as exc:
             logger.debug("Combobox keyboard-navigation fallback failed for %r: %s", cb_label, exc)
-        finally:
-            if _ghost_was_stopped:
-                try:
-                    _ghost.restore_after_uia_read()
-                except Exception:
-                    pass
         return False
 
     def _form_rect(self, state: Dict[str, Any]):

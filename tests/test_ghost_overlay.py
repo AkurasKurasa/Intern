@@ -62,27 +62,6 @@ first_thread = overlay._thread
 overlay.start()  # must not spawn a second root/thread
 assert overlay._thread is first_thread, "start() was not idempotent"
 
-# hide_for_uia_read()/restore_after_uia_read() against a REAL window --
-# proves the stop()-then-start() cycle this relies on actually works
-# (real thread teardown, a real fresh Tk root, hwnd re-captured) rather
-# than just being correct against mocks.
-assert overlay.hwnd is not None, "hwnd never captured by _run()"
-old_thread = overlay._thread
-t0 = time.time()
-hid = overlay.hide_for_uia_read()
-assert hid is True
-assert overlay._thread is None, "hide_for_uia_read() did not actually stop the overlay"
-overlay.restore_after_uia_read()
-# A genuinely NEW thread/window, not just the old one left running --
-# note Windows can and does legitimately reuse the same HWND value for
-# the very next window created in the same process/thread, so hwnd
-# equality alone wouldn't prove anything either way; the thread identity
-# is what actually distinguishes "a fresh overlay" from "nothing happened".
-assert overlay._thread is not None and overlay._thread is not old_thread, \
-    "restore_after_uia_read() did not start a fresh overlay"
-assert overlay.hwnd is not None
-assert time.time() - t0 < 3.0, "hide+restore cycle took too long"
-
 overlay.stop()
 assert overlay._thread is None, "stop() did not clear the thread"
 overlay.stop()  # stopping an already-stopped overlay must not raise
@@ -153,54 +132,6 @@ class TestGracefulDegradationWithoutTkinter:
         overlay = go.GhostOverlay()
         overlay.start()
         overlay.show_cursor(10, 10)  # nobody's draining the queue -- must not raise/block
-
-
-class TestHideForUiaRead:
-    """hide_for_uia_read()/restore_after_uia_read() -- found live
-    2026-08-10: this overlay covers the entire screen for its whole
-    lifetime, and UIA's ControlFromPoint resolves to ITS window instead of
-    whatever's underneath, for as long as it's running -- confirmed
-    directly that neither ShowWindow(SW_HIDE) nor moving the window
-    off-screen (SetWindowPos) makes any difference to this (both correctly
-    changed the real Win32-level state, verified via IsWindowVisible/
-    GetWindowRect, but UIA kept resolving to the window's stale state
-    regardless, even after a full second's wait). Only genuinely stopping
-    the overlay (destroying the window) and starting a fresh one afterward
-    was confirmed, live, to actually work. These tests cover the
-    stop()/start() delegation contract with mocks; the real live UIA
-    behavior was verified manually against this project's own car
-    insurance form, not re-tested here (that would require a real target
-    window and would be flaky/environment-dependent in CI)."""
-
-    def test_hide_returns_false_and_does_not_call_stop_when_never_started(self):
-        overlay = go.GhostOverlay()
-        called = []
-        overlay.stop = lambda: called.append("stop")
-
-        result = overlay.hide_for_uia_read()
-
-        assert result is False
-        assert called == []
-
-    def test_hide_calls_stop_and_returns_true_when_running(self):
-        overlay = go.GhostOverlay()
-        overlay._thread = MagicMock()  # simulate a running overlay without a real Tk window
-        called = []
-        overlay.stop = lambda: called.append("stop")
-
-        result = overlay.hide_for_uia_read()
-
-        assert result is True
-        assert called == ["stop"]
-
-    def test_restore_calls_start(self):
-        overlay = go.GhostOverlay()
-        called = []
-        overlay.start = lambda: called.append("start")
-
-        overlay.restore_after_uia_read()
-
-        assert called == ["start"]
 
 
 class TestClickThroughWindowStyle:

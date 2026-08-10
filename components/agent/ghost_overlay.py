@@ -89,12 +89,6 @@ class GhostOverlay:
         self._queue: "queue.Queue" = queue.Queue()
         self._thread: Optional[threading.Thread] = None
         self._ready = threading.Event()
-        # Set once _run() creates the real window -- used by
-        # hide_for_uia_read()/restore_after_uia_read() to toggle the raw
-        # WS_VISIBLE style directly via ctypes, bypassing the queue/
-        # Tkinter-thread round trip entirely. See those methods' own
-        # docstrings for why this exists.
-        self.hwnd: Optional[int] = None
 
     # ── public, thread-safe API ─────────────────────────────────────────
     def start(self) -> None:
@@ -123,55 +117,27 @@ class GhostOverlay:
     def hide_caret(self) -> None:
         self._queue.put(("caret_hide", None))
 
-    def hide_for_uia_read(self) -> bool:
-        """Fully stops (destroys) the overlay window so UIA-based reads
-        elsewhere in the codebase see the real screen underneath, not this
-        overlay. restore_after_uia_read() starts a fresh one afterward.
-
-        Found live 2026-08-10, directly, and the hard way -- two cheaper
-        approaches were tried first and both DISPROVEN by direct evidence
-        before landing on this one:
-
-        1. canvas.delete()-based hide_cursor()/hide_caret() -- no effect.
-           This overlay covers the ENTIRE screen (root.geometry() above)
-           for its whole lifetime, not just while a cursor/caret shape is
-           actively drawn, so clearing the drawing never mattered: the
-           WINDOW itself, empty or not, is what UIA was hitting.
-        2. ShowWindow(SW_HIDE) / SetWindowPos (move off-screen) via ctypes,
-           synchronous, bypassing the show/hide queue entirely -- also no
-           effect, confirmed directly and surprisingly: IsWindowVisible()
-           and GetWindowRect() both correctly reflected the change at the
-           real Win32 level immediately (even after waiting a full second),
-           but ControlFromPoint at the same screen point kept resolving to
-           this window's STALE bounding rect regardless -- UI Automation's
-           view of this window did not track either its raw visibility
-           flag or its raw position once already established, at least for
-           this Tkinter/overrideredirect window shape.
-
-        Only genuinely destroying the window (stop()) and creating a fresh
-        one (start()) was confirmed, directly, to actually work -- verified
-        live: ControlFromPoint at a point this overlay was covering found
-        the real underlying control again immediately once stop() had
-        returned. This is real, measurable overhead (thread teardown +a
-        new Tk() + waiting for _ready, roughly on the order of a few
-        hundred ms), which is why this is called ONCE per
-        _select_combobox_value_via_keyboard() invocation (agent.py) rather
-        than around every individual keystroke's read, and deliberately
-        NOT used in executor.py's _try_uia_invoke() at all -- that runs on
-        every single click throughout an entire run, where this cost would
-        add up fast; see that method's own docstring for the tradeoff.
-
-        Returns True if a running overlay was actually stopped (caller
-        should only call restore_after_uia_read() in that case) -- False
-        if there was nothing running to stop."""
-        if self._thread is None:
-            return False
-        self.stop()
-        return True
-
-    def restore_after_uia_read(self) -> None:
-        """Undoes hide_for_uia_read() -- starts a fresh overlay window."""
-        self.start()
+    # REMOVED 2026-08-10, same day added: hide_for_uia_read()/
+    # restore_after_uia_read() (a stop()-then-start() cycle, the only
+    # mechanism confirmed live to make UIA's ControlFromPoint see past
+    # this overlay -- canvas-only hide and ShowWindow/SetWindowPos were
+    # both tried and directly disproven first). Verified safe for exactly
+    # ONE cycle in isolation, then shipped and used by agent.py's
+    # _select_combobox_value_via_keyboard() -- but a real run hit it
+    # TWICE in quick succession (two failed 'Policy Status' attempts
+    # before the existing 2-strike back-off gave up and moved on), and
+    # the very next combobox click after that logged "Tcl_AsyncDelete:
+    # async handler deleted by the wrong thread" -- the exact corruption
+    # signature this file's own module docstring already documents as a
+    # precursor to a hard, process-wide crash. The run then went
+    # completely silent for 17 seconds until the user force-killed it,
+    # unable to click anywhere on their own screen -- a severe regression,
+    # worse than the bug being fixed. Repeated in-process stop()/start()
+    # cycling of this Tk thread is not safe; removed rather than left
+    # unused and available to be wired back in by a future "just call it
+    # once more" change that re-triggers the same crash class. See
+    # DEVELOPERS.md's execution_ghost_overlay_breaks_uia_reads entry for
+    # the full incident.
 
     # ── Tkinter thread ──────────────────────────────────────────────────
     def _run(self) -> None:
@@ -197,7 +163,6 @@ class GhostOverlay:
             canvas.pack(fill="both", expand=True)
 
             self._make_click_through(root)
-            self.hwnd = root.winfo_id()
         except Exception as exc:
             logger.warning("GhostOverlay: window setup failed, overlay disabled (%s)", exc)
             self._ready.set()
