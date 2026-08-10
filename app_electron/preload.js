@@ -12,6 +12,7 @@ contextBridge.exposeInMainWorld("recorderAPI", {
 
 contextBridge.exposeInMainWorld("workflowsAPI", {
   list: () => ipcRenderer.invoke("workflows-list"),
+  create: (name) => ipcRenderer.invoke("workflows-create", name),
 });
 
 contextBridge.exposeInMainWorld("capsulesAPI", {
@@ -19,6 +20,7 @@ contextBridge.exposeInMainWorld("capsulesAPI", {
   checkpoints: (capsuleName) => ipcRenderer.invoke("capsules-checkpoints", capsuleName),
   deploy: (capsuleName, checkpointPath) =>
     ipcRenderer.invoke("capsules-deploy", capsuleName, checkpointPath),
+  setEmoji: (capsuleName, emoji) => ipcRenderer.invoke("capsules-set-emoji", capsuleName, emoji),
   run: (modelPath) => ipcRenderer.invoke("capsule-run", modelPath),
   stop: () => ipcRenderer.invoke("capsule-stop"),
 });

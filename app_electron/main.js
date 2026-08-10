@@ -152,7 +152,10 @@ function createMiniWindow() {
 }
 
 // Reads data/demos/<group>/session_*/ directly off disk — a static listing,
-// no need to round-trip through the Python bridge for this.
+// no need to round-trip through the Python bridge for this. Empty groups
+// (just created via createWorkflow(), no sessions recorded yet) are still
+// included -- they need to show up in the Recorder's Save-to dropdown and
+// as a placeholder card in the Workflows list.
 function listWorkflows() {
   const groups = [];
   if (!fs.existsSync(DEMOS_ROOT)) return groups;
@@ -178,17 +181,36 @@ function listWorkflows() {
     }
     sessions.sort((a, b) => b.mtime - a.mtime);
 
-    if (sessions.length) {
-      groups.push({
-        name: groupName,
-        totalSteps: sessions.reduce((a, s) => a + s.steps, 0),
-        sessionCount: sessions.length,
-        sessions,
-      });
-    }
+    groups.push({
+      name: groupName,
+      totalSteps: sessions.reduce((a, s) => a + s.steps, 0),
+      sessionCount: sessions.length,
+      sessions,
+      // Falls back to the folder's own mtime for a fresh, still-empty
+      // group -- there's no session to read a timestamp from yet.
+      mtime: sessions.length ? sessions[0].mtime : fs.statSync(groupPath).mtimeMs,
+    });
   }
-  groups.sort((a, b) => b.sessions[0].mtime - a.sessions[0].mtime);
+  groups.sort((a, b) => b.mtime - a.mtime);
   return groups;
+}
+
+// Reserves a new, empty workflow group -- just a folder under data/demos/,
+// nothing recorded into it yet. Deliberately does NOT touch registry.json:
+// a brand new workflow has no trained checkpoint, so there's nothing real
+// to register as a capsule until the user has actually recorded sessions
+// and trained/registered a model for it.
+function createWorkflow(name) {
+  const trimmed = (name || "").trim();
+  if (!trimmed) throw new Error("Workflow name can't be empty.");
+  if (!/^[A-Za-z0-9 _-]+$/.test(trimmed)) {
+    throw new Error("Use only letters, numbers, spaces, - and _.");
+  }
+  const safe = trimmed.replace(/\s+/g, "_");
+  const dir = path.join(DEMOS_ROOT, safe);
+  if (fs.existsSync(dir)) throw new Error(`'${safe}' already exists.`);
+  fs.mkdirSync(dir, { recursive: true });
+  return { name: safe };
 }
 
 // ── Capsules -- components/agent/capsule.py's WorkflowCapsule/CapsuleRegistry,
@@ -239,6 +261,18 @@ function deployCheckpoint(capsuleName, checkpointPath) {
   return capsule;
 }
 
+// "" clears back to the placeholder -- capsule.py's WorkflowCapsule.emoji
+// field defaults to "" too, so an empty string round-trips cleanly either
+// direction (this app's JSON edit vs. a real Python-side registration).
+function setCapsuleEmoji(capsuleName, emoji) {
+  const registry = readRegistry();
+  const capsule = (registry.capsules || []).find((c) => c.name === capsuleName);
+  if (!capsule) throw new Error(`Capsule not found: ${capsuleName}`);
+  capsule.emoji = (emoji || "").trim();
+  fs.writeFileSync(REGISTRY_PATH, JSON.stringify(registry, null, 2));
+  return capsule;
+}
+
 app.whenReady().then(() => {
   startBridge();
   createWindow();
@@ -266,10 +300,13 @@ ipcMain.handle("recorder-replay", (_evt, n) => {
   queueOrSend({ cmd: "replay", n: n || 10 });
 });
 ipcMain.handle("workflows-list", () => listWorkflows());
+ipcMain.handle("workflows-create", (_evt, name) => createWorkflow(name));
 ipcMain.handle("capsules-list", () => listCapsules());
 ipcMain.handle("capsules-checkpoints", (_evt, capsuleName) => listCheckpoints(capsuleName));
 ipcMain.handle("capsules-deploy", (_evt, capsuleName, checkpointPath) =>
   deployCheckpoint(capsuleName, checkpointPath));
+ipcMain.handle("capsules-set-emoji", (_evt, capsuleName, emoji) =>
+  setCapsuleEmoji(capsuleName, emoji));
 ipcMain.handle("capsule-run", (_evt, modelPath) => {
   queueOrSend({ cmd: "run_capsule", model_path: modelPath });
 });

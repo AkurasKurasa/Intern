@@ -173,9 +173,10 @@ let workflowsLoaded = false;
    exactly one capsule registered (the only case this project has right
    now) any group click loads it; with more than one, name-matching is
    attempted and the first capsule is used as a last resort. */
-const ppSlot        = document.getElementById("ppSlot");
+const ppSlot         = document.getElementById("ppSlot");
 const ppSlotHint     = document.getElementById("ppSlotHint");
 const ppCapsule      = document.getElementById("ppCapsule");
+const ppCapsuleEmoji = document.getElementById("ppCapsuleEmoji");
 const ppCapsuleName  = document.getElementById("ppCapsuleName");
 const ppCapsuleMeta  = document.getElementById("ppCapsuleMeta");
 const ppCheckpoint   = document.getElementById("ppCheckpoint");
@@ -183,6 +184,8 @@ const btnPlay        = document.getElementById("btnPlay");
 const btnStopCapsule = document.getElementById("btnStopCapsule");
 const btnDeploy      = document.getElementById("btnDeploy");
 const capsuleLogEl   = document.getElementById("capsuleLog");
+
+const PLACEHOLDER_EMOJI = "🧩";
 
 let capsulesCache = [];      // last fetched capsule list, from capsulesAPI.list()
 let currentCapsule = null;   // the one loaded in the play panel right now
@@ -222,6 +225,7 @@ async function loadCapsuleIntoSlot(capsule) {
   currentCapsule = capsule;
   ppSlotHint.hidden = true;
   ppCapsule.hidden = false;
+  ppCapsuleEmoji.textContent = capsule.emoji || PLACEHOLDER_EMOJI;
   ppCapsuleName.textContent = capsule.name;
   ppCapsuleMeta.textContent = capsule.description || capsule.model_path;
   ppSlot.classList.add("filled");
@@ -278,39 +282,66 @@ btnDeploy.addEventListener("click", async () => {
   }
 });
 
-/* Clones a small chip at the clicked group's position and animates it to
-   the play panel's slot -- a lightweight FLIP animation (no library): read
-   the two real rects, position the clone at the start rect, then
-   transition it to the end rect on the next frame. */
-function flyToPlayPanel(fromEl, capsule) {
-  const fromRect = fromEl.getBoundingClientRect();
-  const toRect = ppSlot.getBoundingClientRect();
+/* Loading a capsule into the (already-visible, fixed-position) panel is
+   instant -- a brief border/background pulse on the slot itself is enough
+   feedback that something changed, without an element flying across the
+   window. Re-triggerable: force a reflow so clicking a second group right
+   after the first restarts the animation instead of no-op'ing. */
+function flashPlaySlot() {
+  ppSlot.classList.remove("pp-slot-flash");
+  void ppSlot.offsetWidth;
+  ppSlot.classList.add("pp-slot-flash");
+}
 
-  const clone = document.createElement("div");
-  clone.className = "capsule-flying";
-  clone.innerHTML = `<span class="pp-capsule-icon">▶</span><span>${escapeHtml(capsule.name)}</span>`;
-  clone.style.left = `${fromRect.left}px`;
-  clone.style.top = `${fromRect.top}px`;
-  clone.style.width = `${fromRect.width}px`;
-  document.body.appendChild(clone);
+/* Click-to-edit: the capsule's emoji bubble in the Play panel swaps to a
+   small text input, committed on blur/Enter, discarded on Escape. Updates
+   both currentCapsule and its entry in capsulesCache (same staleness
+   pitfall as the checkpoint deploy handler above), then patches every
+   matching group header in the list so it doesn't need a full reload. */
+ppCapsuleEmoji.addEventListener("click", () => {
+  if (!currentCapsule) return;
+  const input = document.createElement("input");
+  input.type = "text";
+  input.className = "pp-capsule-emoji-input";
+  input.value = currentCapsule.emoji || "";
+  input.placeholder = PLACEHOLDER_EMOJI;
+  input.maxLength = 8;
+  ppCapsuleEmoji.replaceWith(input);
+  input.focus();
+  input.select();
 
-  const dx = (toRect.left + toRect.width / 2) - (fromRect.left + fromRect.width / 2);
-  const dy = (toRect.top + toRect.height / 2) - (fromRect.top + fromRect.height / 2);
-
-  requestAnimationFrame(() => {
-    clone.style.transform = `translate(${dx}px, ${dy}px) scale(.7)`;
-    clone.style.opacity = "0";
-  });
-
-  let done = false;
-  const finish = () => {
-    if (done) return;
-    done = true;
-    clone.remove();
-    loadCapsuleIntoSlot(capsule);
+  let cancelled = false;
+  const commit = async () => {
+    if (cancelled) { input.replaceWith(ppCapsuleEmoji); return; }
+    const value = input.value.trim();
+    input.replaceWith(ppCapsuleEmoji);
+    try {
+      const updated = await window.capsulesAPI.setEmoji(currentCapsule.name, value);
+      currentCapsule = updated;
+      const idx = capsulesCache.findIndex((c) => c.name === updated.name);
+      if (idx !== -1) capsulesCache[idx] = updated;
+      ppCapsuleEmoji.textContent = updated.emoji || PLACEHOLDER_EMOJI;
+      refreshGroupEmojis();
+    } catch (e) {
+      capsuleLog(`Couldn't set emoji: ${e.message || e}`, "err");
+    }
   };
-  clone.addEventListener("transitionend", finish, { once: true });
-  setTimeout(finish, 500);   // fallback in case transitionend doesn't fire
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") input.blur();
+    else if (e.key === "Escape") { cancelled = true; input.blur(); }
+  });
+  input.addEventListener("blur", commit, { once: true });
+});
+
+/* Re-reads each visible group's mapped capsule and patches just its emoji
+   span -- cheaper than a full loadWorkflows() and doesn't collapse
+   whatever the user has open. */
+function refreshGroupEmojis() {
+  workflowsListEl.querySelectorAll(".wf-group-head").forEach((headEl) => {
+    const capsule = findCapsuleForGroup(headEl.dataset.groupName);
+    const emojiEl = headEl.querySelector(".wf-emoji");
+    if (emojiEl) emojiEl.textContent = capsule ? (capsule.emoji || PLACEHOLDER_EMOJI) : PLACEHOLDER_EMOJI;
+  });
 }
 
 btnPlay.addEventListener("click", () => {
@@ -373,8 +404,11 @@ async function loadWorkflows() {
     const head = document.createElement("div");
     head.className = "wf-group-head";
     head.title = "Click to expand and load this capsule into Play";
+    head.dataset.groupName = g.name;
+    const headCapsule = findCapsuleForGroup(g.name);
+    const headEmoji = headCapsule ? (headCapsule.emoji || PLACEHOLDER_EMOJI) : PLACEHOLDER_EMOJI;
     head.innerHTML =
-      `<span><span class="chev">▸</span><span class="name">${escapeHtml(g.name)}</span></span>` +
+      `<span><span class="chev">▸</span><span class="wf-emoji">${headEmoji}</span><span class="name">${escapeHtml(g.name)}</span></span>` +
       `<span class="meta">${g.sessionCount} session${g.sessionCount===1?"":"s"} · ${g.totalSteps.toLocaleString()} steps</span>`;
     head.addEventListener("click", () => {
       card.classList.toggle("open");
@@ -386,12 +420,19 @@ async function loadWorkflows() {
       workflowsListEl.querySelectorAll(".wf-group.capsule-selected")
         .forEach((el) => el.classList.remove("capsule-selected"));
       card.classList.add("capsule-selected");
-      flyToPlayPanel(head, capsule);
+      loadCapsuleIntoSlot(capsule);
+      flashPlaySlot();
     });
     card.appendChild(head);
 
     const body = document.createElement("div");
     body.className = "wf-sessions";
+    if (!g.sessions.length) {
+      const empty = document.createElement("p");
+      empty.className = "muted wf-empty-hint";
+      empty.textContent = "No sessions yet — record one from the Recorder tab.";
+      body.appendChild(empty);
+    }
     g.sessions.forEach((s) => {
       const row = document.createElement("div");
       row.className = "wf-session";
@@ -418,3 +459,35 @@ function escapeHtml(s) {
 }
 
 btnRefreshWorkflows.addEventListener("click", () => { loadWorkflows(); populateOutDirOptions(); });
+
+/* ── Create workflow — just reserves an empty data/demos/<name>/ folder.
+   No capsule/model gets registered here; there's nothing trained for a
+   brand-new workflow yet. It shows up immediately in this list (as an
+   empty group) and in the Recorder's Save-to dropdown. ─────────────────── */
+const btnCreateWorkflow = document.getElementById("btnCreateWorkflow");
+const wfCreateForm   = document.getElementById("wfCreateForm");
+const wfCreateName   = document.getElementById("wfCreateName");
+const wfCreateSubmit = document.getElementById("wfCreateSubmit");
+const wfCreateCancel = document.getElementById("wfCreateCancel");
+
+btnCreateWorkflow.addEventListener("click", () => {
+  wfCreateForm.hidden = !wfCreateForm.hidden;
+  if (!wfCreateForm.hidden) { wfCreateName.value = ""; wfCreateName.focus(); }
+});
+wfCreateCancel.addEventListener("click", () => { wfCreateForm.hidden = true; });
+wfCreateName.addEventListener("keydown", (e) => {
+  if (e.key === "Enter") wfCreateSubmit.click();
+  else if (e.key === "Escape") wfCreateForm.hidden = true;
+});
+wfCreateSubmit.addEventListener("click", async () => {
+  const name = wfCreateName.value.trim();
+  if (!name) return;
+  try {
+    await window.workflowsAPI.create(name);
+    wfCreateForm.hidden = true;
+    await loadWorkflows();
+    await populateOutDirOptions();
+  } catch (e) {
+    capsuleLog(`Couldn't create workflow: ${e.message || e}`, "err");
+  }
+});

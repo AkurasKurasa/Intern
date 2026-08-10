@@ -28,6 +28,7 @@ class WorkflowCapsule:
     trigger_apps:     List[str]   # match against window_title (case-insensitive)
     trace_dir:        str = ""    # where training traces live
     created:          str = ""    # ISO timestamp
+    emoji:            str = ""    # user-set display emoji; "" = show a placeholder
 
 
 class CapsuleRegistry:

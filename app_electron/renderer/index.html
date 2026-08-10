@@ -58,8 +58,16 @@
             <h2>Workflows</h2>
             <p class="hint">Recorded demonstration sessions on disk, grouped by task</p>
           </div>
-          <button class="btn btn-ghost btn-sm" id="btnRefreshWorkflows" type="button">⟳ Refresh</button>
+          <div class="mid-head-actions">
+            <button class="btn btn-ghost btn-sm" id="btnCreateWorkflow" type="button">+ Create workflow</button>
+            <button class="btn btn-ghost btn-sm" id="btnRefreshWorkflows" type="button">⟳ Refresh</button>
+          </div>
         </header>
+        <div class="wf-create-form" id="wfCreateForm" hidden>
+          <input class="field" id="wfCreateName" type="text" placeholder="e.g. policy_intake" maxlength="64" />
+          <button class="btn btn-primary btn-sm" id="wfCreateSubmit" type="button">Create</button>
+          <button class="btn btn-ghost btn-sm" id="wfCreateCancel" type="button">Cancel</button>
+        </div>
         <div class="mid-body">
           <div id="workflowsList" class="workflows-list">
             <p class="muted">Loading…</p>
@@ -113,9 +121,9 @@
       </header>
 
       <div class="pp-slot" id="ppSlot">
-        <p class="pp-slot-hint" id="ppSlotHint">Select a capsule on the left to load it here.</p>
+        <p class="pp-slot-hint" id="ppSlotHint">Select a workflow on the left to load it here.</p>
         <div class="pp-capsule" id="ppCapsule" hidden>
-          <span class="pp-capsule-icon">▶</span>
+          <button class="pp-capsule-icon" id="ppCapsuleEmoji" type="button" title="Click to set an emoji for this capsule">🧩</button>
           <div class="pp-capsule-text">
             <span class="pp-capsule-name" id="ppCapsuleName"></span>
             <span class="pp-capsule-meta" id="ppCapsuleMeta"></span>

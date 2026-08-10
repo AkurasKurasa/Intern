@@ -203,7 +203,12 @@ html, body {
   padding-bottom: 12px; margin-bottom: 14px; border-bottom: 1px solid var(--border-strong);
 }
 .mid-head h2 { margin: 0; font-size: 18px; }
+.mid-head-actions { display: flex; gap: 8px; flex: none; }
 .mid-body { flex: 1; min-height: 0; overflow-y: auto; }
+
+.wf-create-form { display: flex; gap: 8px; margin: 0 0 14px; }
+.wf-create-form[hidden] { display: none; }
+.wf-create-form .field { flex: 1; }
 
 .hint { font-size: 11.5px; color: var(--dim); margin: 3px 0 0; }
 
@@ -250,8 +255,18 @@ html, body {
   width: 30px; height: 30px; border-radius: 50%; flex: none;
   background: var(--orange-tint); color: var(--orange);
   display: flex; align-items: center; justify-content: center;
-  font-size: 11px;
+  font-size: 15px; line-height: 1;
+  border: 1px solid transparent; padding: 0; cursor: pointer;
+  transition: border-color .12s ease;
 }
+.pp-capsule-icon:hover { border-color: var(--orange); }
+.pp-capsule-emoji-input {
+  width: 30px; height: 30px; border-radius: 50%; flex: none;
+  background: var(--white); color: var(--ink);
+  text-align: center; font-size: 14px; padding: 0;
+  border: 1px solid var(--orange);
+}
+.pp-capsule-emoji-input:focus { outline: none; }
 .pp-capsule-text { display: flex; flex-direction: column; min-width: 0; gap: 1px; }
 .pp-capsule-name {
   font-size: 12.5px; font-weight: 600; color: var(--ink);
@@ -259,17 +274,15 @@ html, body {
 }
 .pp-capsule-meta { font-size: 10.5px; color: var(--dim); }
 
-/* Transient FLIP-animation clone, appended to <body> for the moment a
-   capsule flies from its row to the play panel's slot. */
-.capsule-flying {
-  position: fixed; z-index: 100; pointer-events: none;
-  display: flex; align-items: center; gap: 6px;
-  background: var(--white); border: 1px solid var(--orange);
-  border-radius: 8px; padding: 5px 10px;
-  font-size: 11.5px; color: var(--ink);
-  box-shadow: 0 4px 14px rgba(28,25,23,.14);
-  transition: transform .38s cubic-bezier(.3,.6,.3,1), opacity .38s ease;
+/* Calm feedback for the panel updating -- replaces an earlier version that
+   flew a cloned chip across the screen from the clicked group to here,
+   which read as gimmicky rather than natural. A brief border/background
+   pulse on the slot itself, right where the user is already looking. */
+@keyframes pp-slot-flash {
+  0%   { border-color: var(--orange); background: var(--orange-tint); }
+  100% { border-color: var(--border-strong); background: var(--white); }
 }
+.pp-slot.pp-slot-flash { animation: pp-slot-flash .5s ease; }
 
 .rp-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 2px; }
 .rp-head h2 { margin: 0; font-size: 14px; font-weight: 700; }
@@ -371,6 +384,7 @@ html, body {
 .wf-group-head .name { font-size: 13px; font-weight: 500; color: var(--ink); }
 .wf-group-head .meta { font-size: 11px; color: var(--dim); }
 .wf-group-head .chev { font-size: 9px; color: var(--dim); margin-right: 6px; }
+.wf-group-head .wf-emoji { margin-right: 6px; font-size: 13px; }
 
 .wf-sessions { margin-top: 8px; display: none; }
 .wf-group.open .wf-sessions { display: block; }
@@ -380,3 +394,4 @@ html, body {
 }
 .wf-session .sname { color: var(--ink); }
 .wf-session .ssteps { color: var(--dim); font-size: 11px; }
+.wf-empty-hint { padding: 4px 0 4px 16px; }
