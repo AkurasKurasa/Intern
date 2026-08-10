@@ -1013,7 +1013,43 @@ class LLMAgent:
             from agent import navigation_protocol as _navproto
         self._navproto = _navproto
 
-        self._executor          = ActionExecutor(dry_run=dry_run, ghost_cursor=True)
+        # ghost_cursor=False -- disabled 2026-08-10, the same day it was
+        # in active development. Three separate, real bugs traced to this
+        # one feature in a single session: (1) it breaks every UIA
+        # ControlFromPoint read for as long as it's running (see
+        # execution_ghost_overlay_breaks_uia_reads); (2) creating it steals
+        # OS foreground/activation on creation and, before WS_EX_NOACTIVATE,
+        # kept re-stealing it after being reclaimed (see
+        # execution_reassert_backoff_unidentified_foreign_window); (3) found
+        # live, directly, the same day as the NOACTIVATE fix: a REAL
+        # physical mouse click aimed exactly at the drawn ghost-cursor icon
+        # does NOT pass through to the window underneath despite
+        # WS_EX_TRANSPARENT being set correctly -- confirmed with an actual
+        # pyautogui.click() at a point the overlay was actively drawing on,
+        # against a real target window (Notepad): the click was swallowed
+        # by the overlay instead of reaching Notepad, which became
+        # foreground instead. That "click-through MUST work" guarantee is
+        # this feature's own stated core requirement (see
+        # ghost_overlay.py's module docstring) and had never actually been
+        # verified against a real click on real drawn content -- only that
+        # the Windows style flags get set, which turned out not to be
+        # sufficient by itself once WS_EX_LAYERED (needed for the
+        # -transparentcolor trick) is combined with WS_EX_TRANSPARENT.
+        # Since the ghost cursor is drawn exactly where the agent just
+        # acted -- precisely where a user watching the run would naturally
+        # try to click too -- this directly explains the repeated "can't
+        # click the form" reports tonight, including after the
+        # WS_EX_NOACTIVATE fix (which fixed the SEPARATE foreground-theft
+        # bug correctly, confirmed live, but never touched this one).
+        # Purely cosmetic in exchange for three confirmed, real, live
+        # incidents (one of them a hard crash) in one session is not a
+        # trade worth continuing to chase under time pressure -- reverts
+        # to moving the real OS cursor for clicks (pyautogui's default,
+        # proven, boring behavior from before this feature existed) until
+        # the overlay is properly redesigned (e.g. a small, positioned
+        # window instead of full-screen, so it has far less surface area
+        # to ever get in the way of anything).
+        self._executor          = ActionExecutor(dry_run=dry_run, ghost_cursor=False)
         self._text_resolver     = _TextResolver()
         # Perception is an injectable adapter (the seam). Any observer whose
         # snapshot() conforms to observers/schema.py plugs in here — UIA now,
@@ -5409,20 +5445,31 @@ class LLMAgent:
         keypress in a bounded search loop like this one.
 
         SKIPPED ENTIRELY while the ghost-cursor overlay is active --
-        temporary, added 2026-08-10, same day as a real incident. That
-        overlay covers the entire screen for its whole lifetime, and UIA's
+        added 2026-08-10, same day as a real incident. That overlay covers
+        the entire screen for its whole lifetime, and UIA's
         ControlFromPoint silently resolves to ITS window instead of the
         real control the whole time it's running (confirmed live) --
         meaning every _live_value() read below is guaranteed None, so
-        every attempt through this function currently has a 0% success
-        rate whenever ghost_cursor is on (agent.py hardcodes
-        ghost_cursor=True for every real, non-dry-run construction, so
-        this means every real live run). A same-day attempt to fix the
-        read itself (stopping/restarting the overlay around it) caused a
-        worse regression -- real Tcl/Tk corruption from repeated in-process
+        every attempt through this function has a 0% success rate whenever
+        the overlay is active. A same-day attempt to fix the read itself
+        (stopping/restarting the overlay around it) caused a worse
+        regression -- real Tcl/Tk corruption from repeated in-process
         cycling, leaving a broken, no-longer-click-through window blocking
         every click on the user's screen -- and was reverted (see
         DEVELOPERS.md's execution_ghost_overlay_breaks_uia_reads entry).
+
+        NOTE: as of 2026-08-10 (later the same day), agent.py's
+        ActionExecutor construction sets ghost_cursor=False -- the overlay
+        that caused this, the foreground-theft bug, AND a confirmed real
+        physical mouse click being swallowed by its drawn cursor icon --
+        so self._executor.ghost is None in every current real run, and
+        this guard is dormant (falls through to the real search logic
+        below). Left in place rather than removed: it's still correct,
+        defensive behavior for whenever the overlay is re-enabled in the
+        future (e.g. after a redesign fixes all three bugs properly), and
+        removing it now would just mean re-adding the identical logic
+        later.
+
         Even without that crash, a guaranteed-to-fail 20-40-keystroke
         search loop with zero visible on-screen feedback (the dropdown
         never renders, so nothing visibly moves) reads to a user watching
