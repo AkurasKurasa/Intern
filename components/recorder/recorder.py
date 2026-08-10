@@ -1350,23 +1350,31 @@ class DemoRecorder:
 
         # ── snapshot subprocess: ON-DEMAND UIA, off the main GIL ─────────────
         # No continuous snapshotting → form is never flooded → no input lag.
+        #
+        # Disabled by default 2026-08-10, live: under this specific hosting
+        # context (Electron -> Node child_process.spawn -> Python bridge ->
+        # multiprocessing.Process snapshot subprocess), the subprocess
+        # consistently failed to return real data -- not intermittently, but
+        # from the very first request of every session, before any user
+        # action at all ([SNAP-DIAG] get() timed out: Empty()). Once the
+        # bounded request queue filled, it stayed wedged (put() Full()) for
+        # the rest of the session -- every subsequent step recorded empty
+        # state. CPU-delta sampling confirmed the subprocess process itself
+        # was genuinely frozen (0% CPU), not just slow. The same code path
+        # tested standalone, outside this process tree, worked fine -- the
+        # problem is specific to this multi-layer spawn chain, not the
+        # subprocess mechanism itself, and wasn't fully root-caused before
+        # switching it off. self._observer (constructed unconditionally
+        # above) is documented as "~10x faster" than the general-purpose
+        # snapshot anyway (foreground-window + Notepad only, not every
+        # visible window) -- using it directly here trades "off the GIL,
+        # but frequently returns nothing" for "on the GIL, but works," which
+        # is the correct trade until the subprocess issue is actually
+        # understood. Re-enable by setting self._use_subprocess = True
+        # after construction if the underlying issue gets fixed.
         self._snap_proc = None
-        self._use_subprocess = True
-        try:
-            import multiprocessing as _mp
-            self._req_q   = _mp.Queue(maxsize=4)
-            self._res_q   = _mp.Queue(maxsize=4)
-            self._mp_stop = _mp.Value("b", False)
-            self._snap_proc = _mp.Process(
-                target=_snapshot_proc,
-                args=(self._req_q, self._res_q, self._mp_stop, ["notepad", ".txt"]),
-                daemon=True,
-            )
-            self._snap_proc.start()
-            print("  [recorder] MODE: on-demand subprocess snapshots")
-        except Exception as _e:
-            self._use_subprocess = False
-            print(f"  [recorder] subprocess unavailable ({_e}); in-process fallback")
+        self._use_subprocess = False
+        print("  [recorder] MODE: in-process snapshots (subprocess disabled)")
 
         self._worker_thread = threading.Thread(target=self._worker, daemon=True)
         self._worker_thread.start()
@@ -1417,9 +1425,23 @@ class DemoRecorder:
                     self._res_q.get_nowait()
             except Exception:
                 pass
-            self._req_q.put(action_type or 1, timeout=timeout)
-            return self._res_q.get(timeout=timeout) or {}
-        except Exception:
+            try:
+                self._req_q.put(action_type or 1, timeout=timeout)
+            except Exception as exc:
+                alive = self._snap_proc.is_alive() if self._snap_proc is not None else None
+                print(f"       [SNAP-DIAG] put() failed: {exc!r}  subprocess_alive={alive}")
+                return {}
+            try:
+                result = self._res_q.get(timeout=timeout)
+            except Exception as exc:
+                alive = self._snap_proc.is_alive() if self._snap_proc is not None else None
+                print(f"       [SNAP-DIAG] get() timed out: {exc!r}  subprocess_alive={alive}")
+                return {}
+            if not result:
+                print(f"       [SNAP-DIAG] got a real response but it was empty/falsy: {result!r}")
+            return result or {}
+        except Exception as exc:
+            print(f"       [SNAP-DIAG] unexpected: {exc!r}")
             return {}
 
     # ── public ─────────────────────────────────────────────────────────────────
@@ -1999,6 +2021,20 @@ class DemoRecorder:
         _last_state (no UIA on this process's GIL → input never lags/drops).
         In fallback mode (no subprocess) snapshots happen here in-process."""
         import queue as _queue
+        # Found 2026-08-10, live: switching the default to in-process
+        # snapshots (_use_subprocess = False) put real uiautomation calls on
+        # THIS thread for the first time -- and this codebase's own
+        # _init_com() docstring already warned "each thread that touches
+        # uiautomation must call this or it crashes." It wasn't called
+        # anywhere (orphaned, likely written for an earlier threading model
+        # before the now-removed subprocess redesign) -- confirmed live by
+        # a full test-suite segfault (Windows access violation) inside
+        # uiautomation's GetFocusedControl, called from this exact thread
+        # via _request_snapshot. The subprocess mode never hit this because
+        # each subprocess is its own fresh process with its own COM state;
+        # taking that isolation away means this thread needs its own COM
+        # init, same as every other thread in this file that touches UIA.
+        self._init_com()
         # initial baseline snapshot (on-demand)
         self._last_state = self._request_snapshot() or {}
         while not self._quit_event.is_set():
@@ -2174,6 +2210,18 @@ class DemoRecorder:
                                   notepad_select=notepad_select,
                                   clipboard=clipboard)
             warn = " [!empty state]" if not state_after.get("elements") else ""
+            if warn:
+                # DIAGNOSTIC, added 2026-08-10: direct user report ("still so
+                # fucking slow" / "still so much delay"), every single step
+                # in a live Electron session showed empty state. snapshot()
+                # has no concept of a locked target window -- it captures
+                # whatever win32gui.GetForegroundWindow() returns at that
+                # instant. Need to see WHAT it's actually grabbing (the form?
+                # the Electron recorder's own window? something else?) to
+                # tell apart "wrong window" from "right window, genuinely
+                # nothing there."
+                print(f"       [EMPTY-DIAG] app={state_after.get('application')!r} "
+                      f"window_title={state_after.get('window_title')!r}")
             print(f"  [{idx:04d}] {desc}{warn}")
 
         # write this step to disk immediately — never lose data on crash/kill
