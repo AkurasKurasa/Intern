@@ -186,61 +186,77 @@ if __name__ == "__main__":
     visual_cache  = {}
     logger.info("VLM pre-scan skipped — using Win32 Notepad read")
 
-    print_countdown(5)
-
-    # ── Perception source ──────────────────────────────────────────────────────
-    # UIA (default) reads the accessibility tree. VISION sees the form from pixels:
-    # a screenshot + CV/OCR observer, locked to the form window the user just
-    # clicked (captured here, while it is the foreground window). Coords are
-    # offset to absolute screen pixels so clicks land. Drop-in via the observer
-    # seam — the agent calls snapshot() identically either way.
-    _observer = None
-    if _args.perception == "vision":
-        import win32gui
-        from observers.vlm.vision_observer.cv_vision_observer import CVVisionObserver
-        _hwnd = win32gui.GetForegroundWindow()
-        _l, _t, _r, _b = win32gui.GetWindowRect(_hwnd)
-        _observer = CVVisionObserver(region=(_l, _t, _r - _l, _b - _t), origin=(_l, _t))
-        logger.info("Perception: VISION (CV+OCR) — window %r rect=%s",
-                    win32gui.GetWindowText(_hwnd), (_l, _t, _r, _b))
-        logger.info("Backends: %s", CVVisionObserver.backend_status())
-    else:
-        logger.info("Perception: UIA (accessibility tree)")
-
-    from agent.scope import INSURANCE_SCOPE   # app-specific tabs/sections/records
-
-    agent = LLMAgent(
-        goal             = GOAL,
-        provider         = PROVIDER,
-        api_key          = _active_key,
-        task_plugin      = None,
-        pure_transformer = False,
-        disable_auto_handlers = True,   # kill legacy heuristics — transformer(WHERE)+LLM(WHAT) merge drives
-        observer         = _observer,   # None → agent defaults to UIA; else vision
-        visual_reader    = visual_reader,
-        visual_cache     = visual_cache,
-        source_window    = SOURCE_WINDOW,
-        max_steps        = MAX_STEPS,
-        step_delay       = STEP_DELAY,
-        start_tab_idx    = _args.start_tab,
-        scope            = INSURANCE_SCOPE,   # the only place insurance-specifics live
-        model_path       = _args.model,
-        route_capsule    = False,             # honor --model; don't let the capsule router override
-        correction_watch_seconds = CORRECTION_WATCH_SECONDS,
-    )
-    logger.info("Model checkpoint: %s", _args.model)
-    if _args.start_tab:
-        logger.info("Drill mode: starting at tab index %d — manually click that tab first.", _args.start_tab)
-
-    logger.info("Starting — goal=%r  provider=%s  no plugin", GOAL, PROVIDER)
+    # Everything below that can meaningfully be interrupted -- the
+    # countdown, LLMAgent(...) construction (can take a while: checkpoint
+    # load, LM Studio connection), and the run itself -- now lives inside
+    # ONE try/except/finally. It used to be that only agent.run() was
+    # covered; a Stop (CTRL_BREAK_EVENT) during the countdown or during
+    # construction hit nothing and hard-killed the process before a single
+    # line of this cleanup ran -- reproduced live, directly: stopping
+    # during the countdown still exited 3221225786 even after the SIGBREAK
+    # handler fix above, because that fix only made CTRL_BREAK_EVENT
+    # *catchable* -- it still needed a try/except actually wrapping the
+    # code that could be interrupted. `agent` starts as None specifically
+    # so the except/finally blocks below can tell "never got that far"
+    # apart from "got partway through a run" and handle both without
+    # crashing on a NameError over an agent that was never constructed.
+    agent = None
     results = []
     try:
+        print_countdown(5)
+
+        # ── Perception source ────────────────────────────────────────────────
+        # UIA (default) reads the accessibility tree. VISION sees the form from
+        # pixels: a screenshot + CV/OCR observer, locked to the form window the
+        # user just clicked (captured here, while it is the foreground window).
+        # Coords are offset to absolute screen pixels so clicks land. Drop-in
+        # via the observer seam — the agent calls snapshot() identically either
+        # way.
+        _observer = None
+        if _args.perception == "vision":
+            import win32gui
+            from observers.vlm.vision_observer.cv_vision_observer import CVVisionObserver
+            _hwnd = win32gui.GetForegroundWindow()
+            _l, _t, _r, _b = win32gui.GetWindowRect(_hwnd)
+            _observer = CVVisionObserver(region=(_l, _t, _r - _l, _b - _t), origin=(_l, _t))
+            logger.info("Perception: VISION (CV+OCR) — window %r rect=%s",
+                        win32gui.GetWindowText(_hwnd), (_l, _t, _r, _b))
+            logger.info("Backends: %s", CVVisionObserver.backend_status())
+        else:
+            logger.info("Perception: UIA (accessibility tree)")
+
+        from agent.scope import INSURANCE_SCOPE   # app-specific tabs/sections/records
+
+        agent = LLMAgent(
+            goal             = GOAL,
+            provider         = PROVIDER,
+            api_key          = _active_key,
+            task_plugin      = None,
+            pure_transformer = False,
+            disable_auto_handlers = True,   # kill legacy heuristics — transformer(WHERE)+LLM(WHAT) merge drives
+            observer         = _observer,   # None → agent defaults to UIA; else vision
+            visual_reader    = visual_reader,
+            visual_cache     = visual_cache,
+            source_window    = SOURCE_WINDOW,
+            max_steps        = MAX_STEPS,
+            step_delay       = STEP_DELAY,
+            start_tab_idx    = _args.start_tab,
+            scope            = INSURANCE_SCOPE,   # the only place insurance-specifics live
+            model_path       = _args.model,
+            route_capsule    = False,             # honor --model; don't let the capsule router override
+            correction_watch_seconds = CORRECTION_WATCH_SECONDS,
+        )
+        logger.info("Model checkpoint: %s", _args.model)
+        if _args.start_tab:
+            logger.info("Drill mode: starting at tab index %d — manually click that tab first.", _args.start_tab)
+
+        logger.info("Starting — goal=%r  provider=%s  no plugin", GOAL, PROVIDER)
         results = agent.run(max_steps=MAX_STEPS, task_name="form_filling")
     except KeyboardInterrupt:
-        results = list(agent._results)
+        results = list(agent._results) if agent is not None else []
         logger.info("Run interrupted by user at step %d.", len(results))
     except Exception:
-        results = list(agent._results)
+        results = list(agent._results) if agent is not None else []
         # exc_info=True logs the full traceback, not just the message -- a
         # crash step number and "IndexError" alone weren't enough to
         # actually diagnose anything without knowing WHERE it happened.
@@ -252,7 +268,7 @@ if __name__ == "__main__":
         sys.path.insert(0, os.path.join(_ROOT, "scripts"))
         from eval_metrics import evaluate_run
         _metrics = evaluate_run(
-            results, goal=GOAL, heuristic_steps=agent._heuristic_steps,
+            results, goal=GOAL, heuristic_steps=getattr(agent, "_heuristic_steps", []),
             run_duration_sec=getattr(agent, "_run_duration_sec", None),
             time_to_first_action_sec=getattr(agent, "_time_to_first_action_sec", None),
             manual_interventions=getattr(agent, "_manual_interventions", 0),
