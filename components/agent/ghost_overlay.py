@@ -64,6 +64,7 @@ _LABEL_TEXT  = "Intern"
 _GWL_EXSTYLE        = -20
 _WS_EX_LAYERED      = 0x00080000
 _WS_EX_TRANSPARENT  = 0x00000020
+_WS_EX_NOACTIVATE   = 0x08000000
 
 # Queue-drain interval, was 30ms (~33 wake-ups/sec) for the entire
 # duration of a live run. Widened 2026-08-10: a user reported the live
@@ -241,6 +242,39 @@ class GhostOverlay:
         pixel we actually draw would be normal, clickable window content
         sitting on top of the exact spot a real click is about to land.
 
+        WS_EX_NOACTIVATE -- added 2026-08-10, a real, separate bug found
+        live: confirmed directly (start a real overlay, check
+        GetForegroundWindow() before/after) that creating this window
+        steals OS foreground/activation status immediately on creation --
+        completely independent of WS_EX_TRANSPARENT, which only ever
+        governed mouse HIT-TESTING (whether a click lands on this window),
+        not window ACTIVATION (which window Windows considers "current").
+        A brand-new, `-topmost`, visible top-level window becomes the
+        active window by default; WS_EX_TRANSPARENT was applied only
+        AFTER the window already exists and is shown, so by the time it
+        takes effect the activation has already happened and nothing
+        gives it back on its own.
+
+        This combined with agent.py's _reassert_form_window() streak-
+        breaker (added earlier the same day, for an unrelated real
+        incident) to produce a genuine, live-reported user-facing bug:
+        the overlay grabs foreground once, the streak-breaker correctly
+        reclaims it the first time, but something keeps handing foreground
+        back to the overlay -- and once the SAME foreign window (the
+        overlay) recurs, the streak-breaker deliberately stops fighting
+        for it, assuming a human is deliberately using another app.
+        Confirmed directly in a real run's log: "NOT re-stealing
+        foreground -- hwnd=1966806 title='tk' class='TkTopLevel'" --
+        title/class are the literal Tkinter defaults, unambiguously this
+        overlay, not some other app or a same-process dialog. Reported
+        live as "clicked the form, literally nothing happened."
+        WS_EX_NOACTIVATE tells Windows this window should never become
+        the foreground/active window through normal means at all --
+        stopping the theft at its actual source, rather than trying to
+        out-fight it after the fact (which is exactly the "keep stealing
+        it back" behavior the streak-breaker was built to prevent
+        overusing in the first place).
+
         `user32` is injectable specifically so tests never touch the real
         `ctypes.windll` singleton -- it's a live, C-backed, process-wide
         object, and patching it directly (tried once while writing this)
@@ -251,7 +285,9 @@ class GhostOverlay:
         try:
             hwnd = root.winfo_id()
             ex_style = user32.GetWindowLongW(hwnd, _GWL_EXSTYLE)
-            user32.SetWindowLongW(hwnd, _GWL_EXSTYLE, ex_style | _WS_EX_LAYERED | _WS_EX_TRANSPARENT)
+            user32.SetWindowLongW(
+                hwnd, _GWL_EXSTYLE,
+                ex_style | _WS_EX_LAYERED | _WS_EX_TRANSPARENT | _WS_EX_NOACTIVATE)
         except Exception as exc:
             logger.warning(
                 "GhostOverlay: couldn't set click-through window style (%s) -- "

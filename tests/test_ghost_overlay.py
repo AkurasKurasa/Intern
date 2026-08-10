@@ -161,6 +161,31 @@ class TestClickThroughWindowStyle:
         assert new_style & go._WS_EX_TRANSPARENT
         assert new_style & go._WS_EX_LAYERED
 
+    def test_sets_ws_ex_noactivate(self):
+        """Found live 2026-08-10: creating this overlay steals OS
+        foreground/activation status immediately (confirmed directly --
+        GetForegroundWindow() before vs. after overlay.start()), and once
+        _reassert_form_window()'s reclaim hands focus back, this overlay
+        kept re-taking it, which the streak-breaker (a separate, earlier
+        fix) then reads as 'the user is deliberately using another
+        window' and permanently stops fighting for -- reported live as
+        'clicked the form, literally nothing happened.' WS_EX_TRANSPARENT
+        only ever governed mouse hit-testing, never activation; confirmed
+        directly (start a real overlay, SetForegroundWindow elsewhere,
+        watch for 5+ seconds across simulated steps) that WS_EX_NOACTIVATE
+        stops the RECURRING theft -- the part _reassert_form_window() has
+        no defense against on its own, since it already handles a single
+        one-time steal correctly by design."""
+        fake_root = MagicMock()
+        fake_root.winfo_id.return_value = 12345
+        fake_user32 = MagicMock()
+        fake_user32.GetWindowLongW.return_value = 0
+
+        go.GhostOverlay._make_click_through(fake_root, user32=fake_user32)
+
+        _, _, new_style = fake_user32.SetWindowLongW.call_args[0]
+        assert new_style & go._WS_EX_NOACTIVATE
+
     def test_preserves_existing_extended_style_bits(self):
         """OR's the new flags in rather than overwriting -- an existing
         style bit (simulated here) must survive the call."""
