@@ -120,15 +120,40 @@ def print_countdown(seconds: int = 5, sleep_fn=None, print_fn=None) -> None:
     watching. Lines are also machine-parseable (COUNTDOWN_BEGIN /
     COUNTDOWN N / COUNTDOWN_END) so the Electron UI can render an actual
     big countdown indicator instead of scrolling log text -- the second,
-    separate request ("add a countdown too")."""
+    separate request ("add a countdown too").
+
+    print_fn defaults to `_flush_safe_print`, not the bare builtin --
+    found live, directly from a real user run: `print(text, flush=True)`
+    raised `OSError: [Errno 22] Invalid argument` on the very first
+    countdown line, crashing the run before anything ever displayed.
+    recorder_bridge.py is spawned by main.js with `windowsHide: true` (no
+    console window), and an explicit `.flush()` on a piped stdout further
+    down that no-console process chain can fail on Windows even though the
+    write itself succeeds. This exact process's own `logger.info(...)`
+    calls never hit this -- not because they're immune, but because
+    Python's `logging.Handler.emit()` already catches and swallows
+    emission errors internally (`handleError()`); the raw `print()` call
+    had no equivalent protection."""
     sleep_fn = sleep_fn or time.sleep
-    print_fn = print_fn or print
-    print_fn("COUNTDOWN_BEGIN", flush=True)
-    print_fn("Click on the target window NOW.", flush=True)
+    print_fn = print_fn or _flush_safe_print
+    print_fn("COUNTDOWN_BEGIN")
+    print_fn("Click on the target window NOW.")
     for i in range(seconds, 0, -1):
-        print_fn(f"COUNTDOWN {i}", flush=True)
+        print_fn(f"COUNTDOWN {i}")
         sleep_fn(1)
-    print_fn("COUNTDOWN_END", flush=True)
+    print_fn("COUNTDOWN_END")
+
+
+def _flush_safe_print(text: str) -> None:
+    """Write, then attempt-and-ignore the flush -- see print_countdown's
+    docstring. Deliberately NOT `print(text, flush=True)` a second time
+    on failure: that would duplicate the line if the write half already
+    succeeded and only the flush half raised."""
+    print(text)
+    try:
+        sys.stdout.flush()
+    except OSError:
+        pass
 
 # ── config ────────────────────────────────────────────────────────────────────
 GOAL          = "Fill the car insurance form using data from the open text file"

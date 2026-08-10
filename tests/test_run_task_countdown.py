@@ -77,4 +77,60 @@ class TestCountdownProducesRealLines:
         out = capsys.readouterr().out
         assert "COUNTDOWN_BEGIN" in out
         assert "COUNTDOWN 1" in out
-        assert "COUNTDOWN_END" in out
+
+
+class TestFlushSafePrintSurvivesOSError:
+    """Reproduces the exact live crash: recorder_bridge.py is spawned by
+    main.js with windowsHide:true (no console window), and an explicit
+    sys.stdout.flush() further down that no-console process chain can
+    raise OSError: [Errno 22] Invalid argument on Windows even though the
+    write itself already succeeded. Found live -- "Run crashed at step 0"
+    on the very first countdown line, before a single tick ever displayed
+    -- which is exactly what "there isn't even a countdown happening"
+    looks like from the Play panel. A fake stream that raises on flush()
+    (but not on write()) reproduces the same shape deterministically,
+    without depending on the OS-level console/handle conditions that
+    triggered it live."""
+
+    def test_flush_oserror_does_not_propagate(self, monkeypatch):
+        class _FlushRaisesStream:
+            def __init__(self):
+                self.written = []
+            def write(self, s):
+                self.written.append(s)
+            def flush(self):
+                raise OSError(22, "Invalid argument")
+
+        fake_stream = _FlushRaisesStream()
+        monkeypatch.setattr(run_task.sys, "stdout", fake_stream)
+
+        run_task._flush_safe_print("COUNTDOWN_BEGIN")  # must not raise
+
+        assert "".join(fake_stream.written) == "COUNTDOWN_BEGIN\n"
+
+    def test_a_normal_stream_still_gets_flushed(self):
+        """Regression check the other direction: the fix must not make
+        flush() a no-op unconditionally -- a stream that CAN flush still
+        should."""
+        class _RecordingStream:
+            def __init__(self):
+                self.flushed = False
+                self.written = []
+            def write(self, s):
+                self.written.append(s)
+            def flush(self):
+                self.flushed = True
+
+        import sys as _sys
+        real_stdout = _sys.stdout
+        fake = _RecordingStream()
+        _sys.stdout = fake
+        try:
+            # print() itself is bound to whichever stdout is current at
+            # call time, so this exercises the real builtin, not a mock.
+            run_task._flush_safe_print("COUNTDOWN 2")
+        finally:
+            _sys.stdout = real_stdout
+
+        assert fake.flushed is True
+        assert "".join(fake.written) == "COUNTDOWN 2\n"
