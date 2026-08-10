@@ -60,9 +60,40 @@ for _p in (_ROOT, _COMP):
 
 from recorder.recorder import DemoRecorder
 
+# Full, persisted transcript of everything the Play panel's Activity log
+# receives -- direct user request ("add a log feature... so you could
+# actually read them") after a capsule run that looked totally silent in
+# the UI even though it was genuinely running underneath. Truncated fresh
+# at the start of each capsule run (see run_capsule() below) so it always
+# holds exactly the most recent run, mirroring run_task.py's own
+# logs/latest.log convention.
+_CAPSULE_LOG_PATH = os.path.join(_ROOT, "logs", "capsule_activity.log")
+
+
+def _log_capsule_line(text: str) -> None:
+    try:
+        os.makedirs(os.path.dirname(_CAPSULE_LOG_PATH), exist_ok=True)
+        with open(_CAPSULE_LOG_PATH, "a", encoding="utf-8") as f:
+            f.write(f"[{datetime.now():%H:%M:%S}] {text}\n")
+    except Exception:
+        pass  # never let logging itself break a capsule run
+
 
 def emit(event: str, **fields) -> None:
-    print(json.dumps({"event": event, **fields}), flush=True)
+    # write() then a separately-guarded flush() -- not print(..., flush=True)
+    # directly. This exact bridge process is spawned by main.js with
+    # windowsHide:true (no console window); an explicit stdout.flush() can
+    # raise OSError: [Errno 22] Invalid argument on Windows under that
+    # no-console chain even though the write itself already succeeds --
+    # found live in run_task.py (same windowsHide ancestry) and fixed there
+    # first (see run_task.py's _flush_safe_print) before realizing this
+    # bridge's own emit() -- called for EVERY single event -- had the exact
+    # same unguarded shape.
+    print(json.dumps({"event": event, **fields}))
+    try:
+        sys.stdout.flush()
+    except OSError:
+        pass
 
 
 class Bridge:
@@ -184,6 +215,15 @@ class Bridge:
             emit("error", message=f"Checkpoint not found: {abs_model}")
             return
 
+        # Fresh transcript for this run -- truncate, don't append, so it
+        # never grows unbounded and always matches "the run I just did."
+        try:
+            os.makedirs(os.path.dirname(_CAPSULE_LOG_PATH), exist_ok=True)
+            with open(_CAPSULE_LOG_PATH, "w", encoding="utf-8") as f:
+                f.write(f"[{datetime.now():%H:%M:%S}] Capsule run starting — model={abs_model}\n")
+        except Exception:
+            pass
+
         run_task_script = os.path.join(_ROOT, "run_task.py")
         try:
             self._capsule_proc = subprocess.Popen(
@@ -210,11 +250,13 @@ class Bridge:
                 for line in proc.stdout:
                     line = line.rstrip("\n")
                     if line:
+                        _log_capsule_line(line)
                         emit("capsule_progress", line=line)
             except Exception:
                 pass
             code = proc.wait()
             self._capsule_proc = None
+            _log_capsule_line(f"Run ended (exit code {code}).")
             emit("capsule_done", code=code)
 
         threading.Thread(target=_pump, daemon=True).start()
@@ -231,6 +273,7 @@ class Bridge:
             # write metrics/logs cleanly. A hard terminate() would skip all
             # of that, the same loss a real Ctrl+C in a terminal would avoid.
             self._capsule_proc.send_signal(signal.CTRL_BREAK_EVENT)
+            _log_capsule_line("Stop requested — CTRL_BREAK_EVENT sent.")
             emit("capsule_stopped")
             emit("log", message="Capsule run interrupted — saving partial results…", level="dim")
         except Exception as exc:

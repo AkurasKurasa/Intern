@@ -23,4 +23,6 @@ contextBridge.exposeInMainWorld("capsulesAPI", {
   setEmoji: (capsuleName, emoji) => ipcRenderer.invoke("capsules-set-emoji", capsuleName, emoji),
   run: (modelPath) => ipcRenderer.invoke("capsule-run", modelPath),
   stop: () => ipcRenderer.invoke("capsule-stop"),
+  openLog: () => ipcRenderer.invoke("capsule-open-log"),
+  readLog: () => ipcRenderer.invoke("capsule-read-log"),
 });

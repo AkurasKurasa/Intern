@@ -189,6 +189,8 @@ const btnDeploy      = document.getElementById("btnDeploy");
 const capsuleLogEl   = document.getElementById("capsuleLog");
 const ppCountdown       = document.getElementById("ppCountdown");
 const ppCountdownNumber = document.getElementById("ppCountdownNumber");
+const btnCopyLog        = document.getElementById("btnCopyLog");
+const btnOpenLog        = document.getElementById("btnOpenLog");
 
 const PLACEHOLDER_EMOJI = "🧩";
 
@@ -438,6 +440,35 @@ btnPlay.addEventListener("click", () => {
 
 btnStopCapsule.addEventListener("click", () => {
   window.capsulesAPI.stop();
+});
+
+/* "So you could actually read them" -- the full, real transcript, not
+   just whatever still fits in the small scrolling box above. Reads from
+   logs/capsule_activity.log (recorder_bridge.py's persisted, truncated-
+   fresh-per-run file) rather than just this window's in-memory DOM, so it
+   still works even after a reload and always matches the actual file on
+   disk that a human (or Claude, next session) would open directly. */
+btnCopyLog.addEventListener("click", async () => {
+  try {
+    const text = await window.capsulesAPI.readLog();
+    if (!text) {
+      capsuleLog("No log yet — run a capsule first.", "dim");
+      return;
+    }
+    await navigator.clipboard.writeText(text);
+    capsuleLog("Full log copied to clipboard.", "ok");
+  } catch (e) {
+    capsuleLog(`Couldn't copy log: ${e.message || e}`, "err");
+  }
+});
+
+btnOpenLog.addEventListener("click", async () => {
+  try {
+    const result = await window.capsulesAPI.openLog();
+    if (!result.ok) capsuleLog(result.error || "Couldn't open log.", "dim");
+  } catch (e) {
+    capsuleLog(`Couldn't open log: ${e.message || e}`, "err");
+  }
 });
 
 /* ── Recorder panel's "Save to" dropdown -- populated from existing

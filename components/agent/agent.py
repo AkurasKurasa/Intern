@@ -1057,6 +1057,16 @@ class LLMAgent:
         # wrong observations/clicks/scrolls. Also the live viewport for scroll.
         self._locked_hwnd: Optional[int]     = None
         self._locked_title: str              = ""
+        # Streak-breaker for _reassert_form_window(), added 2026-08-10 after a
+        # real, severe incident: the user tried to click away from the form
+        # (to reach the Electron Stop button) and could not, because this
+        # method re-steals foreground EVERY step (~1-2s cadence) unconditionally
+        # -- they had to hard-shutdown their laptop. If the SAME foreign window
+        # keeps recurring across consecutive steps, that's the user deliberately
+        # returning to it, not a stray drift -- back off instead of fighting them
+        # forever. See _reassert_form_window() for the actual break condition.
+        self._reassert_foreign_hwnd: Optional[int] = None
+        self._reassert_foreign_streak: int         = 0
         self._visual_cache: Dict[str, str]  = visual_cache or {}   # Gemini pre-scan data
         self._visual_reader: Optional[Any]  = visual_reader        # VisualDataReader instance
         self._source_window: str            = source_window        # Notepad/source window title
@@ -5189,15 +5199,50 @@ class LLMAgent:
 
     def _reassert_form_window(self) -> None:
         """Bring the locked form back to foreground if focus drifted away. Runs at
-        the top of every step → the model physically cannot act on another window."""
+        the top of every step → the model physically cannot act on another window.
+
+        SAFETY: backs off if the same foreign window keeps recurring across
+        consecutive steps -- see the streak-breaker just below. Added
+        2026-08-10 after a real, severe incident: this method used to fight
+        for foreground completely unconditionally, every single step
+        (~1-2s cadence), including using a fake Alt-keypress specifically to
+        defeat Windows' own anti-focus-stealing protection. The user tried
+        to click over to the Electron Stop button and it kept getting
+        yanked back before they could act -- they had to hard-shutdown
+        their laptop to regain control of their own mouse. That is never
+        acceptable, regardless of how well-intentioned the anti-drift
+        design was."""
         if not self._locked_hwnd:
             return
         try:
             import win32gui
             fg = win32gui.GetForegroundWindow()
             if fg == self._locked_hwnd:
+                self._reassert_foreign_hwnd   = None
+                self._reassert_foreign_streak = 0
                 return
             if not win32gui.IsWindow(self._locked_hwnd):
+                return
+
+            # Streak-breaker: a single stray drift-and-recover is normal,
+            # expected behavior (e.g. a combobox dropdown transiently taking
+            # foreground) and this method should still handle it. But if the
+            # SAME foreign window is back again on the VERY NEXT step despite
+            # having just been stolen from, that's not drift -- it's the user
+            # deliberately returning to it (most critically: trying to reach
+            # Stop). Back off for the rest of THIS window's occurrences
+            # rather than fighting them again.
+            if fg == self._reassert_foreign_hwnd:
+                self._reassert_foreign_streak += 1
+            else:
+                self._reassert_foreign_hwnd   = fg
+                self._reassert_foreign_streak = 1
+            if self._reassert_foreign_streak >= 2:
+                logger.warning(
+                    "NOT re-stealing foreground -- hwnd=%s has held focus across "
+                    "%d consecutive steps despite being reclaimed; treating this "
+                    "as deliberate (e.g. the user reaching for Stop), not drift.",
+                    fg, self._reassert_foreign_streak)
                 return
 
             # A MODAL dialog owned by the SAME process as the locked form (e.g. a

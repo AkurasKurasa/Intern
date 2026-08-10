@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain } = require("electron");
+const { app, BrowserWindow, ipcMain, shell } = require("electron");
 const { spawn } = require("child_process");
 const path = require("path");
 const fs = require("fs");
@@ -9,6 +9,14 @@ const REPO_ROOT = path.join(__dirname, "..");
 const BRIDGE_SCRIPT = path.join(REPO_ROOT, "app", "recorder_bridge.py");
 const DEMOS_ROOT = path.join(REPO_ROOT, "data", "demos");
 const REGISTRY_PATH = path.join(REPO_ROOT, "tasks", "registry.json");
+// Matches recorder_bridge.py's own _CAPSULE_LOG_PATH exactly -- a full,
+// persisted transcript of everything the Play panel's Activity log
+// receives, truncated fresh at the start of each capsule run. A strict
+// superset of run_task.py's own logs/latest.log (that only captures
+// logger.*() calls, not the raw print()-based countdown/emergency-stop
+// lines) -- everything run_task.py logs also flows through this process's
+// merged stdout, so one button covers both.
+const CAPSULE_LOG_PATH = path.join(REPO_ROOT, "logs", "capsule_activity.log");
 
 function resolvePython() {
   const candidates = [
@@ -312,6 +320,25 @@ ipcMain.handle("capsule-run", (_evt, modelPath) => {
 });
 ipcMain.handle("capsule-stop", () => {
   queueOrSend({ cmd: "stop_capsule" });
+});
+// "Open log file" / "Copy log" -- direct user request after a run that
+// looked totally silent in the Play panel even though it was genuinely
+// running: a way to actually see the full transcript, not just whatever
+// still fits in the small scrolling Activity box.
+ipcMain.handle("capsule-open-log", () => {
+  if (!fs.existsSync(CAPSULE_LOG_PATH)) {
+    return { ok: false, error: "No capsule log yet -- run a capsule first." };
+  }
+  shell.openPath(CAPSULE_LOG_PATH);
+  return { ok: true };
+});
+ipcMain.handle("capsule-read-log", () => {
+  if (!fs.existsSync(CAPSULE_LOG_PATH)) return "";
+  try {
+    return fs.readFileSync(CAPSULE_LOG_PATH, "utf8");
+  } catch (e) {
+    return "";
+  }
 });
 ipcMain.handle("restore-main", () => {
   if (mainWindow && !mainWindow.isDestroyed()) {

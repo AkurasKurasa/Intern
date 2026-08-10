@@ -184,7 +184,17 @@ CORRECTION_WATCH_SECONDS = 0.5  # DAgger correction-capture window per failed st
 if __name__ == "__main__":
     import argparse
     from agent.agent import LLMAgent
+    from agent.emergency_stop import start_emergency_stop_listener, HOTKEY_LABEL
     from observers.vlm.visual_data_reader.visual_data_reader import VisualDataReader
+
+    # Armed before anything else -- even before the countdown -- so the
+    # user always has an unconditional way out, independent of whatever
+    # the agent itself is doing. See emergency_stop.py for why this exists.
+    start_emergency_stop_listener()
+    # _flush_safe_print, not print(..., flush=True) directly -- this exact
+    # call shape is what OSError: [Errno 22] Invalid argument was coming
+    # from, in this exact windowsHide subprocess chain (see print_countdown).
+    _flush_safe_print(f"[EMERGENCY STOP] Press {HOTKEY_LABEL} at any time to force-kill this run.")
 
     _parser = argparse.ArgumentParser()
     _parser.add_argument("--start_tab", type=int, default=0,
