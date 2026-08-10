@@ -5382,7 +5382,41 @@ class LLMAgent:
         full self._observe() snapshot, which walks the whole visible UI
         tree and would be far too slow to call after every single
         keypress in a bounded search loop like this one.
+
+        SKIPPED ENTIRELY while the ghost-cursor overlay is active --
+        temporary, added 2026-08-10, same day as a real incident. That
+        overlay covers the entire screen for its whole lifetime, and UIA's
+        ControlFromPoint silently resolves to ITS window instead of the
+        real control the whole time it's running (confirmed live) --
+        meaning every _live_value() read below is guaranteed None, so
+        every attempt through this function currently has a 0% success
+        rate whenever ghost_cursor is on (agent.py hardcodes
+        ghost_cursor=True for every real, non-dry-run construction, so
+        this means every real live run). A same-day attempt to fix the
+        read itself (stopping/restarting the overlay around it) caused a
+        worse regression -- real Tcl/Tk corruption from repeated in-process
+        cycling, leaving a broken, no-longer-click-through window blocking
+        every click on the user's screen -- and was reverted (see
+        DEVELOPERS.md's execution_ghost_overlay_breaks_uia_reads entry).
+        Even without that crash, a guaranteed-to-fail 20-40-keystroke
+        search loop with zero visible on-screen feedback (the dropdown
+        never renders, so nothing visibly moves) reads to a user watching
+        the screen as "the agent froze" for 5-10+ real seconds, confirmed
+        directly from the very next live report after the revert: "The
+        Agent couldn't click on the form at all. It's frozen shut." Since
+        this function currently cannot succeed under the one condition
+        that actually matters (a real live run), skipping it outright and
+        going straight to the existing 2-strike give-up-and-move-on
+        escalation (_combobox_dropdown_fail_counts, already proven working
+        live) cuts that same failure from ~11s of silent dead time down to
+        the original ~3.2s poll, with the exact same eventual outcome
+        (failure, marked attempted, agent moves on). Only skipped when
+        self._executor.ghost is not None -- dry_run/tests (where ghost is
+        None) still exercise the real fallback logic below unaffected.
         """
+        if getattr(self._executor, "ghost", None) is not None:
+            return False
+
         try:
             import uiautomation as _uia
         except ImportError:

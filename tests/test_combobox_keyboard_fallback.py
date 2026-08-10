@@ -85,6 +85,12 @@ def _install_fake_uia(monkeypatch, model: _FakeComboboxModel):
 
 def _make_executor_mock(model: _FakeComboboxModel):
     executor = MagicMock()
+    # ghost=None -- this function is skipped outright whenever a ghost
+    # overlay is present (it always breaks the live-value read; see the
+    # function's own docstring), so these tests -- which exercise the
+    # actual search algorithm -- need ghost explicitly absent, matching
+    # dry_run/no-overlay conditions rather than a real live run.
+    executor.ghost = None
 
     def _exec(prediction):
         if prediction.get("action_type") == "keyboard":
@@ -205,6 +211,7 @@ class TestGracefulDegradation:
         monkeypatch.setattr(builtins, "__import__", _fake_import)
         agent = _make_agent()
         agent._executor = MagicMock()
+        agent._executor.ghost = None  # exercise the ImportError path, not the ghost-present skip
 
         result = agent._select_combobox_value_via_keyboard("Policy Status", "Active", 100, 200)
 
@@ -221,8 +228,48 @@ class TestGracefulDegradation:
         monkeypatch.setitem(sys.modules, "uiautomation", fake_uia)
         agent = _make_agent()
         agent._executor = MagicMock()
+        agent._executor.ghost = None  # exercise the live-read exception path, not the ghost-present skip
 
         result = agent._select_combobox_value_via_keyboard(
             "Policy Status", "Active", 100, 200, max_steps=2)
 
         assert result is False  # must not raise
+
+
+class TestSkippedWhileGhostOverlayIsActive:
+    """Added 2026-08-10, same day as the stop/restart fix above was
+    reverted: this function is guaranteed to fail whenever a ghost overlay
+    is present (ControlFromPoint always resolves to the overlay's own
+    window, so every value read comes back None), so it now returns False
+    immediately in that case instead of burning its full keystroke budget
+    for a 0% chance of success. Confirmed live this previously produced
+    ~11 real seconds of pure keyboard input with zero visible on-screen
+    change, reported directly: "The Agent couldn't click on the form at
+    all. It's frozen shut." real._executor.ghost=True here stands in for
+    any real GhostOverlay instance -- the check is just "not None"."""
+
+    def test_returns_false_immediately_without_any_keyboard_action_when_ghost_present(self, monkeypatch):
+        model = _FakeComboboxModel(["Active", "Inactive", "Cancelled"])
+        _install_fake_uia(monkeypatch, model)
+        agent = _make_agent()
+        agent._executor = _make_executor_mock(model)
+        agent._executor.ghost = MagicMock()  # stands in for a real, running GhostOverlay
+
+        result = agent._select_combobox_value_via_keyboard("Policy Status", "Active", 100, 200)
+
+        assert result is False
+        agent._executor.execute.assert_not_called()
+
+    def test_runs_normally_when_ghost_is_none(self, monkeypatch):
+        """dry_run / no-overlay conditions -- the fallback still works
+        exactly as before; this is the same scenario every other test in
+        this file already covers via _make_executor_mock's ghost=None."""
+        model = _FakeComboboxModel(["Active", "Inactive", "Cancelled"])
+        _install_fake_uia(monkeypatch, model)
+        agent = _make_agent()
+        agent._executor = _make_executor_mock(model)
+
+        result = agent._select_combobox_value_via_keyboard("Policy Status", "Active", 100, 200)
+
+        assert result is True
+        agent._executor.execute.assert_called()
