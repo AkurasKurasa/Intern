@@ -65,6 +65,21 @@ _GWL_EXSTYLE        = -20
 _WS_EX_LAYERED      = 0x00080000
 _WS_EX_TRANSPARENT  = 0x00000020
 
+# Queue-drain interval, was 30ms (~33 wake-ups/sec) for the entire
+# duration of a live run. Widened 2026-08-10: a user reported the live
+# agent's actual click/type behavior seeming measurably worse when
+# launched via the Electron "Play" panel than the identical checkpoint
+# run directly from a terminal -- real evidence pointed at CPU contention
+# from the full Electron process tree (main/GPU/renderer/utility) plus
+# this overlay's own background thread eating into timing margins
+# elsewhere in the agent (e.g. combobox dropdown-render polling in
+# agent.py, widened the same day for the same reason). 60ms is still far
+# more responsive than this cursor/caret indicator needs to be -- nothing
+# about tracking a mouse pointer requires sub-frame precision -- while
+# halving this thread's own wake-up frequency for the run's whole
+# lifetime.
+_POLL_MS = 60
+
 
 class GhostOverlay:
     """Background-thread overlay. start()/stop() once; show_cursor(),
@@ -188,9 +203,9 @@ class GhostOverlay:
                         canvas.delete("ghost_caret")
             except queue.Empty:
                 pass
-            root.after(30, poll)
+            root.after(_POLL_MS, poll)
 
-        root.after(30, poll)
+        root.after(_POLL_MS, poll)
         root.after(500, blink)
         self._ready.set()
         try:

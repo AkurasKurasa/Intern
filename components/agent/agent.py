@@ -3312,10 +3312,26 @@ class LLMAgent:
                             # dropdowns (Make, Policy Type, ...) succeeded moments
                             # apart. Not a matching bug — the popup just hadn't
                             # finished rendering within the old 4x0.35s=1.4s window
-                            # every time. Widened to give slow renders more room
-                            # without meaningfully slowing the common fast case
-                            # (the loop still exits the instant items appear).
-                            _POLL_TRIES, _POLL_INTERVAL = 8, 0.4
+                            # every time. Widened to 8x0.4s=3.2s to give slow renders
+                            # more room without meaningfully slowing the common fast
+                            # case (the loop still exits the instant items appear).
+                            #
+                            # Widened AGAIN 2026-08-10: even 3.2s wasn't enough for a
+                            # run launched via the Electron "Play" panel ('Policy
+                            # Status' — "still empty after 8 tries (3.2s) — giving
+                            # up"), on a machine that's also running the full Electron
+                            # process tree (main/GPU/renderer/utility) plus the
+                            # recorder_bridge.py subprocess plus this run's own ghost-
+                            # cursor overlay thread — real, concurrent CPU contention
+                            # a plain terminal invocation of run_task.py doesn't have.
+                            # The model's own predictions are identical either way;
+                            # this is the same "not enough margin above a real,
+                            # variable-latency operation" class of bug this exact
+                            # constant was already fixed for once (see above) and
+                            # ui_observer.py's snapshot timeout was separately fixed
+                            # for too — the fix is the same each time: more margin,
+                            # not chasing every possible source of load.
+                            _POLL_TRIES, _POLL_INTERVAL = 12, 0.5
                             _items = []
                             for _try in range(_POLL_TRIES):
                                 time.sleep(_POLL_INTERVAL)
@@ -4134,7 +4150,14 @@ class LLMAgent:
                 # above (_already_open): once that's fixed, an open→escape→
                 # reopen cycle should be rare, but the poll stays widened as a
                 # second line of defense against genuinely slow renders.
-                _POLL_TRIES, _POLL_INTERVAL = 8, 0.4
+                #
+                # Widened AGAIN 2026-08-10, matching the sibling poll above (same
+                # file) — real CPU contention from the Electron "Play" panel's
+                # own process tree plus the ghost-cursor overlay thread eats into
+                # the margin a plain terminal run of run_task.py doesn't have to
+                # contend with. Same fix as always for this class of bug: more
+                # margin, not chasing every possible source of load.
+                _POLL_TRIES, _POLL_INTERVAL = 12, 0.5
                 _listitems = list(_already_open)
                 for _try in range(_POLL_TRIES):
                     if _listitems:
