@@ -8,6 +8,7 @@ const readline = require("readline");
 const REPO_ROOT = path.join(__dirname, "..");
 const BRIDGE_SCRIPT = path.join(REPO_ROOT, "app", "recorder_bridge.py");
 const DEMOS_ROOT = path.join(REPO_ROOT, "data", "demos");
+const REGISTRY_PATH = path.join(REPO_ROOT, "tasks", "registry.json");
 
 function resolvePython() {
   const candidates = [
@@ -190,6 +191,54 @@ function listWorkflows() {
   return groups;
 }
 
+// ── Capsules -- components/agent/capsule.py's WorkflowCapsule/CapsuleRegistry,
+// read/written directly as JSON here (same "no bridge round-trip for plain
+// disk reads" precedent as listWorkflows() above). One capsule = one named
+// task + the model checkpoint currently deployed for it, e.g. "form_filling".
+function readRegistry() {
+  if (!fs.existsSync(REGISTRY_PATH)) return { capsules: [] };
+  try {
+    return JSON.parse(fs.readFileSync(REGISTRY_PATH, "utf8"));
+  } catch (e) {
+    console.error("Failed to parse registry.json:", e);
+    return { capsules: [] };
+  }
+}
+
+function listCapsules() {
+  return readRegistry().capsules || [];
+}
+
+// Checkpoints living alongside a capsule's current model_path (same
+// directory, e.g. tasks/form_filling/*.pt) -- past training runs this
+// project already keeps as manually-made backups, not a formal version
+// registry. "Deploy" (below) is what promotes one of these to be the
+// capsule's active model_path.
+function listCheckpoints(capsuleName) {
+  const capsule = listCapsules().find((c) => c.name === capsuleName);
+  if (!capsule) return [];
+  const dir = path.dirname(path.join(REPO_ROOT, capsule.model_path));
+  if (!fs.existsSync(dir)) return [];
+  return fs.readdirSync(dir)
+    .filter((f) => f.endsWith(".pt"))
+    .map((f) => {
+      const full = path.join(dir, f);
+      const stat = fs.statSync(full);
+      const rel = path.relative(REPO_ROOT, full).split(path.sep).join("/");
+      return { name: f, path: rel, mtime: stat.mtimeMs, size: stat.size };
+    })
+    .sort((a, b) => b.mtime - a.mtime);
+}
+
+function deployCheckpoint(capsuleName, checkpointPath) {
+  const registry = readRegistry();
+  const capsule = (registry.capsules || []).find((c) => c.name === capsuleName);
+  if (!capsule) throw new Error(`Capsule not found: ${capsuleName}`);
+  capsule.model_path = checkpointPath;
+  fs.writeFileSync(REGISTRY_PATH, JSON.stringify(registry, null, 2));
+  return capsule;
+}
+
 app.whenReady().then(() => {
   startBridge();
   createWindow();
@@ -217,8 +266,15 @@ ipcMain.handle("recorder-replay", (_evt, n) => {
   queueOrSend({ cmd: "replay", n: n || 10 });
 });
 ipcMain.handle("workflows-list", () => listWorkflows());
-ipcMain.handle("workflows-play", (_evt, sessionPath, count) => {
-  queueOrSend({ cmd: "play", session: sessionPath, count: count || 1 });
+ipcMain.handle("capsules-list", () => listCapsules());
+ipcMain.handle("capsules-checkpoints", (_evt, capsuleName) => listCheckpoints(capsuleName));
+ipcMain.handle("capsules-deploy", (_evt, capsuleName, checkpointPath) =>
+  deployCheckpoint(capsuleName, checkpointPath));
+ipcMain.handle("capsule-run", (_evt, modelPath) => {
+  queueOrSend({ cmd: "run_capsule", model_path: modelPath });
+});
+ipcMain.handle("capsule-stop", () => {
+  queueOrSend({ cmd: "stop_capsule" });
 });
 ipcMain.handle("restore-main", () => {
   if (mainWindow && !mainWindow.isDestroyed()) {

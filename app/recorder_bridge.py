@@ -12,7 +12,8 @@ Commands (stdin, one per line)
   {"cmd": "start", "output_dir": "data/demos/eight_Tabs"}
   {"cmd": "stop"}
   {"cmd": "replay", "n": 10}
-  {"cmd": "play", "session": "data/demos/eight_Tabs/session_...", "count": 1}
+  {"cmd": "run_capsule", "model_path": "tasks/form_filling/model.pt"}
+  {"cmd": "stop_capsule"}
   {"cmd": "shutdown"}
 
 Events (stdout, one per line)
@@ -23,9 +24,10 @@ Events (stdout, one per line)
   {"event": "saved", "steps": 42, "session_dir": "..."}
   {"event": "replay_progress", "current": 3, "total": 10}
   {"event": "replay_done", "made": 10, "steps_each": 42, "dest": "..."}
-  {"event": "play_started", "session": "session_..."}
-  {"event": "play_progress", "message": "..."}
-  {"event": "play_done", "steps": 42}
+  {"event": "capsule_started", "model_path": "..."}
+  {"event": "capsule_progress", "line": "..."}
+  {"event": "capsule_done", "code": 0}
+  {"event": "capsule_stopped"}
   {"event": "log", "message": "...", "level": "ok" | "err" | "dim"}
   {"event": "error", "message": "..."}
 """
@@ -35,6 +37,8 @@ import glob
 import json
 import os
 import shutil
+import signal
+import subprocess
 import sys
 import threading
 import time
@@ -68,6 +72,7 @@ class Bridge:
         self._out_dir = os.path.join(_ROOT, "data", "demos", "eight_Tabs")
         self._poll_thread: threading.Thread | None = None
         self._poll_stop = threading.Event()
+        self._capsule_proc: subprocess.Popen | None = None
 
     # ── start / stop ─────────────────────────────────────────────────────────
     def start(self, output_dir: str | None = None) -> None:
@@ -159,41 +164,70 @@ class Bridge:
         emit("log", message=f"Replay = {made} copies of '{os.path.basename(src)}' "
                              f"({len(step_files)} steps each) -> data/demos/human", level="ok")
 
-    # ── play (actually executes the session live, via DemoRecorder.replay) ───
-    # Distinct from replay() above, which is pure file duplication (no mouse,
-    # no live form). This drives the real form with pyautogui, re-finding
-    # each recorded field by its label/type in the CURRENT UI (not raw
-    # coordinates), and saves the newly-executed run as a fresh session.
-    def play(self, session: str, count: int = 1) -> None:
+    # ── capsule run (the real autonomous agent, same as run_task.py) ─────────
+    # "Play" means running the trained agent for a capsule (transformer
+    # decides WHERE, LLM decides WHAT, looping the whole form live) -- not
+    # replaying one recorded session's raw actions. Reuses run_task.py's own
+    # entry point as a subprocess rather than re-implementing LLMAgent
+    # construction here, so a Play run is byte-for-byte the same thing the
+    # user gets running it themselves from a terminal -- one real
+    # implementation, not two that can quietly drift apart.
+    def run_capsule(self, model_path: str) -> None:
         if self._running:
-            emit("error", message="Stop recording before playing a session.")
+            emit("error", message="Stop recording before running a capsule.")
             return
-        session_path = session if os.path.isabs(session) else os.path.join(_ROOT, session)
-        if not os.path.isdir(session_path):
-            emit("error", message=f"Session not found: {session_path}")
+        if self._capsule_proc is not None and self._capsule_proc.poll() is None:
+            emit("error", message="A capsule is already running.")
+            return
+        abs_model = model_path if os.path.isabs(model_path) else os.path.join(_ROOT, model_path)
+        if not os.path.isfile(abs_model):
+            emit("error", message=f"Checkpoint not found: {abs_model}")
             return
 
-        def _progress(message: str) -> None:
-            emit("play_progress", message=message)
+        run_task_script = os.path.join(_ROOT, "run_task.py")
+        try:
+            self._capsule_proc = subprocess.Popen(
+                [sys.executable, run_task_script, "--model", abs_model],
+                cwd=_ROOT,
+                stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
+                bufsize=1,
+                creationflags=subprocess.CREATE_NEW_PROCESS_GROUP,  # needed for a graceful CTRL_BREAK stop
+            )
+        except Exception as exc:
+            emit("error", message=f"Failed to start capsule run: {exc}")
+            return
 
-        def _run() -> None:
+        def _pump() -> None:
+            proc = self._capsule_proc
             try:
-                player = DemoRecorder(output_dir=os.path.join(_ROOT, "data", "demos"),
-                                       trace_type="form_filling")
-                # This thread will call _request_snapshot() -> self._observer.
-                # snapshot() directly (in-process mode, see
-                # uiux_electron_feature_parity in DEVELOPERS.md) -- every
-                # thread that touches uiautomation needs its own COM init or
-                # it segfaults, same lesson _worker() already learned live.
-                player._init_com()
-                total = player.replay(session_path, count=count,
-                                       submit_between=True, progress=_progress)
-                emit("play_done", steps=total)
-            except Exception as exc:
-                emit("error", message=f"Play failed: {exc}")
+                for line in proc.stdout:
+                    line = line.rstrip("\n")
+                    if line:
+                        emit("capsule_progress", line=line)
+            except Exception:
+                pass
+            code = proc.wait()
+            self._capsule_proc = None
+            emit("capsule_done", code=code)
 
-        threading.Thread(target=_run, daemon=True).start()
-        emit("play_started", session=os.path.basename(session_path))
+        threading.Thread(target=_pump, daemon=True).start()
+        emit("capsule_started", model_path=abs_model)
+        emit("log", message=f"Capsule run started — model={os.path.basename(abs_model)}", level="ok")
+
+    def stop_capsule(self) -> None:
+        if self._capsule_proc is None or self._capsule_proc.poll() is not None:
+            emit("error", message="No capsule run in progress.")
+            return
+        try:
+            # CTRL_BREAK_EVENT, not terminate() -- run_task.py's own run()
+            # already catches KeyboardInterrupt to save partial results and
+            # write metrics/logs cleanly. A hard terminate() would skip all
+            # of that, the same loss a real Ctrl+C in a terminal would avoid.
+            self._capsule_proc.send_signal(signal.CTRL_BREAK_EVENT)
+            emit("capsule_stopped")
+            emit("log", message="Capsule run interrupted — saving partial results…", level="dim")
+        except Exception as exc:
+            emit("error", message=f"Failed to stop capsule run: {exc}")
 
     # ── main loop ────────────────────────────────────────────────────────────
     def run(self) -> None:
@@ -215,11 +249,18 @@ class Bridge:
                 self.stop()
             elif cmd == "replay":
                 self.replay(int(msg.get("n", 10)))
-            elif cmd == "play":
-                self.play(msg.get("session", ""), int(msg.get("count", 1)))
+            elif cmd == "run_capsule":
+                self.run_capsule(msg.get("model_path", ""))
+            elif cmd == "stop_capsule":
+                self.stop_capsule()
             elif cmd == "shutdown":
                 if self._running and self._recorder is not None:
                     self._recorder._quit_event.set()
+                if self._capsule_proc is not None and self._capsule_proc.poll() is None:
+                    try:
+                        self._capsule_proc.send_signal(signal.CTRL_BREAK_EVENT)
+                    except Exception:
+                        pass
                 break
             else:
                 emit("error", message=f"Unknown command: {cmd!r}")

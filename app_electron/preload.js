@@ -12,5 +12,13 @@ contextBridge.exposeInMainWorld("recorderAPI", {
 
 contextBridge.exposeInMainWorld("workflowsAPI", {
   list: () => ipcRenderer.invoke("workflows-list"),
-  play: (sessionPath, count) => ipcRenderer.invoke("workflows-play", sessionPath, count),
+});
+
+contextBridge.exposeInMainWorld("capsulesAPI", {
+  list: () => ipcRenderer.invoke("capsules-list"),
+  checkpoints: (capsuleName) => ipcRenderer.invoke("capsules-checkpoints", capsuleName),
+  deploy: (capsuleName, checkpointPath) =>
+    ipcRenderer.invoke("capsules-deploy", capsuleName, checkpointPath),
+  run: (modelPath) => ipcRenderer.invoke("capsule-run", modelPath),
+  stop: () => ipcRenderer.invoke("capsule-stop"),
 });

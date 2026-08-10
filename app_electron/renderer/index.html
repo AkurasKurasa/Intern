@@ -88,7 +88,9 @@
       </div>
 
       <label class="field-label" for="outDir">Save to</label>
-      <input class="field" id="outDir" type="text" value="data/demos/eight_Tabs" />
+      <select class="field" id="outDir">
+        <option value="data/demos/eight_Tabs">data/demos/eight_Tabs</option>
+      </select>
 
       <div class="rp-btn-row">
         <button class="btn btn-primary" id="btnStart">● Start</button>
@@ -100,16 +102,18 @@
     </aside>
 
     <!-- Right — Play panel, shown only while viewing Workflows. One capsule
-         at a time: click a session in the list to load it here (with a
-         transfer animation), then Play executes THAT one, live, on the
-         form. No per-row play buttons -- one control, one loaded capsule. -->
+         at a time: click a workflow group on the left to load its capsule
+         here (with a transfer animation), then Play runs the REAL trained
+         agent for it live (same as run_task.py -- transformer decides
+         WHERE, LLM decides WHAT, the whole form, not a replay of one
+         recorded session). No per-row/per-session play buttons. -->
     <aside class="play-panel" id="playPanel" aria-label="Play" hidden>
       <header class="rp-head">
         <h2>Play</h2>
       </header>
 
       <div class="pp-slot" id="ppSlot">
-        <p class="pp-slot-hint" id="ppSlotHint">Select a session on the left to load it here.</p>
+        <p class="pp-slot-hint" id="ppSlotHint">Select a capsule on the left to load it here.</p>
         <div class="pp-capsule" id="ppCapsule" hidden>
           <span class="pp-capsule-icon">▶</span>
           <div class="pp-capsule-text">
@@ -119,14 +123,17 @@
         </div>
       </div>
 
-      <label class="field-label" for="ppCount">Passes</label>
-      <input class="field" id="ppCount" type="number" min="1" max="20" value="1" />
+      <label class="field-label" for="ppCheckpoint">Checkpoint</label>
+      <select class="field" id="ppCheckpoint" disabled></select>
+      <button class="btn btn-ghost btn-sm rp-replay" id="btnDeploy" type="button" hidden>Deploy this checkpoint</button>
 
       <div class="rp-btn-row">
         <button class="btn btn-primary" id="btnPlay" disabled>▶ Play</button>
+        <button class="btn btn-danger" id="btnStopCapsule" disabled>■ Stop</button>
       </div>
 
-      <p class="play-status" id="playStatus" hidden></p>
+      <h3 class="rp-log-head">Activity</h3>
+      <div class="log" id="capsuleLog"></div>
     </aside>
   </div>
 

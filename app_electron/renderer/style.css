@@ -349,18 +349,25 @@ html, body {
 
 /* ── Workflows list (shown in the main area) ────────────────────────────
    Deliberately quiet: a plain list with thin dividers, not bordered/
-   shadowed "cards" — the sessions are reference data to skim, not the
-   focal action of the screen (Play is a small icon, not a loud button). */
+   shadowed "cards" — the sessions are reference data to skim, individual
+   sessions aren't playable. The GROUP is the capsule unit -- clicking a
+   group header both expands it and loads/flies its capsule into Play. */
 .workflows-list { display: flex; flex-direction: column; }
 .wf-group {
   border-bottom: 1px solid var(--border);
   padding: 10px 2px;
+  border-radius: 6px;
 }
 .wf-group:last-child { border-bottom: none; }
 .wf-group-head {
   display: flex; align-items: baseline; justify-content: space-between;
   cursor: pointer; user-select: none;
+  padding: 4px 6px; border-radius: 6px;
+  transition: background .12s ease;
 }
+.wf-group-head:hover { background: var(--chip-bg); }
+.wf-group.capsule-selected .wf-group-head { background: var(--orange-tint); }
+.wf-group.capsule-selected .wf-group-head .name { color: var(--orange-dark); font-weight: 600; }
 .wf-group-head .name { font-size: 13px; font-weight: 500; color: var(--ink); }
 .wf-group-head .meta { font-size: 11px; color: var(--dim); }
 .wf-group-head .chev { font-size: 9px; color: var(--dim); margin-right: 6px; }
@@ -370,19 +377,6 @@ html, body {
 .wf-session {
   display: flex; align-items: center; justify-content: space-between;
   padding: 5px 0 5px 16px; font-size: 12px;
-  border-radius: 6px;
-  cursor: pointer;
-  transition: background .12s ease;
 }
-.wf-session:hover { background: var(--chip-bg); }
-.wf-session.selected { background: var(--orange-tint); }
-.wf-session.selected .sname { color: var(--orange-dark); font-weight: 600; }
 .wf-session .sname { color: var(--ink); }
 .wf-session .ssteps { color: var(--dim); font-size: 11px; }
-
-.play-status {
-  font-size: 11px; color: var(--dim); font-family: Consolas, monospace;
-  padding: 6px 8px;
-  background: var(--white); border: 1px solid var(--border);
-  border-radius: 6px;
-}

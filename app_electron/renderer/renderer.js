@@ -129,17 +129,19 @@ window.recorderAPI.onEvent((event) => {
       statStatus.textContent = "Idle";
       log(`Replay done — ${event.made} copies (${event.steps_each} steps each) -> ${event.dest}`, "ok");
       break;
-    case "play_started":
-      setPlayStatus(`▶ Playing '${event.session}'…`);
-      btnPlay.disabled = true;
+    case "capsule_started":
+      capsuleLog(`▶ Running capsule — model=${event.model_path.split(/[\\/]/).pop()}`, "ok");
+      setCapsuleRunning(true);
       break;
-    case "play_progress":
-      setPlayStatus(event.message);
+    case "capsule_progress":
+      capsuleLog(event.line, "dim");
       break;
-    case "play_done":
-      setPlayStatus(`Done — ${event.steps} steps replayed.`);
-      setTimeout(() => setPlayStatus(""), 4000);
-      btnPlay.disabled = !selectedSession;
+    case "capsule_done":
+      capsuleLog(`Run ended (exit code ${event.code}).`, event.code === 0 ? "ok" : "err");
+      setCapsuleRunning(false);
+      break;
+    case "capsule_stopped":
+      capsuleLog("Stopping — saving partial results…", "dim");
       break;
     case "log":
       log(event.message, event.level || "dim");
@@ -148,8 +150,8 @@ window.recorderAPI.onEvent((event) => {
       setRecording(false);
       log(event.message, "err");
       sideStatusDot.classList.add("error");
-      setPlayStatus(event.message);
-      btnPlay.disabled = !selectedSession;
+      capsuleLog(event.message, "err");
+      setCapsuleRunning(false);
       break;
     default:
       console.log("Unhandled event:", event);
@@ -159,18 +161,31 @@ window.recorderAPI.onEvent((event) => {
 /* ── Workflows panel ──────────────────────────────────────────────────── */
 const workflowsListEl = document.getElementById("workflowsList");
 const btnRefreshWorkflows = document.getElementById("btnRefreshWorkflows");
-const playStatusEl = document.getElementById("playStatus");
 let workflowsLoaded = false;
 
-/* ── Play panel — one loaded capsule at a time ────────────────────────── */
+/* ── Play panel — one loaded capsule at a time ────────────────────────────
+   A "capsule" (components/agent/capsule.py's WorkflowCapsule) is a named
+   task + the model checkpoint currently deployed for it -- e.g.
+   "form_filling". Playing a capsule runs the REAL trained agent live (same
+   as run_task.py), not a replay of one recorded session. Clicking a
+   workflow GROUP (not an individual session) loads/flies its capsule here
+   -- there's no formal group->capsule mapping in the registry yet, so with
+   exactly one capsule registered (the only case this project has right
+   now) any group click loads it; with more than one, name-matching is
+   attempted and the first capsule is used as a last resort. */
 const ppSlot        = document.getElementById("ppSlot");
 const ppSlotHint     = document.getElementById("ppSlotHint");
 const ppCapsule      = document.getElementById("ppCapsule");
 const ppCapsuleName  = document.getElementById("ppCapsuleName");
 const ppCapsuleMeta  = document.getElementById("ppCapsuleMeta");
-const ppCount        = document.getElementById("ppCount");
+const ppCheckpoint   = document.getElementById("ppCheckpoint");
 const btnPlay        = document.getElementById("btnPlay");
-let selectedSession = null;   // relative path, e.g. "data/demos/eight_Tabs/session_..."
+const btnStopCapsule = document.getElementById("btnStopCapsule");
+const btnDeploy      = document.getElementById("btnDeploy");
+const capsuleLogEl   = document.getElementById("capsuleLog");
+
+let capsulesCache = [];      // last fetched capsule list, from capsulesAPI.list()
+let currentCapsule = null;   // the one loaded in the play panel right now
 
 function timeAgo(ms) {
   const s = Math.max(0, (Date.now() - ms) / 1000);
@@ -180,34 +195,100 @@ function timeAgo(ms) {
   return Math.floor(s / 86400) + "d ago";
 }
 
-function setPlayStatus(message) {
-  playStatusEl.textContent = message || "";
-  playStatusEl.hidden = !message;
+function capsuleLog(message, level = "dim") {
+  const row = document.createElement("div");
+  row.className = "log-entry";
+  const time = new Date().toLocaleTimeString();
+  row.innerHTML = `<span class="log-time">[${time}]</span> <span class="log-${level}">${escapeHtml(message)}</span>`;
+  capsuleLogEl.appendChild(row);
+  capsuleLogEl.scrollTop = capsuleLogEl.scrollHeight;
+}
+
+function setCapsuleRunning(isRunning) {
+  btnPlay.disabled = isRunning || !currentCapsule;
+  btnStopCapsule.disabled = !isRunning;
+}
+
+function findCapsuleForGroup(groupName) {
+  if (capsulesCache.length === 1) return capsulesCache[0];
+  const byName = capsulesCache.find((c) => c.name === groupName);
+  if (byName) return byName;
+  return capsulesCache[0] || null;
 }
 
 /* Loads a capsule into the play panel for real -- called once the fly
    animation (below) lands, or immediately if animation is skipped. */
-function loadCapsuleIntoSlot(sessionPath, name, metaText) {
-  selectedSession = sessionPath;
+async function loadCapsuleIntoSlot(capsule) {
+  currentCapsule = capsule;
   ppSlotHint.hidden = true;
   ppCapsule.hidden = false;
-  ppCapsuleName.textContent = name;
-  ppCapsuleMeta.textContent = metaText;
+  ppCapsuleName.textContent = capsule.name;
+  ppCapsuleMeta.textContent = capsule.description || capsule.model_path;
   ppSlot.classList.add("filled");
-  btnPlay.disabled = false;
+
+  ppCheckpoint.disabled = true;
+  ppCheckpoint.innerHTML = '<option>Loading…</option>';
+  btnDeploy.hidden = true;
+  let checkpoints = [];
+  try {
+    checkpoints = await window.capsulesAPI.checkpoints(capsule.name);
+  } catch (e) {
+    capsuleLog(`Couldn't list checkpoints: ${e.message || e}`, "err");
+  }
+  ppCheckpoint.innerHTML = "";
+  if (!checkpoints.length) {
+    ppCheckpoint.innerHTML = `<option value="${escapeHtml(capsule.model_path)}">${escapeHtml(capsule.model_path)}</option>`;
+  } else {
+    checkpoints.forEach((c) => {
+      const opt = document.createElement("option");
+      opt.value = c.path;
+      const deployed = c.path === currentCapsule.model_path;
+      opt.textContent = `${c.name}${deployed ? "  (deployed)" : ""}`;
+      ppCheckpoint.appendChild(opt);
+    });
+    const deployedOpt = Array.from(ppCheckpoint.options).find((o) => o.value === capsule.model_path);
+    if (deployedOpt) ppCheckpoint.value = capsule.model_path;
+  }
+  ppCheckpoint.disabled = false;
+  setCapsuleRunning(false);
 }
 
-/* Clones a small chip at the clicked row's position and animates it to the
-   play panel's slot -- a lightweight FLIP animation (no library): read the
-   two real rects, position the clone at the start rect, then transition it
-   to the end rect on the next frame. */
-function flyToPlayPanel(rowEl, sessionPath, name, metaText) {
-  const fromRect = rowEl.getBoundingClientRect();
+ppCheckpoint.addEventListener("change", () => {
+  btnDeploy.hidden = !currentCapsule || ppCheckpoint.value === currentCapsule.model_path;
+});
+
+btnDeploy.addEventListener("click", async () => {
+  if (!currentCapsule) return;
+  try {
+    const updated = await window.capsulesAPI.deploy(currentCapsule.name, ppCheckpoint.value);
+    currentCapsule = updated;
+    // Keep capsulesCache in sync too -- without this, re-selecting the same
+    // group without an explicit Refresh would reload the stale pre-deploy
+    // model_path from the cached list, silently undoing the deploy's
+    // visible effect (the registry file itself was still updated fine).
+    const idx = capsulesCache.findIndex((c) => c.name === updated.name);
+    if (idx !== -1) capsulesCache[idx] = updated;
+    ppCapsuleMeta.textContent = currentCapsule.description || currentCapsule.model_path;
+    btnDeploy.hidden = true;
+    capsuleLog(`Deployed ${ppCheckpoint.value} for '${currentCapsule.name}'.`, "ok");
+    // refresh the (deployed) labels
+    loadCapsuleIntoSlot(currentCapsule);
+  } catch (e) {
+    capsuleLog(`Deploy failed: ${e.message || e}`, "err");
+  }
+});
+
+/* Clones a small chip at the clicked group's position and animates it to
+   the play panel's slot -- a lightweight FLIP animation (no library): read
+   the two real rects, position the clone at the start rect, then
+   transition it to the end rect on the next frame. */
+function flyToPlayPanel(fromEl, capsule) {
+  const fromRect = fromEl.getBoundingClientRect();
   const toRect = ppSlot.getBoundingClientRect();
 
   const clone = document.createElement("div");
   clone.className = "capsule-flying";
-  clone.innerHTML = `<span class="pp-capsule-icon">▶</span><span>${escapeHtml(name)}</span>`;
+  clone.innerHTML = `<span class="pp-capsule-icon">▶</span><span>${escapeHtml(capsule.name)}</span>`;
   clone.style.left = `${fromRect.left}px`;
   clone.style.top = `${fromRect.top}px`;
   clone.style.width = `${fromRect.width}px`;
@@ -226,17 +307,44 @@ function flyToPlayPanel(rowEl, sessionPath, name, metaText) {
     if (done) return;
     done = true;
     clone.remove();
-    loadCapsuleIntoSlot(sessionPath, name, metaText);
+    loadCapsuleIntoSlot(capsule);
   };
   clone.addEventListener("transitionend", finish, { once: true });
   setTimeout(finish, 500);   // fallback in case transitionend doesn't fire
 }
 
 btnPlay.addEventListener("click", () => {
-  if (!selectedSession) return;
-  const count = parseInt(ppCount.value, 10) || 1;
-  window.workflowsAPI.play(selectedSession, count);
+  if (!currentCapsule) return;
+  window.capsulesAPI.run(currentCapsule.model_path);
 });
+
+btnStopCapsule.addEventListener("click", () => {
+  window.capsulesAPI.stop();
+});
+
+/* ── Recorder panel's "Save to" dropdown -- populated from existing
+   workflow groups instead of free-typed text. ─────────────────────────── */
+async function populateOutDirOptions() {
+  let groups = [];
+  try {
+    groups = await window.workflowsAPI.list();
+  } catch (e) {
+    return;
+  }
+  if (!groups.length) return;
+  const current = outDirInput.value;
+  outDirInput.innerHTML = "";
+  groups.forEach((g) => {
+    const opt = document.createElement("option");
+    opt.value = `data/demos/${g.name}`;
+    opt.textContent = `data/demos/${g.name}`;
+    outDirInput.appendChild(opt);
+  });
+  if (Array.from(outDirInput.options).some((o) => o.value === current)) {
+    outDirInput.value = current;
+  }
+}
+populateOutDirOptions();
 
 async function loadWorkflows() {
   workflowsListEl.innerHTML = '<p class="muted">Loading…</p>';
@@ -246,6 +354,11 @@ async function loadWorkflows() {
   } catch (e) {
     workflowsListEl.innerHTML = `<p class="muted">Couldn't read data/demos/ (${e.message || e}).</p>`;
     return;
+  }
+  try {
+    capsulesCache = await window.capsulesAPI.list();
+  } catch (e) {
+    capsulesCache = [];
   }
   if (!groups || !groups.length) {
     workflowsListEl.innerHTML = '<p class="muted">No recorded workflows yet — start one from the Recorder tab.</p>';
@@ -259,20 +372,29 @@ async function loadWorkflows() {
 
     const head = document.createElement("div");
     head.className = "wf-group-head";
+    head.title = "Click to expand and load this capsule into Play";
     head.innerHTML =
       `<span><span class="chev">▸</span><span class="name">${escapeHtml(g.name)}</span></span>` +
       `<span class="meta">${g.sessionCount} session${g.sessionCount===1?"":"s"} · ${g.totalSteps.toLocaleString()} steps</span>`;
-    head.addEventListener("click", () => card.classList.toggle("open"));
+    head.addEventListener("click", () => {
+      card.classList.toggle("open");
+      const capsule = findCapsuleForGroup(g.name);
+      if (!capsule) {
+        capsuleLog(`No capsule registered yet for '${g.name}'.`, "dim");
+        return;
+      }
+      workflowsListEl.querySelectorAll(".wf-group.capsule-selected")
+        .forEach((el) => el.classList.remove("capsule-selected"));
+      card.classList.add("capsule-selected");
+      flyToPlayPanel(head, capsule);
+    });
     card.appendChild(head);
 
     const body = document.createElement("div");
     body.className = "wf-sessions";
     g.sessions.forEach((s) => {
-      const sessionPath = `data/demos/${g.name}/${s.name}`;
-      const metaText = `${s.steps.toLocaleString()} steps · ${g.name}`;
       const row = document.createElement("div");
       row.className = "wf-session";
-      row.title = "Click to load this session into the Play panel";
       const left = document.createElement("span");
       left.className = "sname";
       left.textContent = s.name;
@@ -281,12 +403,6 @@ async function loadWorkflows() {
       right.textContent = `${s.steps.toLocaleString()} steps · ${timeAgo(s.mtime)}`;
       row.appendChild(left);
       row.appendChild(right);
-      row.addEventListener("click", () => {
-        workflowsListEl.querySelectorAll(".wf-session.selected")
-          .forEach((el) => el.classList.remove("selected"));
-        row.classList.add("selected");
-        flyToPlayPanel(row, sessionPath, s.name, metaText);
-      });
       body.appendChild(row);
     });
     card.appendChild(body);
@@ -301,4 +417,4 @@ function escapeHtml(s) {
   }[c]));
 }
 
-btnRefreshWorkflows.addEventListener("click", loadWorkflows);
+btnRefreshWorkflows.addEventListener("click", () => { loadWorkflows(); populateOutDirOptions(); });
