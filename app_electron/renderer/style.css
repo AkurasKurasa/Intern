@@ -273,32 +273,16 @@ html, body {
 }
 .pp-capsule-meta { font-size: 10.5px; color: var(--dim); }
 
-/* Arrival pulse on the panel once the flying chip below lands -- a brief
-   border/background flash right where the user is already looking. */
+/* Calm feedback for the panel updating -- no element travels across the
+   screen (tried twice, both read as too intense/uncomfortable even after
+   a proper FLIP implementation -- the discomfort was the travel itself,
+   not the easing or timing). Just a brief border/background pulse on the
+   slot, right where the user is already looking. */
 @keyframes pp-slot-flash {
   0%   { border-color: var(--orange); background: var(--orange-tint); }
   100% { border-color: var(--border-strong); background: var(--white); }
 }
 .pp-slot.pp-slot-flash { animation: pp-slot-flash .5s ease; }
-
-/* FLIP-animation clone: same 30px circular bubble as .pp-capsule-icon
-   (same size, background, font-size) so the landing is a seamless handoff
-   -- the real icon just "is" where the clone stopped, not a size/shape
-   jump cut. JS places + sizes this at its FINAL spot then pushes it back
-   with an inverse translate+scale, so the single transition below is the
-   entire motion (position and scale moving together), not two separate
-   animations fighting each other. */
-.capsule-flying {
-  position: fixed; z-index: 100; pointer-events: none;
-  width: 30px; height: 30px; border-radius: 50%;
-  background: var(--orange-tint); color: var(--orange);
-  display: flex; align-items: center; justify-content: center;
-  font-size: 15px; line-height: 1;
-  box-shadow: 0 5px 16px rgba(28,25,23,.18);
-  transition: transform .48s cubic-bezier(.16,1,.3,1), opacity .18s ease;
-  will-change: transform;
-}
-.capsule-flying.is-placeholder { background: var(--chip-bg); color: var(--dim); }
 
 /* Emoji picker -- "a section that displays all the available emojis" to
    click, opened from .pp-capsule-icon. Positioned via inline left/top set

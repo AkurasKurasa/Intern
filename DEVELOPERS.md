@@ -1241,6 +1241,12 @@ Not a thesis objective — developer tooling. The demo recorder's interface.
 
   Verified live: Electron relaunched, clean single-window startup, no console errors. No Python touched this round, so the full suite wasn't re-run (nothing here could affect it). Not yet confirmed by the user: the picker actually opening/closing correctly, tile clicks committing, and the gray styling reading right in person — all need an in-app look.
 
+  **Direct follow-up, blunt and physical: "the flying chip hurts my fucking eyes."** Even the proper FLIP rebuild from two commits ago didn't fix it — because the discomfort was never about *how well-implemented* the motion was, it was the travel itself: a fast, scaling element covering real screen distance. No amount of easing/timing tuning fixes that; only removing the travel does. Recommended dropping it outright rather than trying a fourth variant, with the tradeoff stated plainly (less "flashy," no visual thread connecting click to result) — confirmed: "Drop it sure."
+
+  Deleted `flyToPlayPanel()` and `.capsule-flying`/`.capsule-flying.is-placeholder` entirely — not commented out, not feature-flagged, gone. The group-header click handler goes back to calling `loadCapsuleIntoSlot()` directly followed by `flashPlaySlot()` (the same calm border/background pulse kept from the version before any of this, which was never the part anyone objected to). This is the version now shipped for real: **no element ever travels across the window** for this interaction, full stop — recorded here so a future round doesn't quietly reintroduce cross-screen motion as a "smoother" fourth attempt without re-reading this line first.
+
+  Verified live: Electron relaunched, clean single-window startup, no console errors, `grep` confirms zero remaining references to `flyToPlayPanel`/`capsule-flying` anywhere in the renderer. No Python touched, full suite not re-run (nothing here could affect it).
+
 ---
 
 ## Scopes & North Star
