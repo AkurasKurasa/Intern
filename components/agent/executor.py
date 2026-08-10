@@ -42,6 +42,13 @@ try:
 except ImportError:
     _PYAUTOGUI_AVAILABLE = False
 
+# ── optional dependency: uiautomation (for cursor-free clicks + caret placement) ──
+try:
+    import uiautomation as _uia
+    _UIA_AVAILABLE = True
+except ImportError:
+    _UIA_AVAILABLE = False
+
 # Found 2026-08-09, live, direct user report ("It closed the fucking
 # Terminal holy shit") -- the process died silently mid-run, no traceback,
 # no "interrupted by user" line, consistent with the TERMINAL window
@@ -111,6 +118,7 @@ class ActionExecutor:
         pre_click_delay:  float = 0.05,
         post_click_delay: float = 0.1,
         keyboard_delay:   float = 0.05,
+        ghost_cursor:      bool  = False,
     ):
         self.dry_run          = dry_run
         self.pre_click_delay  = pre_click_delay
@@ -123,6 +131,23 @@ class ActionExecutor:
                 "Install with:  pip install pyautogui\n"
                 "Or use dry_run=True."
             )
+
+        # Opt-in, default OFF -- specifically so constructing an
+        # ActionExecutor(dry_run=False) in a test (many already do exactly
+        # that, with pyautogui mocked out) never spawns a real overlay
+        # window. Only agent.py's live-run construction turns this on.
+        self.ghost = None
+        if ghost_cursor and not dry_run:
+            try:
+                try:
+                    from components.agent.ghost_overlay import GhostOverlay
+                except ImportError:
+                    from agent.ghost_overlay import GhostOverlay
+                self.ghost = GhostOverlay()
+                self.ghost.start()
+            except Exception as exc:
+                logger.warning("GhostOverlay failed to start; continuing without it: %s", exc)
+                self.ghost = None
 
     def execute(self, prediction: Dict[str, Any]) -> ExecutionResult:
         action_type = prediction.get("action_type", "no_op")
@@ -166,12 +191,63 @@ class ActionExecutor:
         logger.info("CLICK  @ (%d, %d)%s", x, y, "  [DRY-RUN]" if self.dry_run else "")
         if self.dry_run:
             return
+        if self.ghost:
+            try:
+                self.ghost.show_cursor(x, y)
+            except Exception:
+                pass
         time.sleep(self.pre_click_delay)
-        pyautogui.moveTo(x, y, duration=0.15)
-        pyautogui.click(x, y)
+        if not self._try_uia_invoke(x, y):
+            pyautogui.moveTo(x, y, duration=0.15)
+            pyautogui.click(x, y)
         time.sleep(self.post_click_delay)
 
+    def _try_uia_invoke(self, x: int, y: int) -> bool:
+        """Attempt a real UIA action (Invoke/Toggle/Select) at (x, y)
+        instead of a simulated mouse click -- the real OS cursor never
+        moves for this path. Falls back to a coordinate click (handled by
+        the caller) for anything that doesn't support one of these
+        patterns -- not every control does, e.g. many comboboxes and
+        custom/legacy controls, so this is a best-effort upgrade, not a
+        guarantee. Uses the same generic ctrl.GetPattern(PatternId) shape
+        ui_observer.py already relies on for reading ValuePattern/
+        TogglePattern, rather than assuming a specific typed Control
+        subclass's named getters exist on whatever ControlFromPoint hands
+        back."""
+        if not _UIA_AVAILABLE:
+            return False
+        try:
+            ctrl = _uia.ControlFromPoint(x, y)
+            if ctrl is None:
+                return False
+            for pattern_id, method in (
+                (_uia.PatternId.InvokePattern, "Invoke"),
+                (_uia.PatternId.TogglePattern, "Toggle"),
+                (_uia.PatternId.SelectionItemPattern, "Select"),
+            ):
+                pattern = ctrl.GetPattern(pattern_id)
+                if pattern is not None:
+                    getattr(pattern, method)()
+                    logger.info("CLICK  @ (%d, %d) via UIA %s (real cursor untouched)", x, y, method)
+                    return True
+        except Exception as exc:
+            logger.debug("UIA invoke at (%d, %d) failed, falling back to a real click: %s", x, y, exc)
+        return False
+
+    def _show_ghost_caret(self) -> None:
+        if not self.ghost or not _UIA_AVAILABLE:
+            return
+        try:
+            fc = _uia.GetFocusedControl()
+            rect = fc.BoundingRectangle if fc else None
+            if rect and rect.right > rect.left and rect.bottom > rect.top:
+                self.ghost.show_caret(rect.left + 4, rect.top + 3, max(10, (rect.bottom - rect.top) - 6))
+        except Exception as exc:
+            logger.debug("GhostOverlay: couldn't place caret at focused control: %s", exc)
+
     def _keyboard(self, key_count: int, keystrokes: List[str], text: str = "") -> List[str]:
+        if not self.dry_run:
+            self._show_ghost_caret()
         if text:
             logger.info("KEYBOARD  paste=%r%s", text[:60], "  [DRY-RUN]" if self.dry_run else "")
             if not self.dry_run:

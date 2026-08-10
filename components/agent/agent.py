@@ -1013,7 +1013,7 @@ class LLMAgent:
             from agent import navigation_protocol as _navproto
         self._navproto = _navproto
 
-        self._executor          = ActionExecutor(dry_run=dry_run)
+        self._executor          = ActionExecutor(dry_run=dry_run, ghost_cursor=True)
         self._text_resolver     = _TextResolver()
         # Perception is an injectable adapter (the seam). Any observer whose
         # snapshot() conforms to observers/schema.py plugs in here — UIA now,

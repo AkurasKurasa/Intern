@@ -99,7 +99,7 @@ def main():
 
     observer    = UIAutomationObserver()
     trainer     = BCTrainer(save_path=model_path)
-    executor    = ActionExecutor(dry_run=args.dry_run)
+    executor    = ActionExecutor(dry_run=args.dry_run, ghost_cursor=True)
     resolver    = _TextResolver()
     record_data = {}
 
