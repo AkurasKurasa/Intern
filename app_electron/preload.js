@@ -12,5 +12,5 @@ contextBridge.exposeInMainWorld("recorderAPI", {
 
 contextBridge.exposeInMainWorld("workflowsAPI", {
   list: () => ipcRenderer.invoke("workflows-list"),
-  play: (sessionPath) => ipcRenderer.invoke("workflows-play", sessionPath),
+  play: (sessionPath, count) => ipcRenderer.invoke("workflows-play", sessionPath, count),
 });

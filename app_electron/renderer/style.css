@@ -221,6 +221,56 @@ html, body {
 /* Same override-[hidden] pattern as .empty-state/.mid-panel above --
    an author `display` rule is needed for the attribute toggle to stick. */
 .recorder-panel[hidden] { display: none; }
+
+/* ── Play panel — same slot as the recorder panel, shown on Workflows ──── */
+.play-panel {
+  flex: none;
+  width: 260px;
+  background: var(--page-bg);
+  border-left: 1px solid var(--border-strong);
+  display: flex; flex-direction: column;
+  padding: 16px 16px 14px;
+  gap: 10px;
+}
+.play-panel[hidden] { display: none; }
+
+.pp-slot {
+  min-height: 92px;
+  border: 1.5px dashed var(--border-strong);
+  border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  padding: 12px;
+  transition: border-color .2s ease, background .2s ease;
+}
+.pp-slot.filled { border-style: solid; background: var(--white); }
+.pp-slot-hint { font-size: 11.5px; color: var(--dim); text-align: center; margin: 0; }
+
+.pp-capsule { display: flex; align-items: center; gap: 10px; width: 100%; }
+.pp-capsule-icon {
+  width: 30px; height: 30px; border-radius: 50%; flex: none;
+  background: var(--orange-tint); color: var(--orange);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px;
+}
+.pp-capsule-text { display: flex; flex-direction: column; min-width: 0; gap: 1px; }
+.pp-capsule-name {
+  font-size: 12.5px; font-weight: 600; color: var(--ink);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.pp-capsule-meta { font-size: 10.5px; color: var(--dim); }
+
+/* Transient FLIP-animation clone, appended to <body> for the moment a
+   capsule flies from its row to the play panel's slot. */
+.capsule-flying {
+  position: fixed; z-index: 100; pointer-events: none;
+  display: flex; align-items: center; gap: 6px;
+  background: var(--white); border: 1px solid var(--orange);
+  border-radius: 8px; padding: 5px 10px;
+  font-size: 11.5px; color: var(--ink);
+  box-shadow: 0 4px 14px rgba(28,25,23,.14);
+  transition: transform .38s cubic-bezier(.3,.6,.3,1), opacity .38s ease;
+}
+
 .rp-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 2px; }
 .rp-head h2 { margin: 0; font-size: 14px; font-weight: 700; }
 .clock { font-family: Consolas, monospace; font-size: 10.5px; color: var(--dim); }
@@ -321,24 +371,18 @@ html, body {
   display: flex; align-items: center; justify-content: space-between;
   padding: 5px 0 5px 16px; font-size: 12px;
   border-radius: 6px;
+  cursor: pointer;
+  transition: background .12s ease;
 }
 .wf-session:hover { background: var(--chip-bg); }
+.wf-session.selected { background: var(--orange-tint); }
+.wf-session.selected .sname { color: var(--orange-dark); font-weight: 600; }
 .wf-session .sname { color: var(--ink); }
-.wf-session .ssteps { color: var(--dim); font-size: 11px; margin-right: 8px; }
-.wf-session .sright { display: flex; align-items: center; }
-
-.wf-play-btn {
-  width: 22px; height: 22px; border-radius: 50%;
-  border: 1px solid var(--border-strong); background: var(--white); color: var(--dim);
-  display: flex; align-items: center; justify-content: center;
-  font-size: 9px; cursor: pointer; flex: none;
-  transition: color .15s ease, border-color .15s ease, background .15s ease;
-}
-.wf-play-btn:hover { color: var(--orange); border-color: var(--orange); background: var(--orange-tint); }
-.wf-play-btn:disabled { opacity: .4; cursor: not-allowed; }
+.wf-session .ssteps { color: var(--dim); font-size: 11px; }
 
 .play-status {
-  font-size: 11.5px; color: var(--dim); font-family: Consolas, monospace;
-  margin: -6px 0 10px; padding: 6px 10px;
-  background: var(--chip-bg); border-radius: 6px;
+  font-size: 11px; color: var(--dim); font-family: Consolas, monospace;
+  padding: 6px 8px;
+  background: var(--white); border: 1px solid var(--border);
+  border-radius: 6px;
 }
