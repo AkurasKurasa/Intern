@@ -217,6 +217,9 @@ ipcMain.handle("recorder-replay", (_evt, n) => {
   queueOrSend({ cmd: "replay", n: n || 10 });
 });
 ipcMain.handle("workflows-list", () => listWorkflows());
+ipcMain.handle("workflows-play", (_evt, sessionPath) => {
+  queueOrSend({ cmd: "play", session: sessionPath, count: 1 });
+});
 ipcMain.handle("restore-main", () => {
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.restore();

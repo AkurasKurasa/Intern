@@ -207,7 +207,7 @@ html, body {
 
 .hint { font-size: 11.5px; color: var(--dim); margin: 3px 0 0; }
 
-/* ── Recorder panel — small, always-visible, rightmost ────────────────── */
+/* ── Recorder panel — small, rightmost, hidden while on Workflows ──────── */
 .recorder-panel {
   flex: none;
   width: 260px;
@@ -218,6 +218,9 @@ html, body {
   gap: 10px;
   overflow: hidden;
 }
+/* Same override-[hidden] pattern as .empty-state/.mid-panel above --
+   an author `display` rule is needed for the attribute toggle to stick. */
+.recorder-panel[hidden] { display: none; }
 .rp-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 2px; }
 .rp-head h2 { margin: 0; font-size: 14px; font-weight: 700; }
 .clock { font-family: Consolas, monospace; font-size: 10.5px; color: var(--dim); }
@@ -294,33 +297,48 @@ html, body {
 
 .muted { color: var(--dim); font-size: 13px; line-height: 1.6; margin: 0; }
 
-/* ── Workflows list (shown in the main area) ──────────────────────────── */
-.workflows-list { display: flex; flex-direction: column; gap: 12px; }
+/* ── Workflows list (shown in the main area) ────────────────────────────
+   Deliberately quiet: a plain list with thin dividers, not bordered/
+   shadowed "cards" — the sessions are reference data to skim, not the
+   focal action of the screen (Play is a small icon, not a loud button). */
+.workflows-list { display: flex; flex-direction: column; }
 .wf-group {
-  background: var(--white);
-  border: 1px solid var(--border-strong);
-  border-radius: 14px;
-  padding: 14px 18px;
-  box-shadow: 0 1px 2px rgba(28,25,23,.04);
+  border-bottom: 1px solid var(--border);
+  padding: 10px 2px;
 }
+.wf-group:last-child { border-bottom: none; }
 .wf-group-head {
   display: flex; align-items: baseline; justify-content: space-between;
   cursor: pointer; user-select: none;
 }
-.wf-group-head .name { font-size: 14.5px; font-weight: 600; }
-.wf-tag {
-  display: inline-block; font-size: 10px; font-weight: 700; text-transform: uppercase;
-  letter-spacing: .04em; color: var(--orange); background: var(--orange-tint);
-  border-radius: 5px; padding: 2px 6px; margin-right: 8px;
-}
-.wf-group-head .meta { font-size: 12px; color: var(--dim); font-family: Consolas, monospace; }
-.wf-group-head .chev { font-size: 10px; color: var(--orange); margin-right: 6px; }
+.wf-group-head .name { font-size: 13px; font-weight: 500; color: var(--ink); }
+.wf-group-head .meta { font-size: 11px; color: var(--dim); }
+.wf-group-head .chev { font-size: 9px; color: var(--dim); margin-right: 6px; }
 
-.wf-sessions { margin-top: 10px; border-top: 1px solid var(--border); padding-top: 10px; display: none; }
+.wf-sessions { margin-top: 8px; display: none; }
 .wf-group.open .wf-sessions { display: block; }
 .wf-session {
   display: flex; align-items: center; justify-content: space-between;
-  padding: 6px 0; font-size: 12.5px;
+  padding: 5px 0 5px 16px; font-size: 12px;
+  border-radius: 6px;
 }
-.wf-session .sname { font-family: Consolas, monospace; color: var(--ink); }
-.wf-session .ssteps { color: var(--dim); font-family: Consolas, monospace; }
+.wf-session:hover { background: var(--chip-bg); }
+.wf-session .sname { color: var(--ink); }
+.wf-session .ssteps { color: var(--dim); font-size: 11px; margin-right: 8px; }
+.wf-session .sright { display: flex; align-items: center; }
+
+.wf-play-btn {
+  width: 22px; height: 22px; border-radius: 50%;
+  border: 1px solid var(--border-strong); background: var(--white); color: var(--dim);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 9px; cursor: pointer; flex: none;
+  transition: color .15s ease, border-color .15s ease, background .15s ease;
+}
+.wf-play-btn:hover { color: var(--orange); border-color: var(--orange); background: var(--orange-tint); }
+.wf-play-btn:disabled { opacity: .4; cursor: not-allowed; }
+
+.play-status {
+  font-size: 11.5px; color: var(--dim); font-family: Consolas, monospace;
+  margin: -6px 0 10px; padding: 6px 10px;
+  background: var(--chip-bg); border-radius: 6px;
+}

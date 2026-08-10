@@ -12,6 +12,7 @@ Commands (stdin, one per line)
   {"cmd": "start", "output_dir": "data/demos/eight_Tabs"}
   {"cmd": "stop"}
   {"cmd": "replay", "n": 10}
+  {"cmd": "play", "session": "data/demos/eight_Tabs/session_...", "count": 1}
   {"cmd": "shutdown"}
 
 Events (stdout, one per line)
@@ -22,6 +23,9 @@ Events (stdout, one per line)
   {"event": "saved", "steps": 42, "session_dir": "..."}
   {"event": "replay_progress", "current": 3, "total": 10}
   {"event": "replay_done", "made": 10, "steps_each": 42, "dest": "..."}
+  {"event": "play_started", "session": "session_..."}
+  {"event": "play_progress", "message": "..."}
+  {"event": "play_done", "steps": 42}
   {"event": "log", "message": "...", "level": "ok" | "err" | "dim"}
   {"event": "error", "message": "..."}
 """
@@ -155,6 +159,42 @@ class Bridge:
         emit("log", message=f"Replay = {made} copies of '{os.path.basename(src)}' "
                              f"({len(step_files)} steps each) -> data/demos/human", level="ok")
 
+    # ── play (actually executes the session live, via DemoRecorder.replay) ───
+    # Distinct from replay() above, which is pure file duplication (no mouse,
+    # no live form). This drives the real form with pyautogui, re-finding
+    # each recorded field by its label/type in the CURRENT UI (not raw
+    # coordinates), and saves the newly-executed run as a fresh session.
+    def play(self, session: str, count: int = 1) -> None:
+        if self._running:
+            emit("error", message="Stop recording before playing a session.")
+            return
+        session_path = session if os.path.isabs(session) else os.path.join(_ROOT, session)
+        if not os.path.isdir(session_path):
+            emit("error", message=f"Session not found: {session_path}")
+            return
+
+        def _progress(message: str) -> None:
+            emit("play_progress", message=message)
+
+        def _run() -> None:
+            try:
+                player = DemoRecorder(output_dir=os.path.join(_ROOT, "data", "demos"),
+                                       trace_type="form_filling")
+                # This thread will call _request_snapshot() -> self._observer.
+                # snapshot() directly (in-process mode, see
+                # uiux_electron_feature_parity in DEVELOPERS.md) -- every
+                # thread that touches uiautomation needs its own COM init or
+                # it segfaults, same lesson _worker() already learned live.
+                player._init_com()
+                total = player.replay(session_path, count=count,
+                                       submit_between=True, progress=_progress)
+                emit("play_done", steps=total)
+            except Exception as exc:
+                emit("error", message=f"Play failed: {exc}")
+
+        threading.Thread(target=_run, daemon=True).start()
+        emit("play_started", session=os.path.basename(session_path))
+
     # ── main loop ────────────────────────────────────────────────────────────
     def run(self) -> None:
         emit("ready")
@@ -175,6 +215,8 @@ class Bridge:
                 self.stop()
             elif cmd == "replay":
                 self.replay(int(msg.get("n", 10)))
+            elif cmd == "play":
+                self.play(msg.get("session", ""), int(msg.get("count", 1)))
             elif cmd == "shutdown":
                 if self._running and self._recorder is not None:
                     self._recorder._quit_event.set()

@@ -18,17 +18,19 @@ function maybeDismissSplash() {
 setTimeout(() => { bridgeIsReady = true; maybeDismissSplash(); }, 4000);
 
 /* ── Sidebar navigation — controls what shows in the middle main area ──── */
-/* The recorder panel on the right is always visible; the sidebar only
-   switches the (currently placeholder) middle content. */
+/* The recorder panel only makes sense while actually recording, so it's
+   hidden on the Workflows tab -- that tab plays sessions instead. */
 const navRecorder = document.getElementById("navRecorder");
 const navWorkflows = document.getElementById("navWorkflows");
 const emptyState = document.getElementById("emptyState");
 const workflowsWrap = document.getElementById("workflowsWrap");
+const recorderPanel = document.getElementById("recorderPanel");
 
 function showMain(name) {
   const toHome = name === "home";
   emptyState.hidden = !toHome;
   workflowsWrap.hidden = toHome;
+  recorderPanel.hidden = !toHome;
   navRecorder.classList.toggle("active", toHome);
   navWorkflows.classList.toggle("active", !toHome);
   navRecorder.setAttribute("aria-current", toHome ? "page" : "false");
@@ -125,6 +127,18 @@ window.recorderAPI.onEvent((event) => {
       statStatus.textContent = "Idle";
       log(`Replay done — ${event.made} copies (${event.steps_each} steps each) -> ${event.dest}`, "ok");
       break;
+    case "play_started":
+      setPlayStatus(`▶ Playing '${event.session}'…`);
+      setPlayButtonsDisabled(true);
+      break;
+    case "play_progress":
+      setPlayStatus(event.message);
+      break;
+    case "play_done":
+      setPlayStatus(`Done — ${event.steps} steps replayed.`);
+      setTimeout(() => setPlayStatus(""), 4000);
+      setPlayButtonsDisabled(false);
+      break;
     case "log":
       log(event.message, event.level || "dim");
       break;
@@ -132,6 +146,8 @@ window.recorderAPI.onEvent((event) => {
       setRecording(false);
       log(event.message, "err");
       sideStatusDot.classList.add("error");
+      setPlayStatus(event.message);
+      setPlayButtonsDisabled(false);
       break;
     default:
       console.log("Unhandled event:", event);
@@ -141,6 +157,7 @@ window.recorderAPI.onEvent((event) => {
 /* ── Workflows panel ──────────────────────────────────────────────────── */
 const workflowsListEl = document.getElementById("workflowsList");
 const btnRefreshWorkflows = document.getElementById("btnRefreshWorkflows");
+const playStatusEl = document.getElementById("playStatus");
 let workflowsLoaded = false;
 
 function timeAgo(ms) {
@@ -149,6 +166,15 @@ function timeAgo(ms) {
   if (s < 3600) return Math.floor(s / 60) + "m ago";
   if (s < 86400) return Math.floor(s / 3600) + "h ago";
   return Math.floor(s / 86400) + "d ago";
+}
+
+function setPlayStatus(message) {
+  playStatusEl.textContent = message || "";
+  playStatusEl.hidden = !message;
+}
+
+function setPlayButtonsDisabled(disabled) {
+  workflowsListEl.querySelectorAll(".wf-play-btn").forEach((b) => { b.disabled = disabled; });
 }
 
 async function loadWorkflows() {
@@ -173,7 +199,7 @@ async function loadWorkflows() {
     const head = document.createElement("div");
     head.className = "wf-group-head";
     head.innerHTML =
-      `<span><span class="chev">▸</span><span class="wf-tag">Form</span><span class="name">${escapeHtml(g.name)}</span></span>` +
+      `<span><span class="chev">▸</span><span class="name">${escapeHtml(g.name)}</span></span>` +
       `<span class="meta">${g.sessionCount} session${g.sessionCount===1?"":"s"} · ${g.totalSteps.toLocaleString()} steps</span>`;
     head.addEventListener("click", () => card.classList.toggle("open"));
     card.appendChild(head);
@@ -181,11 +207,23 @@ async function loadWorkflows() {
     const body = document.createElement("div");
     body.className = "wf-sessions";
     g.sessions.forEach((s) => {
+      const sessionPath = `data/demos/${g.name}/${s.name}`;
       const row = document.createElement("div");
       row.className = "wf-session";
-      row.innerHTML =
-        `<span class="sname">${escapeHtml(s.name)}</span>` +
-        `<span class="ssteps">${s.steps.toLocaleString()} steps · ${timeAgo(s.mtime)}</span>`;
+      const left = document.createElement("span");
+      left.className = "sname";
+      left.textContent = s.name;
+      const right = document.createElement("span");
+      right.className = "sright";
+      right.innerHTML =
+        `<span class="ssteps">${s.steps.toLocaleString()} steps · ${timeAgo(s.mtime)}</span>` +
+        `<button class="wf-play-btn" type="button" title="Play this session on the live form">▶</button>`;
+      right.querySelector(".wf-play-btn").addEventListener("click", (evt) => {
+        evt.stopPropagation();
+        window.workflowsAPI.play(sessionPath);
+      });
+      row.appendChild(left);
+      row.appendChild(right);
       body.appendChild(row);
     });
     card.appendChild(body);
