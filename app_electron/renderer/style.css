@@ -260,13 +260,12 @@ html, body {
   transition: border-color .12s ease;
 }
 .pp-capsule-icon:hover { border-color: var(--orange); }
-.pp-capsule-emoji-input {
-  width: 30px; height: 30px; border-radius: 50%; flex: none;
-  background: var(--white); color: var(--ink);
-  text-align: center; font-size: 14px; padding: 0;
-  border: 1px solid var(--orange);
-}
-.pp-capsule-emoji-input:focus { outline: none; }
+/* Unset ("template") emoji -- gray chrome around the glyph. Note this can
+   only ever be the background/border: real emoji render via the OS's own
+   color emoji font, which ignores CSS `color`, so the glyph itself can't
+   be recolored either way -- gray or otherwise. */
+.pp-capsule-icon.is-placeholder { background: var(--chip-bg); color: var(--dim); }
+.pp-capsule-icon.is-placeholder:hover { border-color: var(--dim); }
 .pp-capsule-text { display: flex; flex-direction: column; min-width: 0; gap: 1px; }
 .pp-capsule-name {
   font-size: 12.5px; font-weight: 600; color: var(--ink);
@@ -299,6 +298,32 @@ html, body {
   transition: transform .48s cubic-bezier(.16,1,.3,1), opacity .18s ease;
   will-change: transform;
 }
+.capsule-flying.is-placeholder { background: var(--chip-bg); color: var(--dim); }
+
+/* Emoji picker -- "a section that displays all the available emojis" to
+   click, opened from .pp-capsule-icon. Positioned via inline left/top set
+   in JS (anchored just under the bubble that opened it), not CSS, since
+   the anchor point depends on where the panel actually is on screen. */
+.emoji-picker {
+  position: fixed; z-index: 200;
+  display: grid; grid-template-columns: repeat(6, 28px); gap: 4px;
+  background: var(--white); border: 1px solid var(--border-strong);
+  border-radius: 10px; padding: 8px;
+  box-shadow: 0 10px 28px rgba(28,25,23,.18);
+}
+.emoji-picker-tile {
+  width: 28px; height: 28px; border-radius: 7px;
+  border: 1px solid transparent; background: transparent;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 15px; line-height: 1; padding: 0; cursor: pointer;
+  transition: background .1s ease, border-color .1s ease;
+}
+.emoji-picker-tile:hover { background: var(--chip-bg); border-color: var(--border-strong); }
+.emoji-picker-tile.is-placeholder {
+  background: var(--chip-bg); color: var(--dim);
+  grid-column: 1 / -1; width: auto; justify-self: stretch;
+}
+.emoji-picker-tile.is-placeholder:hover { border-color: var(--dim); }
 
 .rp-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 2px; }
 .rp-head h2 { margin: 0; font-size: 14px; font-weight: 700; }
@@ -400,7 +425,12 @@ html, body {
 .wf-group-head .name { font-size: 13px; font-weight: 500; color: var(--ink); }
 .wf-group-head .meta { font-size: 11px; color: var(--dim); }
 .wf-group-head .chev { font-size: 9px; color: var(--dim); margin-right: 6px; }
-.wf-group-head .wf-emoji { margin-right: 6px; font-size: 13px; }
+.wf-group-head .wf-emoji {
+  margin-right: 6px; font-size: 13px;
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 18px; height: 18px; border-radius: 5px;
+}
+.wf-group-head .wf-emoji.is-placeholder { background: var(--chip-bg); }
 
 .wf-sessions { margin-top: 8px; display: none; }
 .wf-group.open .wf-sessions { display: block; }
@@ -408,6 +438,6 @@ html, body {
   display: flex; align-items: center; justify-content: space-between;
   padding: 5px 0 5px 16px; font-size: 12px;
 }
-.wf-session .sname { color: var(--ink); }
+.wf-session .sname { color: var(--dim); }
 .wf-session .ssteps { color: var(--dim); font-size: 11px; }
 .wf-empty-hint { padding: 4px 0 4px 16px; }

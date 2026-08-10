@@ -225,7 +225,7 @@ async function loadCapsuleIntoSlot(capsule) {
   currentCapsule = capsule;
   ppSlotHint.hidden = true;
   ppCapsule.hidden = false;
-  ppCapsuleEmoji.textContent = capsule.emoji || PLACEHOLDER_EMOJI;
+  applyCapsuleEmojiDisplay(ppCapsuleEmoji, capsule.emoji);
   ppCapsuleName.textContent = capsule.name;
   ppCapsuleMeta.textContent = capsule.description || capsule.model_path;
   ppSlot.classList.add("filled");
@@ -317,7 +317,7 @@ function flyToPlayPanel(fromEmojiEl, capsule) {
   const scale = Math.max(fromRect.height, 10) / FINAL;
 
   const clone = document.createElement("div");
-  clone.className = "capsule-flying";
+  clone.className = "capsule-flying" + (capsule.emoji ? "" : " is-placeholder");
   clone.textContent = capsule.emoji || PLACEHOLDER_EMOJI;
   clone.style.left = `${toCenterX - FINAL / 2}px`;
   clone.style.top = `${toCenterY - FINAL / 2}px`;
@@ -344,44 +344,97 @@ function flyToPlayPanel(fromEmojiEl, capsule) {
   setTimeout(finish, 650); // fallback in case transitionend doesn't fire
 }
 
-/* Click-to-edit: the capsule's emoji bubble in the Play panel swaps to a
-   small text input, committed on blur/Enter, discarded on Escape. Updates
-   both currentCapsule and its entry in capsulesCache (same staleness
-   pitfall as the checkpoint deploy handler above), then patches every
-   matching group header in the list so it doesn't need a full reload. */
+/* A fixed, curated set rather than free text -- "a section that displays
+   all the available emojis" to click, not type into. The placeholder
+   puzzle piece doubles as the first tile, so picking it is how you clear
+   back to "unset." */
+const EMOJI_CHOICES = [
+  "📋", "🚗", "📊", "✅", "🔧", "⚙️", "📁", "💼",
+  "🖱️", "⌨️", "📝", "🗂️", "🎯", "🔁", "🤖", "⚡",
+  "🧠", "🗃️", "📌", "📇", "🧾", "🛠️", "🗺️", "💡", "🔍",
+];
+
+// A "template"/unset emoji shows in gray chrome (background + border) --
+// note this can only ever be the CHROME around the glyph, not the glyph
+// itself: real emoji render via the OS's own color emoji font, which
+// ignores CSS `color` entirely, so there's no way to actually recolor the
+// character glyph itself either way.
+function applyCapsuleEmojiDisplay(el, emojiValue) {
+  el.textContent = emojiValue || PLACEHOLDER_EMOJI;
+  el.classList.toggle("is-placeholder", !emojiValue);
+}
+
+async function chooseEmojiForCurrentCapsule(value) {
+  if (!currentCapsule) return;
+  try {
+    const updated = await window.capsulesAPI.setEmoji(currentCapsule.name, value);
+    currentCapsule = updated;
+    // Same staleness pitfall as the checkpoint deploy handler above.
+    const idx = capsulesCache.findIndex((c) => c.name === updated.name);
+    if (idx !== -1) capsulesCache[idx] = updated;
+    applyCapsuleEmojiDisplay(ppCapsuleEmoji, updated.emoji);
+    refreshGroupEmojis();
+  } catch (e) {
+    capsuleLog(`Couldn't set emoji: ${e.message || e}`, "err");
+  }
+}
+
+let openEmojiPicker = null;
+
+function closeEmojiPicker() {
+  if (!openEmojiPicker) return;
+  openEmojiPicker.remove();
+  openEmojiPicker = null;
+  document.removeEventListener("mousedown", handlePickerOutsideClick, true);
+  document.removeEventListener("keydown", handlePickerEscape, true);
+}
+function handlePickerOutsideClick(e) {
+  if (openEmojiPicker && !openEmojiPicker.contains(e.target) && e.target !== ppCapsuleEmoji) {
+    closeEmojiPicker();
+  }
+}
+function handlePickerEscape(e) {
+  if (e.key === "Escape") closeEmojiPicker();
+}
+
+/* Click the capsule's emoji bubble in the Play panel to open a small grid
+   of every available choice, anchored just below the bubble. Clicking a
+   tile commits immediately and closes the picker -- no typing, no
+   confirm step. Uses `mousedown` (not `click`) for the outside-close
+   listener specifically so it can't catch the very click that opened the
+   picker: mousedown for that click already finished before this `click`
+   handler even runs, so a mousedown listener added here can only ever
+   fire on a later, separate click. */
 ppCapsuleEmoji.addEventListener("click", () => {
   if (!currentCapsule) return;
-  const input = document.createElement("input");
-  input.type = "text";
-  input.className = "pp-capsule-emoji-input";
-  input.value = currentCapsule.emoji || "";
-  input.placeholder = PLACEHOLDER_EMOJI;
-  input.maxLength = 8;
-  ppCapsuleEmoji.replaceWith(input);
-  input.focus();
-  input.select();
+  if (openEmojiPicker) { closeEmojiPicker(); return; }
 
-  let cancelled = false;
-  const commit = async () => {
-    if (cancelled) { input.replaceWith(ppCapsuleEmoji); return; }
-    const value = input.value.trim();
-    input.replaceWith(ppCapsuleEmoji);
-    try {
-      const updated = await window.capsulesAPI.setEmoji(currentCapsule.name, value);
-      currentCapsule = updated;
-      const idx = capsulesCache.findIndex((c) => c.name === updated.name);
-      if (idx !== -1) capsulesCache[idx] = updated;
-      ppCapsuleEmoji.textContent = updated.emoji || PLACEHOLDER_EMOJI;
-      refreshGroupEmojis();
-    } catch (e) {
-      capsuleLog(`Couldn't set emoji: ${e.message || e}`, "err");
-    }
+  const picker = document.createElement("div");
+  picker.className = "emoji-picker";
+
+  const makeTile = (value, isClear) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "emoji-picker-tile" + (isClear ? " is-placeholder" : "");
+    btn.textContent = value;
+    btn.title = isClear ? "Clear (use placeholder)" : value;
+    btn.addEventListener("click", () => {
+      chooseEmojiForCurrentCapsule(isClear ? "" : value);
+      closeEmojiPicker();
+    });
+    return btn;
   };
-  input.addEventListener("keydown", (e) => {
-    if (e.key === "Enter") input.blur();
-    else if (e.key === "Escape") { cancelled = true; input.blur(); }
-  });
-  input.addEventListener("blur", commit, { once: true });
+  picker.appendChild(makeTile(PLACEHOLDER_EMOJI, true));
+  EMOJI_CHOICES.forEach((em) => picker.appendChild(makeTile(em, false)));
+
+  const rect = ppCapsuleEmoji.getBoundingClientRect();
+  picker.style.left = `${rect.left}px`;
+  picker.style.top = `${rect.bottom + 6}px`;
+  document.body.appendChild(picker);
+  openEmojiPicker = picker;
+
+  document.addEventListener("mousedown", handlePickerOutsideClick, true);
+  document.addEventListener("keydown", handlePickerEscape, true);
 });
 
 /* Re-reads each visible group's mapped capsule and patches just its emoji
@@ -391,7 +444,7 @@ function refreshGroupEmojis() {
   workflowsListEl.querySelectorAll(".wf-group-head").forEach((headEl) => {
     const capsule = findCapsuleForGroup(headEl.dataset.groupName);
     const emojiEl = headEl.querySelector(".wf-emoji");
-    if (emojiEl) emojiEl.textContent = capsule ? (capsule.emoji || PLACEHOLDER_EMOJI) : PLACEHOLDER_EMOJI;
+    if (emojiEl) applyCapsuleEmojiDisplay(emojiEl, capsule ? capsule.emoji : "");
   });
 }
 
@@ -457,9 +510,11 @@ async function loadWorkflows() {
     head.title = "Click to expand and load this capsule into Play";
     head.dataset.groupName = g.name;
     const headCapsule = findCapsuleForGroup(g.name);
-    const headEmoji = headCapsule ? (headCapsule.emoji || PLACEHOLDER_EMOJI) : PLACEHOLDER_EMOJI;
+    const headEmojiValue = headCapsule ? headCapsule.emoji : "";
+    const headEmojiText = headEmojiValue || PLACEHOLDER_EMOJI;
+    const headEmojiClass = "wf-emoji" + (headEmojiValue ? "" : " is-placeholder");
     head.innerHTML =
-      `<span><span class="chev">▸</span><span class="wf-emoji">${headEmoji}</span><span class="name">${escapeHtml(g.name)}</span></span>` +
+      `<span><span class="chev">▸</span><span class="${headEmojiClass}">${headEmojiText}</span><span class="name">${escapeHtml(g.name)}</span></span>` +
       `<span class="meta">${g.sessionCount} session${g.sessionCount===1?"":"s"} · ${g.totalSteps.toLocaleString()} steps</span>`;
     head.addEventListener("click", () => {
       card.classList.toggle("open");
