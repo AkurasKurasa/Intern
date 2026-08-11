@@ -594,15 +594,37 @@ class ScreenObserver:
 
         # 2. Keyboard text
         if step_strokes:
-            _IGNORE = {"shift", "ctrl", "alt", "win", "caps lock",
+            # Keys with zero standalone effect -- meaningless without a
+            # companion key (a lone Shift/Ctrl/Alt/Win/Caps Lock press does
+            # nothing to any GUI by itself). Deliberately NARROWER than the
+            # old single _IGNORE set used below: navigation keys (Tab,
+            # arrows, Escape, Page Up/Down, Home/End, Insert/Delete, F-keys)
+            # are excluded from this set on purpose -- those DO have real,
+            # independent effects (Tab moves focus, Escape closes a
+            # dropdown) that validate_transitions.py's check_transition()
+            # already correctly validates via its own focus/value-changed
+            # check for empty-text keyboard actions. Confirmed live 2026-08-11
+            # before shipping: an earlier draft of this fix folded navigation
+            # keys into the same suppression and turned a real, legitimate
+            # lone Tab press into action_type="noop" -- destroying real
+            # training signal (Tab correctly moving focus is a GOOD example
+            # to train on), not fixing anything. Caught by testing
+            # _derive_action_from({'key': 'tab'}) directly before committing.
+            _PURE_MODIFIERS = {"shift", "ctrl", "alt", "win", "caps lock"}
+            _IGNORE = _PURE_MODIFIERS | {
                        "tab", "esc", "escape", "up", "down", "left", "right",
                        "page up", "page down", "home", "end", "insert", "delete",
                        "f1","f2","f3","f4","f5","f6","f7","f8","f9","f10","f11","f12"}
             chars = []
+            saw_backspace = False
+            saw_meaningful_key = False   # any key besides a bare modifier / blank
             for stroke in step_strokes:
                 key = stroke.get("key", "")
                 low = key.lower()
+                if low and low not in _PURE_MODIFIERS:
+                    saw_meaningful_key = True
                 if low == "backspace":
+                    saw_backspace = True
                     if chars:
                         chars.pop()
                 elif low == "space":
@@ -612,17 +634,34 @@ class ScreenObserver:
                 elif low not in _IGNORE and len(key) == 1:
                     chars.append(key)
             typed_text = "".join(chars)
-            click_pos = None
-            if step_mouse:
-                pos = step_mouse[0].get("position", [])
-                if len(pos) == 2:
-                    click_pos = [int(pos[0]), int(pos[1])]
-            return {
-                "action_type":    "keyboard",
-                "text":           typed_text,
-                "keystrokes":     [s.get("key", "") for s in step_strokes],
-                "click_position": click_pos,
-            }
+            # Suppress the keyboard-action classification ONLY when every
+            # stroke was either a blank/malformed key value or a bare
+            # modifier with nothing else in the group -- genuinely nothing
+            # for the model to learn from either way. Found 2026-08-11
+            # tracing a real failure: session_20260808_144216 step 0 had
+            # keystrokes=[""] (an empty/malformed key value), text="", and
+            # zero observable effect -- exactly the "mistrains the model on
+            # a transition that didn't really happen" case
+            # validate_transitions.py's own docstring warns about. Falling
+            # through to the mouse/noop checks below treats this the same
+            # as if step_strokes had been empty in the first place --
+            # semantically correct, and noop steps are already excluded
+            # from validate_transitions.py's actionable-transitions
+            # denominator. Every navigation key (Tab/arrows/Escape/etc.)
+            # still produces a real keyboard action even with empty text,
+            # same as before this fix.
+            if saw_meaningful_key:
+                click_pos = None
+                if step_mouse:
+                    pos = step_mouse[0].get("position", [])
+                    if len(pos) == 2:
+                        click_pos = [int(pos[0]), int(pos[1])]
+                return {
+                    "action_type":    "keyboard",
+                    "text":           typed_text,
+                    "keystrokes":     [s.get("key", "") for s in step_strokes],
+                    "click_position": click_pos,
+                }
 
         # 3. Mouse action
         if step_mouse:
