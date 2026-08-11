@@ -65,6 +65,7 @@ _GWL_EXSTYLE        = -20
 _WS_EX_LAYERED      = 0x00080000
 _WS_EX_TRANSPARENT  = 0x00000020
 _WS_EX_NOACTIVATE   = 0x08000000
+_GA_ROOT            = 2
 
 # Queue-drain interval, was 30ms (~33 wake-ups/sec) for the entire
 # duration of a live run. Widened 2026-08-10: a user reported the live
@@ -279,11 +280,43 @@ class GhostOverlay:
         `ctypes.windll` singleton -- it's a live, C-backed, process-wide
         object, and patching it directly (tried once while writing this)
         triggers a genuine low-level crash (a real access-violation-class
-        fault, not a Python exception), not just a flaky test."""
+        fault, not a Python exception), not just a flaky test.
+
+        Operates on GetAncestor(root.winfo_id(), GA_ROOT), NOT
+        root.winfo_id() directly -- found live 2026-08-11, the morning
+        after this file was first written, chasing a real, separate
+        report: "I never saw [the cursor], btw." Confirmed directly:
+        Tkinter's own winfo_id() for a plain Tk() root returns a CHILD
+        window (class "TkChild"), not the actual top-level window Windows
+        composites and manages (class "TkTopLevel", found one level up
+        via GetAncestor) -- every style change this method has ever made
+        was applied to the wrong window. A real, cropped screen capture
+        (not GetPixel, which turned out to be unreliable for this exact
+        kind of layered window -- see below) showed content drawn via
+        plain -transparentcolor alone renders correctly, but the same
+        drawing through the real GhostOverlay class -- this method
+        included, targeting the child hwnd -- did not appear on screen at
+        the same test position. WS_EX_LAYERED applied a second time to a
+        CHILD window (Tkinter's own -transparentcolor call already
+        applies it correctly to the true top-level window internally) is
+        the likely mechanism: layered-window semantics are a top-level
+        concept in Win32, and redundantly/incorrectly re-asserting it one
+        level down plausibly corrupts the compositor state the top-level
+        window already had configured correctly.
+
+        Diagnostic dead end worth recording so it isn't repeated:
+        GetPixel() via GetDC(0) reads GDI's legacy desktop surface, which
+        does not reliably reflect what a DWM-composited layered window
+        actually shows on screen -- it read back "invisible" even in
+        cases a real screenshot (System.Drawing's CopyFromScreen)
+        immediately proved were rendering correctly. Any future visual
+        verification of this overlay must use a real composited capture,
+        not GetPixel."""
         if user32 is None:
             user32 = ctypes.windll.user32
         try:
-            hwnd = root.winfo_id()
+            child_hwnd = root.winfo_id()
+            hwnd = user32.GetAncestor(child_hwnd, _GA_ROOT) or child_hwnd
             ex_style = user32.GetWindowLongW(hwnd, _GWL_EXSTYLE)
             user32.SetWindowLongW(
                 hwnd, _GWL_EXSTYLE,

@@ -150,16 +150,53 @@ class TestClickThroughWindowStyle:
         fake_root = MagicMock()
         fake_root.winfo_id.return_value = 12345
         fake_user32 = MagicMock()
+        fake_user32.GetAncestor.return_value = 99999  # the real top-level window
         fake_user32.GetWindowLongW.return_value = 0
 
         go.GhostOverlay._make_click_through(fake_root, user32=fake_user32)
 
         args, _ = fake_user32.SetWindowLongW.call_args
         hwnd, gwl_exstyle, new_style = args
-        assert hwnd == 12345
+        assert hwnd == 99999
         assert gwl_exstyle == go._GWL_EXSTYLE
         assert new_style & go._WS_EX_TRANSPARENT
         assert new_style & go._WS_EX_LAYERED
+
+    def test_operates_on_the_true_top_level_window_not_the_child(self):
+        """Found live 2026-08-11: root.winfo_id() for a plain Tk() root
+        returns a CHILD window (class 'TkChild'), not the actual
+        top-level window Windows composites and manages (class
+        'TkTopLevel', one level up via GetAncestor(hwnd, GA_ROOT)) --
+        confirmed directly, live, with a real cropped screen capture.
+        Every style bit this method sets must land on the resolved
+        top-level ancestor, not the raw winfo_id() child, or the fix
+        does nothing."""
+        fake_root = MagicMock()
+        fake_root.winfo_id.return_value = 555  # the child
+        fake_user32 = MagicMock()
+        fake_user32.GetAncestor.return_value = 777  # the true top-level
+        fake_user32.GetWindowLongW.return_value = 0
+
+        go.GhostOverlay._make_click_through(fake_root, user32=fake_user32)
+
+        fake_user32.GetAncestor.assert_called_once_with(555, go._GA_ROOT)
+        assert fake_user32.GetWindowLongW.call_args[0][0] == 777
+        assert fake_user32.SetWindowLongW.call_args[0][0] == 777
+
+    def test_falls_back_to_the_child_hwnd_if_get_ancestor_returns_nothing(self):
+        """GetAncestor can legitimately return NULL (0) if the window has
+        no such ancestor -- degrade to the old (imperfect but
+        non-crashing) behavior rather than pass a null hwnd to
+        SetWindowLongW."""
+        fake_root = MagicMock()
+        fake_root.winfo_id.return_value = 555
+        fake_user32 = MagicMock()
+        fake_user32.GetAncestor.return_value = 0
+        fake_user32.GetWindowLongW.return_value = 0
+
+        go.GhostOverlay._make_click_through(fake_root, user32=fake_user32)
+
+        assert fake_user32.SetWindowLongW.call_args[0][0] == 555
 
     def test_sets_ws_ex_noactivate(self):
         """Found live 2026-08-10: creating this overlay steals OS
@@ -179,6 +216,7 @@ class TestClickThroughWindowStyle:
         fake_root = MagicMock()
         fake_root.winfo_id.return_value = 12345
         fake_user32 = MagicMock()
+        fake_user32.GetAncestor.return_value = 99999
         fake_user32.GetWindowLongW.return_value = 0
 
         go.GhostOverlay._make_click_through(fake_root, user32=fake_user32)
@@ -192,6 +230,7 @@ class TestClickThroughWindowStyle:
         fake_root = MagicMock()
         fake_root.winfo_id.return_value = 1
         fake_user32 = MagicMock()
+        fake_user32.GetAncestor.return_value = 2
         fake_user32.GetWindowLongW.return_value = 0x00040000  # some pre-existing bit
 
         go.GhostOverlay._make_click_through(fake_root, user32=fake_user32)
