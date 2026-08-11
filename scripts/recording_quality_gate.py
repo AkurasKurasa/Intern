@@ -62,9 +62,17 @@ LOG_PATH   = ROOT / "data" / "output" / "recording_quality_log.jsonl"
 # describing the FORM for a QA report, not a decision the agent makes, so it's
 # not the kind of hardcoding CLAUDE.md's "let the Transformer/Agent work"
 # rule is about.
+#
+# Fixed 2026-08-11: this previously listed 9 entries including three
+# separate "Driver 1/2/3" tabs -- didn't match the real form
+# (car_insurance_form_wx.py) at all. There is no "Driver 1" tab (the
+# Policyholder tab IS the primary driver); Driver 2 and Driver 3 are two
+# sections inside one "Drivers" tab; and "History" was missing entirely.
+# Matches bc_fidelity._TAB_PREFIXES, fixed alongside this for the same
+# underlying scope1_tab_order investigation.
 CANONICAL_TAB_ORDER = [
     "Policy", "Policyholder", "Vehicle", "Coverage",
-    "Driver 1", "Driver 2", "Driver 3", "Claims", "Payment",
+    "Drivers", "History", "Claims", "Payment",
 ]
 
 # Per-tab known field counts, derived from bc_fidelity's own label→key map —

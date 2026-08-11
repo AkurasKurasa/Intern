@@ -47,15 +47,23 @@ SUBMISSIONS_DIR = ROOT / "data" / "output" / "submissions"
 # Fields to skip when scoring (metadata, not filled by agent)
 _SKIP_FIELDS = {"_timestamp", "policy_number", "policy_status"}
 
-# Tab prefix → tab name mapping
+# Tab prefix → tab name mapping. Matches the real 8-tab wx form structure
+# (car_insurance_entry/car_insurance_form_wx.py) confirmed directly 2026-08-11
+# while fixing scope1_tab_order -- there is no "Driver 1" tab (the
+# Policyholder IS the primary driver, ph_* fields), Driver 2 and Driver 3 are
+# two sections inside ONE "Drivers" tab (not two separate tabs), "disc_"
+# (the Coverage tab's Discounts Applied section) was missing entirely and
+# fell into "Other" for every discount field, and "hist_" (the whole History
+# tab) was missing entirely too.
 _TAB_PREFIXES = {
     "policy_": "Policy",
     "ph_":     "Policyholder",
     "v_":      "Vehicle",
     "cov_":    "Coverage",
-    "d1_":     "Driver 1",
-    "d2_":     "Driver 2",
-    "d3_":     "Driver 3",
+    "disc_":   "Coverage",
+    "d2_":     "Drivers",
+    "d3_":     "Drivers",
+    "hist_":   "History",
     "claim_":  "Claims",
     "pay_":    "Payment",
 }
@@ -184,6 +192,144 @@ _LABEL_TO_KEY: dict[str, str] = {
     "parking sensors":            "v_parking_sensors",
     "lane departure warning":     "v_lane_assist",
     "adaptive cruise control":    "v_adaptive_cruise",
+    # Coverage tab -- added 2026-08-11 alongside scope1_tab_order (see
+    # _TAB_PREFIXES comment above for why Coverage/Drivers/History/Claims/
+    # Payment were all missing from this dict until now)
+    "bodily injury (k$/k$)":      "cov_bodily_limit",
+    "property damage ($)":        "cov_property",
+    "collision deductible":       "cov_collision_ded",
+    "comprehensive deductible":   "cov_comp_ded",
+    "uninsured/underinsured motorist": "cov_um_uim",
+    "personal injury protection (pip)": "cov_pip",
+    "medical payments":           "cov_medpay",
+    "rental reimbursement":       "cov_rental",
+    "roadside assistance":        "cov_roadside",
+    "gap insurance":              "cov_gap",
+    "rideshare coverage":         "cov_rideshare",
+    "new car replacement":        "cov_new_car",
+    "accident forgiveness":       "cov_acc_forgive",
+    "diminishing deductible":     "cov_disappear_ded",
+    "um/uim limit":               "cov_um_limit",
+    "pip limit ($)":              "cov_pip_limit",
+    "medpay limit ($)":           "cov_medpay_limit",
+    "rental limit":               "cov_rental_limit",
+    "multi-car":                  "disc_multi_car",
+    "multi-policy / bundle":      "disc_multi_policy",
+    "good driver (5+ yr clean)":  "disc_good_driver",
+    "good student":               "disc_good_student",
+    "defensive driving course":   "disc_defensive_drv",
+    "loyalty discount":           "disc_loyalty",
+    "military":                   "disc_military",
+    "affinity group":             "disc_affinity",
+    # "Total Premium ($)" / "Payment Frequency" appear verbatim on BOTH the
+    # Coverage tab ([ Premium Summary ]) and the Payment tab
+    # ([ Billing Summary ]) with different underlying fields -- these two
+    # entries are the Coverage-tab (default/fallback) meaning; _SECTION_OVERRIDES
+    # below redirects them to pay_amount/pay_frequency specifically while
+    # inside "[ Billing Summary ]".
+    "total premium ($)":          "cov_premium_total",
+    "payment frequency":          "cov_premium_period",
+    # History tab
+    "at-fault accidents":         "hist_at_fault",
+    "not-at-fault accidents":     "hist_not_at_fault",
+    "total accidents":            "hist_accidents_3yr",
+    "moving violations":          "hist_violations_3yr",
+    "comprehensive claims":       "hist_comp_claims",
+    "total claims filed":         "hist_claims_3yr",
+    "dui / dwi on record":        "hist_dui",
+    "sr-22 / fr-44 filed":        "hist_sr22",
+    "license suspended or revoked": "hist_license_susp",
+    # Claims tab
+    "claim number":               "claim_number",
+    "date of loss":                "claim_date",
+    "claim type":                  "claim_type",
+    "claim status":                "claim_status",
+    "claim amount ($)":            "claim_amount",
+    "deductible ($)":              "claim_deductible",
+    "adjuster name":                "claim_adjuster",
+    "settlement amount ($)":       "claim_settlement",
+    "resolution date":             "claim_resolve_date",
+    "claim description":           "claim_desc",
+    "police report filed":         "claim_police_rpt",
+    "policyholder at fault":       "claim_at_fault",
+    "injury involved":             "claim_injury",
+    "third party involved":        "claim_third_party",
+    "police report no.":           "claim_report_no",
+    "third party name":            "claim_tp_name",
+    "third party policy":          "claim_tp_policy",
+    # Payment tab (non-ambiguous fields only -- "City"/"State"/"ZIP Code" and
+    # "Total Premium ($)"/"Payment Frequency" are handled by
+    # _SECTION_OVERRIDES below since those exact labels already mean
+    # something else by default, under Policyholder/Coverage respectively)
+    "down payment ($)":           "pay_down_payment",
+    "balance due ($)":            "pay_balance_due",
+    "payment due date":           "pay_due_date",
+    "last payment date":          "pay_last_paid_date",
+    "last payment amount ($)":    "pay_last_paid_amt",
+    "auto-pay enrolled":          "pay_auto_pay",
+    "method":                     "pay_method",
+    "cardholder name":            "pay_cc_name",
+    "card number":                "pay_cc_number",
+    "expiration (mm/yy)":         "pay_cc_exp",
+    "cvv":                        "pay_cc_cvv",
+    "bank name":                  "pay_bank_name",
+    "routing number":             "pay_routing",
+    "account number":             "pay_account",
+    "account type":               "pay_account_type",
+    "street address":             "pay_billing_addr1",
+}
+
+# label → key overrides that only apply while parsing is currently inside a
+# specific "[ Section ]" block -- for the handful of labels that mean a
+# genuinely different field depending on section (checked BEFORE the
+# section-agnostic _LABEL_TO_KEY above). Found 2026-08-11 auditing the
+# intake file directly while extending _LABEL_TO_KEY to the 5 previously-
+# unsupported tabs: Driver 2 and Driver 3 share an identical label set with
+# each other AND with several Policyholder labels ("First Name", "DL
+# Number", "Gender", ...); Payment's "[ Billing Address ]" reuses
+# Policyholder's "City"/"State"/"ZIP Code" labels verbatim; Payment's
+# "[ Billing Summary ]" reuses Coverage's "Total Premium ($)"/"Payment
+# Frequency" labels verbatim. A flat dict cannot represent "same label,
+# different field" -- _parse_intake_record() tracks the current section
+# header while iterating lines specifically so this table can disambiguate.
+_SECTION_OVERRIDES: dict[str, dict[str, str]] = {
+    "driver 2": {
+        "first name":          "d2_first",
+        "last name":           "d2_last",
+        "date of birth":       "d2_dob",
+        "gender":              "d2_gender",
+        "relationship":        "d2_relation",
+        "dl number":           "d2_dl",
+        "dl issuing state":    "d2_dl_state",
+        "dl expiration":       "d2_dl_exp",
+        "accidents (3 yr)":    "d2_accidents",
+        "violations (3 yr)":   "d2_violations",
+        "sr-22 required":      "d2_sr22",
+        "excluded driver":     "d2_excluded",
+    },
+    "driver 3": {
+        "first name":          "d3_first",
+        "last name":           "d3_last",
+        "date of birth":       "d3_dob",
+        "gender":              "d3_gender",
+        "relationship":        "d3_relation",
+        "dl number":           "d3_dl",
+        "dl issuing state":    "d3_dl_state",
+        "dl expiration":       "d3_dl_exp",
+        "accidents (3 yr)":    "d3_accidents",
+        "violations (3 yr)":   "d3_violations",
+        "sr-22 required":      "d3_sr22",
+        "excluded driver":     "d3_excluded",
+    },
+    "billing summary": {
+        "total premium ($)":  "pay_amount",
+        "payment frequency":  "pay_frequency",
+    },
+    "billing address": {
+        "city":                "pay_billing_city",
+        "state":               "pay_billing_state",
+        "zip code":            "pay_billing_zip",
+    },
 }
 
 
@@ -216,22 +362,49 @@ def _parse_intake_record(text: str, record_num: int = 1) -> dict:
         return {}
 
     result = {}
+    # Tracks the current "[ Section ]" block so _SECTION_OVERRIDES can
+    # disambiguate labels that mean a different field depending on section
+    # (e.g. "First Name" under [ Driver 2 ] vs [ Driver 3 ] vs the
+    # Policyholder tab's own default meaning). Added 2026-08-11 -- see
+    # _SECTION_OVERRIDES' docstring-comment above for the full reasoning.
+    current_section = ""
+    _section_re = re.compile(r"^\[\s*(.+?)\s*\]$")
+
     for line in target_body.splitlines():
         line = line.strip()
-        if ":" not in line or line.startswith("=") or line.startswith("-") or line.startswith("["):
+
+        section_match = _section_re.match(line)
+        if section_match:
+            current_section = section_match.group(1).strip().lower()
+            continue
+
+        if ":" not in line or line.startswith("=") or line.startswith("-"):
             continue
         label_raw, _, value_raw = line.partition(":")
         label = label_raw.strip().rstrip(".").lower()
         value = value_raw.strip()
 
-        # Strip [VERIFY] annotations
-        value = re.sub(r"\[VERIFY\]", "", value).strip()
+        # Strip [VERIFY ...] annotations -- was `\[VERIFY\]`, which only
+        # matched the bare literal and missed every real variant in the
+        # file ("[VERIFY before saving]", "[VERIFY -- do not store]", ...),
+        # leaving the annotation text stuck in the parsed value. Found
+        # 2026-08-11 while extending this parser to the Claims/Payment tabs,
+        # both of which carry several [VERIFY ...]-annotated sensitive
+        # fields (SSN, card number, CVV, routing number).
+        value = re.sub(r"\[VERIFY[^\]]*\]", "", value).strip()
+        # Strip trailing "← inline comment" annotations the intake file uses
+        # for data-entry notes (e.g. "12 Month  ← NOTE: Annual term, not
+        # 6-month") -- same class of bug: left uncleaned, these become part
+        # of the "gold" value and would falsely mismatch against whatever an
+        # agent actually types.
+        value = re.sub(r"\s*←.*$", "", value).strip()
 
         # Skip empty or placeholder values
         if not value or value.lower() in ("(none)", "n/a", ""):
             continue
 
-        key = _LABEL_TO_KEY.get(label)
+        key = (_SECTION_OVERRIDES.get(current_section, {}).get(label)
+               or _LABEL_TO_KEY.get(label))
         if key is None:
             continue
 
@@ -241,6 +414,16 @@ def _parse_intake_record(text: str, record_num: int = 1) -> dict:
             "v_salvage", "v_anti_theft", "v_airbags", "v_abs",
             "v_daytime_lights", "v_backup_camera", "v_gps",
             "v_parking_sensors", "v_lane_assist", "v_adaptive_cruise",
+            "cov_um_uim", "cov_pip", "cov_medpay", "cov_rental",
+            "cov_roadside", "cov_gap", "cov_rideshare", "cov_new_car",
+            "cov_acc_forgive", "cov_disappear_ded",
+            "disc_multi_car", "disc_multi_policy", "disc_good_driver",
+            "disc_good_student", "disc_defensive_drv", "disc_loyalty",
+            "disc_military", "disc_affinity",
+            "d2_sr22", "d2_excluded", "d3_sr22", "d3_excluded",
+            "hist_dui", "hist_sr22", "hist_license_susp",
+            "claim_police_rpt", "claim_at_fault", "claim_injury",
+            "claim_third_party", "pay_auto_pay",
         }
         if key in bool_keys:
             result[key] = _parse_bool(value)
