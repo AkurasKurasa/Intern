@@ -1013,43 +1013,36 @@ class LLMAgent:
             from agent import navigation_protocol as _navproto
         self._navproto = _navproto
 
-        # ghost_cursor=False -- disabled 2026-08-10, the same day it was
-        # in active development. Three separate, real bugs traced to this
-        # one feature in a single session: (1) it breaks every UIA
-        # ControlFromPoint read for as long as it's running (see
-        # execution_ghost_overlay_breaks_uia_reads); (2) creating it steals
-        # OS foreground/activation on creation and, before WS_EX_NOACTIVATE,
-        # kept re-stealing it after being reclaimed (see
-        # execution_reassert_backoff_unidentified_foreign_window); (3) found
-        # live, directly, the same day as the NOACTIVATE fix: a REAL
-        # physical mouse click aimed exactly at the drawn ghost-cursor icon
-        # does NOT pass through to the window underneath despite
-        # WS_EX_TRANSPARENT being set correctly -- confirmed with an actual
-        # pyautogui.click() at a point the overlay was actively drawing on,
-        # against a real target window (Notepad): the click was swallowed
-        # by the overlay instead of reaching Notepad, which became
-        # foreground instead. That "click-through MUST work" guarantee is
-        # this feature's own stated core requirement (see
-        # ghost_overlay.py's module docstring) and had never actually been
-        # verified against a real click on real drawn content -- only that
-        # the Windows style flags get set, which turned out not to be
-        # sufficient by itself once WS_EX_LAYERED (needed for the
-        # -transparentcolor trick) is combined with WS_EX_TRANSPARENT.
-        # Since the ghost cursor is drawn exactly where the agent just
-        # acted -- precisely where a user watching the run would naturally
-        # try to click too -- this directly explains the repeated "can't
-        # click the form" reports tonight, including after the
-        # WS_EX_NOACTIVATE fix (which fixed the SEPARATE foreground-theft
-        # bug correctly, confirmed live, but never touched this one).
-        # Purely cosmetic in exchange for three confirmed, real, live
-        # incidents (one of them a hard crash) in one session is not a
-        # trade worth continuing to chase under time pressure -- reverts
-        # to moving the real OS cursor for clicks (pyautogui's default,
-        # proven, boring behavior from before this feature existed) until
-        # the overlay is properly redesigned (e.g. a small, positioned
-        # window instead of full-screen, so it has far less surface area
-        # to ever get in the way of anything).
-        self._executor          = ActionExecutor(dry_run=dry_run, ghost_cursor=False)
+        # ghost_cursor=True -- RE-ENABLED 2026-08-11, direct request, after
+        # every known root cause behind its four real bugs this session was
+        # actually fixed rather than just avoided:
+        #   1. Broke every UIA ControlFromPoint read the whole time it ran
+        #      -- root cause (see 4 below) fixed; the defensive skip in
+        #      _select_combobox_value_via_keyboard() stays in place regardless.
+        #   2. Stole OS foreground/activation on creation and kept re-stealing
+        #      it after being reclaimed -- fixed with WS_EX_NOACTIVATE,
+        #      confirmed live (5+ seconds, zero recurrence after reclaim).
+        #   3. A real click on the drawn cursor icon got swallowed instead of
+        #      passing through, despite WS_EX_TRANSPARENT being "set" --
+        #      turned out to be the SAME root cause as #4 below: the style was
+        #      being applied to the wrong window the entire time, so it was
+        #      never actually taking effect on the window Windows uses for
+        #      hit-testing either.
+        #   4. ROOT CAUSE, found last: root.winfo_id() for a plain Tk() root
+        #      returns a CHILD window (class TkChild), not the real top-level
+        #      window Windows composites/hit-tests (class TkTopLevel, one
+        #      level up via GetAncestor). Every style bit -- TRANSPARENT,
+        #      LAYERED, NOACTIVATE -- was landing on the wrong window this
+        #      whole session. _make_click_through() now resolves the correct
+        #      top-level ancestor first. Confirmed with a real composited
+        #      screenshot that content drawn through the unmodified class
+        #      was invisible, while the same drawing without the (buggy)
+        #      click-through call rendered correctly -- isolating this as the
+        #      actual cause of both #1's cosmetic invisibility and #3's very
+        #      real click-swallowing at the same time.
+        # Not yet confirmed end-to-end on a real live run with all four
+        # fixes combined -- that confirmation is the user's to make.
+        self._executor          = ActionExecutor(dry_run=dry_run, ghost_cursor=True)
         self._text_resolver     = _TextResolver()
         # Perception is an injectable adapter (the seam). Any observer whose
         # snapshot() conforms to observers/schema.py plugs in here — UIA now,
@@ -5458,17 +5451,22 @@ class LLMAgent:
         every click on the user's screen -- and was reverted (see
         DEVELOPERS.md's execution_ghost_overlay_breaks_uia_reads entry).
 
-        NOTE: as of 2026-08-10 (later the same day), agent.py's
-        ActionExecutor construction sets ghost_cursor=False -- the overlay
-        that caused this, the foreground-theft bug, AND a confirmed real
-        physical mouse click being swallowed by its drawn cursor icon --
-        so self._executor.ghost is None in every current real run, and
-        this guard is dormant (falls through to the real search logic
-        below). Left in place rather than removed: it's still correct,
-        defensive behavior for whenever the overlay is re-enabled in the
-        future (e.g. after a redesign fixes all three bugs properly), and
-        removing it now would just mean re-adding the identical logic
-        later.
+        NOTE: ghost_cursor was disabled for the rest of 2026-08-10, then
+        RE-ENABLED 2026-08-11 once its root cause was actually found and
+        fixed -- root.winfo_id() was targeting the wrong (child) window
+        for every Win32 style change, which explains both the invisible
+        rendering AND the click-swallowing (see
+        ghost_cursor_wrong_hwnd_render_bug in DEVELOPERS.md). That fix
+        does NOT touch this specific guard's reason for existing, though:
+        it only corrects real mouse hit-testing and visual compositing,
+        neither of which governs UIA's OWN ControlFromPoint -- confirmed
+        directly, separately, live, that UIA's hit-testing ignores
+        WS_EX_TRANSPARENT entirely regardless of which window it's
+        correctly applied to. So self._executor.ghost is non-None again
+        in every current real run, and this guard is ACTIVE again --
+        genuinely still the only thing standing between a real run and
+        the guaranteed-to-fail 20-40-keystroke search loop this whole
+        docstring describes.
 
         Even without that crash, a guaranteed-to-fail 20-40-keystroke
         search loop with zero visible on-screen feedback (the dropdown
