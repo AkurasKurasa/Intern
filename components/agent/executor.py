@@ -13,6 +13,8 @@ Classes
 
 from __future__ import annotations
 
+import ctypes
+import ctypes.wintypes as wintypes
 import logging
 import os
 import re
@@ -22,6 +24,16 @@ from datetime import datetime
 from typing import Any, Dict, List, NamedTuple, Optional
 
 logger = logging.getLogger(__name__)
+
+# BM_CLICK -- simulates a click on a native win32 "Button"-class control
+# (push button, checkbox, or radio button) by delivering the message
+# straight to that window's own procedure. No coordinates, no cursor.
+_BM_CLICK = 0x00F5
+
+# Module-level handle, mirroring the _uia optional-dependency pattern above
+# -- gives tests a single name to monkeypatch (mod._user32) instead of
+# patching the live, C-backed, process-wide ctypes.windll singleton.
+_user32 = ctypes.windll.user32
 
 # ── path setup ────────────────────────────────────────────────────────────────
 _HERE     = os.path.dirname(os.path.abspath(__file__))   # agent/
@@ -197,7 +209,7 @@ class ActionExecutor:
             except Exception:
                 pass
         time.sleep(self.pre_click_delay)
-        if not self._try_uia_invoke(x, y):
+        if not self._try_uia_invoke(x, y) and not self._try_semantic_click(x, y):
             pyautogui.moveTo(x, y, duration=0.15)
             pyautogui.click(x, y)
         time.sleep(self.post_click_delay)
@@ -251,6 +263,74 @@ class ActionExecutor:
         except Exception as exc:
             logger.debug("UIA invoke at (%d, %d) failed, falling back to a real click: %s", x, y, exc)
         return False
+
+    def _try_semantic_click(self, x: int, y: int, user32=None) -> bool:
+        """Second-tier fallback, between _try_uia_invoke() and the raw
+        pyautogui click below: sends a semantic Win32 control message
+        (BM_CLICK) to the native window under (x, y) instead of a
+        coordinate-precise simulated mouse click. Per explicit direction
+        2026-08-11 ("use semantic, not precise") -- WM_LBUTTONDOWN/UP
+        posted at an exact pixel was tested and rejected first: it never
+        moved a text caret to the clicked position on a real EDIT
+        control (EM_GETSEL stayed 0,0 no matter what), because pixel-
+        accurate hit-testing inside a control's own client area isn't
+        something a coordinate-blind message can do. BM_CLICK sidesteps
+        that entirely by not needing a position at all -- it tells the
+        control itself "you were clicked" and lets the control's own
+        window procedure decide what that means. Real OS cursor is never
+        touched by this path -- SendMessageW hands the message straight
+        to the target window's own procedure; nothing in that call ever
+        reaches SetCursorPos/mouse_event/SendInput. (GetCursorPos()
+        before/after isn't itself proof of that, since a live human's
+        hand on the mouse will move it anyway during the round trip --
+        the real guarantee is architectural: BM_CLICK's documented
+        delivery path has no step that touches the system cursor.)
+
+        Only handles the win32 "Button" window class (push buttons,
+        checkboxes, and radio buttons all share this class under
+        wxWidgets on Windows) -- confirmed live 2026-08-11 against a
+        real BS_AUTOCHECKBOX that SendMessageW(hwnd, BM_CLICK, 0, 0)
+        correctly toggles BM_GETCHECK's state. (An earlier run of that
+        same test appeared to fail -- turned out to be a bug in the test
+        script itself, using plain BS_CHECKBOX instead of
+        BS_AUTOCHECKBOX; plain BS_CHECKBOX requires the app to manage
+        its own check state and was never going to toggle from BM_CLICK
+        alone, regardless of how correct the message delivery was.) No
+        explicit SetFocus() call is needed first -- BM_CLICK drives
+        DefWindowProc's click handling directly, which doesn't depend on
+        which window currently has OS keyboard focus.
+
+        Everything else (Edit, ComboBox, custom/owner-drawn controls)
+        falls through to the pyautogui fallback -- there's no semantic
+        message for "place the caret at this pixel" or "open this
+        specific dropdown item," so a coordinate is genuinely required
+        there. Comboboxes in particular have a separate, deeper, already-
+        documented issue (some never render their dropdown at all,
+        _select_combobox_value_via_keyboard's whole reason for existing)
+        that a different click mechanism wouldn't change.
+
+        `user32` is injectable for tests (defaulting to the module-level
+        `_user32`, itself monkeypatchable), same reasoning as
+        ghost_overlay._make_click_through: ctypes.windll.user32 is a
+        live, C-backed, process-wide object, unsafe to patch in place.
+        """
+        if user32 is None:
+            user32 = _user32
+        try:
+            user32.WindowFromPoint.restype = wintypes.HWND
+            hwnd = user32.WindowFromPoint(wintypes.POINT(x, y))
+            if not hwnd:
+                return False
+            buf = ctypes.create_unicode_buffer(256)
+            user32.GetClassNameW(hwnd, buf, 256)
+            if buf.value != "Button":
+                return False
+            user32.SendMessageW(hwnd, _BM_CLICK, 0, 0)
+            logger.info("CLICK  @ (%d, %d) via semantic BM_CLICK (real cursor untouched)", x, y)
+            return True
+        except Exception as exc:
+            logger.debug("Semantic click at (%d, %d) failed, falling back to a real click: %s", x, y, exc)
+            return False
 
     def _show_ghost_caret(self) -> None:
         if not self.ghost or not _UIA_AVAILABLE:
