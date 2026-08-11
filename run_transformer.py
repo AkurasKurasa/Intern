@@ -99,7 +99,9 @@ def main():
 
     observer    = UIAutomationObserver()
     trainer     = BCTrainer(save_path=model_path)
-    executor    = ActionExecutor(dry_run=args.dry_run, ghost_cursor=True)
+    # ghost_cursor=False -- reverted 2026-08-11 alongside agent.py's own
+    # live-run construction site; see the comment there for why.
+    executor    = ActionExecutor(dry_run=args.dry_run, ghost_cursor=False)
     resolver    = _TextResolver()
     record_data = {}
 

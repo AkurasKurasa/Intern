@@ -1013,36 +1013,22 @@ class LLMAgent:
             from agent import navigation_protocol as _navproto
         self._navproto = _navproto
 
-        # ghost_cursor=True -- RE-ENABLED 2026-08-11, direct request, after
-        # every known root cause behind its four real bugs this session was
-        # actually fixed rather than just avoided:
-        #   1. Broke every UIA ControlFromPoint read the whole time it ran
-        #      -- root cause (see 4 below) fixed; the defensive skip in
-        #      _select_combobox_value_via_keyboard() stays in place regardless.
-        #   2. Stole OS foreground/activation on creation and kept re-stealing
-        #      it after being reclaimed -- fixed with WS_EX_NOACTIVATE,
-        #      confirmed live (5+ seconds, zero recurrence after reclaim).
-        #   3. A real click on the drawn cursor icon got swallowed instead of
-        #      passing through, despite WS_EX_TRANSPARENT being "set" --
-        #      turned out to be the SAME root cause as #4 below: the style was
-        #      being applied to the wrong window the entire time, so it was
-        #      never actually taking effect on the window Windows uses for
-        #      hit-testing either.
-        #   4. ROOT CAUSE, found last: root.winfo_id() for a plain Tk() root
-        #      returns a CHILD window (class TkChild), not the real top-level
-        #      window Windows composites/hit-tests (class TkTopLevel, one
-        #      level up via GetAncestor). Every style bit -- TRANSPARENT,
-        #      LAYERED, NOACTIVATE -- was landing on the wrong window this
-        #      whole session. _make_click_through() now resolves the correct
-        #      top-level ancestor first. Confirmed with a real composited
-        #      screenshot that content drawn through the unmodified class
-        #      was invisible, while the same drawing without the (buggy)
-        #      click-through call rendered correctly -- isolating this as the
-        #      actual cause of both #1's cosmetic invisibility and #3's very
-        #      real click-swallowing at the same time.
-        # Not yet confirmed end-to-end on a real live run with all four
-        # fixes combined -- that confirmation is the user's to make.
-        self._executor          = ActionExecutor(dry_run=dry_run, ghost_cursor=True)
+        # ghost_cursor=False -- REVERTED 2026-08-11, direct request ("Same old
+        # problem, fuck the cursor and the caret, revert to when the play was
+        # working properly") after Play broke again during a live test with
+        # this session's semantic-click tier layered on top of the overlay.
+        # This was re-enabled once already (see git history / DEVELOPERS.md
+        # for the four bugs found and fixed that time: broken UIA reads,
+        # foreground theft, click-swallowing, and the root-cause wrong-HWND
+        # bug) and DID pass a live checkpoint after that round of fixes. But
+        # it has now cost two separate live sessions their working state, and
+        # the user made clear tonight that the visual overlay itself isn't
+        # worth the recurring risk -- turned off, not left as a "one more
+        # patch" candidate. If cursor-free clicking is wanted again, the
+        # already-shipped _try_semantic_click() (BM_CLICK on real Button-
+        # class controls) achieves that without a visual overlay at all, so
+        # nothing about "no real mouse movement" is lost by this revert.
+        self._executor          = ActionExecutor(dry_run=dry_run, ghost_cursor=False)
         self._text_resolver     = _TextResolver()
         # Perception is an injectable adapter (the seam). Any observer whose
         # snapshot() conforms to observers/schema.py plugs in here — UIA now,
@@ -5462,11 +5448,19 @@ class LLMAgent:
         neither of which governs UIA's OWN ControlFromPoint -- confirmed
         directly, separately, live, that UIA's hit-testing ignores
         WS_EX_TRANSPARENT entirely regardless of which window it's
-        correctly applied to. So self._executor.ghost is non-None again
-        in every current real run, and this guard is ACTIVE again --
-        genuinely still the only thing standing between a real run and
-        the guaranteed-to-fail 20-40-keystroke search loop this whole
+        correctly applied to. So self._executor.ghost was non-None again
+        in every real run for a while, and this guard was ACTIVE --
+        genuinely the only thing standing between a real run and the
+        guaranteed-to-fail 20-40-keystroke search loop this whole
         docstring describes.
+
+        REVERTED AGAIN 2026-08-11 (ghost_cursor=False, direct request) --
+        self._executor.ghost is back to None in every real run, so this
+        guard is currently a no-op. Left in place regardless: it's correct
+        for whichever way ghost_cursor is currently set, costs nothing
+        when the overlay is off, and protects the next re-enable attempt
+        (this is the third time that flag has flipped) from silently
+        reintroducing the exact failure mode described below.
 
         Even without that crash, a guaranteed-to-fail 20-40-keystroke
         search loop with zero visible on-screen feedback (the dropdown
