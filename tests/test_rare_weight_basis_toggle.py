@@ -65,7 +65,7 @@ class TestDefaultsReproduceBaseline:
     def test_default_disambiguate_attempted_is_off(self, tmp_path):
         _write_same_type_session(tmp_path)
         ds = TrajectoryDataset(str(tmp_path), max_elements=8, hist_len=4)
-        assert ds._disambiguate_attempted is False
+        assert ds._disambiguate_attempted == "none"
 
 
 class TestRareWeightBasisType:
@@ -146,7 +146,7 @@ class TestDisambiguateAttemptedToggle:
     def test_on_gives_repeated_labels_distinct_attempted_keys(self, tmp_path):
         paths = _write_driver_session(tmp_path)
         ds = TrajectoryDataset(str(tmp_path), max_elements=8, hist_len=4,
-                                disambiguate_attempted=True)
+                                disambiguate_attempted="rank")
         attempted_before_step1 = ds._attempted_by_file[str(paths[1])]
         # Only e0's own disambiguated key (rank 0) should be marked -- e1's
         # distinct key (rank 1) must NOT be, since e1 hasn't been clicked yet.

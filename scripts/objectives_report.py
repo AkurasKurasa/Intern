@@ -20,11 +20,15 @@ Sources read (each optional — missing ones are reported as "no data yet"):
   data/output/transition_validation_log.jsonl objective 4
   data/output/encoding_ambiguity_log.jsonl    objective 2
   data/output/setup_time_log.jsonl            objective 11 (Intern side only)
+  data/output/adaptation_proxy_log.jsonl      objective 6  (synthetic-perturbation PROXY, not the real test)
 
-Objectives 6 (adaptation to unseen GUIs) and 11/12's RPA-baseline comparison
-need dedicated runs (an unseen-environment test session; scripts/compare_
-baseline.py with real baseline numbers) — this report says so explicitly
-rather than guessing.
+Objective 6's number here comes from scripts/adaptation_proxy_eval.py — a
+synthetic layout-perturbation proxy on EXISTING recorded data (element
+shuffle + window translation), not a genuine unseen-GUI live test. Flagged as
+such in the row below; a real held-out-environment run is still needed for
+an authoritative reading. 11/12's RPA-baseline comparison needs a dedicated
+run too (scripts/compare_baseline.py with real, externally-collected
+baseline numbers) — this report says so explicitly rather than guessing.
 
 Usage
 -----
@@ -83,6 +87,7 @@ def main() -> None:
     transitions   = _load_jsonl(OUT / "transition_validation_log.jsonl")
     ambiguity     = _load_jsonl(OUT / "encoding_ambiguity_log.jsonl")
     setup_times   = _load_jsonl(OUT / "setup_time_log.jsonl")
+    adaptation    = _load_jsonl(OUT / "adaptation_proxy_log.jsonl")
 
     apa   = _avg([r.get("action_prediction_accuracy") for r in run_metrics])
     esr   = _avg([r.get("execution_success_rate") for r in run_metrics])
@@ -103,6 +108,9 @@ def main() -> None:
 
     latest_ambiguity = ambiguity[-1] if ambiguity else {}
     ambiguity_rate = latest_ambiguity.get("overall_ambiguity_rate")
+
+    latest_adaptation = adaptation[-1] if adaptation else {}
+    adaptation_rate = latest_adaptation.get("overall_both_success_rate")
 
     # Perception: break out by environment, and roll up an overall.
     envs: dict[str, list[float]] = {}
@@ -152,9 +160,14 @@ def main() -> None:
                _fmt_pct(train_click), train_click is not None and train_click >= 0.90))
 
     print(_row("6", "Adaptation — success rate on UNSEEN GUI environments", ">=75%",
-               "not instrumented", None))
-    print("       Needs a dedicated held-out/perturbed-layout test session (different from training "
-          "envs) — no auto flag for 'unseen' exists yet in eval_metrics.py.")
+               _fmt_pct(adaptation_rate), adaptation_rate is not None and adaptation_rate >= 0.75))
+    if adaptation:
+        print("       PROXY reading (synthetic layout perturbation on existing data, not a genuine "
+              "unseen-GUI live run) -- see scripts/adaptation_proxy_eval.py. A real held-out "
+              "environment test is still needed for an authoritative number.")
+    else:
+        print("       No data — run scripts/adaptation_proxy_eval.py --log (proxy only; a real "
+              "held-out/perturbed-layout live session is still needed for an authoritative reading).")
 
     print(_row("7", "Scalability — performance held as dataset grows", ">=90%",
                (f"{len(training_log)} training runs logged" if training_log else "no data"), None))

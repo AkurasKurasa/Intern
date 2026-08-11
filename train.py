@@ -72,6 +72,20 @@ def main():
     parser.add_argument("--hist_len",       type=int,   default=4,
                         help="Action-history window the model sees (default: 4; "
                              "try 8-12 for long multi-tab trajectories)")
+    parser.add_argument("--disambiguate_attempted", default="none",
+                        choices=["none", "rank", "section"],
+                        help="Repeated-label ('attempted' feature) disambiguation for Driver 1/2/3-"
+                             "style sections (default: none). See transformer.py's TrajectoryDataset "
+                             "docstring for the full rationale of each mode.")
+    parser.add_argument("--rare_weight_basis", default="type",
+                        choices=["none", "type", "field"],
+                        help="Rare-action loss up-weighting basis (default: type).")
+    parser.add_argument("--section_pattern", default=None,
+                        help="Regex (2 groups) identifying section-pane labels, e.g. "
+                             "r'section_(driver|vehicle)_(\\d+)$'. Only used with "
+                             "--disambiguate_attempted=section.")
+    parser.add_argument("--section_prefix", default="section_",
+                        help="Prefix identifying section-pane elements by label.")
     args = parser.parse_args()
 
     # Resolve relative paths from the project root — comma-separated --trace_dir
@@ -108,6 +122,10 @@ def main():
         dim_feedforward=args.dim_feedforward,
         dropout=args.dropout,
         hist_len=args.hist_len,
+        disambiguate_attempted=args.disambiguate_attempted,
+        rare_weight_basis=args.rare_weight_basis,
+        section_pattern=args.section_pattern,
+        section_prefix=args.section_prefix,
     )
 
     print(f"\n{'='*60}")

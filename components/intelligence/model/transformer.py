@@ -207,7 +207,51 @@ def _elem_label(elem: dict) -> str:
     return ((elem.get("label") or elem.get("text") or "").strip())
 
 
-def _attempt_key(elem: dict, elements: Optional[list] = None):
+def _detect_section(elem: dict, elements: Optional[list], section_pattern: Optional[str],
+                     section_prefix: str = "section_") -> str:
+    """
+    Offline mirror of components/agent/agent.py's LLMAgent._detect_section,
+    operating on a raw elements snapshot from a trace file instead of live
+    agent state (no ScopeConfig instance available at dataset-build time —
+    section_pattern/section_prefix are passed in directly instead). Keep the
+    geometry rule in sync with agent.py's copy: the section is the lowest
+    section-pane whose top edge is at/above elem's vertical centre.
+
+    Output format mirrors scope.py's _default_section_format (kind.title() +
+    " " + num) — the only formatter any real ScopeConfig in this repo uses
+    today. A scope with a custom section_format would need this kept in sync
+    by hand; not worth importing ScopeConfig here just to avoid that, since
+    doing so would couple a generic training module to one app's config type.
+    """
+    import re as _re
+    if not section_pattern or not elem or not elem.get("bbox"):
+        return ""
+    fx1, fy1, fx2, fy2 = elem["bbox"]
+    fy_center = (fy1 + fy2) / 2
+    section_panes = sorted(
+        [e for e in (elements or [])
+         if (e.get("type") or "").lower() == "panecontrol"
+         and e.get("window_role") != "background"
+         and e.get("bbox")
+         and (e.get("label") or e.get("text") or "").startswith(section_prefix)],
+        key=lambda e: e["bbox"][1]
+    )
+    current_label = ""
+    for pane in section_panes:
+        if pane["bbox"][1] <= fy_center:
+            current_label = pane.get("label") or pane.get("text") or ""
+        else:
+            break
+    if not current_label:
+        return ""
+    m = _re.match(section_pattern, current_label.lower())
+    if not m:
+        return ""
+    groups = m.groups()
+    return f"{groups[0].title()} {groups[1]}" if len(groups) >= 2 else current_label
+
+
+def _attempt_key(elem: dict, elements: Optional[list] = None, section: str = ""):
     """
     Session-stable identity for the 'attempted' feature. Label-primary so it
     survives scroll (positions shift, labels don't); falls back to a coarse
@@ -223,19 +267,27 @@ def _attempt_key(elem: dict, elements: Optional[list] = None):
     shared key "first name" as attempted, so Driver 2's First Name (a different,
     still-empty element) silently read as already-done too.
 
-    Fix: when `elements` (the full elements list from the SAME state as `elem`)
-    is given and more than one element shares `elem`'s label, disambiguate by
-    this element's rank among same-labeled elements in list order. List order
-    reflects accessibility-tree traversal order, which — unlike bbox — does
-    not change with scroll, so this assumes (consistent with this project's
-    other UIA-ordering findings) that traversal order for a given static form
-    is stable across snapshots. `elements=None` keeps the old label-only
-    behavior for any caller that can't supply the full list.
+    Two disambiguation strategies, mutually exclusive (section wins if both given):
+    - `section` (new, 2026-08-11): the caller has already resolved which repeated
+      section (e.g. "Driver 2") this element belongs to, via real panecontrol
+      bbox geometry (see _detect_section) — a stable signal that doesn't depend
+      on accessibility-tree list order.
+    - `elements` (original, 2026-08-07): when the full elements list from the
+      SAME state as `elem` is given and more than one element shares `elem`'s
+      label, disambiguate by this element's rank among same-labeled elements in
+      list order. Real failure precedent: tested alone, this regressed
+      val_click_acc to 46.9% (from a 68.9% baseline) — accessibility-tree list
+      order isn't a stable enough signal across snapshots (see DEVELOPERS.md).
+      Kept as an option, not the default, for exactly that reason.
+
+    Neither given → old label-only behavior (the un-regressed baseline).
     """
     lbl = (elem.get("label") or elem.get("text") or "").strip().lower()
     if not lbl:
         b = elem.get("bbox") or [0, 0, 0, 0]
         return ("@", round((b[0] + b[2]) / 2 / 20) * 20, round((b[1] + b[3]) / 2 / 20) * 20)
+    if section:
+        return (section, lbl)
     if elements:
         same_label_ids = [id(e) for e in elements
                            if (e.get("label") or e.get("text") or "").strip().lower() == lbl]
@@ -484,41 +536,65 @@ class TrajectoryDataset(Dataset):
         hist_len: int = 4,
         glob: str = "*.json",
         aug_drop_prob: float = 0.0,   # probability of zeroing a UI element row
-        disambiguate_attempted: bool = False,
+        disambiguate_attempted: str = "none",
         rare_weight_basis: str = "type",
+        section_pattern: Optional[str] = None,
+        section_prefix: str = "section_",
     ):
         """
-        disambiguate_attempted : bool (default False)
-            Controls whether _attempt_key's repeated-label rank disambiguation
-            (Driver 1/2/3 "First Name" etc.) is used for the 'attempted' input
-            feature. Introduced in 7999efc7 alongside field-level rare-action
-            weighting; when tested ALONE (weighting reverted to type-level) it
-            still regressed val_click_acc to 46.9% (from a 68.9% baseline) —
-            accessibility-tree list order isn't stable enough across snapshots
-            to be a clean training signal (see DEVELOPERS.md). Defaults to False
-            (matching the un-regressed baseline) until a stable, non-rank-based
-            disambiguation mechanism replaces it. The live agent (agent.py)
-            keeps its own always-disambiguated copy for real-time tracking —
-            this flag only affects TRAINING data derivation.
+        disambiguate_attempted : "none" | "rank" | "section" (default "none")
+            Controls how _attempt_key disambiguates repeated-label elements
+            (Driver 1/2/3 "First Name" etc.) for the 'attempted' input feature.
+            "none"    — old label-only behavior (the un-regressed baseline).
+                        Same-labeled elements share one attempted-key, bug and
+                        all (filling Driver 1's First Name silently marks
+                        Driver 2's still-empty First Name as attempted too).
+            "rank"    — disambiguate by this element's rank among same-labeled
+                        elements in accessibility-tree list order. Introduced
+                        in 7999efc7 alongside field-level rare-action weighting;
+                        tested ALONE (weighting reverted to type-level) it still
+                        regressed val_click_acc to 46.9% (from a 68.9% baseline)
+                        — list order isn't stable enough across snapshots to be
+                        a clean training signal (see DEVELOPERS.md).
+            "section" — disambiguate by real panecontrol bbox geometry via
+                        _detect_section (needs section_pattern set, or this
+                        silently behaves like "none" for every element with no
+                        section). A differentiated, more stable signal than
+                        list order — found 2026-08-11, not yet validated by a
+                        real A/B run; treat as an experiment, not an assumed win.
+            The live agent (agent.py) keeps its own always-rank-disambiguated
+            copy for real-time tracking — this flag only affects TRAINING data
+            derivation.
         rare_weight_basis : "none" | "type" | "field" (default "type")
             What _wmap's rare-action loss up-weighting groups clicks by:
             "type"  — clicked element's control type (editcontrol, etc.) —
                       the original, pre-7999efc7 basis.
             "field" — clicked element's specific identity (_attempt_key) —
                       finer-grained; 7999efc7 made this the ONLY basis and
-                      bundled it with disambiguate_attempted=True, so it was
+                      bundled it with disambiguate_attempted="rank", so it was
                       never tested in isolation. Uses disambiguate_attempted
                       to decide whether same-labeled repeated fields (Driver
-                      1/2/3) are counted as one identity or split by rank.
+                      1/2/3) are counted as one identity or split apart.
             "none"  — uniform weight 1.0, no reweighting.
+        section_pattern / section_prefix : mirrors components/agent/scope.py's
+            ScopeConfig fields of the same name (e.g. r"section_(driver|
+            vehicle)_(\\d+)$" / "section_"). Only consulted when
+            disambiguate_attempted="section". Not importing ScopeConfig
+            directly keeps this module scope-agnostic — the caller (train.py's
+            CLI) injects the real app's pattern, same as agent.py does.
         """
         self.max_elements  = max_elements
         self.hist_len      = hist_len
         self.aug_drop_prob = aug_drop_prob
         if rare_weight_basis not in ("none", "type", "field"):
             raise ValueError(f"rare_weight_basis must be 'none'/'type'/'field', got {rare_weight_basis!r}")
+        if disambiguate_attempted not in ("none", "rank", "section"):
+            raise ValueError(f"disambiguate_attempted must be 'none'/'rank'/'section', got {disambiguate_attempted!r}")
         self._disambiguate_attempted = disambiguate_attempted
         self._rare_weight_basis      = rare_weight_basis
+        self._section_pattern        = section_pattern
+        self._section_prefix         = section_prefix
+        # Toggled by train() around the val_loader pass so validation is scored on
         # Toggled by train() around the val_loader pass so validation is scored on
         # clean, unaugmented samples — element dropout makes the click choice easier
         # (fewer confusable candidates on screen), which inflates val_click_acc if
@@ -526,6 +602,9 @@ class TrajectoryDataset(Dataset):
         # so this is a global switch, not per-sample; safe because train()/val() run
         # sequentially per epoch (num_workers=0, no concurrent access).
         self._eval_mode    = False
+
+        # (defined once, called at every _attempt_key call site below)
+        self._key_for = self._make_key_fn()
 
         # Collect trace files as *groups* — each group is a contiguous recording
         # session whose traces are temporally adjacent.  The flat files directly
@@ -581,7 +660,8 @@ class TrajectoryDataset(Dataset):
         # ELEM_FEATURES in the key → a change in the feature layout invalidates
         # any stale cache built with a different one.
         _cache_key  = (max_elements, hist_len, aug_drop_prob, ELEM_FEATURES,
-                       "v8_configurable_weighting", disambiguate_attempted, rare_weight_basis)
+                       "v9_section_disambiguation", disambiguate_attempted, rare_weight_basis,
+                       section_pattern, section_prefix)
 
         def _cache_valid() -> bool:
             if not _cache_path.exists():
@@ -718,8 +798,7 @@ class TrajectoryDataset(Dataset):
                 # type both get up-weighted, no hardcoded class/field name).
                 click_type = ((elems[click_idx].get("type") or "").lower()
                               if 0 <= click_idx < len(elems) else "")
-                click_key  = (_attempt_key(elems[click_idx],
-                                            elements=(elems if self._disambiguate_attempted else None))
+                click_key  = (self._key_for(elems[click_idx], elems)
                               if 0 <= click_idx < len(elems) else "")
                 # 'attempted' derivation: this step SEES every field acted on in
                 # PRIOR steps (snapshot before adding the current target). Then
@@ -731,8 +810,7 @@ class TrajectoryDataset(Dataset):
                 elif action[0] == ACTION_KEYBOARD and 0 <= src_idx < len(elems):
                     _tgt_elem = elems[src_idx]
                 if _tgt_elem is not None:
-                    g_acted.add(_attempt_key(_tgt_elem,
-                                              elements=(elems if self._disambiguate_attempted else None)))
+                    g_acted.add(self._key_for(_tgt_elem, elems))
                 valid_files.append(fpath)
                 g_actions.append(action)
                 g_src_idx.append(src_idx)
@@ -915,6 +993,19 @@ class TrajectoryDataset(Dataset):
             print(f"[Dataset] Large dataset ({len(unique_files)} files) — "
                   f"using LRU tensor cache (max={_PRELOAD_LIMIT}).", flush=True)
 
+    def _make_key_fn(self):
+        """Build the (elem, elements) -> attempt-key function matching this
+        dataset's disambiguate_attempted mode. One closure per Dataset
+        instance instead of branching on a string at every call site."""
+        mode = self._disambiguate_attempted
+        if mode == "rank":
+            return lambda elem, elements: _attempt_key(elem, elements=elements)
+        if mode == "section":
+            pat, pfx = self._section_pattern, self._section_prefix
+            return lambda elem, elements: _attempt_key(
+                elem, section=_detect_section(elem, elements, pat, pfx))
+        return lambda elem, elements: _attempt_key(elem)
+
     def _stamp_attempted(self, fpath, state: dict) -> None:
         """Mark elements that were acted on EARLIER in this session (the
         'attempted' feature) by mutating the state dict before encoding."""
@@ -923,7 +1014,7 @@ class TrajectoryDataset(Dataset):
             return
         elements = state.get("elements", [])
         for e in elements:
-            if _attempt_key(e, elements=(elements if self._disambiguate_attempted else None)) in keys:
+            if self._key_for(e, elements) in keys:
                 e["attempted"] = 1.0
 
     def _get_tensor(self, fpath: "Path") -> torch.Tensor:
@@ -1365,8 +1456,10 @@ def train(
     dropout: float = 0.1,
     class_weight_mode: str = "none",          # "none" | "inverse" | "sqrt_inverse"
     balanced_sampler: bool = True,             # WeightedRandomSampler for type imbalance (default on — see Run 6)
-    disambiguate_attempted: bool = False,      # see TrajectoryDataset docstring
+    disambiguate_attempted: str = "none",      # "none" | "rank" | "section" — see TrajectoryDataset docstring
     rare_weight_basis: str = "type",           # "none" | "type" | "field" — see TrajectoryDataset docstring
+    section_pattern: Optional[str] = None,     # only used when disambiguate_attempted="section"
+    section_prefix: str = "section_",
     device_str: str = "auto",
     verbose: bool = True,
 ) -> TransformerAgentNetwork:
@@ -1402,6 +1495,8 @@ def train(
         aug_drop_prob=aug_drop_prob,
         disambiguate_attempted=disambiguate_attempted,
         rare_weight_basis=rare_weight_basis,
+        section_pattern=section_pattern,
+        section_prefix=section_prefix,
     )
     if verbose:
         print(f"[train] {dataset}")
@@ -1552,7 +1647,14 @@ def train(
     # Persist training metrics for trend tracking across runs
     try:
         import json as _json, datetime as _dt
-        _log_path = Path(save_path_p).parents[2] / "data" / "output" / "transformer_training_log.jsonl"
+        # Anchored on this FILE's own location, not save_path_p's -- save_path
+        # isn't always exactly 2 levels under repo root (e.g. an experiments/
+        # subdir for an A/B run), and parents[2] silently pointed the log at
+        # the wrong place when it wasn't. Found 2026-08-12 running an A/B into
+        # tasks/form_filling/experiments/*.pt: logged to tasks/data/output/
+        # instead of data/output/.
+        _repo_root = Path(__file__).resolve().parents[3]
+        _log_path = _repo_root / "data" / "output" / "transformer_training_log.jsonl"
         _log_path.parent.mkdir(parents=True, exist_ok=True)
         _n_train = len(train_loader.dataset)
         _row = {
@@ -1768,10 +1870,20 @@ def _parse_args() -> argparse.Namespace:
     p.add_argument("--balanced_sampler", action=argparse.BooleanOptionalAction, default=True,
                    help="Use WeightedRandomSampler to balance click vs keyboard per epoch "
                         "(default: on — disable with --no-balanced_sampler)")
-    p.add_argument("--disambiguate_attempted", action="store_true", default=False,
-                   help="Use rank-based repeated-label disambiguation (Driver 1/2/3) for the "
-                        "'attempted' feature. Default off — tested alone it regressed val_click_acc "
-                        "to 46.9%% from a 68.9%% baseline (unstable across snapshots).")
+    p.add_argument("--disambiguate_attempted", default="none",
+                   choices=["none", "rank", "section"],
+                   help="Repeated-label disambiguation (Driver 1/2/3) for the 'attempted' feature. "
+                        "'none' (default, un-regressed baseline). 'rank' — list-order based; tested "
+                        "alone it regressed val_click_acc to 46.9%% from a 68.9%% baseline (unstable "
+                        "across snapshots). 'section' — panecontrol bbox-geometry based (needs "
+                        "--section_pattern set); a more stable signal, not yet validated by a real A/B.")
+    p.add_argument("--section_pattern", default=None,
+                   help="Regex (2 groups: kind, number) identifying a section-pane's label, e.g. "
+                        "r'section_(driver|vehicle)_(\\d+)$' (mirrors ScopeConfig.section_pattern). "
+                        "Only used when --disambiguate_attempted=section.")
+    p.add_argument("--section_prefix", default="section_",
+                   help="Prefix identifying section-pane elements by label (mirrors "
+                        "ScopeConfig.section_prefix). Only used when --disambiguate_attempted=section.")
     p.add_argument("--rare_weight_basis", default="type",
                    choices=["none", "type", "field"],
                    help="Rare-action loss up-weighting basis: 'type' (control type, original "
@@ -1796,6 +1908,8 @@ if __name__ == "__main__":
             balanced_sampler=args.balanced_sampler,
             disambiguate_attempted=args.disambiguate_attempted,
             rare_weight_basis=args.rare_weight_basis,
+            section_pattern=args.section_pattern,
+            section_prefix=args.section_prefix,
             device_str=args.device_str,
         )
     else:

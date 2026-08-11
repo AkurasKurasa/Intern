@@ -71,6 +71,10 @@ class BCTrainer:
         dim_feedforward: int   = 128,
         dropout:         float = 0.2,
         hist_len:        int   = 4,
+        disambiguate_attempted: str = "none",   # "none" | "rank" | "section"
+        rare_weight_basis:      str = "type",   # "none" | "type" | "field"
+        section_pattern: Optional[str] = None,
+        section_prefix:  str = "section_",
     ):
         self.trace_dir       = trace_dir
         self.save_path       = save_path
@@ -85,6 +89,10 @@ class BCTrainer:
         self.dim_feedforward = dim_feedforward
         self.dropout         = dropout
         self.hist_len        = hist_len
+        self.disambiguate_attempted = disambiguate_attempted
+        self.rare_weight_basis      = rare_weight_basis
+        self.section_pattern        = section_pattern
+        self.section_prefix         = section_prefix
 
     def train(self, trace_dir: Optional[str] = None, epochs: Optional[int] = None):
         """
@@ -116,6 +124,10 @@ class BCTrainer:
             dim_feedforward = self.dim_feedforward,
             dropout         = self.dropout,
             hist_len        = self.hist_len,
+            disambiguate_attempted = self.disambiguate_attempted,
+            rare_weight_basis      = self.rare_weight_basis,
+            section_pattern        = self.section_pattern,
+            section_prefix         = self.section_prefix,
         )
         logger.info("BCTrainer: checkpoint saved → %s", self.save_path)
         return model
