@@ -68,7 +68,18 @@ def start_emergency_stop_listener() -> None:
 
 
 def _listen() -> None:
-    user32 = ctypes.windll.user32
+    # use_last_error=True, NOT ctypes.windll.user32 -- found 2026-08-11
+    # while investigating a real live failure that logged "err=0" for a
+    # RegisterHotKey call that had definitely failed (confirmed separately:
+    # a different, still-running process already held Ctrl+Alt+K).
+    # ctypes.get_last_error() only reflects the real Win32 last-error code
+    # when the DLL handle was constructed with use_last_error=True -- the
+    # plain ctypes.windll.user32 cached instance never updates it, so this
+    # branch was ALWAYS going to log a misleading "err=0" on any real
+    # failure, not just this one. Every future diagnosis of a failed arm
+    # needs the real error code (e.g. 1409/ERROR_HOTKEY_ALREADY_REGISTERED)
+    # to actually be useful.
+    user32 = ctypes.WinDLL("user32", use_last_error=True)
     if not user32.RegisterHotKey(None, _HOTKEY_ID, _MOD_ALT | _MOD_CONTROL, _VK_K):
         logger.warning(
             "EmergencyStop: RegisterHotKey(%s) failed (err=%s) -- the "

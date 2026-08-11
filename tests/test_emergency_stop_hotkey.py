@@ -33,6 +33,7 @@ is verifying the real OS-level mechanism end to end, not a stand-in for it.
 """
 from __future__ import annotations
 
+import ctypes
 import os
 import subprocess
 import sys
@@ -106,3 +107,61 @@ def test_ctrl_alt_k_force_kills_the_process_immediately():
     assert elapsed < 5, f"took {elapsed:.1f}s to die -- should be near-instant"
     assert "SHOULD_NEVER_REACH_HERE" not in remaining
     assert "EMERGENCY STOP" in remaining
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="RegisterHotKey is Windows-only")
+class TestRegisterHotKeyFailureIsDiagnosable:
+    """Found live 2026-08-11: a real RegisterHotKey failure (a different,
+    still-running process already held Ctrl+Alt+K) logged 'err=0' --
+    completely uninformative, because ctypes.get_last_error() only reflects
+    the real Win32 last-error code when the DLL handle was constructed with
+    use_last_error=True. The plain ctypes.windll.user32 cached instance
+    never updates it -- this was ALWAYS going to misreport 'err=0' on any
+    real failure, not just this one. These tests reproduce a genuine,
+    deterministic RegisterHotKey failure (registering the identical combo
+    twice in this same process) and confirm the two ways of reading the
+    error code actually differ -- proving the fix is real, not cosmetic.
+    """
+
+    _MOD_ALT_CONTROL = 0x0001 | 0x0002
+    _VK_L = 0x4C  # an arbitrary key unlikely to collide with a real hotkey
+    _ERROR_HOTKEY_ALREADY_REGISTERED = 1409
+
+    def test_plain_windll_user32_never_reports_the_real_error(self):
+        """Locks down the OLD (buggy) behavior this fix moved away from --
+        if ctypes ever starts tracking this correctly by default, this test
+        failing would be worth noticing, not a silent behavior change."""
+        user32 = ctypes.windll.user32
+        first_id, second_id = 0xE5D1, 0xE5D2
+        assert user32.RegisterHotKey(None, first_id, self._MOD_ALT_CONTROL, self._VK_L)
+        try:
+            ok = user32.RegisterHotKey(None, second_id, self._MOD_ALT_CONTROL, self._VK_L)
+            assert not ok, "registering the identical combo twice should fail"
+            assert ctypes.get_last_error() == 0, (
+                "documents the bug this fix moved away from -- plain "
+                "ctypes.windll.user32 never updates get_last_error()"
+            )
+        finally:
+            user32.UnregisterHotKey(None, first_id)
+
+    def test_windll_with_use_last_error_reports_the_real_error(self):
+        """The actual fix: emergency_stop.py now constructs its DLL handle
+        this way, so a real failure reports a real, diagnosable code."""
+        user32 = ctypes.WinDLL("user32", use_last_error=True)
+        first_id, second_id = 0xE5D3, 0xE5D4
+        assert user32.RegisterHotKey(None, first_id, self._MOD_ALT_CONTROL, self._VK_L)
+        try:
+            ok = user32.RegisterHotKey(None, second_id, self._MOD_ALT_CONTROL, self._VK_L)
+            assert not ok, "registering the identical combo twice should fail"
+            assert ctypes.get_last_error() == self._ERROR_HOTKEY_ALREADY_REGISTERED
+        finally:
+            user32.UnregisterHotKey(None, first_id)
+
+    def test_emergency_stop_module_uses_use_last_error(self):
+        """Direct guard on the actual source line -- catches a future
+        refactor silently reverting to plain ctypes.windll.user32."""
+        sys.path.insert(0, str(_ROOT / "components"))
+        import inspect
+        from agent import emergency_stop
+        src = inspect.getsource(emergency_stop._listen)
+        assert 'use_last_error=True' in src
