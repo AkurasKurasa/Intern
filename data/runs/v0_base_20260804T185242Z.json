@@ -1,0 +1,105 @@
+{
+  "variant": "v0_base",
+  "mapping": "data\\mappings\\v0_handwritten.json",
+  "started": "2026-08-04T18:52:40+00:00",
+  "dry_run": true,
+  "rows": [
+    {
+      "row": 1,
+      "student_id": "2021-10001",
+      "status": "filled",
+      "reason": "",
+      "filled": {
+        "Course": "BS Information Systems",
+        "Year 1-5": "2",
+        "Grade 0-100": "85",
+        "Remarks": "Passed"
+      },
+      "verified": {
+        "Course": "BS Information Systems",
+        "Year 1-5": "2",
+        "Grade 0-100": "85",
+        "Remarks": "Passed"
+      },
+      "escalations": []
+    },
+    {
+      "row": 2,
+      "student_id": "2021-10008",
+      "status": "filled",
+      "reason": "",
+      "filled": {
+        "Course": "BS Information Systems",
+        "Year 1-5": "2",
+        "Grade 0-100": "96",
+        "Remarks": "Passed"
+      },
+      "verified": {
+        "Course": "BS Information Systems",
+        "Year 1-5": "2",
+        "Grade 0-100": "96",
+        "Remarks": "Passed"
+      },
+      "escalations": []
+    },
+    {
+      "row": 3,
+      "student_id": "2021-10015",
+      "status": "filled",
+      "reason": "",
+      "filled": {
+        "Course": "BS Information Systems",
+        "Year 1-5": "3",
+        "Grade 0-100": "95",
+        "Remarks": "Passed"
+      },
+      "verified": {
+        "Course": "BS Information Systems",
+        "Year 1-5": "3",
+        "Grade 0-100": "95",
+        "Remarks": "Passed"
+      },
+      "escalations": []
+    },
+    {
+      "row": 4,
+      "student_id": "2021-10022",
+      "status": "filled",
+      "reason": "",
+      "filled": {
+        "Course": "BS Information Technology",
+        "Year 1-5": "2",
+        "Grade 0-100": "87",
+        "Remarks": "Passed"
+      },
+      "verified": {
+        "Course": "BS Information Technology",
+        "Year 1-5": "2",
+        "Grade 0-100": "87",
+        "Remarks": "Passed"
+      },
+      "escalations": []
+    },
+    {
+      "row": 5,
+      "student_id": "2021-10029",
+      "status": "filled",
+      "reason": "",
+      "filled": {
+        "Course": "BS Information Systems",
+        "Year 1-5": "1",
+        "Grade 0-100": "72",
+        "Remarks": "Failed"
+      },
+      "verified": {
+        "Course": "BS Information Systems",
+        "Year 1-5": "1",
+        "Grade 0-100": "72",
+        "Remarks": "Failed"
+      },
+      "escalations": []
+    }
+  ],
+  "committed": false,
+  "commit_status": "dry run - 5 rows filled and verified, not saved"
+}

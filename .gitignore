@@ -1,0 +1,20 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+
+# Embedding cache - regenerated on demand, and large
+data/cache/
+
+# Tooling that is not part of the project
+.gstack/
+.claude/
+
+# Excel lock files, created while a workbook is open
+~$*.xlsx
+
+# Editor
+.vscode/
+.idea/

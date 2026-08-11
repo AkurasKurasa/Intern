@@ -1,0 +1,19 @@
+{
+  "manifest_version": 3,
+  "name": "Grade Portal Demonstration Recorder",
+  "version": "0.1.0",
+  "description": "Records demonstrated form fills for the spreadsheet-to-form mapping experiment. Demo time only - it does nothing at execution time.",
+  "permissions": ["storage", "downloads"],
+  "host_permissions": ["http://localhost/*", "http://127.0.0.1/*", "file:///*"],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["http://localhost/*", "http://127.0.0.1/*", "file:///*"],
+      "js": ["content.js"],
+      "run_at": "document_idle",
+      "all_frames": false
+    }
+  ]
+}

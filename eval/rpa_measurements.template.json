@@ -1,0 +1,66 @@
+{
+  "_instructions": [
+    "Milestone 10. Copy this file to eval/rpa_measurements.json and fill it in",
+    "while following eval/rpa_protocol.md. Leave a field null until you have",
+    "actually measured it - the harness prints 'not measured' rather than",
+    "inventing a number, and a half-filled file is fine.",
+    "",
+    "Times are in seconds. Record them with a stopwatch, not an estimate."
+  ],
+
+  "operator": {
+    "who": null,
+    "rpa_experience": null,
+    "_note": "e.g. 'first time using Power Automate Desktop' or '2 years'. Skill is the biggest confound in this comparison and has to be stated."
+  },
+
+  "tool": {
+    "name": null,
+    "version": null,
+    "_note": "Power Automate Desktop is free on Windows 11 and is the suggested choice; UiPath Community Edition also works."
+  },
+
+  "setup": {
+    "human_demonstration_seconds": null,
+    "_note_human": "Time the person spends demonstrating/recording, measured the SAME way for both systems: from starting the recording to finishing the last demonstrated row.",
+
+    "configuration_seconds": null,
+    "_note_config": "Everything after the recording that is needed before the first row can run: selector fixes, loop setup, variable wiring, Excel connection.",
+
+    "time_to_first_verified_row_seconds": null,
+    "_note_first_row": "From opening the tool with nothing configured, to one row correctly filled AND visually verified in the portal."
+  },
+
+  "baseline_run": {
+    "variant": "v0_base",
+    "rows_attempted": null,
+    "rows_filled_correctly": null,
+    "_note": "Run the finished automation over all 50 rows of v0_base and count how many landed correctly."
+  },
+
+  "after_ui_change": {
+    "_note": "Apply the SAME automation, with no re-recording and no edits, to each variant. Record what happens.",
+    "v1_reordered": {
+      "rows_filled_correctly": null,
+      "outcome": null,
+      "_outcome_values": "one of: 'ran correctly', 'ran but wrong fields', 'crashed', 'selector not found'"
+    },
+    "v2_relabeled": {
+      "rows_filled_correctly": null,
+      "outcome": null
+    },
+    "v4_unassociated": {
+      "rows_filled_correctly": null,
+      "outcome": null
+    }
+  },
+
+  "reconfiguration": {
+    "_note": "For each variant that broke, time how long it takes to get it working again.",
+    "v1_reordered_seconds": null,
+    "v2_relabeled_seconds": null,
+    "v4_unassociated_seconds": null
+  },
+
+  "notes": []
+}
