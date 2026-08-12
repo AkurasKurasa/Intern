@@ -5157,6 +5157,21 @@ class LLMAgent:
                 self._typed_keys.clear()
                 self._advance_blacklist_pos.clear()
                 self._leave_blank_keys.clear()
+                # Found live 2026-08-13: _checked_fields was the one piece of
+                # per-record state missing from this reset. Its own __init__
+                # comment says "checkboxes already clicked this run" but it
+                # was never cleared anywhere -- so once a checkbox got
+                # checked in ANY earlier record, both the uncheck-branch's
+                # own guard (`_flabel not in self._checked_fields`, ~L3935)
+                # and the click-guard (`_chk_label in self._checked_fields`,
+                # ~L4032) treated it as permanently off-limits, even when a
+                # later record's data wants the opposite state. Reproduced
+                # directly from a live run's log: 'Renewal Policy' checked
+                # during an earlier record, record 2 wants 'NO' (unchecked) --
+                # the uncheck-branch never fires (guard always False), so the
+                # agent just redirects off the field and back onto it forever
+                # (4+ identical no_change steps before the run was stopped).
+                self._checked_fields.clear()
                 # car_insurance_form_wx.py's own _on_submit() always calls
                 # self.nb.SetSelection(0) — a real Submit puts the FORM on
                 # Policy tab regardless of where the agent started (drill mode
