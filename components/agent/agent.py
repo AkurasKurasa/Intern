@@ -5722,7 +5722,26 @@ class LLMAgent:
             # move the value at all means the boundary has been reached
             # and every further press in that direction is guaranteed
             # wasted, not just unlucky.
+            # Found live 2026-08-12: 'Primary Use' burned the FULL max_steps
+            # budget in both directions (39 keystrokes, ~8s) without ever
+            # matching -- visually "the up and down buttons looping a lot",
+            # prompting a manual scroll to try to unstick it. The existing
+            # non-wrapping-boundary break above only fires on two REAL,
+            # non-None reads that happen to be equal -- if _live_value()
+            # returns None on every single attempt (ControlFromPoint not
+            # resolving the right control, a stale/moved position, or a
+            # genuine read failure), that check never fires at all, since
+            # None is never "not None and == prev". A working control (per
+            # this function's own docstring) produces real, changing string
+            # reads throughout the search -- three unreadable reads in a row
+            # is a strong, safe signal this control isn't going to become
+            # readable by pressing more keys, not evidence the target is
+            # just further down the list. Doesn't change behavior for any
+            # currently-working combobox (they never hit this), only cuts a
+            # guaranteed-blind search short instead of exhausting it.
+            _UNREADABLE_LIMIT = 3
             _prev = _live_value()
+            _unreadable_streak = 0
             for _ in range(max_steps):
                 self._executor.execute({"action_type": "keyboard", "key_count": 1, "keystrokes": ["down"]})
                 time.sleep(0.15)
@@ -5730,11 +5749,22 @@ class LLMAgent:
                 if _v is not None and _option_matches(cb_val, _v):
                     logger.info("Combobox(keyboard): %r → %r via Down-arrow", cb_label, _v)
                     return True
-                if _v is not None and _v == _prev:
-                    break  # hit the bottom of the (non-wrapping) list
+                if _v is None:
+                    _unreadable_streak += 1
+                    if _unreadable_streak >= _UNREADABLE_LIMIT:
+                        logger.warning("Combobox(keyboard): %r — value unreadable %d reads in a "
+                                       "row during Down-search — stopping early instead of "
+                                       "burning the rest of the %d-step budget.",
+                                       cb_label, _unreadable_streak, max_steps)
+                        return False
+                else:
+                    _unreadable_streak = 0
+                    if _v == _prev:
+                        break  # hit the bottom of the (non-wrapping) list
                 _prev = _v
 
             _prev = _live_value()
+            _unreadable_streak = 0
             for _ in range(max_steps):
                 self._executor.execute({"action_type": "keyboard", "key_count": 1, "keystrokes": ["up"]})
                 time.sleep(0.15)
@@ -5742,8 +5772,18 @@ class LLMAgent:
                 if _v is not None and _option_matches(cb_val, _v):
                     logger.info("Combobox(keyboard): %r → %r via Up-arrow", cb_label, _v)
                     return True
-                if _v is not None and _v == _prev:
-                    break  # hit the top of the (non-wrapping) list
+                if _v is None:
+                    _unreadable_streak += 1
+                    if _unreadable_streak >= _UNREADABLE_LIMIT:
+                        logger.warning("Combobox(keyboard): %r — value unreadable %d reads in a "
+                                       "row during Up-search — stopping early instead of "
+                                       "burning the rest of the %d-step budget.",
+                                       cb_label, _unreadable_streak, max_steps)
+                        return False
+                else:
+                    _unreadable_streak = 0
+                    if _v == _prev:
+                        break  # hit the top of the (non-wrapping) list
                 _prev = _v
         except Exception as exc:
             logger.debug("Combobox keyboard-navigation fallback failed for %r: %s", cb_label, exc)

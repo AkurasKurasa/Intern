@@ -198,6 +198,95 @@ class TestGenuineFailure:
         assert result is False
 
 
+class TestUnreadableControlStopsEarly:
+    """Found live 2026-08-12: 'Primary Use' burned the full 39-keystroke
+    budget (19 Down + 20 Up, ~8s) without ever matching -- visually "the up
+    and down buttons looping a lot", prompting a manual scroll to try to
+    unstick it. The existing non-wrapping-boundary early-stop only fires on
+    two REAL, non-None reads that happen to be equal -- if _live_value()
+    returns None on every attempt (the control can't be read at all, for
+    whatever reason), that check never fires, since None is never "not
+    None and == prev". Three consecutive unreadable reads now stops the
+    search immediately instead of exhausting max_steps in that direction."""
+
+    def test_down_search_stops_after_three_unreadable_reads_not_max_steps(self, monkeypatch):
+        fake_ctrl = MagicMock()
+        fake_ctrl.GetPattern.side_effect = RuntimeError("COM error")  # every _live_value() -> None
+        fake_uia = types.SimpleNamespace(
+            ControlFromPoint=MagicMock(return_value=fake_ctrl),
+            PatternId=types.SimpleNamespace(ValuePattern="ValuePattern"),
+        )
+        monkeypatch.setitem(sys.modules, "uiautomation", fake_uia)
+        agent = _make_agent()
+        agent._executor = MagicMock()
+        agent._executor.ghost = None
+
+        result = agent._select_combobox_value_via_keyboard(
+            "Primary Use", "Personal/Pleasure", 100, 200, max_steps=20)
+
+        assert result is False
+        down_presses = [
+            c.args[0] for c in agent._executor.execute.call_args_list
+            if c.args[0].get("keystrokes") == ["down"]
+        ]
+        # 3 unreadable reads in a row triggers the stop -- nowhere near the
+        # 20-step budget the original bug burned through.
+        assert len(down_presses) <= 3, f"expected an early stop, got {len(down_presses)} Down presses"
+
+    def test_never_falls_back_to_up_search_after_down_gives_up_unreadable(self, monkeypatch):
+        """The Down loop's early return happens before the Up loop even
+        starts -- confirms the fix returns immediately rather than still
+        wasting a second full search in the other direction."""
+        fake_ctrl = MagicMock()
+        fake_ctrl.GetPattern.side_effect = RuntimeError("COM error")
+        fake_uia = types.SimpleNamespace(
+            ControlFromPoint=MagicMock(return_value=fake_ctrl),
+            PatternId=types.SimpleNamespace(ValuePattern="ValuePattern"),
+        )
+        monkeypatch.setitem(sys.modules, "uiautomation", fake_uia)
+        agent = _make_agent()
+        agent._executor = MagicMock()
+        agent._executor.ghost = None
+
+        agent._select_combobox_value_via_keyboard(
+            "Primary Use", "Personal/Pleasure", 100, 200, max_steps=20)
+
+        up_presses = [
+            c.args[0] for c in agent._executor.execute.call_args_list
+            if c.args[0].get("keystrokes") == ["up"]
+        ]
+        assert up_presses == []
+
+    def test_intermittent_unreadable_reads_do_not_falsely_trigger_the_stop(self, monkeypatch):
+        """Only THREE CONSECUTIVE unreadable reads should stop the search --
+        a single flaky read sandwiched between real ones must not abort a
+        search that's actually working."""
+        model = _FakeComboboxModel(["Inactive", "Cancelled", "Expired", "Pending"])
+        flaky_pattern = _FakeValuePattern(model)
+        fake_ctrl = MagicMock()
+        call_count = {"n": 0}
+
+        def _get_pattern(_pattern_id):
+            call_count["n"] += 1
+            if call_count["n"] == 2:   # one flaky read, not three in a row
+                raise RuntimeError("transient COM error")
+            return flaky_pattern
+        fake_ctrl.GetPattern.side_effect = _get_pattern
+        fake_uia = types.SimpleNamespace(
+            ControlFromPoint=MagicMock(return_value=fake_ctrl),
+            PatternId=types.SimpleNamespace(ValuePattern="ValuePattern"),
+        )
+        monkeypatch.setitem(sys.modules, "uiautomation", fake_uia)
+        agent = _make_agent()
+        agent._executor = _make_executor_mock(model)
+        agent._executor.ghost = None
+
+        result = agent._select_combobox_value_via_keyboard(
+            "Policy Status", "Pending", 100, 200, max_steps=20)
+
+        assert result is True
+
+
 class TestGracefulDegradation:
     def test_returns_false_immediately_when_uiautomation_unavailable(self, monkeypatch):
         import builtins
