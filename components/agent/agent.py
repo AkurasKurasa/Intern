@@ -4403,6 +4403,29 @@ class LLMAgent:
                     self._executor.execute({"action_type": "keyboard", "key_count": 1,
                                             "keystrokes": ["escape"]})
                     _action_history.append(("combobox_fail", _flabel))
+                    # Found live 2026-08-12, direct report ("Another loop
+                    # damn"): 'Bodily Injury (k$/k$)' retried this exact
+                    # failing search 71 times across the run -- the record's
+                    # own target value ('30/60') genuinely isn't one of this
+                    # control's real options (['25/50', '50/100', '100/300',
+                    # '250/500', '500/500', '300/300']), a real data problem
+                    # no amount of retrying can ever resolve. This branch had
+                    # no escalation/give-up counter at all, unlike its
+                    # sibling click-fill branch above, which already solved
+                    # the identical shape of bug 2026-08-09 ('Payment
+                    # Frequency', 121 retries) via _combobox_dropdown_fail_
+                    # counts -- that same, already-proven mechanism, reused
+                    # here rather than inventing a second one.
+                    _combobox_dropdown_fail_counts[_flabel_full] = (
+                        _combobox_dropdown_fail_counts.get(_flabel_full, 0) + 1)
+                    if _combobox_dropdown_fail_counts[_flabel_full] >= _COMBOBOX_DROPDOWN_FAIL_LIMIT:
+                        logger.warning(
+                            "[OPT2] %r failed to fill %d times in a row (option never matched "
+                            "or dropdown never rendered) — marking attempted and moving on.",
+                            _flabel_full, _combobox_dropdown_fail_counts[_flabel_full])
+                        _combobox_dropdown_fail_counts.pop(_flabel_full, None)
+                        if _fel is not None:
+                            self._mark_attempted(_fel, elements=state.get("elements", []))
                 time.sleep(self.step_delay * 0.5)
                 continue
 
