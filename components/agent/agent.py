@@ -4843,6 +4843,12 @@ class LLMAgent:
             self._history.append({
                 "state":       state,
                 "action_type": prediction.get("action_type", "no_op"),
+                # Set only by a semantic-mode model's predict() (see
+                # transformer.py's SEMANTIC_VERBS block) -- None for legacy
+                # models. Lets predict() read its own history back in the
+                # exact verb space it was trained on instead of reconstructing
+                # it (lossily) from the collapsed legacy action_type string.
+                "verb":        prediction.get("verb"),
                 "click_xy":    [pos[0] / W, pos[1] / H] if pos else [0.0, 0.0],
                 "key_count":   prediction.get("key_count", 0),
                 "typed_text":  prediction.get("text", ""),

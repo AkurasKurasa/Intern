@@ -30,10 +30,12 @@ import sys
 from pathlib import Path
 
 import pytest
+import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "components"))
 from intelligence.model.transformer import (
     TrajectoryDataset, NUM_SEMANTIC_ACTIONS, NUM_ACTIONS, VERB_TO_ID, ID_TO_VERB,
+    PolicyOutput, ACTION_CLICK, ACTION_KEYBOARD,
 )
 from agent.semantic_action import Verb
 
@@ -146,3 +148,120 @@ class TestVerbConstants:
     def test_verb_to_id_and_id_to_verb_are_inverses(self):
         for verb, i in VERB_TO_ID.items():
             assert ID_TO_VERB[i] is verb
+
+
+def _state(n_elements: int = 4) -> dict:
+    return {
+        "screen_resolution": [1920, 1080],
+        "elements": [
+            {"element_id": f"e{i}", "type": "editcontrol", "window_role": "active",
+             "label": "F", "text": "F", "value": "", "bbox": [0, 0, 10, 10],
+             "confidence": 1.0}
+            for i in range(n_elements)
+        ],
+    }
+
+
+class TestPredictHistoryUsesVerbSpace:
+    """Regression test for the 2026-08-13 live-deployability fix.
+
+    agent.py's self._history always stored the legacy-collapsed action_type
+    string (predict() always returns a legacy-shaped dict via
+    SemanticAction.to_legacy_dict() so agent.py needs zero changes to consume
+    either mode) -- so a semantic-mode model reading its own history back in
+    predict() was feeding LEGACY ids (0-6) into an embedding trained on VERB
+    ids (0-9). These schemes numerically collide (legacy CLICK=1 == verb
+    SET_VALUE=1), so this wasn't just imprecise, it was actively wrong.
+
+    Fixed by having agent.py additionally stamp the raw "verb" string
+    (already returned by a semantic model's predict(), just not persisted)
+    onto each history entry, and having predict() use it directly when
+    present, falling back to a lossy SemanticAction.from_legacy_dict()
+    reconstruction only for history entries that predate this fix.
+    """
+
+    class _FakeSemanticModel:
+        hist_len     = 3
+        max_elements = 4
+        num_actions  = NUM_SEMANTIC_ACTIONS
+        action_space = "semantic"
+
+        def __init__(self, capture: dict):
+            self._capture = capture
+
+        def __call__(self, s_batch, p_types, p_cont):
+            self._capture["p_types"] = p_types[0].tolist()
+            from agent.semantic_action import Verb as _V
+            B = s_batch.shape[0]
+            type_logits = torch.zeros(B, self.num_actions)
+            type_logits[0, VERB_TO_ID[_V.WAIT]] = 10.0  # force a stable, uninteresting prediction
+            return PolicyOutput(
+                type_logits=type_logits,
+                click_elem=torch.zeros(B, self.max_elements),
+                key_count=torch.zeros(B, 1),
+                source_elem=torch.zeros(B, self.max_elements),
+            )
+
+    class _FakeLegacyModel:
+        hist_len     = 3
+        max_elements = 4
+        num_actions  = NUM_ACTIONS
+        action_space = "legacy"
+
+        def __init__(self, capture: dict):
+            self._capture = capture
+
+        def __call__(self, s_batch, p_types, p_cont):
+            self._capture["p_types"] = p_types[0].tolist()
+            B = s_batch.shape[0]
+            type_logits = torch.zeros(B, self.num_actions)
+            type_logits[0, ACTION_CLICK] = 10.0
+            return PolicyOutput(
+                type_logits=type_logits,
+                click_elem=torch.zeros(B, self.max_elements),
+                key_count=torch.zeros(B, 1),
+                source_elem=torch.zeros(B, self.max_elements),
+            )
+
+    def test_verb_field_used_over_lossy_action_type_reconstruction(self, monkeypatch):
+        from intelligence.model import transformer as tmod
+        from agent.semantic_action import Verb
+
+        capture: dict = {}
+        monkeypatch.setattr(tmod, "_load_model",
+                             lambda path, device: self._FakeSemanticModel(capture))
+
+        history = [
+            # "verb" present -> must win over reconstructing from action_type
+            # (which alone would give ACTION_IDS["click"]==1, not FOCUS==0).
+            {"state": _state(), "action_type": "click", "verb": "focus",
+             "click_xy": [0.0, 0.0], "key_count": 0},
+            # no "verb" (pre-fix-shaped history) -> lossy fallback reconstruction.
+            {"state": _state(), "action_type": "click",
+             "click_xy": [0.0, 0.0], "key_count": 0},
+        ]
+        tmod.predict(state=_state(), history=history, model_path="unused_semantic.pt")
+
+        assert capture["p_types"][0] == VERB_TO_ID[Verb.FOCUS], (
+            "must read the 'verb' field (focus=0), not reconstruct from "
+            "action_type (which would wrongly give click's legacy id, 1)"
+        )
+        assert capture["p_types"][1] == VERB_TO_ID[Verb.INVOKE], (
+            "missing 'verb' should still fall back to "
+            "SemanticAction.from_legacy_dict(...).verb, not crash or default to 0"
+        )
+
+    def test_legacy_mode_history_encoding_unaffected(self, monkeypatch):
+        from intelligence.model import transformer as tmod
+
+        capture: dict = {}
+        monkeypatch.setattr(tmod, "_load_model",
+                             lambda path, device: self._FakeLegacyModel(capture))
+
+        history = [
+            {"state": _state(), "action_type": "click", "click_xy": [0.0, 0.0], "key_count": 0},
+            {"state": _state(), "action_type": "keyboard", "click_xy": [0.0, 0.0], "key_count": 5},
+        ]
+        tmod.predict(state=_state(), history=history, model_path="unused_legacy.pt")
+
+        assert capture["p_types"] == [ACTION_CLICK, ACTION_KEYBOARD]

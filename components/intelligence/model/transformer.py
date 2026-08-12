@@ -1877,6 +1877,9 @@ def predict(
     H            = model.hist_len
     max_elements = model.max_elements
     num_actions  = model.num_actions
+    # Computed here (not just below, near the output decode) so the history
+    # encoding below can branch on it too — see the p_types loop's comment.
+    _is_semantic = getattr(model, "action_space", "legacy") == "semantic"
 
     ctx = (history or [])[-(H - 1):]  # last H-1 items
 
@@ -1890,8 +1893,24 @@ def predict(
     # Build action tensors
     p_types_list, p_cont_list = [], []
     for item in ctx:
-        at  = item.get("action_type", 0)
-        at  = _ACTION_IDS.get(at, at) if isinstance(at, str) else at
+        if _is_semantic:
+            # agent.py stamps a raw "verb" string onto each history entry
+            # alongside the always-legacy "action_type" (added 2026-08-13) --
+            # use it directly so a semantic model reads its own history back
+            # in the same verb space it was trained on. Older history entries
+            # (or a mixed-mode run) won't have "verb" yet; fall back to a
+            # lossy reconstruction from the legacy action_type rather than
+            # feeding a legacy id (0-6) straight into a verb (0-9) embedding,
+            # where e.g. legacy CLICK=1 would silently collide with verb
+            # SET_VALUE=1.
+            _verb_str = item.get("verb")
+            if _verb_str is not None:
+                at = VERB_TO_ID.get(_Verb(_verb_str), VERB_TO_ID[_Verb.WAIT])
+            else:
+                at = VERB_TO_ID[SemanticAction.from_legacy_dict(item).verb]
+        else:
+            at  = item.get("action_type", 0)
+            at  = _ACTION_IDS.get(at, at) if isinstance(at, str) else at
         cxy = item.get("click_xy", [0.0, 0.0])
         kn  = min(float(item.get("key_count", 0)) / 100.0, 1.0)
         res = item.get("state", {}).get("screen_resolution", [DEFAULT_W, DEFAULT_H])
@@ -1925,7 +1944,7 @@ def predict(
     # rest of the pipeline (agent.py's merge/execution) fully unaware of which
     # action_space trained the model at all. No agent.py changes needed for
     # either mode; both always speak the same legacy dict shape at this boundary.
-    _is_semantic = getattr(model, "action_space", "legacy") == "semantic"
+    # (_is_semantic computed earlier, above the p_types history-encoding loop.)
     if _is_semantic:
         _verb = ID_TO_VERB.get(idx, _Verb.WAIT)
         result: Dict[str, Any] = {
