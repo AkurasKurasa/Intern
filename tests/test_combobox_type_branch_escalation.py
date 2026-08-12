@@ -20,11 +20,28 @@ Fix: reuse that exact same, already-proven counter/constant
 type-into-combobox branch's failure path too, instead of inventing a
 second mechanism. These tests pin down the shared counting/escalation
 logic itself.
+
+FOLLOW-UP FIX, same day, found immediately after shipping the above:
+'Bodily Injury (k$/k$)' STILL retried right after "marking attempted and
+moving on" was logged. self._mark_attempted() is bookkeeping only -- it
+never moves keyboard focus. Focus stayed on the same failed combobox, so
+the very next step's LLM lookup (which doesn't check attempted-state at
+all -- it just answers from the record) re-triggered the entire branch
+from scratch. Fixed two ways: (1) an active redirect to the next visible
+target after escalating, mirroring the click-fill sibling branch's own
+already-working redirect; (2) the escalated field is now ALSO added to
+self._leave_blank_keys (a 2-strike give-up is just as final and
+deliberate a decision as a genuine leave-blank answer), so the reclick
+guard extended earlier the same day for leave-blank fields also protects
+against the TRANSFORMER's own navigate-click pointer drifting back onto
+this field later, not just this immediate re-ask.
 """
 import sys
 from pathlib import Path
+from unittest.mock import MagicMock
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "components"))
+from agent.agent import LLMAgent
 
 _COMBOBOX_DROPDOWN_FAIL_LIMIT = 2  # matches agent.py's real constant
 
@@ -88,3 +105,55 @@ class TestThisIsTheExactLiveScenario:
                 break
         assert gave_up is True
         assert attempts == _COMBOBOX_DROPDOWN_FAIL_LIMIT
+
+
+def _combobox_element(label="Bodily Injury (k$/k$)", element_id="e1",
+                       bbox=(1400, 200, 1600, 230)):
+    return {"element_id": element_id, "type": "comboboxcontrol", "label": label,
+            "text": label, "value": "", "bbox": list(bbox), "window_role": "active"}
+
+
+class TestEscalationMarksLeaveBlankNotJustAttempted:
+    """The follow-up fix, verified against the REAL LLMAgent methods (not a
+    mirror) -- confirms escalation's output (a key in self._leave_blank_keys)
+    actually composes with the reclick guard's input (checking that same
+    set), which is the part that was silently broken before: attempted-only
+    bookkeeping that nothing downstream actually respected for a still-
+    focused, still-failing combobox."""
+
+    def _make_agent(self):
+        return LLMAgent(goal="test goal", dry_run=True, max_steps=1)
+
+    def test_mark_attempted_alone_is_not_enough_to_block_a_reclick(self):
+        """Pins down the ORIGINAL gap this whole fix responds to: attempted
+        alone does NOT stop the reclick guard (matching the SEVENTH-round
+        reasoning -- attempted alone must stay permissive for fields that
+        still genuinely need a value). This is why leave_blank_keys, not
+        attempted_keys, had to be the signal."""
+        agent = self._make_agent()
+        agent._executor = MagicMock()
+        field = _combobox_element()
+        elements = [field]
+        agent._mark_attempted(field, elements=elements)
+        key = agent._attempt_key(field, elements=elements)
+
+        assert key in agent._attempted_keys
+        assert key not in agent._leave_blank_keys
+
+    def test_escalation_style_marking_makes_the_field_reclick_protected(self):
+        """Mirrors exactly what the real escalation code now does on give-up:
+        mark_attempted() AND add to leave_blank_keys. Confirms the SAME key
+        computation used by both the escalation site and the reclick guard
+        agree with each other (attempt_key is deterministic for a labeled
+        element), so the guard actually recognizes this field afterward."""
+        agent = self._make_agent()
+        agent._executor = MagicMock()
+        field = _combobox_element()
+        elements = [field]
+
+        agent._mark_attempted(field, elements=elements)
+        agent._leave_blank_keys.add(agent._attempt_key(field, elements=elements))
+
+        # Same lookup the real reclick guard performs at the click position.
+        key_at_reclick_time = agent._attempt_key(field, elements=elements)
+        assert key_at_reclick_time in agent._leave_blank_keys

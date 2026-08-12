@@ -3508,6 +3508,16 @@ class LLMAgent:
                                         _cb_label, _combobox_dropdown_fail_counts[_cb_label])
                                     _combobox_dropdown_fail_counts.pop(_cb_label, None)
                                     self._mark_attempted(_cbox, elements=state.get("elements", []))
+                                    # Same reasoning as the type-into-combobox
+                                    # sibling branch's own 2026-08-12 fix: a
+                                    # 2-strike give-up is a final, deliberate
+                                    # decision, same category as leave-blank --
+                                    # reusing that set lets the reclick guard
+                                    # protect this field from the transformer's
+                                    # own navigate-click pointer drifting back
+                                    # onto it later, not just this immediate visit.
+                                    self._leave_blank_keys.add(
+                                        self._attempt_key(_cbox, elements=state.get("elements", [])))
                                     _cd_target = self._navproto.find_visible_empty_target(
                                         state, self._form_viewport_bottom(state) - 8,
                                         attempted_keys=self._attempted_keys, attempt_key_fn=self._attempt_key)
@@ -4426,6 +4436,38 @@ class LLMAgent:
                         _combobox_dropdown_fail_counts.pop(_flabel_full, None)
                         if _fel is not None:
                             self._mark_attempted(_fel, elements=state.get("elements", []))
+                            # A 2-strike give-up is just as final and deliberate
+                            # a decision as a genuine leave-blank answer (see
+                            # self._leave_blank_keys' own comment) -- reusing
+                            # the same set means the reclick guard (extended
+                            # 2026-08-12 for leave-blank fields) also protects
+                            # this field from the TRANSFORMER's own navigate-
+                            # click pointer drifting back onto it later in the
+                            # run, not just from this immediate re-ask.
+                            self._leave_blank_keys.add(
+                                self._attempt_key(_fel, elements=state.get("elements", [])))
+                        # Found live 2026-08-12, immediately after shipping the
+                        # counter above: 'Bodily Injury (k$/k$)' STILL retried
+                        # right after "marking attempted and moving on" logged
+                        # -- marking attempted is bookkeeping only, it doesn't
+                        # move keyboard focus. Focus stayed on the same failed
+                        # combobox, so the very next step's LLM lookup (which
+                        # doesn't check attempted-state at all -- it just
+                        # answers from the record) re-triggered this entire
+                        # branch from scratch. The click-fill sibling branch
+                        # above already actively redirects focus after its own
+                        # escalation for exactly this reason -- mirrored here.
+                        _cd_target = self._navproto.find_visible_empty_target(
+                            state, self._form_viewport_bottom(state) - 8,
+                            attempted_keys=self._attempted_keys, attempt_key_fn=self._attempt_key)
+                        if _cd_target and _cd_target.get("bbox"):
+                            _cd_label = (_cd_target.get("label") or _cd_target.get("text") or "").strip()
+                            _cdb = _cd_target["bbox"]
+                            if not (_cd_label and self._focus_element_via_uia(_cd_label, expected_bbox=_cdb)):
+                                self._executor.execute({
+                                    "action_type": "click",
+                                    "click_position": [(_cdb[0] + _cdb[2]) / 2, (_cdb[1] + _cdb[3]) / 2],
+                                })
                 time.sleep(self.step_delay * 0.5)
                 continue
 
