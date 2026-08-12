@@ -223,7 +223,21 @@ if __name__ == "__main__":
     _parser.add_argument("--perception", choices=["uia", "vision"], default="uia",
                          help="Perception source: 'uia' (accessibility tree, default) or "
                               "'vision' (screenshot + CV/OCR — sees the form from pixels).")
+    _parser.add_argument("--start_record", type=int, default=1,
+                         help="Record number to start from in the intake text (default: 1). "
+                              "After each successful Submit, the agent automatically advances "
+                              "to the next record and keeps going — see --end_record to cap "
+                              "how far.")
+    _parser.add_argument("--end_record", type=int, default=None,
+                         help="Last record number to attempt (inclusive). Default: none — "
+                              "advance through every record the intake text actually has. "
+                              "e.g. --start_record 2 --end_record 3 attempts only records 2-3 "
+                              "of a 5-record file.")
     _args = _parser.parse_args()
+    if _args.end_record is not None and _args.end_record < _args.start_record:
+        logger.warning("--end_record (%d) is before --start_record (%d) — the run will "
+                       "attempt record %d, submit it, then immediately end.",
+                       _args.end_record, _args.start_record, _args.start_record)
 
     _active_key = API_KEY if PROVIDER == "anthropic" else GROQ_API_KEY if PROVIDER == "groq" else API_KEY
     if PROVIDER not in ("lmstudio", "none") and not _active_key:
@@ -304,6 +318,8 @@ if __name__ == "__main__":
             max_steps        = MAX_STEPS,
             step_delay       = STEP_DELAY,
             start_tab_idx    = _args.start_tab,
+            record_num       = _args.start_record,
+            end_record       = _args.end_record,
             scope            = INSURANCE_SCOPE,   # the only place insurance-specifics live
             model_path       = _args.model,
             route_capsule    = False,             # honor --model; don't let the capsule router override

@@ -470,6 +470,28 @@ def _find_submit_button(elements: List[Dict[str, Any]]) -> Optional[Dict[str, An
     )
 
 
+def _next_record_or_finished(current: int, total: int) -> Optional[int]:
+    """Given the record number just submitted and the total record count
+    found in the intake text, return the next record number to advance to,
+    or None if `current` was the last one (the run is genuinely finished).
+
+    Pure and total-agnostic on purpose: `total` comes from actually parsing
+    the intake text's record blocks (see _total_records_in), not a hardcoded
+    "5 records" assumption — a 1-record or 20-record intake file both just
+    work, no agent-side change needed either way.
+    """
+    return current + 1 if current < total else None
+
+
+def _total_records_in(records: Dict[int, Any]) -> int:
+    """How many records a _parse_records()-shaped {record_num: {...}} dict
+    represents. 1 (not 0) when empty — the un-multi-record default, so a
+    source with no 'RECORD N OF M' structure at all still behaves exactly
+    as a single-record run always has (record_num never exceeds total, so
+    _next_record_or_finished always signals 'finished' after one submit)."""
+    return max(records.keys()) if records else 1
+
+
 def _find_destructive_button_at(elements: List[Dict[str, Any]], pos) -> Optional[Dict[str, Any]]:
     """Any button-type element at `pos`, or None.
 
@@ -922,6 +944,8 @@ class LLMAgent:
         llm_every:     int            = 2,
         device_str:    str            = "auto",
         record_num:    int            = 1,
+        end_record:    Optional[int]  = None,  # cap multi-record advance at this record (inclusive);
+                                                 # None = advance through every record the intake text has
         use_ocr:       bool           = False,
         visual_cache:  Optional[Dict[str, str]] = None,  # Gemini-extracted {field: value}
         visual_reader: Optional[Any]  = None,   # VisualDataReader for per-tab scanning
@@ -1052,6 +1076,32 @@ class LLMAgent:
         self._correction        = CorrectionHandler()
         self._correction_watch_seconds = correction_watch_seconds
         self._record_num: int               = record_num
+        # Discovered from the intake text on the first _refresh_record_cache
+        # call (_total_records_in); 1 = single-record default, so a source
+        # with no 'RECORD N OF M' structure behaves exactly as before this
+        # was added — record_num never exceeds total, one submit always ends
+        # the run. Multi-record advance added 2026-08-12: self._record_num
+        # used to never be reassigned anywhere in this file (agent.py, see
+        # _try_advance_tab's last-tab-exhausted branch), so a run could only
+        # ever attempt record 1 no matter how many records the intake held.
+        self._total_records: int             = 1
+        # User-specified cap (--end_record), independent of _total_records --
+        # _refresh_record_cache recomputes _total_records from the intake text
+        # every refresh, which would silently overwrite any explicit range the
+        # user asked for; this stays fixed for the whole run instead.
+        self._end_record: Optional[int]      = end_record
+        # Set True by _try_advance_tab when the LAST record has just been
+        # submitted — checked at the top of run()'s main loop to end the run
+        # cleanly instead of continuing to act on a form that has nothing
+        # left to submit.
+        self._task_finished: bool            = False
+        # Set True by _try_advance_tab when it just advanced to a NEW record
+        # (submitted the previous one, more remain). Consumed once at the top
+        # of run()'s main loop to reset the per-record navigation-guard state
+        # (stuck-position streaks, tab-scroll counts, etc.) that would
+        # otherwise carry stale history from the record just finished into
+        # the fresh one.
+        self._record_just_advanced: bool     = False
         # 'attempted' state-feature (inference side): identities of fields acted on
         # this session, fed to the transformer so it stops re-targeting them (the
         # principled fix for empty-optional-field loops). Reset per record.
@@ -1364,6 +1414,33 @@ class LLMAgent:
 
         for step_idx in range(n):
           try:
+            # Multi-record advance (2026-08-12): _try_advance_tab sets these
+            # two flags after clicking Submit — checked here, once, at the
+            # top of every iteration, rather than at each of its ~10 call
+            # sites, so none of their existing logic needs to change.
+            if self._task_finished:
+                logger.info("All records complete (%d/%d) — ending run.",
+                            self._record_num, self._total_records)
+                break
+            if self._record_just_advanced:
+                logger.info("New record (%d/%d) — resetting per-record navigation state.",
+                            self._record_num, self._total_records)
+                self._record_just_advanced = False
+                _stuck_pos = None; _stuck_count = 0
+                _llm_click_pos = None; _llm_click_count = 0
+                _no_change_streak = 0
+                _last_focused_id = None
+                _open_combobox_label = ""
+                _tab_just_switched = True
+                _last_auto_step = -1
+                _tab_scroll_count = 0
+                _steps_on_tab = 0
+                _pane_escape_last_field = ""
+                _pane_escape_streak = 0
+                _confirmed_blank_fields = set()
+                _lowconf_fallback_streak = 0
+                _reclick_streak = 0
+                _redirect_stall_count = 0
             _step_t0 = time.time()
             # Found 2026-08-09, live, direct user report ("We're in a loop
             # and we're missing certain steps"): the generic repeat-action
@@ -4910,6 +4987,7 @@ class LLMAgent:
 
         records = _parse_records(full_text)
         if records:
+            self._total_records = _total_records_in(records)
             rec = records.get(self._record_num, records.get(min(records), {}))
             self._cached_record = rec
             # New record = new session → clear attempted history so fields on the
@@ -6846,7 +6924,15 @@ class LLMAgent:
             # Last resort: re-observe after scrolling form back to top so tab bar is visible
             logger.warning("_try_advance_tab: no tabs found — scroll to top and re-observe.")
             self._scroll_form_to_top(state)
-            import time; time.sleep(0.5)
+            # `time` is already imported at module level (line 51) -- this used
+            # to needlessly re-import it locally, which shadows the module-level
+            # name for this WHOLE function (Python scoping: any local
+            # assignment/import makes a name local throughout its function, even
+            # before the import line executes). Harmless while this was the only
+            # time.sleep() call in _try_advance_tab; broke the multi-record
+            # advance branch added 2026-08-12, which calls time.sleep() via a
+            # different code path that never reaches this import.
+            time.sleep(0.5)
             state2 = self._observe()
             tabs = [
                 e for e in state2.get("elements", [])
@@ -6907,15 +6993,34 @@ class LLMAgent:
                 self._executor.execute({"action_type": "click",
                                         "click_position": [(_sb1 + _sb2) / 2, (_sy1 + _sy2) / 2]})
                 # car_insurance_form_wx.py's own _on_submit() always resets to
-                # tab 0 — force the agent's own tracking to match immediately
-                # rather than relying on the record-boundary reset (which
-                # depends on self._record_num, never incremented anywhere in
-                # this file, so it wouldn't fire here). Without this, the
-                # backward-tab-click guard (execution_backward_tab_click_guard)
-                # would wrongly block the legitimate next click onto tab 0 for
-                # whatever the run does next, mistaking the post-submit reset
-                # for the exact erroneous backward jump it exists to catch.
+                # tab 0 — force the agent's own tracking to match immediately.
+                # Belt-and-suspenders with _refresh_record_cache's own reset
+                # below (which fires on a record_num change) — without this
+                # explicit line, the backward-tab-click guard
+                # (execution_backward_tab_click_guard) would wrongly block the
+                # legitimate next click onto tab 0, mistaking the post-submit
+                # reset for the exact erroneous backward jump it exists to catch.
                 self._current_tab_idx = 0
+                # Multi-record advance (2026-08-12) — see _next_record_or_finished
+                # and self._total_records's own comments for the history this
+                # replaces (self._record_num used to never change here at all).
+                # --end_record caps this independent of how many records the
+                # intake text actually has, e.g. --start_record 2 --end_record 3
+                # to attempt only records 2-3 of a 5-record file.
+                _effective_total = (min(self._total_records, self._end_record)
+                                     if self._end_record is not None else self._total_records)
+                _next = _next_record_or_finished(self._record_num, _effective_total)
+                if _next is not None:
+                    logger.info("Record %d/%d submitted — advancing to record %d.",
+                                self._record_num, _effective_total, _next)
+                    self._record_num = _next
+                    time.sleep(self.step_delay)   # let the form's own reset finish
+                    self._refresh_record_cache(self._observe())
+                    self._record_just_advanced = True
+                else:
+                    logger.info("Record %d/%d submitted — no further records, run complete.",
+                                self._record_num, _effective_total)
+                    self._task_finished = True
                 return True
             logger.info("Stuck guard: last tab exhausted, but no submit-like button found — "
                         "signalling done.")
