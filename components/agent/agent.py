@@ -2781,9 +2781,30 @@ class LLMAgent:
                             _reclick_ty in ("editcontrol", "input")
                             and _reclick_key in self._typed_keys
                         )
-                        if _reclick_combobox_filled or _reclick_checkbox_attempted or _reclick_edit_filled:
+                        # Found live 2026-08-12: 831 of ~894 steps in one 40-minute
+                        # run (93%) were the navigate pointer oscillating between two
+                        # correctly-blank fields, 'Lienholder Address' and
+                        # 'Lienholder/Lender' -- real fills stopped completely for
+                        # the last ~34 minutes. Neither field was EVER in
+                        # self._typed_keys (nothing gets typed into a field the
+                        # record deliberately wants blank -- that's the whole point
+                        # of self._leave_blank_keys, see its own comment), so
+                        # _reclick_edit_filled above never fired for them, and they
+                        # got zero protection from this guard at all -- unlike a
+                        # merely-attempted-but-not-yet-typed field (which correctly
+                        # stays reclickable, see _reclick_edit_filled's own
+                        # reasoning above), a leave-blank decision IS final and
+                        # deliberate, same category as a genuine typed value, not a
+                        # stray navigation click. Not type-gated (editcontrol/
+                        # comboboxcontrol/checkboxcontrol can all be left-blank) --
+                        # self._leave_blank_keys is already the authoritative "this
+                        # is done, nothing goes here" signal regardless of type.
+                        _reclick_leave_blank = _reclick_key in self._leave_blank_keys
+                        if (_reclick_combobox_filled or _reclick_checkbox_attempted
+                                or _reclick_edit_filled or _reclick_leave_blank):
                             _reclick_label = (_reclick_elem.get("label") or _reclick_elem.get("text") or "?")[:30]
                             _reclick_reason = ("filled" if (_reclick_combobox_filled or _reclick_edit_filled)
+                                               else "left-blank" if _reclick_leave_blank
                                                else "checked")
                             _reclick_streak += 1
                             # Found 2026-08-08, live, direct user report ("still not
