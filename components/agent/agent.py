@@ -3901,6 +3901,47 @@ class LLMAgent:
                                         self._mark_attempted(_fel, elements=state.get("elements", []))
                                 except Exception as _cbe:
                                     logger.warning("Checkbox BM_SETCHECK failed: %s", _cbe)
+                        elif not _should_chk and _flabel not in self._checked_fields:
+                            # Symmetric with the check-branch above -- was
+                            # entirely missing until 2026-08-12, found live:
+                            # 'Renewal Policy' was already checked (a form-
+                            # reset quirk, not anything the agent did -- it
+                            # was checked the very first time the agent ever
+                            # looked at it this record) but record 2's own
+                            # data wanted it 'NO'. With no code path to
+                            # actively uncheck a box, the click-guard a few
+                            # lines below (correctly, on its own terms)
+                            # permanently blocked every click on it -- it
+                            # only ever knows "already checked" means "leave
+                            # it alone", never "checked but shouldn't be".
+                            # 25 identical redirects over ~80s before the
+                            # run moved on. This is the first record in the
+                            # whole project that has ever wanted a checked
+                            # box turned off, so the gap never surfaced
+                            # before now. Don't assume the form always
+                            # starts a record in the right state -- actively
+                            # drive it to the target state either direction,
+                            # same as a human would.
+                            _chk_bbox = _fel.get("bbox")
+                            if _chk_bbox:
+                                try:
+                                    import win32gui as _wgu; import win32api as _wau
+                                    _cx = (_chk_bbox[0] + _chk_bbox[2]) / 2
+                                    _cy = (_chk_bbox[1] + _chk_bbox[3]) / 2
+                                    _hw = _wgu.WindowFromPoint((int(_cx), int(_cy)))
+                                    if _hw:
+                                        BM_GETCHECK, BM_SETCHECK, BST_CHECKED = 0x00F0, 0x00F1, 1
+                                        if _wau.SendMessage(_hw, BM_GETCHECK, 0, 0) == BST_CHECKED:
+                                            _wau.SendMessage(_hw, BM_SETCHECK, 0, 0)  # BST_UNCHECKED
+                                            logger.info("Checkbox %r unchecked via BM_SETCHECK "
+                                                        "(type intercept, target=NO).", _flabel_full)
+                                        self._filled_this_tab.add(_flabel_full)
+                                        _real_progress_this_step = True
+                                        # Same belt-and-suspenders reasoning as the
+                                        # check-branch's own mark_attempted call.
+                                        self._mark_attempted(_fel, elements=state.get("elements", []))
+                                except Exception as _cbe:
+                                    logger.warning("Checkbox BM_SETCHECK (uncheck) failed: %s", _cbe)
                     else:
                         logger.warning("LLM type into non-edit [%s] %r — pressing Tab instead.",
                                        _fel.get("type","?"), _flabel[:40])
