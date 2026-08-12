@@ -4289,12 +4289,36 @@ class LLMAgent:
                 if not _match and _listitems:
                     logger.warning("Combobox: %r not in options %s",
                                    _combo_value, [_opt(e) for e in _listitems][:12])
-                # No dropdown ever rendered at all -- same real, verified-live
-                # fallback as the sibling click-fill branch above (see
-                # _select_combobox_value_via_keyboard's own docstring for why
-                # this can happen for a genuinely working combobox).
+                # Keyboard fallback (_select_combobox_value_via_keyboard) -- two
+                # real, distinct reasons to reach it, both meaning "the rendered
+                # listitems can't be trusted, read the control's own live value
+                # instead":
+                #   1. No dropdown ever rendered at all (original case).
+                #   2. Real live evidence 2026-08-12: a long alphabetical list
+                #      (US states, 'State' field) only ever showed the first
+                #      ~12 items (Alabama..Idaho) no matter how many times the
+                #      dropdown was reopened -- 37 identical retries over 96s,
+                #      all seeing the exact same truncated set, hunting
+                #      'Texas'. The listbox only materializes UIA elements for
+                #      whatever's currently scrolled into view; re-clicking to
+                #      reopen never scrolls it, so a target past the visible
+                #      window was permanently invisible to _listitems no
+                #      matter how many times this branch retried -- gated out
+                #      of the ONLY existing escape hatch (this function) by
+                #      "and not _listitems", since 12 (wrong) items is a
+                #      non-empty list. Arrow-key navigation reads
+                #      ValuePattern.Value directly instead of rendered
+                #      elements, so it doesn't care what's scrolled into view.
+                # Escape first in case #2 (a real, wrong dropdown IS open) --
+                # puts the control into the same closed/focused state case #1
+                # already left it in, which is the state this fallback was
+                # actually verified against live.
                 _kb_filled = False
-                if not _match and not _listitems:
+                if not _match:
+                    if _listitems:
+                        self._executor.execute({"action_type": "keyboard", "key_count": 1,
+                                                "keystrokes": ["escape"]})
+                        time.sleep(0.15)
                     _kb_filled = self._select_combobox_value_via_keyboard(
                         _flabel, _combo_value, _ccx, _ccy)
                 if _match or _kb_filled:
