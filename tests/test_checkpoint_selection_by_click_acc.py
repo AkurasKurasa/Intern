@@ -51,11 +51,16 @@ def test_checkpoint_selection_uses_click_acc_alone(tmp_path):
     # here too, so use numbers where combined would pick epoch 1 wrongly)
     # -- construct explicitly so combined-score selection would pick epoch 1
     # and click_acc-only selection picks epoch 2.
+    # src_acc: a placeholder value -- checkpoint selection is click_acc-only,
+    # this test doesn't exercise src_acc's own behavior -- but train()'s
+    # per-epoch print statement reads val_m['src_acc'] unconditionally now
+    # (added 2026-08-12 alongside the semantic-action-space port), so it must
+    # be present or the mocked epoch metrics raise a KeyError there.
     fake_metrics = [
-        dict(loss=1.0, l_type=0.1, l_click=0.1, l_key=0.0, accuracy=0.9, click_acc=0.1),      # epoch1 train
-        dict(loss=1.0, l_type=0.1, l_click=0.1, l_key=0.0, accuracy=0.914, click_acc=0.171),  # epoch1 val
-        dict(loss=0.8, l_type=0.1, l_click=0.1, l_key=0.0, accuracy=0.5, click_acc=0.35),      # epoch2 train
-        dict(loss=0.8, l_type=0.1, l_click=0.1, l_key=0.0, accuracy=0.4, click_acc=0.396),     # epoch2 val
+        dict(loss=1.0, l_type=0.1, l_click=0.1, l_key=0.0, accuracy=0.9, click_acc=0.1, src_acc=0.0),      # epoch1 train
+        dict(loss=1.0, l_type=0.1, l_click=0.1, l_key=0.0, accuracy=0.914, click_acc=0.171, src_acc=0.0),  # epoch1 val
+        dict(loss=0.8, l_type=0.1, l_click=0.1, l_key=0.0, accuracy=0.5, click_acc=0.35, src_acc=0.0),      # epoch2 train
+        dict(loss=0.8, l_type=0.1, l_click=0.1, l_key=0.0, accuracy=0.4, click_acc=0.396, src_acc=0.0),     # epoch2 val
     ]
     assert fake_metrics[1]["accuracy"] + fake_metrics[1]["click_acc"] > \
            fake_metrics[3]["accuracy"] + fake_metrics[3]["click_acc"], \
@@ -66,7 +71,12 @@ def test_checkpoint_selection_uses_click_acc_alone(tmp_path):
     calls = {"i": 0}
 
     def fake_run_epoch(model, loader, optimizer, device, lambda_click, lambda_key,
-                        label_smoothing, class_weights=None):
+                        label_smoothing, class_weights=None, **_ignored_new_kwargs):
+        # **_ignored_new_kwargs absorbs key_verb_id/lambda_src (added
+        # 2026-08-12 for action_space="semantic") and any future additions,
+        # so this mock doesn't need updating every time train() grows a new
+        # pass-through parameter for _run_epoch -- this test is specifically
+        # about checkpoint selection, not about _run_epoch's own call shape.
         m = fake_metrics[calls["i"]]
         calls["i"] += 1
         return m

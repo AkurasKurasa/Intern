@@ -75,6 +75,7 @@ class BCTrainer:
         rare_weight_basis:      str = "type",   # "none" | "type" | "field"
         section_pattern: Optional[str] = None,
         section_prefix:  str = "section_",
+        action_space:    str = "legacy",   # "legacy" | "semantic"
     ):
         self.trace_dir       = trace_dir
         self.save_path       = save_path
@@ -93,6 +94,7 @@ class BCTrainer:
         self.rare_weight_basis      = rare_weight_basis
         self.section_pattern        = section_pattern
         self.section_prefix         = section_prefix
+        self.action_space           = action_space
 
     def train(self, trace_dir: Optional[str] = None, epochs: Optional[int] = None):
         """
@@ -128,6 +130,7 @@ class BCTrainer:
             rare_weight_basis      = self.rare_weight_basis,
             section_pattern        = self.section_pattern,
             section_prefix         = self.section_prefix,
+            action_space           = self.action_space,
         )
         logger.info("BCTrainer: checkpoint saved → %s", self.save_path)
         return model

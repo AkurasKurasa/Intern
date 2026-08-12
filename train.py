@@ -86,6 +86,11 @@ def main():
                              "--disambiguate_attempted=section.")
     parser.add_argument("--section_prefix", default="section_",
                         help="Prefix identifying section-pane elements by label.")
+    parser.add_argument("--action_space", default="legacy",
+                        choices=["legacy", "semantic"],
+                        help="'legacy' (default) -- unchanged. 'semantic' -- Universal Semantic "
+                             "Action Space, ported 2026-08-12 from origin/verb-loop-rewrite. "
+                             "Unverified on this project's own data until an isolated A/B runs.")
     args = parser.parse_args()
 
     # Resolve relative paths from the project root — comma-separated --trace_dir
@@ -126,6 +131,7 @@ def main():
         rare_weight_basis=args.rare_weight_basis,
         section_pattern=args.section_pattern,
         section_prefix=args.section_prefix,
+        action_space=args.action_space,
     )
 
     print(f"\n{'='*60}")
