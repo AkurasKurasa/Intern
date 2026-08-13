@@ -109,6 +109,20 @@ def _next_value(elem: Dict, next_by_key: Dict[tuple, Dict]) -> Optional[str]:
     return nxt.get("value") if nxt is not None else None
 
 
+def _resolve_next_focused_idx(elements: List[Dict], next_state: Dict[str, Any]) -> Optional[int]:
+    """Match next_state's newly-focused element back into the CURRENT
+    elements list, by element_id. Used for Tab/Shift+Tab -- the field that
+    ends up focused is almost always already present (just not yet focused)
+    in the current step's own element snapshot."""
+    next_focused_id = next_state.get("focused_element_id")
+    if not next_focused_id:
+        return None
+    for i, e in enumerate(elements):
+        if e.get("element_id") == next_focused_id:
+            return i
+    return None
+
+
 def translate_step(trace: Dict[str, Any]) -> SemanticAction:
     """One trace JSON dict (as loaded) -> one SemanticAction label."""
     state       = trace.get("state", {}) or {}
@@ -182,12 +196,53 @@ def translate_step(trace: Dict[str, Any]) -> SemanticAction:
             idx = _find_focused_entry_idx(state, elements)
             return SemanticAction(verb=Verb.SET_VALUE, target_idx=(idx if idx >= 0 else None),
                                   value=typed_text)
+        # Tab/Shift+Tab moves keyboard focus to the next/previous field with
+        # no value change -- semantically identical to clicking that field
+        # directly (already labeled FOCUS above, at the click-branch's own
+        # _TEXT_ENTRY_TYPES case), just via keyboard instead of mouse. Found
+        # 2026-08-13: labeling it HOTKEY instead split one intent into two
+        # ground-truth verbs based purely on input modality (click vs
+        # keypress), a distinction the model has no reliable way to predict
+        # from state features alone. Confirmed via a real per-verb confusion
+        # breakdown on the trained checkpoint: focus (24.1% acc) and
+        # set_value (63.3% acc) were both dominated by misclassification AS
+        # hotkey -- the two most important verbs for this task, undermined by
+        # an artifact of how the labels were assigned, not a model weakness.
+        if hotkey_name in ("tab", "shift+tab"):
+            idx = _resolve_next_focused_idx(elements, next_state)
+            return SemanticAction(verb=Verb.FOCUS, target_idx=idx,
+                                  reason="tab/shift+tab navigation")
+        # Backspace/Delete mid-edit is a value CORRECTION on the field
+        # currently being typed into -- part of SET_VALUE, not a "window-
+        # level key combo" (HOTKEY's own docstring). Same mechanism as the
+        # Tab fix above, but verified against this project's real recorded
+        # data first (2026-08-13, after the Tab fix measurably changed
+        # nothing on this dataset -- 0 steps ever used a literal Tab press,
+        # every field-to-field move here was a direct click, already FOCUS):
+        # backspace is 455 of 470 real hotkey-labeled steps across all 5
+        # sessions (97%), overwhelmingly the actual driver of the confusion
+        # a real per-verb breakdown found (focus 24.1%, set_value 63.3% acc,
+        # both dominated by misclassification AS hotkey). No pasted/typed
+        # text this step (that's the typed_text branch above), so value is
+        # empty -- consistent with how a single-character SET_VALUE step
+        # already only carries THAT step's own text, not the field's running
+        # total. delete included too though absent from current data (0
+        # occurrences) -- same edit-correction semantics, kept for any
+        # future recording that uses it.
+        if hotkey_name in ("backspace", "delete"):
+            idx = _find_focused_entry_idx(state, elements)
+            return SemanticAction(verb=Verb.SET_VALUE, target_idx=(idx if idx >= 0 else None),
+                                  value="", reason=f"{hotkey_name} correction mid-edit")
         if hotkey_name:
             return SemanticAction(verb=Verb.HOTKEY, keystrokes=hotkey_name.split("+"))
         if raw_keys:
-            # non-printable strokes with no declared hotkey (e.g. lone Tab/Enter/
-            # Backspace groups the recorder didn't tag) -> still a HOTKEY, just a
-            # single-key one.
+            if all(k.lower() in ("tab", "key.tab") for k in raw_keys):
+                idx = _resolve_next_focused_idx(elements, next_state)
+                return SemanticAction(verb=Verb.FOCUS, target_idx=idx,
+                                      reason="tab/shift+tab navigation (raw)")
+            # non-printable strokes with no declared hotkey (e.g. lone Enter/
+            # Backspace groups the recorder didn't tag) -> still a HOTKEY,
+            # just a single-key one.
             return SemanticAction(verb=Verb.HOTKEY, keystrokes=raw_keys)
 
     return SemanticAction(verb=Verb.WAIT)

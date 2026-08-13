@@ -695,7 +695,7 @@ class TrajectoryDataset(Dataset):
         # ELEM_FEATURES in the key → a change in the feature layout invalidates
         # any stale cache built with a different one.
         _cache_key  = (max_elements, hist_len, aug_drop_prob, ELEM_FEATURES,
-                       "v10_semantic_action_space", disambiguate_attempted, rare_weight_basis,
+                       "v11_backspace_setvalue_fix", disambiguate_attempted, rare_weight_basis,
                        section_pattern, section_prefix, action_space)
 
         def _cache_valid() -> bool:
