@@ -28,4 +28,5 @@ See [DEVELOPERS.md](DEVELOPERS.md) for the project overview, architecture, and t
 - Explain what you're doing in simple terms as you're doing it, as if you're actually teaching me.
 - As much as possible when you're responding, talk as simple as possible.
 - Explain your solutions to problems clearly.
-- Before implementing or doing anything, explain back to me what I want you to do.
+- Before implementing or doing anything, Iexplain back to me what I want you to do.
+- At the very top of every response, state the problem being addressed as "Problem: ...".
