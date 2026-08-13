@@ -3371,7 +3371,11 @@ class LLMAgent:
                             # see _open_dropdown_items' docstring for why (a click
                             # toggles, it doesn't just open).
                             if not _open_dropdown_items(state.get("elements", [])):
-                                self._executor.execute({"action_type": "click", "click_position": _snap2})
+                                # Target the arrow button, not the center -- see
+                                # _combobox_dropdown_arrow_pos's own docstring.
+                                _cb_arrow_pos = (self._combobox_dropdown_arrow_pos(_cbox["bbox"])
+                                                 if _cbox and _cbox.get("bbox") else _snap2)
+                                self._executor.execute({"action_type": "click", "click_position": _cb_arrow_pos})
                             if not _cb_val:
                                 # Optional field with no record value (e.g. Suffix).
                                 # Escape + Tab past it, and MARK it attempted so the
@@ -4348,7 +4352,10 @@ class LLMAgent:
                                 _flabel, len(_already_open))
                 else:
                     logger.info("Combobox: clicking to open dropdown for %r → %r", _flabel, _combo_value)
-                    self._executor.execute({"action_type": "click", "click_position": [_ccx, _ccy]})
+                    # Target the arrow button, not the center -- see
+                    # _combobox_dropdown_arrow_pos's own docstring.
+                    _cb_arrow_pos2 = self._combobox_dropdown_arrow_pos(_fel["bbox"])
+                    self._executor.execute({"action_type": "click", "click_position": _cb_arrow_pos2})
                 # The dropdown can take a moment to render. Poll a few times before
                 # giving up — otherwise we Escape on an empty observe and waste a
                 # whole open→escape→reopen cycle (the #1 combobox time-sink).
@@ -4568,29 +4575,49 @@ class LLMAgent:
                                "Key.return", "Key.enter", "Key.escape"}
                 _is_nav_only = not _pred_text and all(k in _nav_keys for k in _pred_keys)
                 if not _is_nav_only and _focused_el:
-                    # Click the field's own bbox before typing into it. Found
-                    # 2026-08-08, live: even with verify-at-fill's settle-poll
-                    # fix (which waits for the UI to catch up), one field
-                    # ('Years Continuously Insured', a plain editcontrol, no
-                    # different from any working field) kept failing verify
+                    # Focus the field before typing into it. Found 2026-08-08,
+                    # live: even with verify-at-fill's settle-poll fix, one
+                    # field ('Years Continuously Insured', a plain editcontrol,
+                    # no different from any working field) kept failing verify
                     # for multiple REAL seconds -- too long to be settle time.
                     # But verify-at-fill's own RETRY path, which re-clicks the
-                    # field before retyping, reliably fixed it every time.
-                    # That's evidence the type had reached the field UIA
-                    # reports as focused, but real OS keyboard focus hadn't
-                    # actually landed there yet -- a focus-transition race,
-                    # not a value-settle race. The retry recovers by force;
-                    # doing the same click before the FIRST attempt (which
-                    # this project's own click-anchoring fix already
-                    # establishes is safe -- "we already know exactly where
-                    # the focused field is, no reason to trust a second,
-                    # independent guess") should prevent needing the retry at
-                    # all. Universal for any typed field, not specific to one.
+                    # field before retyping, reliably fixed it every time --
+                    # evidence the type had reached the field UIA reports as
+                    # focused, but real OS keyboard focus hadn't actually
+                    # landed there yet: a focus-transition race, not a
+                    # value-settle race. The original fix here was a
+                    # coordinate click + a flat 0.1s sleep before the first
+                    # attempt -- still failing live 2026-08-14 on this exact
+                    # field, and separately on 'Years at Address', where a
+                    # direct check (reading its real current bbox from the
+                    # live UIA tree) found the click coordinate 474px off
+                    # from the field's real position -- a second, different
+                    # mechanism (stale coordinate, not a race) hitting the
+                    # same raw-coordinate-click code path.
+                    #
+                    # Both are fixed by the same real, generalizing change:
+                    # _focus_element_via_uia (already built and proven for
+                    # exactly this class of bug -- 'Street Address 1/2',
+                    # 2026-08-08, "simulated click missed despite a correct
+                    # bbox") uses UIA's SetFocus() directly instead of a
+                    # simulated coordinate click. That sidesteps the
+                    # focus-transition race entirely (SetFocus is a direct,
+                    # synchronous accessibility call, not a queued OS input
+                    # event) and sidesteps coordinate staleness entirely (it
+                    # looks the control up by its current accessible Name,
+                    # not a bbox captured earlier in the decision cycle).
+                    # Falls back to the coordinate click only if UIA lookup
+                    # fails -- same fallback shape already used at every
+                    # other _focus_element_via_uia call site in this file.
+                    # Universal for any typed field, not specific to either
+                    # one that surfaced it.
                     if _focused_el.get("bbox"):
                         _fcb = _focused_el["bbox"]
-                        self._executor.execute({"action_type": "click",
-                                                "click_position": [(_fcb[0] + _fcb[2]) / 2,
-                                                                    (_fcb[1] + _fcb[3]) / 2]})
+                        _fc_label = (_focused_el.get("label") or _focused_el.get("text") or "").strip()
+                        if not (_fc_label and self._focus_element_via_uia(_fc_label, expected_bbox=_fcb)):
+                            self._executor.execute({"action_type": "click",
+                                                    "click_position": [(_fcb[0] + _fcb[2]) / 2,
+                                                                        (_fcb[1] + _fcb[3]) / 2]})
                         time.sleep(0.1)
                     _foc_val = (_focused_el.get("value") or "").strip()
                     if _foc_val:
@@ -4725,9 +4752,19 @@ class LLMAgent:
                                 "known value %r — typing now instead of next step.",
                                 _cn_label, _cn_val[:40])
                             _cnb = _cn_el["bbox"]
-                            self._executor.execute({"action_type": "click",
-                                                    "click_position": [(_cnb[0] + _cnb[2]) / 2,
-                                                                        (_cnb[1] + _cnb[3]) / 2]})
+                            # Same _focus_element_via_uia fix as the standard
+                            # type path above -- this branch had ZERO settle
+                            # time at all between click and paste (not even
+                            # the 0.1s the standard path had), the same
+                            # raw-coordinate-click risk (focus-transition
+                            # race / stale coordinate), collapsed into one
+                            # step specifically to save time. Real focus via
+                            # UIA SetFocus first; coordinate click only as
+                            # fallback.
+                            if not (_cn_label and self._focus_element_via_uia(_cn_label, expected_bbox=_cnb)):
+                                self._executor.execute({"action_type": "click",
+                                                        "click_position": [(_cnb[0] + _cnb[2]) / 2,
+                                                                            (_cnb[1] + _cnb[3]) / 2]})
                             self._executor.execute({"action_type": "keyboard", "text": _cn_val})
                             prediction = {"action_type": "keyboard", "text": _cn_val}
                             state_after = self._observe()
@@ -4937,7 +4974,14 @@ class LLMAgent:
                 continue
             self._exec_fail_streak = 0
 
-            time.sleep(self.step_delay)
+            # Adaptive settle-wait (2026-08-14), not a blind time.sleep(self.
+            # step_delay) -- see _adaptive_settle_wait's own docstring. Only
+            # the SUCCESS path (this one) gets the adaptive treatment; the
+            # failure-path sleep just above (L4936) keeps its full, blind
+            # wait deliberately -- a failed execution is exactly the case
+            # this project's own prior incident (checking the screen too
+            # soon) warns against being clever about.
+            self._adaptive_settle_wait(self.step_delay)
 
           except Exception as _step_exc:
             import traceback as _tb
@@ -6212,6 +6256,36 @@ class LLMAgent:
         ev = expected.lower().strip()
         should_check = ev.startswith("yes") or ev in {"check", "true", "1", "checked"}
         return (field_name, should_check)
+
+    @staticmethod
+    def _combobox_dropdown_arrow_pos(bbox) -> List[float]:
+        """Position of a combobox's own dropdown-arrow button, not its
+        text-area center. Found live 2026-08-14, investigating a real
+        emergency-stop incident: the click-open mechanism has always
+        clicked dead center of the combobox's bbox, gambling on the whole
+        control responding to a click the same way a button does. Direct
+        UIA inspection of the real form (not assumed) showed every
+        combobox exposes its ACTUAL dropdown toggle as a SEPARATE
+        ButtonControl with a real InvokePattern, flush against the right
+        edge of the combobox's own bounding rectangle (measured ~19px wide
+        in this form) -- the combobox control itself only exposes
+        ValuePattern, no ExpandCollapsePattern. Center-clicking happens to
+        still work for most comboboxes (the underlying native control
+        responds to a plain click too), but isn't the semantically correct
+        target -- same "use semantic, not precise" principle already
+        shipped for buttons (executor.py's BM_CLICK tier). Targeting the
+        arrow position lets the SAME existing click pipeline
+        (_try_uia_invoke, tried before any raw coordinate click) actually
+        invoke the real toggle control instead of hoping a center-click
+        lands on something responsive. Generic geometry (right-edge offset
+        from the combobox's OWN bbox), not tied to any specific field.
+        NOT a confirmed fix for any one field's dropdown-render failures
+        (root cause for those remains open, per this file's own prior
+        investigation) -- a real hardening found along the way, not a
+        guess at why one specific combobox fails while others don't.
+        """
+        x1, y1, x2, y2 = bbox[0], bbox[1], bbox[2], bbox[3]
+        return [max(x1, x2 - 15), (y1 + y2) / 2]
 
     def _focus_element_via_uia(self, label: str, expected_bbox=None) -> bool:
         """
@@ -7747,6 +7821,63 @@ class LLMAgent:
         except Exception as exc:
             logger.warning("Observer error: %s", exc)
         return {"elements": [], "screen_resolution": [1920, 1080]}
+
+    @staticmethod
+    def _observed_state_fingerprint(state: Dict[str, Any]) -> tuple:
+        """Lightweight signature of an observed state, for _adaptive_settle_wait
+        below. Deliberately broader than navigation_protocol.visible_field_
+        signature (which is scoped to viewport-visible fields, for scroll-
+        movement detection specifically) -- this one catches ANY kind of
+        change the UI might still be settling into (a value finishing typing,
+        a dialog opening, a delayed repaint), not just fields moving in/out
+        of view."""
+        els = state.get("elements", [])
+        return (
+            len(els),
+            state.get("focused_element_id"),
+            tuple((e.get("element_id"), e.get("value")) for e in els),
+        )
+
+    def _adaptive_settle_wait(self, max_wait: float, poll: float = 0.15) -> None:
+        """Replaces a blind time.sleep(max_wait) with a real settle-check:
+        poll the observed state at short intervals and return as soon as two
+        consecutive reads agree the UI has stopped changing, instead of
+        always waiting the full budget. Bounded by real wall-clock time, not
+        an assumed per-poll cost -- can overshoot max_wait by at most one
+        poll interval (a slow _observe() call included), never by more.
+
+        Found live 2026-08-14, direct request ("fix Speed without
+        sacrificing reliability"): STEP_DELAY (1.0s, fixed, unconditional on
+        every single step) measured as roughly HALF of total per-step wall-
+        clock time across a real run. Most steps don't need the full second
+        -- the UI has already settled well before it elapses -- but a real
+        minority (tab switches, scrolls) genuinely do, per this project's own
+        prior incident ("a bug came from checking the screen too soon after
+        a tab switch"). A blind constant can't tell the difference; this can,
+        using the same verify-don't-assume principle already used everywhere
+        else in this file (verify-at-fill, redirect-then-confirm) instead of
+        a new mechanism. Worst case (state never stabilizes) still waits the
+        same max_wait this replaces, just spent polling instead of sleeping
+        blind -- this can only be faster than or equal to today's behavior,
+        never slower by more than one poll interval.
+        """
+        if max_wait <= 0:
+            return
+        _t0 = time.time()
+        try:
+            prev = self._observed_state_fingerprint(self._observe())
+        except Exception:
+            time.sleep(max_wait)
+            return
+        while time.time() - _t0 < max_wait:
+            time.sleep(poll)
+            try:
+                cur = self._observed_state_fingerprint(self._observe())
+            except Exception:
+                return
+            if cur == prev:
+                return
+            prev = cur
 
     @staticmethod
     def _slim_for_model(state: Dict[str, Any]) -> Dict[str, Any]:
