@@ -2893,10 +2893,15 @@ class LLMAgent:
                                     # docstring for why). Falls back to the click only if
                                     # UIA can't find/focus the control at all.
                                     _rc_full_label = (_rc_target.get("label") or _rc_target.get("text") or "").strip()
-                                    if not self._focus_element_via_uia(_rc_full_label, expected_bbox=_rcb):
+                                    _rc_pos = [(_rcb[0] + _rcb[2]) / 2, (_rcb[1] + _rcb[3]) / 2]
+                                    # _find_destructive_button_at guard (2026-08-13) -- see
+                                    # the checkbox-redirect fix elsewhere in this loop for
+                                    # the full incident writeup; same risk shape, same fix.
+                                    if (not self._focus_element_via_uia(_rc_full_label, expected_bbox=_rcb)
+                                            and not _find_destructive_button_at(state.get("elements", []), _rc_pos)):
                                         self._executor.execute({
                                             "action_type": "click",
-                                            "click_position": [(_rcb[0] + _rcb[2]) / 2, (_rcb[1] + _rcb[3]) / 2],
+                                            "click_position": _rc_pos,
                                         })
                                     time.sleep(self.step_delay * 0.4)
                                     _reclick_streak = 0
@@ -3193,10 +3198,18 @@ class LLMAgent:
                                         _cb_label_skip[:30], _reclick_streak, _cb_rc_label)
                                     # Same UIA SetFocus-first fix as the sibling guard above.
                                     _cb_rc_full_label = (_cb_rc_target.get("label") or _cb_rc_target.get("text") or "").strip()
-                                    if not self._focus_element_via_uia(_cb_rc_full_label, expected_bbox=_cbrcb):
+                                    _cb_rc_pos = [(_cbrcb[0] + _cbrcb[2]) / 2, (_cbrcb[1] + _cbrcb[3]) / 2]
+                                    # _find_destructive_button_at guard (2026-08-13) -- same
+                                    # risk shape as every other find_visible_empty_target
+                                    # redirect that falls through to a raw coordinate click:
+                                    # the target could be ANY on-screen element, including a
+                                    # button. Only relevant if the UIA-focus-by-name attempt
+                                    # above fails and this falls through to the raw click.
+                                    if (not self._focus_element_via_uia(_cb_rc_full_label, expected_bbox=_cbrcb)
+                                            and not _find_destructive_button_at(state.get("elements", []), _cb_rc_pos)):
                                         self._executor.execute({
                                             "action_type": "click",
-                                            "click_position": [(_cbrcb[0] + _cbrcb[2]) / 2, (_cbrcb[1] + _cbrcb[3]) / 2],
+                                            "click_position": _cb_rc_pos,
                                         })
                                     time.sleep(self.step_delay * 0.4)
                                     _reclick_streak = 0
@@ -3524,10 +3537,15 @@ class LLMAgent:
                                     if _cd_target and _cd_target.get("bbox"):
                                         _cd_label = (_cd_target.get("label") or _cd_target.get("text") or "").strip()
                                         _cdb = _cd_target["bbox"]
-                                        if not (_cd_label and self._focus_element_via_uia(_cd_label, expected_bbox=_cdb)):
+                                        _cd_pos = [(_cdb[0] + _cdb[2]) / 2, (_cdb[1] + _cdb[3]) / 2]
+                                        # _find_destructive_button_at guard (2026-08-13) -- see
+                                        # the same-shaped fix above this record's own checkbox
+                                        # redirect for the full incident writeup.
+                                        if (not (_cd_label and self._focus_element_via_uia(_cd_label, expected_bbox=_cdb))
+                                                and not _find_destructive_button_at(state.get("elements", []), _cd_pos)):
                                             self._executor.execute({
                                                 "action_type": "click",
-                                                "click_position": [(_cdb[0] + _cdb[2]) / 2, (_cdb[1] + _cdb[3]) / 2],
+                                                "click_position": _cd_pos,
                                             })
                             time.sleep(self.step_delay * 0.5)
                             continue
@@ -3649,7 +3667,11 @@ class LLMAgent:
                                 # guard, just never carried into this one.
                                 _tlabel_full = (_target.get("label") or _target.get("text") or "").strip()
                                 _t_key = self._attempt_key(_target, elements=state.get("elements", []))
-                                if not self._focus_element_via_uia(_tlabel_full, expected_bbox=_tb):
+                                # _find_destructive_button_at guard (2026-08-13) -- see the
+                                # checkbox-redirect fix elsewhere in this loop for the full
+                                # incident writeup; same risk shape, same fix.
+                                if (not self._focus_element_via_uia(_tlabel_full, expected_bbox=_tb)
+                                        and not _find_destructive_button_at(state.get("elements", []), [_tcx, _tcy])):
                                     self._executor.execute({
                                         "action_type": "click",
                                         "click_position": [_tcx, _tcy],
@@ -3997,10 +4019,27 @@ class LLMAgent:
                     _cb_next = self._navproto.find_visible_empty_target(
                         state, self._form_viewport_bottom(state) - 8,
                         attempted_keys=self._attempted_keys, attempt_key_fn=self._attempt_key)
+                    # _find_destructive_button_at guard, applied here for the first
+                    # time -- found live 2026-08-13: this exact redirect landed on
+                    # 'Clear All' (real confirmation dialog popped, run derailed for
+                    # several steps). The guard already exists, already covers the
+                    # navigate and combobox-open-dropdown branches (same risk shape:
+                    # clicking a coordinate resolved from search/scan logic, not a
+                    # position already known by construction to belong to a field) --
+                    # this branch has the identical risk and was simply never wired
+                    # through it. Not a new keyword or a Clear-All-specific rule; the
+                    # guard blocks ANY button-type element at the target position,
+                    # by construction, regardless of label.
+                    _cb_next_pos = None
                     if _cb_next and _cb_next.get("bbox"):
                         _cnb = _cb_next["bbox"]
-                        prediction = {"action_type": "click",
-                                      "click_position": [(_cnb[0] + _cnb[2]) / 2, (_cnb[1] + _cnb[3]) / 2]}
+                        _cb_next_pos = [(_cnb[0] + _cnb[2]) / 2, (_cnb[1] + _cnb[3]) / 2]
+                    if _cb_next_pos and _find_destructive_button_at(state.get("elements", []), _cb_next_pos):
+                        logger.warning("Checkbox redirect target was a destructive button %r — Tab instead.",
+                                        (_cb_next.get("text") or _cb_next.get("label") or "?"))
+                        prediction = {"action_type": "keyboard", "key_count": 1, "keystrokes": ["tab"]}
+                    elif _cb_next_pos:
+                        prediction = {"action_type": "click", "click_position": _cb_next_pos}
                     else:
                         prediction = {"action_type": "keyboard", "key_count": 1, "keystrokes": ["tab"]}
 
@@ -4244,11 +4283,15 @@ class LLMAgent:
                                 "[GUARD] pointer clicked tab %r (idx %d) but %r is still unfilled on "
                                 "the current tab — redirecting there instead of leaving early.",
                                 _hit_name, _hit_idx, _rem_label[:30])
-                            if not (_rem_label and self._focus_element_via_uia(_rem_label, expected_bbox=_rem_bbox)):
+                            _rem_pos = [(_rem_bbox[0] + _rem_bbox[2]) / 2, (_rem_bbox[1] + _rem_bbox[3]) / 2]
+                            # _find_destructive_button_at guard (2026-08-13) -- see the
+                            # checkbox-redirect fix above for the full incident writeup;
+                            # same risk shape, same fix.
+                            if (not (_rem_label and self._focus_element_via_uia(_rem_label, expected_bbox=_rem_bbox))
+                                    and not _find_destructive_button_at(state.get("elements", []), _rem_pos)):
                                 self._executor.execute({
                                     "action_type": "click",
-                                    "click_position": [(_rem_bbox[0] + _rem_bbox[2]) / 2,
-                                                        (_rem_bbox[1] + _rem_bbox[3]) / 2],
+                                    "click_position": _rem_pos,
                                 })
                             time.sleep(self.step_delay * 0.4)
                             continue
@@ -4463,10 +4506,15 @@ class LLMAgent:
                         if _cd_target and _cd_target.get("bbox"):
                             _cd_label = (_cd_target.get("label") or _cd_target.get("text") or "").strip()
                             _cdb = _cd_target["bbox"]
-                            if not (_cd_label and self._focus_element_via_uia(_cd_label, expected_bbox=_cdb)):
+                            _cd_pos = [(_cdb[0] + _cdb[2]) / 2, (_cdb[1] + _cdb[3]) / 2]
+                            # _find_destructive_button_at guard (2026-08-13) -- see the
+                            # checkbox-redirect fix above for the full incident writeup;
+                            # same risk shape, same fix.
+                            if (not (_cd_label and self._focus_element_via_uia(_cd_label, expected_bbox=_cdb))
+                                    and not _find_destructive_button_at(state.get("elements", []), _cd_pos)):
                                 self._executor.execute({
                                     "action_type": "click",
-                                    "click_position": [(_cdb[0] + _cdb[2]) / 2, (_cdb[1] + _cdb[3]) / 2],
+                                    "click_position": _cd_pos,
                                 })
                 time.sleep(self.step_delay * 0.5)
                 continue
