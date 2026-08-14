@@ -416,7 +416,7 @@ class TestBatchFastFill:
 
     def _batch_window(self):
         idx = _SOURCE.index("OPT2 BATCH FAST-FILL")
-        return _SOURCE[idx:idx + 12000]
+        return _SOURCE[idx:idx + 15000]
 
     def test_batch_block_exists_before_the_single_field_block(self):
         batch_idx = _SOURCE.index("OPT2 BATCH FAST-FILL")
@@ -444,7 +444,7 @@ class TestBatchFastFill:
     def test_editcontrol_uses_direct_fill_hwnd_no_click(self):
         window = self._batch_window()
         idx = window.index('_bf_ty == "editcontrol"')
-        section = window[idx:idx + 1600]
+        section = window[idx:idx + 3400]
         assert '"direct_fill_hwnd": _bf_hwnd' in section
         assert '"action_type": "click"' not in section
         assert "_bf_ctrl.SetFocus()" in section
@@ -452,7 +452,7 @@ class TestBatchFastFill:
     def test_comboboxcontrol_uses_combobox_select_and_checks_success(self):
         window = self._batch_window()
         idx = window.index('_bf_ty == "comboboxcontrol"')
-        section = window[idx:idx + 1600]
+        section = window[idx:idx + 2400]
         assert '"action_type": "combobox_select"' in section
         assert '"combobox_hwnd": _bf_hwnd' in section
         assert "_bf_cb_result.success" in section
@@ -484,8 +484,10 @@ class TestBatchFastFill:
         assert "self._observe()" not in loop_body
 
     def test_marks_attempted_for_every_filled_field(self):
+        """3 real writes (editcontrol/comboboxcontrol/checkbox) + 2
+        confirmed-blank skips (editcontrol/comboboxcontrol) = 5."""
         window = self._batch_window()
-        assert window.count("self._mark_attempted(_bf_el") == 3
+        assert window.count("self._mark_attempted(_bf_el") == 5
 
     def test_settles_once_for_the_whole_batch_not_per_field(self):
         """One settle-wait call gated on filled_count > 0, not one per
@@ -519,3 +521,70 @@ class TestBatchFastFill:
         batch_idx = _SOURCE.index("OPT2 BATCH FAST-FILL")
         predict_idx = _SOURCE.index('t_pred = self._predict(state)')
         assert batch_idx < predict_idx
+
+
+class TestBatchFastFillConfirmedBlankSkip:
+    """Tests for the confirmed-blank extension to OPT2 batch fast-fill --
+    added 2026-08-14, direct follow-up ("I need it a bit more faster")
+    after real log evidence: a single genuinely-blank field ('Custom
+    Equipment Value ($)') cost TWO full transformer calls before the
+    reactive path's own three-attempt escalation finally confirmed there
+    was nothing to fill. Batch fast-fill now runs that same escalation
+    (_resolve_field_value_with_escalation, shared with _ask_llm -- see
+    tests/test_resolve_field_value_with_escalation.py) itself, and Tabs
+    past a confirmed-blank field with no transformer call at all."""
+
+    def _batch_window(self):
+        idx = _SOURCE.index("OPT2 BATCH FAST-FILL")
+        return _SOURCE[idx:idx + 15000]
+
+    def test_editcontrol_and_comboboxcontrol_both_use_the_escalation_helper(self):
+        window = self._batch_window()
+        assert window.count(
+            "self._resolve_field_value_with_escalation(state, _bf_label, section=_bf_sec)") == 2
+
+    def test_confirmed_blank_is_recorded_in_leave_blank_keys(self):
+        """Must feed the SAME tracker Navigation Protocol and the reactive
+        path already trust (self._leave_blank_keys), not a separate,
+        batch-only concept of 'blank' that the rest of the file can't see."""
+        window = self._batch_window()
+        assert window.count("self._leave_blank_keys.add(_bf_key)") == 2
+
+    def test_confirmed_blank_sends_no_write_message_only_tab(self):
+        """The whole point -- a confirmed-blank field costs a Tab
+        keystroke and nothing else, no WM_SETTEXT/CB_SETCURSEL call."""
+        window = self._batch_window()
+        idx = window.index("confirmed blank, Tab past")
+        section = window[idx:idx + 700]
+        assert '"direct_fill_hwnd"' not in section
+        assert '"combobox_select"' not in section
+        assert '"key_count": 1, "keystrokes": ["tab"]' in section
+
+    def test_confirmed_blank_still_marks_attempted_and_counts_toward_the_batch(self):
+        """A confirmed-blank field is real, useful work -- it must still
+        mark_attempted (so it's never re-checked) and increment the same
+        _bf_filled counter that gates the end-of-batch continue, exactly
+        like an actual write does."""
+        window = self._batch_window()
+        idx = window.index("confirmed blank, Tab past")
+        section = window[idx:idx + 700]
+        assert "self._mark_attempted(_bf_el" in section
+        assert "_bf_filled += 1" in section
+
+    def test_already_confirmed_blank_fields_are_not_re_escalated(self):
+        """The existing leave_blank_keys/typed_keys gate at the top of
+        each branch already runs BEFORE the escalation call -- a field
+        confirmed blank on an earlier batch must not pay for the
+        escalation (cache refresh + Notepad peek) a second time."""
+        window = self._batch_window()
+        edit_idx = window.index('_bf_ty == "editcontrol"')
+        escalation_idx = window.index(
+            "self._resolve_field_value_with_escalation(state, _bf_label, section=_bf_sec)", edit_idx)
+        gate_idx = window.index("_bf_key in self._leave_blank_keys", edit_idx)
+        assert edit_idx < gate_idx < escalation_idx
+
+    def test_is_not_hardcoded_to_any_specific_field_name(self):
+        window = self._batch_window()
+        idx = window.index("confirmed blank, Tab past")
+        section = window[idx - 200:idx + 400]
+        assert not re.search(r'_bf_label\s*==\s*[\'"]', section)

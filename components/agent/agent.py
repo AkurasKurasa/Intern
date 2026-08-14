@@ -2430,8 +2430,25 @@ class LLMAgent:
                                 or _bf_key in self._typed_keys):
                             continue
                         _bf_sec = self._detect_section(state, _bf_el)
-                        _bf_val = self._lookup_field(_bf_label, section=_bf_sec)
+                        # Three-attempt escalation (plain lookup, cache
+                        # refresh + retry, Notepad peek + retry) -- the
+                        # exact same trust bar _ask_llm's own blank fast
+                        # path already earned live (2026-08-08: a naive
+                        # single-lookup miss got a real field hallucinated
+                        # by the LLM 3 times before this escalation finally
+                        # confirmed it blank on the 4th). A confirmed-blank
+                        # result costs no more than what the reactive path
+                        # was already paying for the SAME field -- this
+                        # just skips the transformer call in front of it.
+                        _bf_val = self._resolve_field_value_with_escalation(state, _bf_label, section=_bf_sec)
                         if not _bf_val:
+                            logger.info("[OPT2] batch fast-fill '%s' → confirmed blank, Tab past "
+                                        "(no transformer, no LLM, no click)", _bf_label)
+                            self._leave_blank_keys.add(_bf_key)
+                            self._mark_attempted(_bf_el, elements=state.get("elements", []))
+                            self._executor.execute({"action_type": "keyboard",
+                                                    "key_count": 1, "keystrokes": ["tab"]})
+                            _bf_filled += 1
                             continue
                         _bf_ctrl = self._find_uia_control_by_name(_bf_label, expected_bbox=_bf_el.get("bbox"))
                         _bf_hwnd = None
@@ -2460,8 +2477,15 @@ class LLMAgent:
                                 or _bf_key in self._typed_keys):
                             continue
                         _bf_sec = self._detect_section(state, _bf_el)
-                        _bf_val = self._lookup_field(_bf_label, section=_bf_sec)
+                        _bf_val = self._resolve_field_value_with_escalation(state, _bf_label, section=_bf_sec)
                         if not _bf_val:
+                            logger.info("[OPT2] batch fast-fill '%s' → confirmed blank, Tab past "
+                                        "(no transformer, no LLM, no click)", _bf_label)
+                            self._leave_blank_keys.add(_bf_key)
+                            self._mark_attempted(_bf_el, elements=state.get("elements", []))
+                            self._executor.execute({"action_type": "keyboard",
+                                                    "key_count": 1, "keystrokes": ["tab"]})
+                            _bf_filled += 1
                             continue
                         _bf_ctrl = self._find_uia_control_by_name(_bf_label, expected_bbox=_bf_el.get("bbox"))
                         _bf_hwnd = None
@@ -7919,6 +7943,36 @@ class LLMAgent:
 
     # ── LLM dispatch ─────────────────────────────────────────────────────────
 
+    def _resolve_field_value_with_escalation(self, state: Dict[str, Any],
+                                              field_name: str, section: str = "") -> str:
+        """Three-attempt escalation used to answer "does the record have
+        this field's value" with total confidence, INCLUDING a genuinely
+        blank answer -- not just a lookup miss. Tries a plain lookup, then
+        a full cache refresh + retry, then a targeted Notepad peek + retry.
+        Returns the found value, or "" only once all three attempts agree
+        there's nothing there.
+
+        Extracted 2026-08-14 from _ask_llm's own blank fast path (found
+        live 2026-08-08, "there seems to be a loop of some kind"): a naive
+        single lookup miss isn't trustworthy enough to conclude "blank" --
+        'Account Type' got hallucinated by the LLM three times in a row
+        before a fourth attempt, using this same escalation, finally got
+        it right. Reused by both _ask_llm (the LLM decision path, unchanged
+        behavior) and OPT2 batch fast-fill (a new no-model blank-skip path)
+        so a genuinely-blank field is recognized with the same confidence
+        either way -- one escalation, not two copies that could disagree.
+        """
+        if not field_name:
+            return ""
+        expected = self._lookup_field(field_name, section=section)
+        if not expected:
+            self._refresh_record_cache(state)
+            expected = self._lookup_field(field_name, section=section)
+        if not expected:
+            self._peek_notepad(state, field_name)
+            expected = self._lookup_field(field_name, section=section)
+        return expected
+
     def _ask_llm(self, state: Dict[str, Any]) -> Dict[str, Any]:
         # Prefer _cached_record (Win32 Notepad read, fully parsed) over visual_cache
         # (which is empty when VLM pre-scan is disabled). This prevents the LLM from
@@ -7945,16 +7999,13 @@ class LLMAgent:
                 _ft  = focused_el.get("type", "?")
                 _fsec = self._detect_section(state, focused_el)
                 # Look up the expected value — section-qualified so Driver 3 First Name
-                # returns "Tyler" not the policyholder's "James".
-                _expected = self._lookup_field(_fn, section=_fsec) if _fn != "?" else ""
-                # Cache miss — force a live re-read of Notepad then retry
-                if not _expected and _fn != "?":
-                    self._refresh_record_cache(state)
-                    _expected = self._lookup_field(_fn, section=_fsec)
-                # Still nothing — direct peek for this specific field
-                if not _expected and _fn != "?":
-                    self._peek_notepad(state, _fn)
-                    _expected = self._lookup_field(_fn, section=_fsec)
+                # returns "Tyler" not the policyholder's "James". Three-attempt
+                # escalation (plain lookup, cache refresh + retry, Notepad peek +
+                # retry) extracted into _resolve_field_value_with_escalation so
+                # OPT2 batch fast-fill can reuse the exact same "confirmed blank"
+                # trust bar this file already earned live on 2026-08-08.
+                _expected = (self._resolve_field_value_with_escalation(state, _fn, section=_fsec)
+                             if _fn != "?" else "")
                 logger.info("LLM focused-field lookup: field=%r  expected=%r  cache_size=%d",
                             _fn, _expected[:40] if _expected else "", len(self._cached_record))
 
