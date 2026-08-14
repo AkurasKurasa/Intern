@@ -37,6 +37,16 @@ _WM_SETTEXT       = 0x000C
 _WM_GETTEXT       = 0x000D
 _WM_GETTEXTLENGTH = 0x000E
 
+# CB_SETCURSEL direct-select fast path -- see _combobox_direct's own
+# docstring. CB_GETCOUNT/CB_GETLBTEXT(LEN) enumerate a combobox's real
+# options directly, no dropdown ever opened; CB_GETCURSEL reads back
+# which index actually ended up selected, for verification.
+_CB_GETCOUNT     = 0x0146
+_CB_GETLBTEXT    = 0x0148
+_CB_GETLBTEXTLEN = 0x0149
+_CB_SETCURSEL    = 0x014E
+_CB_GETCURSEL    = 0x0147
+
 # Module-level handle, mirroring the _uia optional-dependency pattern above
 # -- gives tests a single name to monkeypatch (mod._user32) instead of
 # patching the live, C-backed, process-wide ctypes.windll singleton.
@@ -200,6 +210,22 @@ class ActionExecutor:
                 direct_fill_hwnd = prediction.get("direct_fill_hwnd")
                 issued           = self._keyboard(key_count, keystrokes, text, direct_fill_hwnd)
                 return ExecutionResult("keyboard", None, len(issued), issued, ts, self.dry_run, True, "")
+
+            elif action_type == "combobox_select":
+                # A genuinely new action type (unlike the keyboard/direct-fill
+                # case) -- today's click-based combobox filling never sets
+                # action_type == "keyboard" at all (it's two separate "click"
+                # actions in agent.py), so there's no existing gate to widen
+                # or risk silently missing.
+                text = prediction.get("text", "")
+                hwnd = prediction.get("combobox_hwnd")
+                if self.dry_run:
+                    logger.info("COMBOBOX  direct select would target hwnd=%s: %r  [DRY-RUN]",
+                                hwnd, text[:60])
+                    return ExecutionResult("combobox_select", None, 0, [], ts, self.dry_run, True, "")
+                ok = bool(hwnd) and self._combobox_direct(hwnd, text)
+                return ExecutionResult("combobox_select", None, 0, [], ts, self.dry_run, ok,
+                                       "" if ok else "no_match_or_wrong_class")
 
             elif action_type == "scroll":
                 pos       = prediction.get("click_position", [0, 0])
@@ -397,6 +423,61 @@ class ActionExecutor:
             return True
         except Exception as exc:
             logger.debug("Direct fill via WM_SETTEXT failed, falling back to paste: %s", exc)
+            return False
+
+    def _combobox_direct(self, hwnd: int, text: str, user32=None) -> bool:
+        """Fast path for selecting a combobox option: one CB_SETCURSEL
+        message, no click, no opening the dropdown at all. Falls back
+        (returns False) on anything this can't confidently handle -- the
+        caller then runs the existing click-based open+select mechanism
+        exactly as it always has.
+
+        Live-tested 2026-08-14 against the real practice form (read-only/
+        reversible test): the combobox's real options were read directly
+        via CB_GETCOUNT/CB_GETLBTEXT (no dropdown ever opened), then
+        CB_SETCURSEL was sent for one of them -- confirmed correct via
+        both CB_GETCURSEL's own readback and UIA's ValuePattern, which
+        agreed with each other. This is the direct-selection counterpart
+        to _keyboard_direct's WM_SETTEXT (text fields) and the existing
+        BM_SETCHECK mechanism (checkboxes) -- the third and last of the
+        three control types this form uses.
+
+        Same injectable-`user32` shape as _try_semantic_click/
+        _keyboard_direct, for the same reason: ctypes.windll.user32 is a
+        live, C-backed, process-wide object, unsafe to patch in place in
+        a test.
+        """
+        if user32 is None:
+            user32 = _user32
+        try:
+            buf = ctypes.create_unicode_buffer(256)
+            user32.GetClassNameW(hwnd, buf, 256)
+            if buf.value != "ComboBox":
+                return False
+            count = user32.SendMessageW(hwnd, _CB_GETCOUNT, 0, 0)
+            target_idx = None
+            wanted = text.strip().lower()
+            for i in range(count):
+                length = user32.SendMessageW(hwnd, _CB_GETLBTEXTLEN, i, 0)
+                opt_buf = ctypes.create_unicode_buffer(length + 1)
+                user32.SendMessageW(hwnd, _CB_GETLBTEXT, i, opt_buf)
+                if opt_buf.value.strip().lower() == wanted:
+                    target_idx = i
+                    break
+            if target_idx is None:
+                logger.debug("Direct combobox select: %r not found among %d real option(s) "
+                             "-- falling back to click-based open+select.", text[:40], count)
+                return False
+            user32.SendMessageW(hwnd, _CB_SETCURSEL, target_idx, 0)
+            actual_idx = user32.SendMessageW(hwnd, _CB_GETCURSEL, 0, 0)
+            if actual_idx != target_idx:
+                logger.debug("Direct combobox select readback mismatch (index %s != %s) "
+                             "-- falling back to click-based open+select.", actual_idx, target_idx)
+                return False
+            logger.info("COMBOBOX  direct select via CB_SETCURSEL (no click, no dropdown): %r", text[:60])
+            return True
+        except Exception as exc:
+            logger.debug("Direct combobox select via CB_SETCURSEL failed, falling back: %s", exc)
             return False
 
     def _show_ghost_caret(self) -> None:

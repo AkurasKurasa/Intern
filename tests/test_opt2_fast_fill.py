@@ -15,11 +15,12 @@ earlier the same night: `_lookup_field`, `_find_uia_control_by_name` +
 `.SetFocus()` (no click), and the WM_SETTEXT direct-fill mechanism
 (`direct_fill_hwnd`, `_keyboard_direct`).
 
-Deliberately scoped to editcontrol only -- comboboxes were live-tested
-this session to silently reject the direct-write mechanism entirely, and
-checkboxes already have their own separate, working mechanism
-(BM_SETCHECK). Both must keep going through the existing reactive path
-untouched.
+Extended the same night to comboboxcontrol via CB_SETCURSEL (a direct
+message that selects a real option with no click and no dropdown ever
+opened -- live-tested against the real form, see
+tests/test_executor_combobox_direct.py). Checkboxes already have their
+own separate, working mechanism (BM_SETCHECK) and stay on the existing
+reactive path untouched.
 
 This branch sits deep inside LLMAgent.run() (~8000 lines, many
 preconditions before reaching it -- Navigation Protocol's own decision,
@@ -57,14 +58,14 @@ def _field(label, elem_type, value="", element_id="e1", bbox=(1400, 270, 1600, 3
 def _is_fast_fill_eligible(agent, focused_el, elements, leave_blank_keys=frozenset(),
                             typed_keys=frozenset()):
     """Mirrors the exact gating condition inserted before `_predict()`:
-    `if (_ff_fel and _ff_ty == "editcontrol" and not _ff_val
+    `if (_ff_fel and _ff_ty in ("editcontrol", "comboboxcontrol") and not _ff_val
             and _ff_key not in self._leave_blank_keys
             and _ff_key not in self._typed_keys):`"""
     ty  = (focused_el.get("type") or "").lower() if focused_el else ""
     val = (focused_el.get("value") or "").strip() if focused_el else ""
     key = agent._attempt_key(focused_el, elements=elements) if focused_el else None
     return bool(
-        focused_el and ty == "editcontrol" and not val
+        focused_el and ty in ("editcontrol", "comboboxcontrol") and not val
         and key not in leave_blank_keys and key not in typed_keys
     )
 
@@ -83,12 +84,14 @@ class TestFastFillEligibilityMirror:
         field = _field("Policy Number", "editcontrol", value="POL-000123")
         assert _is_fast_fill_eligible(agent, field, [field]) is False
 
-    def test_comboboxcontrol_is_never_eligible(self):
-        """Live-tested this session: WM_SETTEXT is a silent no-op on a
-        combobox -- must never be routed through this fast path."""
+    def test_comboboxcontrol_is_eligible(self):
+        """Extended the same night: CB_SETCURSEL (live-tested against the
+        real form) lets comboboxes use this fast path too, via a
+        different underlying mechanism than editcontrol (combobox_hwnd,
+        not direct_fill_hwnd)."""
         agent = _make_agent()
         field = _field("Policy Status", "comboboxcontrol")
-        assert _is_fast_fill_eligible(agent, field, [field]) is False
+        assert _is_fast_fill_eligible(agent, field, [field]) is True
 
     def test_checkboxcontrol_is_never_eligible(self):
         """Checkboxes already have their own separate, working mechanism
@@ -152,7 +155,7 @@ class TestSourceWiresRealMechanisms:
 
     def _fast_fill_window(self):
         idx = _SOURCE.index("OPT2 FAST-FILL")
-        return _SOURCE[idx:idx + 4200]
+        return _SOURCE[idx:idx + 5600]
 
     def test_gated_on_no_autohandlers(self):
         window = self._fast_fill_window()
@@ -192,6 +195,32 @@ class TestSourceWiresRealMechanisms:
         window = self._fast_fill_window()
         assert "self._mark_attempted(_ff_fel" in window
         assert "self._adaptive_settle_wait(self.step_delay * 0.4)" in window
+
+    def test_combobox_uses_combobox_select_not_direct_fill_hwnd(self):
+        """Comboboxes must route through the new combobox_select action
+        type (combobox_hwnd), not the text-field mechanism -- WM_SETTEXT
+        is a confirmed no-op on comboboxes."""
+        window = self._fast_fill_window()
+        assert '"action_type": "combobox_select"' in window
+        assert '"combobox_hwnd": _ff_hwnd' in window
+
+    def test_combobox_checks_success_before_committing(self):
+        """A combobox whose known value doesn't match any real option
+        must fall through to the existing click-based path, not be
+        silently treated as done."""
+        window = self._fast_fill_window()
+        assert "_ff_cb_result.success" in window
+
+    def test_combobox_falls_through_to_existing_click_path_on_failure(self):
+        """No `continue` reachable purely from a failed combobox_select --
+        must fall through to today's existing reactive combobox handling."""
+        window = self._fast_fill_window()
+        result_idx = window.index("_ff_cb_result = self._executor.execute")
+        after = window[result_idx:result_idx + 1000]
+        # continue only appears inside the `if _ff_cb_result.success:` block
+        success_idx = after.index("if _ff_cb_result.success:")
+        continue_idx = after.index("continue")
+        assert success_idx < continue_idx
 
     def test_falls_through_to_continue_only_on_full_success(self):
         """Every failure point (no ctrl, no hwnd, no known value) must
