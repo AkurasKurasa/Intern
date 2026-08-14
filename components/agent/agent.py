@@ -2462,6 +2462,67 @@ class LLMAgent:
                             # attempt otherwise failed) -- fall through to
                             # today's existing click-based open+select path
                             # below, unchanged.
+                elif (_ff_fel and _ff_ty in ("checkboxcontrol", "checkbox")
+                      and (_ff_fel.get("label") or _ff_fel.get("text") or "").strip()
+                          not in self._checked_fields):
+                    # ── OPT2 CHECKBOX FAST-FILL: added 2026-08-14, same
+                    # night, direct evidence from a real live run's log --
+                    # 25 of 57 remaining live model decisions in one full
+                    # run were checkboxes, every one shown already having a
+                    # deterministically known answer via the exact same
+                    # lookup mechanism text/combobox fields already use.
+                    # Checkboxes were excluded from the fast-fill checks
+                    # above because they need different eligibility rules
+                    # (no reliable .value to read -- see self._checked_fields'
+                    # own comment -- and a different, already-proven
+                    # mechanism: BM_SETCHECK via WindowFromPoint on the
+                    # bbox center, the exact same call shape already used
+                    # at this file's other checkbox sites, not the name-
+                    # based UIA lookup text/combobox fields use).
+                    # _auto_check() already bundles the lookup + "yes"-
+                    # prefix parsing in one call -- reused exactly, not
+                    # reimplemented.
+                    _chk_result = self._auto_check(state)
+                    if _chk_result is not None:
+                        _chk_label, _chk_should_check = _chk_result
+                        _chk_bbox = _ff_fel.get("bbox")
+                        if _chk_should_check and _chk_bbox:
+                            try:
+                                import win32gui as _cfwg
+                                import win32api as _cfwa
+                                _chk_cx = (_chk_bbox[0] + _chk_bbox[2]) / 2
+                                _chk_cy = (_chk_bbox[1] + _chk_bbox[3]) / 2
+                                _chk_hw = _cfwg.WindowFromPoint((int(_chk_cx), int(_chk_cy)))
+                                if _chk_hw:
+                                    _cfwa.SendMessage(_chk_hw, 0x00F1, 1, 0)  # BM_SETCHECK, BST_CHECKED
+                                    logger.info("[OPT2] fast-fill checkbox '%s' → checked "
+                                                "(no transformer, no LLM, no click)", _chk_label)
+                                    self._checked_fields.add(_chk_label)
+                                    self._mark_attempted(_ff_fel, elements=state.get("elements", []))
+                                    self._executor.execute({"action_type": "keyboard",
+                                                            "key_count": 1, "keystrokes": ["tab"]})
+                                    self._adaptive_settle_wait(self.step_delay * 0.2)
+                                    continue
+                            except Exception as _chk_exc:
+                                logger.debug("Fast-fill checkbox check failed for %r — %s",
+                                             _chk_label, _chk_exc)
+                        elif not _chk_should_check:
+                            # Wx checkboxes already default to unchecked
+                            # (execution_checkbox_reset_default) -- a known
+                            # "NO" answer needs no action at all, just Tab
+                            # past and mark it handled, same as the existing
+                            # type-intercept path's own unchecked branch.
+                            logger.info("[OPT2] fast-fill checkbox '%s' → leave unchecked "
+                                        "(no transformer, no LLM, no click)", _chk_label)
+                            self._checked_fields.add(_chk_label)
+                            self._mark_attempted(_ff_fel, elements=state.get("elements", []))
+                            self._executor.execute({"action_type": "keyboard",
+                                                    "key_count": 1, "keystrokes": ["tab"]})
+                            self._adaptive_settle_wait(self.step_delay * 0.2)
+                            continue
+                    # Unknown checkbox value -- fall through to today's
+                    # existing reactive path (transformer + LLM decide),
+                    # exactly as before this change.
                 elif _ff_fel and _ff_ty not in ("editcontrol", "comboboxcontrol",
                                                 "checkboxcontrol", "checkbox"):
                     # ── OPT2 DEAD-SPOT RESCUE: added 2026-08-14, direct

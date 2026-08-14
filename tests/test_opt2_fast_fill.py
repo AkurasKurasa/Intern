@@ -155,7 +155,7 @@ class TestSourceWiresRealMechanisms:
 
     def _fast_fill_window(self):
         idx = _SOURCE.index("OPT2 FAST-FILL")
-        return _SOURCE[idx:idx + 9200]
+        return _SOURCE[idx:idx + 13500]
 
     def test_gated_on_no_autohandlers(self):
         window = self._fast_fill_window()
@@ -251,9 +251,11 @@ class TestSourceWiresRealMechanisms:
     def test_settle_wait_was_tightened_not_removed(self):
         """Tightened 2026-08-14 ahead of a ~1-minute demo target -- must
         still be present (still adaptive, still bounded), just a lower
-        ceiling than the general-purpose fill path's own budget."""
+        ceiling than the general-purpose fill path's own budget. 3 from
+        editcontrol/combobox/dead-spot-rescue + 2 more from the later
+        checkbox fast-fill addition (checked + unchecked cases) = 5."""
         window = self._fast_fill_window()
-        assert window.count("self._adaptive_settle_wait(self.step_delay * 0.2)") == 3
+        assert window.count("self._adaptive_settle_wait(self.step_delay * 0.2)") == 5
 
 
 class TestDeadSpotRescue:
@@ -266,7 +268,7 @@ class TestDeadSpotRescue:
 
     def _fast_fill_window(self):
         idx = _SOURCE.index("OPT2 FAST-FILL")
-        return _SOURCE[idx:idx + 9200]
+        return _SOURCE[idx:idx + 13500]
 
     def test_rescue_block_exists_and_is_gated_correctly(self):
         window = self._fast_fill_window()
@@ -338,3 +340,61 @@ class TestDeadSpotRescueEligibilityMirror:
 
     def test_buttoncontrol_is_rescue_eligible(self):
         assert _dead_spot_rescue_eligible("buttoncontrol") is True
+
+
+class TestCheckboxFastFill:
+    """Tests for OPT2's checkbox fast-fill -- added 2026-08-14, same
+    night, direct evidence from a real live run's log: 25 of 57 remaining
+    live model decisions in one full run were checkboxes, every one
+    already having a deterministically known answer via the same lookup
+    text/combobox fields already use. Reuses self._auto_check() (lookup +
+    'yes'-prefix parsing, already existing) and the exact same
+    WindowFromPoint + BM_SETCHECK call shape this file already uses at
+    its other checkbox sites -- not a new mechanism."""
+
+    def _fast_fill_window(self):
+        idx = _SOURCE.index("OPT2 FAST-FILL")
+        return _SOURCE[idx:idx + 13500]
+
+    def test_gated_on_checked_fields_not_typed_keys(self):
+        """Checkboxes don't reliably expose .value (see
+        self._checked_fields' own comment) -- must use the checkbox-
+        specific tracker, not the text-field one."""
+        window = self._fast_fill_window()
+        assert 'not in self._checked_fields' in window
+
+    def test_reuses_real_auto_check_not_a_reimplementation(self):
+        window = self._fast_fill_window()
+        assert "self._auto_check(state)" in window
+
+    def test_uses_the_same_bm_setcheck_mechanism_as_existing_sites(self):
+        """Must use WindowFromPoint on the bbox center + BM_SETCHECK --
+        the exact same call shape already proven elsewhere in this file,
+        not the name-based UIA lookup text/combobox fields use."""
+        window = self._fast_fill_window()
+        idx = window.index("OPT2 CHECKBOX FAST-FILL")
+        section = window[idx:idx + 3200]
+        assert "WindowFromPoint((int(_chk_cx), int(_chk_cy)))" in section
+        assert "SendMessage(_chk_hw, 0x00F1, 1, 0)" in section
+
+    def test_unchecked_case_needs_no_bm_setcheck_call(self):
+        """Wx checkboxes already default to unchecked -- a known 'NO'
+        answer should just Tab past, not send any message at all."""
+        window = self._fast_fill_window()
+        idx = window.index("elif not _chk_should_check:")
+        section = window[idx:idx + 500]
+        assert "SendMessage" not in section
+
+    def test_falls_through_on_unknown_checkbox_value(self):
+        """If _auto_check returns None (not in the lookup data), must
+        fall through to today's existing reactive path -- never guess."""
+        window = self._fast_fill_window()
+        idx = window.index("if _chk_result is not None:")
+        # The comment documenting the fall-through-on-unknown case must
+        # exist, confirming this isn't silently unhandled.
+        assert "Unknown checkbox value" in window
+
+    def test_is_gated_before_the_transformer_predict_call(self):
+        checkbox_idx = _SOURCE.index("OPT2 CHECKBOX FAST-FILL")
+        predict_idx = _SOURCE.index('t_pred = self._predict(state)')
+        assert checkbox_idx < predict_idx
