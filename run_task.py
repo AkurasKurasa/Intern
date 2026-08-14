@@ -168,11 +168,25 @@ MAX_STEPS     = 1000  # was 200 -- hard ceiling that guaranteed incompletion reg
                       # old cap, running out of steps was mathematically certain no matter
                       # how many more loop bugs got fixed. Sized with headroom, not tightly
                       # tuned -- first real end-to-end attempt will show the real number.
-STEP_DELAY    = 1.0  # was 1.5 -- tonight's live runs showed ~2-3s/step dominated by this
-                      # fixed pause, not LLM waits (fast-path lookup already made those
-                      # near-free). Some settle time is genuinely load-bearing (a prior
-                      # bug came from checking the screen too soon after a tab switch),
-                      # so this is a moderate cut to test live, not a blind zero-out.
+STEP_DELAY    = 0.5  # was 1.0, was 1.5 before that -- tightened again 2026-08-14, direct
+                      # request against a ~1-minute target: with model calls now mostly
+                      # eliminated (OPT2 fast-fill + dead-spot rescue), a real partial run
+                      # still averaged ~1.5s/step, meaning the fixed per-step floor itself
+                      # (not the model) is now the dominant remaining cost -- this is THE
+                      # single constant every settle-wait budget in agent.py scales from
+                      # (fast-fill's *0.2, the main loop's own *1.0, etc.), so cutting it
+                      # once here proportionally speeds up every one of them at once.
+                      # REAL RISK, stated plainly: _adaptive_settle_wait already returns
+                      # early once state stabilizes, so this ceiling mainly matters for the
+                      # genuinely-slow cases -- and some of those are exactly the focus-
+                      # transition races this project already found and fixed once this
+                      # session (specific fields that needed real settle time to land
+                      # correctly). This is NOT proven safe at this value -- needs a real
+                      # live check afterward, watching specifically for a value that used
+                      # to fill correctly failing to land, not just the unit suite passing.
+                      # A moderate cut to test live (0.5, not zeroed out), given some
+                      # settle time is genuinely load-bearing (a prior bug came from
+                      # checking the screen too soon after a tab switch).
 CORRECTION_WATCH_SECONDS = 0.5  # DAgger correction-capture window per failed step (0 = off).
                                  # Default was 4.0s (agent.py's own default) — that's a real-time
                                  # block for a human to physically step in and correct; on a run
