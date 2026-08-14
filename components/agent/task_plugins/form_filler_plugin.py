@@ -447,6 +447,13 @@ class FormFillerPlugin(TaskPlugin):
                     section_fn=self._detect_section,
                 )
                 self._plan_idx = 0
+                _n_hit = sum(1 for pf in self._field_plan if pf.resolution == Resolution.LOOKUP_HIT)
+                _n_blank = sum(1 for pf in self._field_plan if pf.resolution == Resolution.LOOKUP_BLANK)
+                _n_llm = sum(1 for pf in self._field_plan if pf.resolution == Resolution.NEEDS_LLM)
+                logger.info(
+                    "Plan-replay: built plan for this view -- %d field(s) "
+                    "(%d ready to fill, %d leave-blank, %d need live reasoning).",
+                    len(self._field_plan), _n_hit, _n_blank, _n_llm)
 
         if self._plan_replay and self._plan_idx < len(self._field_plan):
             planned = self._field_plan[self._plan_idx]
@@ -456,8 +463,12 @@ class FormFillerPlugin(TaskPlugin):
                 # Not what we planned for anymore (vanished, or already holds
                 # something unexpected) -- consume the stale entry and let the
                 # existing cascade below handle whatever's actually focused.
+                logger.info("Plan-replay: '%s' no longer matches the plan (vanished or "
+                            "unexpectedly changed) -- deferring to the normal cascade.",
+                            planned.label)
                 self._plan_idx += 1
             elif status == DivergenceStatus.SATISFIED:
+                logger.info("Plan-replay: '%s' already correct -- Tab.", planned.label)
                 self._plan_idx += 1
                 self._executor.execute({"action_type": "keyboard",
                                         "key_count": 1, "keystrokes": ["tab"]})
@@ -470,6 +481,9 @@ class FormFillerPlugin(TaskPlugin):
                 # the reactive path below at least starts from the right
                 # target, then let it decide. _plan_idx untouched: re-checked
                 # next call, only advances once this field stops being pending.
+                logger.info("Plan-replay: '%s' needs live reasoning (%s) -- "
+                            "handing off to transformer/LLM.",
+                            planned.label, planned.resolution.value)
                 (self._focus_fn or self._focus_by_label)(planned.label, planned.bbox)
                 return (False, False)
             else:
@@ -478,6 +492,7 @@ class FormFillerPlugin(TaskPlugin):
                 focused = (self._focus_fn or self._focus_by_label)(planned.label, planned.bbox)
                 if focused:
                     if planned.resolution == Resolution.LOOKUP_BLANK:
+                        logger.info("Plan-replay: '%s' = (leave blank) -- Tab.", planned.label)
                         self._executor.execute({"action_type": "keyboard",
                                                 "key_count": 1, "keystrokes": ["tab"]})
                     else:
@@ -485,6 +500,8 @@ class FormFillerPlugin(TaskPlugin):
                                                      planned.needs_clear)
                         self._executor.execute({"action_type": "keyboard",
                                                 "key_count": 1, "keystrokes": ["tab"]})
+                        logger.info("Plan-replay fill: '%s' -> %r (verified=%s)",
+                                    planned.label, planned.expected_value[:40], _ok)
                         if _ok:
                             self._filled_this_tab.add(planned.label)
                             self._fill_retries.pop(planned.label, None)
@@ -494,6 +511,8 @@ class FormFillerPlugin(TaskPlugin):
                     self._last_auto_step   = step_idx
                     (self._settle_wait_fn or (lambda w: time.sleep(w)))(self.step_delay)
                     return (True, True)
+                logger.info("Plan-replay: could not focus '%s' via UIA -- deferring to "
+                            "the normal cascade.", planned.label)
                 # Focus failed entirely (element genuinely not reachable via
                 # UIA by name right now) -- treat as diverged, don't guess at
                 # a stale coordinate. Let the cascade below have this step.

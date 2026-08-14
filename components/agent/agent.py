@@ -1537,7 +1537,7 @@ class LLMAgent:
                 logger.warning("Element count spiked %d→%d — unexpected dialog detected, pressing Escape.",
                                _prev_elem_count, _cur_elem_count)
                 self._executor.execute({"action_type": "hotkey", "keys": ["escape"]})
-                time.sleep(self.step_delay)
+                self._adaptive_settle_wait(self.step_delay)
                 _prev_elem_count = 0
                 continue
             _prev_elem_count = _cur_elem_count
@@ -2579,7 +2579,7 @@ class LLMAgent:
                                 self._attempt_key(_fe2, elements=state.get("elements", [])))
                         self._executor.execute({"action_type": "keyboard",
                                                 "key_count": 1, "keystrokes": ["tab"]})
-                        time.sleep(self.step_delay * 0.4)
+                        self._adaptive_settle_wait(self.step_delay * 0.4)
                         continue
 
                     prediction = self._merge(t_pred, t_conf, llm_action, state)
@@ -2659,7 +2659,7 @@ class LLMAgent:
                             self._mark_attempted(_fe2, elements=state.get("elements", []))
                         self._executor.execute({"action_type": "keyboard",
                                                 "key_count": 1, "keystrokes": ["tab"]})
-                        time.sleep(self.step_delay * 0.4)
+                        self._adaptive_settle_wait(self.step_delay * 0.4)
                         continue
                 else:
                     # Transformer pointer navigates to the next field
@@ -2913,7 +2913,7 @@ class LLMAgent:
                                             "action_type": "click",
                                             "click_position": _rc_pos,
                                         })
-                                    time.sleep(self.step_delay * 0.4)
+                                    self._adaptive_settle_wait(self.step_delay * 0.4)
                                     _reclick_streak = 0
                                     # VERIFY the redirect actually moved focus, don't
                                     # just assume it worked and `continue` blind.
@@ -3101,7 +3101,7 @@ class LLMAgent:
                                 _reclick_reason, _reclick_ty, _reclick_label)
                             self._executor.execute({"action_type": "keyboard",
                                                     "key_count": 1, "keystrokes": ["tab"]})
-                            time.sleep(self.step_delay * 0.4)
+                            self._adaptive_settle_wait(self.step_delay * 0.4)
                             continue
                         # COMBOBOX-AS-FILL: demos action comboboxes as CLICKS, so the
                         # model clicks them; but a plain click only toggles the
@@ -3221,7 +3221,7 @@ class LLMAgent:
                                             "action_type": "click",
                                             "click_position": _cb_rc_pos,
                                         })
-                                    time.sleep(self.step_delay * 0.4)
+                                    self._adaptive_settle_wait(self.step_delay * 0.4)
                                     _reclick_streak = 0
                                     # Same verify-don't-assume fix as the sibling guard.
                                     _cb_rc_check = self._observe()
@@ -3307,7 +3307,7 @@ class LLMAgent:
                                         _cb_label_skip[:30])
                             self._executor.execute({"action_type": "keyboard",
                                                     "key_count": 1, "keystrokes": ["tab"]})
-                            time.sleep(self.step_delay * 0.5)
+                            self._adaptive_settle_wait(self.step_delay * 0.5)
                             continue
                         if _cbox is not None:
                             _cb_label = (_cbox.get("label") or _cbox.get("text") or "").strip()
@@ -3596,7 +3596,7 @@ class LLMAgent:
                                                _snap2[0], _snap2[1])
                                 self._executor.execute({"action_type": "keyboard",
                                                         "key_count": 1, "keystrokes": ["tab"]})
-                                time.sleep(self.step_delay * 0.5)
+                                self._adaptive_settle_wait(self.step_delay * 0.5)
                                 continue
                             # Found 2026-08-08, live: this branch's low-confidence
                             # navigate-pointer landed on a real 'Clear All' button
@@ -3625,7 +3625,7 @@ class LLMAgent:
                                     _snap2[0], _snap2[1], _nb_name)
                                 self._executor.execute({"action_type": "keyboard",
                                                         "key_count": 1, "keystrokes": ["tab"]})
-                                time.sleep(self.step_delay * 0.5)
+                                self._adaptive_settle_wait(self.step_delay * 0.5)
                                 continue
                             prediction = {"action_type": "click", "click_position": _snap2}
                             _is_plain_navigate_click = True
@@ -3690,7 +3690,7 @@ class LLMAgent:
                                         "action_type": "click",
                                         "click_position": [_tcx, _tcy],
                                     })
-                                time.sleep(self.step_delay * 0.4)
+                                self._adaptive_settle_wait(self.step_delay * 0.4)
                                 _lowconf_fallback_streak = 0
                                 _reclick_streak = 0
                                 _lc_check = self._observe()
@@ -4207,7 +4207,7 @@ class LLMAgent:
                             _hit_name, _hit_idx, self._current_tab_idx)
                         self._executor.execute({"action_type": "keyboard",
                                                 "key_count": 1, "keystrokes": ["tab"]})
-                        time.sleep(self.step_delay * 0.4)
+                        self._adaptive_settle_wait(self.step_delay * 0.4)
                         continue
                     # Found 2026-08-09, live, direct user report ("Coverage
                     # was skipped"): the backward-block guard above stops a
@@ -4572,7 +4572,7 @@ class LLMAgent:
                     _action_history.clear()
                     _no_change_streak = 0
                     self._executor.execute({"action_type": "keyboard", "key_count": 1, "keystrokes": ["tab"]})
-                    time.sleep(self.step_delay * 0.5)
+                    self._adaptive_settle_wait(self.step_delay * 0.5)
                     continue
 
             if prediction.get("action_type") == "keyboard":
