@@ -42,6 +42,10 @@ _FILLABLE_TYPES: Set[str] = {"editcontrol", "input", "comboboxcontrol", "combobo
                               "checkbox", "checkboxcontrol"}
 _SIG_TYPES: Set[str] = {"editcontrol", "comboboxcontrol", "checkbox", "checkboxcontrol"}
 
+# Public alias — lets other modules (e.g. field_planner.py) reuse the same
+# fillable-type set instead of maintaining a second private copy.
+FILLABLE_TYPES: Set[str] = _FILLABLE_TYPES
+
 
 class NavAction(Enum):
     """What the Navigation Protocol wants done next."""

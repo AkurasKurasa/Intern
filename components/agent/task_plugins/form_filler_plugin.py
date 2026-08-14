@@ -14,6 +14,10 @@ import time
 from typing import Any, Dict, List, Optional, Set, Tuple
 
 from .base_plugin import TaskPlugin
+from ..field_planner import (
+    DivergenceStatus, PlannedField, Resolution,
+    check_divergence, is_fast_replayable, plan_visible_fields,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -48,6 +52,10 @@ class FormFillerPlugin(TaskPlugin):
         step_delay:  float = 1.2,
         observe_fn=None,                 # () -> state dict; set by LLMAgent after init
         form_title_fragment: str = "",   # fragment of form window title for focus check
+        plan_replay: bool = False,       # opt-in: batch-plan a tab, replay it mechanically
+        focus_fn=None,                   # (label, expected_bbox) -> bool; set by LLMAgent after init
+        settle_wait_fn=None,             # (max_wait) -> None; set by LLMAgent after init
+        viewport_bottom_fn=None,         # (state) -> float; set by LLMAgent after init
     ) -> None:
         self._executor            = executor
         self._data_source         = data_source
@@ -56,6 +64,19 @@ class FormFillerPlugin(TaskPlugin):
         self.step_delay           = step_delay
         self._observe_fn          = observe_fn
         self._form_title_fragment = form_title_fragment.lower() if form_title_fragment else ""
+
+        # ── Plan-then-replay mode (off by default) ──────────────────────────
+        # See components/agent/field_planner.py for the "why". _focus_fn and
+        # _settle_wait_fn are wired onto this instance by LLMAgent.__init__
+        # (the same hasattr-gated pattern already used for _executor etc.);
+        # when left unwired (e.g. this plugin is used standalone/in tests),
+        # _focus_by_label and a plain time.sleep are used instead.
+        self._plan_replay:    bool                = plan_replay
+        self._focus_fn                            = focus_fn
+        self._settle_wait_fn                      = settle_wait_fn
+        self._viewport_bottom_fn                  = viewport_bottom_fn
+        self._field_plan:     List[PlannedField]  = []
+        self._plan_idx:       int                 = 0
 
         # ── Mirrors of agent instance state that was previously on LLMAgent ──
         self._filled_this_tab:    Set[str] = set()
@@ -407,6 +428,77 @@ class FormFillerPlugin(TaskPlugin):
                 time.sleep(self.step_delay)
                 return (True, True)
 
+        # ── 1d. Plan-replay (opt-in, off by default) ─────────────────────────
+        # Consume one entry from a pre-built field plan mechanically, instead
+        # of falling through to the full auto-skip/auto-fill/auto-check
+        # cascade below. See components/agent/field_planner.py for the "why".
+        # With self._plan_replay False (the default) this block's guard is
+        # always false and every branch below is reached exactly as before --
+        # this mode is purely additive.
+        if self._plan_replay:
+            if self._plan_idx >= len(self._field_plan):
+                # First call after a tab switch (plan starts empty) or the
+                # previous plan just got fully consumed -- (re)build it. Also
+                # catches fields that only appear after another field's value
+                # changes, without needing a dedicated detector.
+                _vb = self._viewport_bottom_fn(state) if self._viewport_bottom_fn else float("inf")
+                self._field_plan = plan_visible_fields(
+                    state, _vb, lookup_fn=self._lookup_field, peek_fn=self._peek_notepad,
+                    section_fn=self._detect_section,
+                )
+                self._plan_idx = 0
+
+        if self._plan_replay and self._plan_idx < len(self._field_plan):
+            planned = self._field_plan[self._plan_idx]
+            status  = check_divergence(planned, state)
+
+            if status == DivergenceStatus.DIVERGED:
+                # Not what we planned for anymore (vanished, or already holds
+                # something unexpected) -- consume the stale entry and let the
+                # existing cascade below handle whatever's actually focused.
+                self._plan_idx += 1
+            elif status == DivergenceStatus.SATISFIED:
+                self._plan_idx += 1
+                self._executor.execute({"action_type": "keyboard",
+                                        "key_count": 1, "keystrokes": ["tab"]})
+                self._no_change_streak = 0
+                time.sleep(self.step_delay * 0.25)
+                return (True, True)
+            elif planned.resolution == Resolution.NEEDS_LLM or not is_fast_replayable(planned):
+                # Genuinely ambiguous, or a combobox/checkbox (still on the
+                # existing reactive branches in v1) -- best-effort focus so
+                # the reactive path below at least starts from the right
+                # target, then let it decide. _plan_idx untouched: re-checked
+                # next call, only advances once this field stops being pending.
+                (self._focus_fn or self._focus_by_label)(planned.label, planned.bbox)
+                return (False, False)
+            else:
+                # LOOKUP_HIT / LOOKUP_BLANK editcontrol -- mechanical fill,
+                # no re-derivation of the cascade below at all.
+                focused = (self._focus_fn or self._focus_by_label)(planned.label, planned.bbox)
+                if focused:
+                    if planned.resolution == Resolution.LOOKUP_BLANK:
+                        self._executor.execute({"action_type": "keyboard",
+                                                "key_count": 1, "keystrokes": ["tab"]})
+                    else:
+                        _ok = self._paste_and_verify(planned.label, planned.expected_value,
+                                                     planned.needs_clear)
+                        self._executor.execute({"action_type": "keyboard",
+                                                "key_count": 1, "keystrokes": ["tab"]})
+                        if _ok:
+                            self._filled_this_tab.add(planned.label)
+                            self._fill_retries.pop(planned.label, None)
+                    self._plan_idx += 1
+                    self._no_change_streak = 0
+                    self._steps_on_tab     = 0
+                    self._last_auto_step   = step_idx
+                    (self._settle_wait_fn or (lambda w: time.sleep(w)))(self.step_delay)
+                    return (True, True)
+                # Focus failed entirely (element genuinely not reachable via
+                # UIA by name right now) -- treat as diverged, don't guess at
+                # a stale coordinate. Let the cascade below have this step.
+                self._plan_idx += 1
+
         # ── 2. Auto-skip ─────────────────────────────────────────────────────
         if self._auto_skip(state):
             logger.info("Auto-skip: focused field already has correct value — Tab.")
@@ -722,6 +814,11 @@ class FormFillerPlugin(TaskPlugin):
         self._steps_on_tab      = 0
         self._filled_this_tab.clear()
         self._confirmed_blank_fields.clear()
+        # A plan built for the previous tab must never be replayed against
+        # this one -- discard it, plan_replay's tab-just-switched branch
+        # will rebuild it against the new tab's own elements.
+        self._field_plan = []
+        self._plan_idx   = 0
 
     def notify_validation(self, validation_status: str, focused_id: Optional[str]) -> None:
         """
@@ -1244,6 +1341,37 @@ class FormFillerPlugin(TaskPlugin):
         except Exception as exc:
             logger.warning("Scroll-form-top: failed — %s", exc)
 
+    def _focus_by_label(self, label: str, expected_bbox: Optional[List[float]] = None) -> bool:
+        """
+        SetFocus a control by its UIA Name, trying EditControl, then
+        ComboBoxControl, then CheckBoxControl. Returns False (never raises)
+        on any failure. This is the local fallback used only when
+        LLMAgent hasn't wired a real _focus_fn (_focus_element_via_uia,
+        which additionally disambiguates same-labeled elements by
+        expected_bbox) onto this plugin -- e.g. when FormFillerPlugin is
+        used standalone or in tests. `expected_bbox` is accepted for
+        signature symmetry with that real method but unused here.
+        """
+        if not label or label == "?":
+            return False
+        try:
+            import win32gui as _w32g
+            import uiautomation as _uia_mod
+            _fg = _w32g.GetForegroundWindow()
+            _root = _uia_mod.ControlFromHandle(_fg)
+            _ctrl = _root.EditControl(searchDepth=10, Name=label)
+            if not _ctrl.Exists(maxSearchSeconds=0.2):
+                _ctrl = _root.ComboBoxControl(searchDepth=10, Name=label)
+            if not _ctrl.Exists(maxSearchSeconds=0.2):
+                _ctrl = _root.CheckBoxControl(searchDepth=10, Name=label)
+            if _ctrl.Exists(maxSearchSeconds=0.2):
+                _ctrl.SetFocus()
+                logger.info("_focus_by_label: UIA SetFocus on %r", label)
+                return True
+        except Exception:
+            pass
+        return False
+
     def _focus_first_empty_field(
         self,
         state:        Dict[str, Any],
@@ -1296,23 +1424,8 @@ class FormFillerPlugin(TaskPlugin):
         cx, cy = (x1 + x2) / 2, (y1 + y2) / 2
         field_label = (e.get("label") or e.get("text") or "?").strip()
         # Try UIA SetFocus first
-        if field_label and field_label != "?":
-            try:
-                import win32gui as _w32g
-                import uiautomation as _uia_mod
-                _fg = _w32g.GetForegroundWindow()
-                _root = _uia_mod.ControlFromHandle(_fg)
-                _ctrl = _root.EditControl(searchDepth=10, Name=field_label)
-                if not _ctrl.Exists(maxSearchSeconds=0.2):
-                    _ctrl = _root.ComboBoxControl(searchDepth=10, Name=field_label)
-                if not _ctrl.Exists(maxSearchSeconds=0.2):
-                    _ctrl = _root.CheckBoxControl(searchDepth=10, Name=field_label)
-                if _ctrl.Exists(maxSearchSeconds=0.2):
-                    _ctrl.SetFocus()
-                    logger.info("Tab-advance focus: UIA SetFocus on %r", field_label)
-                    return True
-            except Exception:
-                pass
+        if field_label and field_label != "?" and self._focus_by_label(field_label):
+            return True
         cy = max(cy, _tab_floor)
         cy = min(cy, y2 - 2)
         logger.info("Tab-advance focus: clicking first unhandled field %r @ (%.0f, %.0f)",

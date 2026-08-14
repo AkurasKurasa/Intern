@@ -61,6 +61,10 @@ SOURCE_WINDOW    = "data_entry_intake"   # fragment of source window title (matc
 USE_VLM          = True   # set True to enable Groq/Gemini vision; live scan per tab
 USE_VLM_PRESCAN  = False  # set True to also do upfront full-document pre-scan
                           # (heavy on rate limits — only useful when scan_tab is unreliable)
+PLAN_REPLAY      = False  # set True to batch-plan each tab once and replay it
+                          # mechanically instead of re-deciding field by field —
+                          # see components/agent/field_planner.py. Off by default;
+                          # purely additive when enabled. Not yet live-verified.
 
 # ── run ───────────────────────────────────────────────────────────────────────
 if __name__ == "__main__":
@@ -137,6 +141,7 @@ if __name__ == "__main__":
             record_num           = record_num,
             step_delay           = STEP_DELAY,
             form_title_fragment  = "Car Insurance",
+            plan_replay          = PLAN_REPLAY,
         )
         # Per-record VLM cache becomes primary data for this record.
         # Falls back to flat cache if VLM didn't bucket this record (unscrolled

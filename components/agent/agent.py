@@ -1208,6 +1208,16 @@ class LLMAgent:
                 task_plugin._visual_reader = visual_reader
             if hasattr(task_plugin, "_source_window") and not task_plugin._source_window and source_window:
                 task_plugin._source_window = source_window
+            # Plan-then-replay support (components/agent/field_planner.py) —
+            # wire the real UIA-focus/settle-wait/viewport-bottom methods so
+            # the plugin's own local fallbacks are only used when it's run
+            # standalone (e.g. tests) without a full LLMAgent behind it.
+            if hasattr(task_plugin, "_focus_fn") and task_plugin._focus_fn is None:
+                task_plugin._focus_fn = self._focus_element_via_uia
+            if hasattr(task_plugin, "_settle_wait_fn") and task_plugin._settle_wait_fn is None:
+                task_plugin._settle_wait_fn = self._adaptive_settle_wait
+            if hasattr(task_plugin, "_viewport_bottom_fn") and task_plugin._viewport_bottom_fn is None:
+                task_plugin._viewport_bottom_fn = self._form_viewport_bottom
 
         # EXPERIMENTAL — OCR overlay via VisionObserver
         # Disabled by default; enable with use_ocr=True in LLMAgent(...)
