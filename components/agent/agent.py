@@ -2450,7 +2450,7 @@ class LLMAgent:
                                                     "key_count": 1, "keystrokes": ["tab"]})
                             _bf_filled += 1
                             continue
-                        _bf_ctrl = self._find_uia_control_by_name(_bf_label, expected_bbox=_bf_el.get("bbox"))
+                        _bf_ctrl = self._resolve_field_control(state, _bf_label, _bf_el.get("bbox"))
                         _bf_hwnd = None
                         if _bf_ctrl is not None:
                             try:
@@ -2487,7 +2487,7 @@ class LLMAgent:
                                                     "key_count": 1, "keystrokes": ["tab"]})
                             _bf_filled += 1
                             continue
-                        _bf_ctrl = self._find_uia_control_by_name(_bf_label, expected_bbox=_bf_el.get("bbox"))
+                        _bf_ctrl = self._resolve_field_control(state, _bf_label, _bf_el.get("bbox"))
                         _bf_hwnd = None
                         if _bf_ctrl is not None:
                             try:
@@ -2584,7 +2584,7 @@ class LLMAgent:
                     _ff_sec   = self._detect_section(state, _ff_fel)
                     _ff_val_known = self._lookup_field(_ff_label, section=_ff_sec) if _ff_label else ""
                     if _ff_label and _ff_val_known:
-                        _ff_ctrl = self._find_uia_control_by_name(_ff_label, expected_bbox=_ff_fel.get("bbox"))
+                        _ff_ctrl = self._resolve_field_control(state, _ff_label, _ff_fel.get("bbox"))
                         _ff_hwnd = None
                         if _ff_ctrl is not None:
                             try:
@@ -2720,8 +2720,8 @@ class LLMAgent:
                     if _dsr_target and _dsr_target.get("bbox"):
                         _dsr_label = (_dsr_target.get("label") or _dsr_target.get("text") or "").strip()
                         if _dsr_label:
-                            _dsr_ctrl = self._find_uia_control_by_name(
-                                _dsr_label, expected_bbox=_dsr_target.get("bbox"))
+                            _dsr_ctrl = self._resolve_field_control(
+                                state, _dsr_label, _dsr_target.get("bbox"))
                             if _dsr_ctrl is not None:
                                 try:
                                     _dsr_ctrl.SetFocus()
@@ -4988,7 +4988,7 @@ class LLMAgent:
                             # focuses the field also hands us its NativeWindowHandle
                             # for the WM_SETTEXT fast path below -- same underlying
                             # UIA call, same SetFocus(), nothing resolved twice.
-                            _fc_ctrl = self._find_uia_control_by_name(_fc_label, expected_bbox=_fcb)
+                            _fc_ctrl = self._resolve_field_control(state, _fc_label, _fcb)
                             if _fc_ctrl is not None:
                                 try:
                                     _fc_ctrl.SetFocus()
@@ -6795,6 +6795,49 @@ class LLMAgent:
         except Exception as exc:
             logger.debug("UIA control lookup for %r failed — %s", label, exc)
             return None
+
+    def _resolve_field_control(self, state: Dict[str, Any], label: str, bbox):
+        """Resolves a live UIA control for a field via
+        _find_uia_control_by_name -- but only pays for that function's
+        expensive position-based disambiguation search (a foundIndex=1..10
+        loop, each "does this index exist" check costing a real UIA
+        timeout when it doesn't) when the label is ACTUALLY ambiguous in
+        the current observed state. For a unique label -- the overwhelming
+        majority of real fields -- passes expected_bbox=None instead,
+        which takes _find_uia_control_by_name's own fast path (one
+        Exists() check per finder, returns as soon as found, no
+        timeout-driven "does a second match exist" probing at all).
+
+        Found live 2026-08-14, direct request ("still too slow, at least
+        <60s"): timed OPT2 batch fast-fill's own log -- 13 fields filled
+        in 7 seconds with NO observe() between them (the thing batching
+        was built to eliminate), meaning something else was costing
+        ~0.5s/field. Traced into _find_uia_control_by_name itself:
+        every batch/single-field/dead-spot-rescue caller always passed
+        expected_bbox, forcing the slow disambiguation path on every
+        field, even though disambiguation only matters for the small
+        minority of labels that genuinely repeat (e.g. "First Name"
+        across Driver 1/2/3 sections -- the real reason expected_bbox
+        exists at all, added 2026-08-09). Worse for non-editcontrol
+        types: the function tries EditControl/ComboBoxControl/
+        CheckBoxControl in that fixed order, so a checkbox field paid for
+        TWO wrong-type timeouts before ever reaching the right one.
+
+        Fix doesn't touch _find_uia_control_by_name itself or weaken its
+        disambiguation guarantee -- a genuinely-duplicate label still
+        gets expected_bbox exactly as before, so still resolves to the
+        correct one of several matches, unchanged. Only the "is this
+        label unique on screen right now" check (an in-memory count over
+        elements already in hand, not a new UIA call) decides whether the
+        slow path is even needed. Never slower than before, only faster
+        for the common case.
+        """
+        if not label:
+            return None
+        elements = state.get("elements", [])
+        _dup = sum(1 for e in elements
+                   if (e.get("label") or e.get("text") or "").strip() == label)
+        return self._find_uia_control_by_name(label, expected_bbox=bbox if _dup > 1 else None)
 
     def _scroll_into_view_via_uia(self, label: str, expected_bbox=None) -> bool:
         """

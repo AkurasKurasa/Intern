@@ -177,9 +177,13 @@ class TestSourceWiresRealMechanisms:
 
     def test_uses_real_find_uia_control_by_name_and_setfocus_no_click(self):
         """The whole point: moving to the field must not be a raw
-        coordinate click."""
+        coordinate click. Routes through _resolve_field_control (added
+        2026-08-14, "still too slow") which only pays for
+        _find_uia_control_by_name's expensive position-based
+        disambiguation when the label is genuinely ambiguous on screen --
+        still the same underlying no-click UIA mechanism either way."""
         window = self._fast_fill_window()
-        assert "self._find_uia_control_by_name(_ff_label" in window
+        assert "self._resolve_field_control(state, _ff_label" in window
         assert "_ff_ctrl.SetFocus()" in window
         assert '"action_type": "click"' not in window
 
@@ -292,6 +296,17 @@ class TestDeadSpotRescue:
         rescue_section = window[rescue_idx:]
         assert "_dsr_ctrl.SetFocus()" in rescue_section
         assert '"action_type": "click"' not in rescue_section
+
+    def test_routes_through_resolve_field_control_not_the_raw_lookup(self):
+        """Added 2026-08-14 ("still too slow") -- must skip the expensive
+        disambiguation search for unique labels via _resolve_field_control,
+        same as batch/single-field fast-fill, not call
+        _find_uia_control_by_name directly."""
+        window = self._fast_fill_window()
+        rescue_idx = window.index("OPT2 DEAD-SPOT RESCUE")
+        rescue_section = window[rescue_idx:]
+        assert "self._resolve_field_control(" in rescue_section
+        assert "self._find_uia_control_by_name(" not in rescue_section
 
     def test_falls_through_safely_on_any_failure(self):
         """No target found, no label, no live control, or SetFocus
@@ -456,6 +471,20 @@ class TestBatchFastFill:
         assert '"action_type": "combobox_select"' in section
         assert '"combobox_hwnd": _bf_hwnd' in section
         assert "_bf_cb_result.success" in section
+
+    def test_routes_through_resolve_field_control_not_the_raw_lookup(self):
+        """Added 2026-08-14 ("still too slow, at least <60s"): timed a real
+        batch (13 fields, 7s, no observe() between them) and traced the
+        cost into _find_uia_control_by_name's own expensive disambiguation
+        search, always triggered because every caller always passed
+        expected_bbox even for fields whose label is completely unique on
+        screen. _resolve_field_control only pays for that search when the
+        label is genuinely ambiguous -- both editcontrol and
+        comboboxcontrol branches must route through it, not call
+        _find_uia_control_by_name directly."""
+        window = self._batch_window()
+        assert window.count("self._resolve_field_control(state, _bf_label, _bf_el.get(\"bbox\"))") == 2
+        assert "self._find_uia_control_by_name(" not in window
 
     def test_checkbox_reuses_the_extracted_lookup_helper_not_auto_check(self):
         """Batch can't use self._auto_check(state) directly -- that method
