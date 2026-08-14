@@ -4624,7 +4624,26 @@ class LLMAgent:
                     if _focused_el.get("bbox"):
                         _fcb = _focused_el["bbox"]
                         _fc_label = (_focused_el.get("label") or _focused_el.get("text") or "").strip()
-                        if not (_fc_label and self._focus_element_via_uia(_fc_label, expected_bbox=_fcb)):
+                        _fc_focused = False
+                        if _fc_label and prediction.get("direct_fill_eligible"):
+                            # Direct-fill eligible: resolve the live Control ourselves
+                            # instead of going through _focus_element_via_uia's
+                            # bool-only wrapper, so the same lookup that already
+                            # focuses the field also hands us its NativeWindowHandle
+                            # for the WM_SETTEXT fast path below -- same underlying
+                            # UIA call, same SetFocus(), nothing resolved twice.
+                            _fc_ctrl = self._find_uia_control_by_name(_fc_label, expected_bbox=_fcb)
+                            if _fc_ctrl is not None:
+                                try:
+                                    _fc_ctrl.SetFocus()
+                                    _fc_focused = True
+                                    prediction["direct_fill_hwnd"] = _fc_ctrl.NativeWindowHandle
+                                except Exception as _fc_exc:
+                                    logger.debug("Direct-fill focus/handle resolution failed for %r — %s",
+                                                 _fc_label, _fc_exc)
+                        elif _fc_label:
+                            _fc_focused = self._focus_element_via_uia(_fc_label, expected_bbox=_fcb)
+                        if not _fc_focused:
                             self._executor.execute({"action_type": "click",
                                                     "click_position": [(_fcb[0] + _fcb[2]) / 2,
                                                                         (_fcb[1] + _fcb[3]) / 2]})
@@ -7477,8 +7496,18 @@ class LLMAgent:
             if not text:
                 return {"action_type": "keyboard", "key_count": 1, "keystrokes": ["tab"]}
             logger.info("[MERGE] type: value=%r", text[:40])
+            # direct_fill_eligible: cheap, no I/O -- scoped to exactly the
+            # one control type live-tested 2026-08-14 (plain EditControl).
+            # Live-tested: WM_SETTEXT is a silent no-op on ComboBoxControl
+            # (_tp_fel_ty already excludes those from this branch's own
+            # click-override check above), so this deliberately stays a
+            # strict equality, not an "in (...)" membership check -- see
+            # _keyboard_direct's own docstring in executor.py for the full
+            # story. The live HWND itself is resolved later, only when
+            # this flag is set, at the focus/clear call site.
             return {"action_type": "keyboard", "key_count": len(text),
-                    "keystrokes": list(text), "text": text}
+                    "keystrokes": list(text), "text": text,
+                    "direct_fill_eligible": _tp_fel_ty == "editcontrol"}
 
         # Click — prefer LLM's named target (resolved to element bbox center),
         # fall back to transformer coords only when no resolvable label is available.

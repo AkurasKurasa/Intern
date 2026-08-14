@@ -92,9 +92,15 @@ class TestBothCallSitesWireInTheRealGuard:
                 / "components" / "agent" / "agent.py").read_text(encoding="utf-8")
 
     def test_standard_type_path_calls_focus_via_uia_before_the_click(self):
+        """Window widened 2026-08-14 (400 -> 1800): the direct-fill
+        WM_SETTEXT fast path (see tests/test_merge_direct_fill_eligible.py)
+        added a real, legitimate branch between the anchor and this call --
+        _focus_element_via_uia is still called exactly as before, as the
+        fallback for the non-direct-fill-eligible case, just further from
+        the anchor now."""
         src = self._agent_py_source()
         anchor = src.index("if _focused_el.get(\"bbox\"):")
-        window = src[anchor:anchor + 400]
+        window = src[anchor:anchor + 1800]
         assert "self._focus_element_via_uia(_fc_label" in window
         assert 'self._executor.execute({"action_type": "click"' in window
 

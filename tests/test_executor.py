@@ -130,6 +130,22 @@ class TestActionExecutor:
         with pytest.raises(ImportError, match="pyautogui"):
             ActionExecutor(dry_run=False)
 
+    def test_execute_keyboard_with_direct_fill_hwnd_stays_boring_under_dry_run(self, executor):
+        """A dry_run executor's result shape must be identical whether or
+        not the new, optional direct_fill_hwnd key is present -- the
+        widened path must stay boring for the common/legacy case. See
+        tests/test_executor_direct_fill.py for the live (dry_run=False)
+        WM_SETTEXT behavior itself."""
+        pred = {"action_type": "keyboard", "key_count": 6,
+                 "keystrokes": list("374.84"), "text": "374.84",
+                 "direct_fill_hwnd": 12345}
+        result = executor.execute(pred)
+        assert result.action_type == "keyboard"
+        assert result.keystrokes  == list("374.84")
+        assert result.success     is True
+        assert result.dry_run     is True
+        assert result.error       == ""
+
 
 # ══════════════════════════════════════════════════════════════════════════════
 #  ExecutorAgent tests  (no model needed — prediction is mocked)

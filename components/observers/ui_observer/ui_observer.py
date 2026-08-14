@@ -65,6 +65,13 @@ try:
 except ImportError:
     pass
 
+# Native Win32 edit-control window classes -- shared with executor.py so the
+# write side (direct WM_SETTEXT fill) and this read side (WM_GETTEXT
+# fallback) agree on exactly which control classes are safe to talk to
+# directly, rather than maintaining two independent copies of this set.
+_EDIT_CLASSES = {"Edit", "RichEditD2DPT", "RichEdit20W", "RICHEDIT50W",
+                 "RICHEDIT60W", "RichEdit"}
+
 # ── UIA control type → simplified trace type ─────────────────────────────────
 _CTRL_TYPE_MAP: Dict[str, str] = {
     "Button":        "button",
@@ -439,8 +446,6 @@ class UIAutomationObserver(Observer):
             # Notepad WinUI3, some PDF viewers).  Read directly from the Win32 edit
             # control via WM_GETTEXT / WM_GETTEXTLENGTH, which bypasses UIA entirely.
             if len(value) <= 1 and _WIN32_AVAILABLE:
-                _EDIT_CLASSES = {"Edit", "RichEditD2DPT", "RichEdit20W", "RICHEDIT50W",
-                                 "RICHEDIT60W", "RichEdit"}
                 try:
                     import ctypes as _ct
                     WM_GETTEXT       = 0x000D

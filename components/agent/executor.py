@@ -30,10 +30,27 @@ logger = logging.getLogger(__name__)
 # straight to that window's own procedure. No coordinates, no cursor.
 _BM_CLICK = 0x00F5
 
+# WM_SETTEXT direct-fill fast path -- see _keyboard_direct's own docstring
+# for the full story. WM_GETTEXT/WM_GETTEXTLENGTH read a value back the
+# same way ui_observer.py's WM_GETTEXT fallback already does.
+_WM_SETTEXT       = 0x000C
+_WM_GETTEXT       = 0x000D
+_WM_GETTEXTLENGTH = 0x000E
+
 # Module-level handle, mirroring the _uia optional-dependency pattern above
 # -- gives tests a single name to monkeypatch (mod._user32) instead of
 # patching the live, C-backed, process-wide ctypes.windll singleton.
 _user32 = ctypes.windll.user32
+
+# Shared with ui_observer.py's own WM_GETTEXT read-side fallback, so the
+# write side here and the read side there always agree on exactly which
+# native control classes are safe to talk to directly via raw messages,
+# rather than maintaining two independent copies of this set.
+try:
+    from observers.ui_observer.ui_observer import _EDIT_CLASSES
+except ImportError:
+    _EDIT_CLASSES = {"Edit", "RichEditD2DPT", "RichEdit20W", "RICHEDIT50W",
+                      "RICHEDIT60W", "RichEdit"}
 
 # ── path setup ────────────────────────────────────────────────────────────────
 _HERE     = os.path.dirname(os.path.abspath(__file__))   # agent/
@@ -177,10 +194,11 @@ class ActionExecutor:
                 return ExecutionResult("click", (x, y), 0, [], ts, self.dry_run, True, "")
 
             elif action_type == "keyboard":
-                key_count  = max(1, int(prediction.get("key_count", 1)))
-                keystrokes = list(prediction.get("keystrokes", []))
-                text       = prediction.get("text", "")
-                issued     = self._keyboard(key_count, keystrokes, text)
+                key_count        = max(1, int(prediction.get("key_count", 1)))
+                keystrokes       = list(prediction.get("keystrokes", []))
+                text             = prediction.get("text", "")
+                direct_fill_hwnd = prediction.get("direct_fill_hwnd")
+                issued           = self._keyboard(key_count, keystrokes, text, direct_fill_hwnd)
                 return ExecutionResult("keyboard", None, len(issued), issued, ts, self.dry_run, True, "")
 
             elif action_type == "scroll":
@@ -332,6 +350,55 @@ class ActionExecutor:
             logger.debug("Semantic click at (%d, %d) failed, falling back to a real click: %s", x, y, exc)
             return False
 
+    def _keyboard_direct(self, hwnd: int, text: str, user32=None) -> bool:
+        """Fast path for filling a plain text field: set its value with one
+        raw WM_SETTEXT message, no click, no simulated keystrokes, no
+        select-all+paste. Falls back (returns False) on anything this
+        can't confidently handle -- the caller (_keyboard) then runs the
+        existing paste mechanism exactly as it always has.
+
+        Live-tested 2026-08-14 against the real practice form (read-only/
+        reversible tests, not assumed): WM_SETTEXT sent via
+        ctypes.windll.user32.SendMessageW reliably sets an EditControl's
+        value in one call, confirmed correct two independent ways -- a raw
+        ctypes WM_GETTEXTLENGTH/WM_GETTEXT readback, and UIA's own
+        ValuePattern readback -- that agree with each other. Two real
+        traps were found and ruled out along the way, not assumed away:
+        UIA's own ValuePattern.SetValue() fails outright (COM error) on
+        this form's controls, so it isn't used here; and win32gui's own
+        GetWindowText() wrapper was independently found to be buggy for
+        reading this exact control back (disagreed with two OTHER correct
+        readbacks), which is why verification here uses raw ctypes
+        SendMessageW, not that wrapper. Also live-tested against a
+        ComboBoxControl and found to be a silent no-op (value unchanged,
+        no error) -- comboboxes are excluded via the _EDIT_CLASSES class
+        check below and keep their existing click-based handling entirely.
+
+        Same injectable-`user32` shape as _try_semantic_click, for the
+        same reason: ctypes.windll.user32 is a live, C-backed, process-
+        wide object, unsafe to patch in place in a test.
+        """
+        if user32 is None:
+            user32 = _user32
+        try:
+            buf = ctypes.create_unicode_buffer(256)
+            user32.GetClassNameW(hwnd, buf, 256)
+            if buf.value not in _EDIT_CLASSES:
+                return False
+            user32.SendMessageW(hwnd, _WM_SETTEXT, 0, text)
+            length = user32.SendMessageW(hwnd, _WM_GETTEXTLENGTH, 0, 0)
+            readback = ctypes.create_unicode_buffer(length + 1)
+            user32.SendMessageW(hwnd, _WM_GETTEXT, length + 1, readback)
+            if readback.value != text:
+                logger.debug("Direct fill readback mismatch (%r != %r) -- falling back to paste.",
+                             readback.value[:40], text[:40])
+                return False
+            logger.info("KEYBOARD  direct fill via WM_SETTEXT (no click, no paste): %r", text[:60])
+            return True
+        except Exception as exc:
+            logger.debug("Direct fill via WM_SETTEXT failed, falling back to paste: %s", exc)
+            return False
+
     def _show_ghost_caret(self) -> None:
         if not self.ghost or not _UIA_AVAILABLE:
             return
@@ -343,27 +410,38 @@ class ActionExecutor:
         except Exception as exc:
             logger.debug("GhostOverlay: couldn't place caret at focused control: %s", exc)
 
-    def _keyboard(self, key_count: int, keystrokes: List[str], text: str = "") -> List[str]:
+    def _keyboard(self, key_count: int, keystrokes: List[str], text: str = "",
+                  direct_fill_hwnd: Optional[int] = None) -> List[str]:
         if not self.dry_run:
             self._show_ghost_caret()
         if text:
-            logger.info("KEYBOARD  paste=%r%s", text[:60], "  [DRY-RUN]" if self.dry_run else "")
-            if not self.dry_run:
-                try:
-                    import pyperclip
-                    pyperclip.copy(text)
-                    time.sleep(0.15)
-                    # Select-all before paste so typing is IDEMPOTENT: if a step is
-                    # retried (e.g. validator false no_change), the paste OVERWRITES
-                    # the field instead of appending (was producing '9'+'9'='99').
-                    pyautogui.hotkey("ctrl", "a")
-                    time.sleep(0.05)
-                    pyautogui.hotkey("ctrl", "v")
-                    time.sleep(self.post_click_delay)
-                except Exception:
-                    pyautogui.hotkey("ctrl", "a")
-                    for ch in text:
-                        pyautogui.typewrite(ch, interval=self.keyboard_delay)
+            if self.dry_run:
+                if direct_fill_hwnd:
+                    logger.info("KEYBOARD  direct fill (WM_SETTEXT) would target hwnd=%s: %r  [DRY-RUN]",
+                                direct_fill_hwnd, text[:60])
+                else:
+                    logger.info("KEYBOARD  paste=%r  [DRY-RUN]", text[:60])
+                return list(text)
+
+            if direct_fill_hwnd and self._keyboard_direct(direct_fill_hwnd, text):
+                return list(text)
+
+            logger.info("KEYBOARD  paste=%r", text[:60])
+            try:
+                import pyperclip
+                pyperclip.copy(text)
+                time.sleep(0.15)
+                # Select-all before paste so typing is IDEMPOTENT: if a step is
+                # retried (e.g. validator false no_change), the paste OVERWRITES
+                # the field instead of appending (was producing '9'+'9'='99').
+                pyautogui.hotkey("ctrl", "a")
+                time.sleep(0.05)
+                pyautogui.hotkey("ctrl", "v")
+                time.sleep(self.post_click_delay)
+            except Exception:
+                pyautogui.hotkey("ctrl", "a")
+                for ch in text:
+                    pyautogui.typewrite(ch, interval=self.keyboard_delay)
             return list(text)
 
         elif keystrokes:
