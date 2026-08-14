@@ -953,6 +953,8 @@ class LLMAgent:
         task_plugin:       Optional[Any]  = None,   # TaskPlugin for task-specific logic
         pure_transformer:  bool           = False,  # skip all hardcoded handlers; transformer+LLM only
         disable_auto_handlers: bool       = False,  # skip legacy heuristics but KEEP LLM+transformer merge
+        disable_transformer: bool         = False,  # ablation test: skip the model, force the SAME
+                                                     # low-confidence fallback it already uses when unsure
         start_tab_idx:     int            = 0,      # start agent at this tab index (drill testing)
         scope:             Optional[Any]  = None,   # ScopeConfig — app-specific tabs/sections/records
         observer:          Optional[Any]  = None,   # perception adapter (snapshot()→schema); default=UIA
@@ -1188,6 +1190,14 @@ class LLMAgent:
 
         self._pure_transformer: bool = pure_transformer
         self._no_autohandlers:  bool = disable_auto_handlers
+        # Ablation test flag, added 2026-08-14 ("I have to verify that if
+        # we don't have the model we're using right now the performance
+        # would drop"). See _predict() for the actual skip + fallback
+        # mechanics; _ablation_transformer_calls_skipped counts how many
+        # times the real model WOULD have been consulted, for the
+        # after-the-fact comparison this exists to enable.
+        self._disable_transformer: bool = disable_transformer
+        self._ablation_transformer_calls_skipped: int = 0
 
         # ── Task plugin (optional — encapsulates task-specific logic) ───────────
         self._task_plugin: Optional[Any] = task_plugin
@@ -8605,6 +8615,29 @@ class LLMAgent:
                 e["attempted"] = 1.0
 
     def _predict(self, state: Dict[str, Any]) -> Dict[str, Any]:
+        if self._disable_transformer:
+            # Ablation mode, added 2026-08-14, direct request ("I have to
+            # verify that if we don't have the model we're using right
+            # now the performance would drop"). Skips the real model call
+            # entirely and returns a synthetic zero-confidence result
+            # instead -- NOT a new fallback invented for this test.
+            # Every key here already has a caller-side `.get(key,
+            # default)` (confirmed by reading every t_pred access in this
+            # file before writing this), so this result routes through
+            # the SAME low-confidence Tab-fallback path the real model
+            # already triggers whenever ITS OWN confidence is low
+            # (_gate_low_confidence_click, "[OPT2] pointer low-confidence
+            # ... Tab fallback") -- proven, existing behavior, just
+            # forced to fire on every step instead of rarely. Lets a
+            # live comparison run (model on vs. model off, same record)
+            # answer directly: does the run still complete correctly,
+            # and how much slower/faster, with the model never consulted.
+            self._ablation_transformer_calls_skipped += 1
+            logger.info("[ABLATION] transformer call #%d skipped (disable_transformer=True) "
+                        "-- would have asked the model here",
+                        self._ablation_transformer_calls_skipped)
+            return {"action_type": "no_op", "confidence": 0.0, "_scores": {},
+                    "click_position": None, "_click_conf": 0.0}
         try:
             try:
                 from components.intelligence.model.transformer import predict

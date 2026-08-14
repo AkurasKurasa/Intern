@@ -247,6 +247,13 @@ if __name__ == "__main__":
                               "advance through every record the intake text actually has. "
                               "e.g. --start_record 2 --end_record 3 attempts only records 2-3 "
                               "of a 5-record file.")
+    _parser.add_argument("--disable_transformer", action="store_true",
+                         help="Ablation test: never call the real model. Every step forces "
+                              "the SAME low-confidence Tab-fallback the model already "
+                              "triggers when it's genuinely unsure, instead of a real "
+                              "prediction. For comparing a normal run against a model-off "
+                              "run on the same record — does it still complete, and how "
+                              "much slower/faster. Not for normal use.")
     _args = _parser.parse_args()
     if _args.end_record is not None and _args.end_record < _args.start_record:
         logger.warning("--end_record (%d) is before --start_record (%d) — the run will "
@@ -325,6 +332,7 @@ if __name__ == "__main__":
             task_plugin      = None,
             pure_transformer = False,
             disable_auto_handlers = True,   # kill legacy heuristics — transformer(WHERE)+LLM(WHAT) merge drives
+            disable_transformer = _args.disable_transformer,  # ablation test, off by default
             observer         = _observer,   # None → agent defaults to UIA; else vision
             visual_reader    = visual_reader,
             visual_cache     = visual_cache,
@@ -340,6 +348,10 @@ if __name__ == "__main__":
             correction_watch_seconds = CORRECTION_WATCH_SECONDS,
         )
         logger.info("Model checkpoint: %s", _args.model)
+        if _args.disable_transformer:
+            logger.info("ABLATION MODE: --disable_transformer set — the real model will "
+                       "never be called this run; every step forces the low-confidence "
+                       "Tab-fallback instead.")
         if _args.start_tab:
             logger.info("Drill mode: starting at tab index %d — manually click that tab first.", _args.start_tab)
 
@@ -356,6 +368,12 @@ if __name__ == "__main__":
         logger.error("Run crashed at step %d:", len(results), exc_info=True)
     finally:
         logger.info("Run ended — %d steps", len(results))
+        if _args.disable_transformer and agent is not None:
+            logger.info("ABLATION MODE summary: the real model was skipped %d time(s) "
+                       "this run -- compare against a normal run's own "
+                       "'[TRANSFORMER] action=' count in the log for the same record "
+                       "to see how many of those the model would actually have been "
+                       "asked to make.", agent._ablation_transformer_calls_skipped)
 
         # ── Evaluation metrics (always runs, even on early stop or crash) ──────
         sys.path.insert(0, os.path.join(_ROOT, "scripts"))
