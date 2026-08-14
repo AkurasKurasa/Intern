@@ -155,7 +155,7 @@ class TestSourceWiresRealMechanisms:
 
     def _fast_fill_window(self):
         idx = _SOURCE.index("OPT2 FAST-FILL")
-        return _SOURCE[idx:idx + 5600]
+        return _SOURCE[idx:idx + 9200]
 
     def test_gated_on_no_autohandlers(self):
         window = self._fast_fill_window()
@@ -194,7 +194,7 @@ class TestSourceWiresRealMechanisms:
     def test_marks_attempted_and_settles_via_real_helpers(self):
         window = self._fast_fill_window()
         assert "self._mark_attempted(_ff_fel" in window
-        assert "self._adaptive_settle_wait(self.step_delay * 0.4)" in window
+        assert "self._adaptive_settle_wait(self.step_delay * 0.2)" in window
 
     def test_combobox_uses_combobox_select_not_direct_fill_hwnd(self):
         """Comboboxes must route through the new combobox_select action
@@ -230,7 +230,7 @@ class TestSourceWiresRealMechanisms:
         # The `continue` must be nested inside the `if _ff_hwnd:` block,
         # not unconditional -- confirm it's preceded by the settle-wait
         # call on the same success path, not floating free.
-        settle_idx = window.index("self._adaptive_settle_wait(self.step_delay * 0.4)")
+        settle_idx = window.index("self._adaptive_settle_wait(self.step_delay * 0.2)")
         after = window[settle_idx:settle_idx + 100]
         assert "continue" in after
 
@@ -247,3 +247,94 @@ class TestSourceWiresRealMechanisms:
         fast_fill_idx = _SOURCE.index("OPT2 FAST-FILL")
         predict_idx = _SOURCE.index('t_pred = self._predict(state)')
         assert fast_fill_idx < predict_idx
+
+    def test_settle_wait_was_tightened_not_removed(self):
+        """Tightened 2026-08-14 ahead of a ~1-minute demo target -- must
+        still be present (still adaptive, still bounded), just a lower
+        ceiling than the general-purpose fill path's own budget."""
+        window = self._fast_fill_window()
+        assert window.count("self._adaptive_settle_wait(self.step_delay * 0.2)") == 3
+
+
+class TestDeadSpotRescue:
+    """Tests for the OPT2 dead-spot rescue -- added 2026-08-14 from real
+    log evidence (a live run showed Tab periodically landing on a
+    non-fillable section-divider pane, paying for a full transformer
+    decision every time). Tries the same deterministic,
+    already-tested/used find_visible_empty_target mechanism first,
+    before ever asking the model."""
+
+    def _fast_fill_window(self):
+        idx = _SOURCE.index("OPT2 FAST-FILL")
+        return _SOURCE[idx:idx + 9200]
+
+    def test_rescue_block_exists_and_is_gated_correctly(self):
+        window = self._fast_fill_window()
+        assert "OPT2 DEAD-SPOT RESCUE" in window
+        assert '"checkboxcontrol", "checkbox")' in window
+
+    def test_uses_the_real_navigation_protocol_mechanism(self):
+        """Must reuse the exact same function this file already calls
+        elsewhere for the identical purpose -- not a reimplementation
+        that could silently drift from it."""
+        window = self._fast_fill_window()
+        assert "self._navproto.find_visible_empty_target(" in window
+        assert "self._form_viewport_bottom(state)" in window
+        assert "attempted_keys=self._attempted_keys" in window
+        assert "attempt_key_fn=self._attempt_key" in window
+
+    def test_moves_focus_without_a_click(self):
+        """The whole point -- SetFocus, not a coordinate click."""
+        window = self._fast_fill_window()
+        rescue_idx = window.index("OPT2 DEAD-SPOT RESCUE")
+        rescue_section = window[rescue_idx:]
+        assert "_dsr_ctrl.SetFocus()" in rescue_section
+        assert '"action_type": "click"' not in rescue_section
+
+    def test_falls_through_safely_on_any_failure(self):
+        """No target found, no label, no live control, or SetFocus
+        raising must all leave `continue` unreached -- today's existing
+        transformer-driven code must still run exactly as it does now."""
+        window = self._fast_fill_window()
+        rescue_idx = window.index("OPT2 DEAD-SPOT RESCUE")
+        predict_idx = window.index('t_pred = self._predict(state)')
+        rescue_section = window[rescue_idx:predict_idx]
+        # continue only appears once, inside the try/except success path
+        assert rescue_section.count("continue") == 1
+        assert "except Exception as _dsr_exc:" in rescue_section
+
+    def test_is_gated_before_the_transformer_predict_call(self):
+        rescue_idx = _SOURCE.index("OPT2 DEAD-SPOT RESCUE")
+        predict_idx = _SOURCE.index('t_pred = self._predict(state)')
+        assert rescue_idx < predict_idx
+
+
+def _dead_spot_rescue_eligible(elem_type: str) -> bool:
+    """Mirrors the exact gating condition:
+    `elif _ff_fel and _ff_ty not in ("editcontrol", "comboboxcontrol",
+    "checkboxcontrol", "checkbox"):`"""
+    return elem_type.lower() not in ("editcontrol", "comboboxcontrol",
+                                      "checkboxcontrol", "checkbox")
+
+
+class TestDeadSpotRescueEligibilityMirror:
+    def test_panecontrol_is_rescue_eligible(self):
+        """The exact real-world case from the log: a section-divider
+        pane, no field to fill at all."""
+        assert _dead_spot_rescue_eligible("panecontrol") is True
+
+    def test_editcontrol_is_not_rescue_eligible(self):
+        """Must never fire when a real fillable field is focused --
+        that's the fast-fill branch's job, not this one's."""
+        assert _dead_spot_rescue_eligible("editcontrol") is False
+
+    def test_comboboxcontrol_is_not_rescue_eligible(self):
+        assert _dead_spot_rescue_eligible("comboboxcontrol") is False
+
+    def test_checkboxcontrol_is_not_rescue_eligible(self):
+        """Checkboxes have their own existing, correct handling --
+        must not be redirected away from it."""
+        assert _dead_spot_rescue_eligible("checkboxcontrol") is False
+
+    def test_buttoncontrol_is_rescue_eligible(self):
+        assert _dead_spot_rescue_eligible("buttoncontrol") is True

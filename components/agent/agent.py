@@ -2433,7 +2433,16 @@ class LLMAgent:
                             self._mark_attempted(_ff_fel, elements=state.get("elements", []))
                             self._executor.execute({"action_type": "keyboard",
                                                     "key_count": 1, "keystrokes": ["tab"]})
-                            self._adaptive_settle_wait(self.step_delay * 0.4)
+                            # Tightened 2026-08-14, direct request ahead of a
+                            # ~1-minute demo target: the settle-wait here is
+                            # ALREADY adaptive (returns early once the state
+                            # stabilizes) -- this only lowers the worst-case
+                            # ceiling, and we already have hard, synchronous
+                            # proof the value landed (the WM_SETTEXT readback
+                            # matched, checked before this line ever runs),
+                            # unlike the general-purpose fill path this same
+                            # helper also guards, which has no such proof.
+                            self._adaptive_settle_wait(self.step_delay * 0.2)
                             continue
                         elif _ff_hwnd and _ff_ty == "comboboxcontrol":
                             self._ensure_foreground(state)
@@ -2447,12 +2456,49 @@ class LLMAgent:
                                 self._mark_attempted(_ff_fel, elements=state.get("elements", []))
                                 self._executor.execute({"action_type": "keyboard",
                                                         "key_count": 1, "keystrokes": ["tab"]})
-                                self._adaptive_settle_wait(self.step_delay * 0.4)
+                                self._adaptive_settle_wait(self.step_delay * 0.2)
                                 continue
                             # No matching real option (or the direct-select
                             # attempt otherwise failed) -- fall through to
                             # today's existing click-based open+select path
                             # below, unchanged.
+                elif _ff_fel and _ff_ty not in ("editcontrol", "comboboxcontrol",
+                                                "checkboxcontrol", "checkbox"):
+                    # ── OPT2 DEAD-SPOT RESCUE: added 2026-08-14, direct
+                    # request ahead of a ~1-minute demo target, from real log
+                    # evidence -- a live run showed Tab periodically landing
+                    # on a genuinely non-fillable element (a section-divider
+                    # pane between groups of fields), which paid for a full
+                    # transformer decision every single time before recovery.
+                    # Before paying for that live model call, try the exact
+                    # same deterministic, model-free "find the next visible,
+                    # empty, unattempted field" mechanism already used
+                    # elsewhere in this file for the identical purpose
+                    # (agent.py's own redirect-stuck sites) -- no new
+                    # navigation logic invented, just tried earlier, before
+                    # the model, instead of only after it as an escalation.
+                    # Falls straight through to today's unmodified code
+                    # (the transformer call) if this finds nothing or fails
+                    # -- never worse than today, only sometimes faster.
+                    _dsr_vb = self._form_viewport_bottom(state) - 8
+                    _dsr_target = self._navproto.find_visible_empty_target(
+                        state, _dsr_vb, attempted_keys=self._attempted_keys,
+                        attempt_key_fn=self._attempt_key)
+                    if _dsr_target and _dsr_target.get("bbox"):
+                        _dsr_label = (_dsr_target.get("label") or _dsr_target.get("text") or "").strip()
+                        if _dsr_label:
+                            _dsr_ctrl = self._find_uia_control_by_name(
+                                _dsr_label, expected_bbox=_dsr_target.get("bbox"))
+                            if _dsr_ctrl is not None:
+                                try:
+                                    _dsr_ctrl.SetFocus()
+                                    logger.info("[OPT2] dead-spot rescue: focused '%s' directly "
+                                                "(no transformer, no click)", _dsr_label)
+                                    self._adaptive_settle_wait(self.step_delay * 0.2)
+                                    continue
+                                except Exception as _dsr_exc:
+                                    logger.debug("Dead-spot rescue focus failed for %r — %s",
+                                                 _dsr_label, _dsr_exc)
 
             # 2. Transformer always runs — learned behavioral engine
             llm_action = None
