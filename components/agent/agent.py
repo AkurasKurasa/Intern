@@ -2377,6 +2377,154 @@ class LLMAgent:
                     time.sleep(self.step_delay)
                     continue
 
+            # ── OPT2 BATCH FAST-FILL: fill EVERY currently-visible known-value
+            # field in one pass, not just the focused one. Added 2026-08-14,
+            # direct request ("it needs to be instant") after live log
+            # evidence showed the single-field fast-fill below had already
+            # cut model calls to almost nothing (16 transformer calls in a
+            # full run) yet total time barely moved (4m09s vs last night's
+            # 4m33s) — steps landed ~1s apart REGARDLESS of whether the model
+            # was skipped, because each field still paid for its own
+            # observe()+act() cycle. The fixed per-step cost (a fresh UIA
+            # snapshot of 100+ elements, every single field) was the real
+            # bottleneck, not reasoning.
+            #
+            # Navigation Protocol (just above) already guarantees at least
+            # one actionable target is visible before this line is reached —
+            # find_all_visible_empty_targets (navigation_protocol.py) reuses
+            # that exact same eligibility rule (fillable type, empty value,
+            # not yet attempted, on-screen) to return ALL of them instead of
+            # just the first. Each one is filled directly via the same
+            # already-tested, already-shipped mechanisms as the single-field
+            # path below (WM_SETTEXT / CB_SETCURSEL / BM_SETCHECK via
+            # SetFocus, no click) — reused, not reimplemented — with no Tab
+            # key and no re-observe between fields in the same batch, only a
+            # cheap Tab-to-blur after each write. One settle-wait for the
+            # WHOLE batch, then one continue: the next step's single observe()
+            # picks up whatever's left (unknowns, or fields a scroll would
+            # reveal), so a full tab's known fields cost one observe() plus
+            # N direct writes instead of N observe()+act() cycles.
+            #
+            # Any single field this loop can't resolve (no label, lookup
+            # miss, HWND resolution fails, combobox option doesn't match)
+            # is just skipped — it stays visible and empty, so it's picked
+            # up by the single-field fast-fill / dead-spot rescue /
+            # transformer fallback below on a later step, exactly as if
+            # batch fast-fill had never run. filled_count starts at 0 and
+            # only a nonzero count short-circuits the rest of this step.
+            if self._no_autohandlers:
+                _bf_targets = self._navproto.find_all_visible_empty_targets(
+                    state, _nav_vb, attempted_keys=self._attempted_keys,
+                    attempt_key_fn=self._attempt_key)
+                _bf_filled = 0
+                if _bf_targets:
+                    self._ensure_foreground(state)
+                for _bf_el in _bf_targets:
+                    _bf_ty = (_bf_el.get("type") or "").lower()
+                    _bf_label = (_bf_el.get("label") or _bf_el.get("text") or "").strip()
+                    if not _bf_label:
+                        continue
+                    _bf_key = self._attempt_key(_bf_el, elements=state.get("elements", []))
+                    if _bf_ty == "editcontrol":
+                        if (_bf_key in self._leave_blank_keys
+                                or _bf_key in self._typed_keys):
+                            continue
+                        _bf_sec = self._detect_section(state, _bf_el)
+                        _bf_val = self._lookup_field(_bf_label, section=_bf_sec)
+                        if not _bf_val:
+                            continue
+                        _bf_ctrl = self._find_uia_control_by_name(_bf_label, expected_bbox=_bf_el.get("bbox"))
+                        _bf_hwnd = None
+                        if _bf_ctrl is not None:
+                            try:
+                                _bf_ctrl.SetFocus()
+                                _bf_hwnd = _bf_ctrl.NativeWindowHandle
+                            except Exception as _bf_exc:
+                                logger.debug("Batch fast-fill focus/handle resolution failed for %r — %s",
+                                             _bf_label, _bf_exc)
+                        if not _bf_hwnd:
+                            continue
+                        logger.info("[OPT2] batch fast-fill '%s' → %r (no transformer, no LLM, no click)",
+                                    _bf_label, _bf_val[:40])
+                        self._executor.execute({
+                            "action_type": "keyboard", "text": _bf_val,
+                            "key_count": len(_bf_val), "keystrokes": list(_bf_val),
+                            "direct_fill_hwnd": _bf_hwnd,
+                        })
+                        self._mark_attempted(_bf_el, elements=state.get("elements", []))
+                        self._executor.execute({"action_type": "keyboard",
+                                                "key_count": 1, "keystrokes": ["tab"]})
+                        _bf_filled += 1
+                    elif _bf_ty == "comboboxcontrol":
+                        if (_bf_key in self._leave_blank_keys
+                                or _bf_key in self._typed_keys):
+                            continue
+                        _bf_sec = self._detect_section(state, _bf_el)
+                        _bf_val = self._lookup_field(_bf_label, section=_bf_sec)
+                        if not _bf_val:
+                            continue
+                        _bf_ctrl = self._find_uia_control_by_name(_bf_label, expected_bbox=_bf_el.get("bbox"))
+                        _bf_hwnd = None
+                        if _bf_ctrl is not None:
+                            try:
+                                _bf_ctrl.SetFocus()
+                                _bf_hwnd = _bf_ctrl.NativeWindowHandle
+                            except Exception as _bf_exc:
+                                logger.debug("Batch fast-fill focus/handle resolution failed for %r — %s",
+                                             _bf_label, _bf_exc)
+                        if not _bf_hwnd:
+                            continue
+                        _bf_cb_result = self._executor.execute({
+                            "action_type": "combobox_select", "text": _bf_val,
+                            "combobox_hwnd": _bf_hwnd,
+                        })
+                        if not _bf_cb_result.success:
+                            continue   # no matching option — leave for the click-based fallback
+                        logger.info("[OPT2] batch fast-fill '%s' → %r (no transformer, no LLM, no click)",
+                                    _bf_label, _bf_val[:40])
+                        self._mark_attempted(_bf_el, elements=state.get("elements", []))
+                        self._executor.execute({"action_type": "keyboard",
+                                                "key_count": 1, "keystrokes": ["tab"]})
+                        _bf_filled += 1
+                    elif _bf_ty in ("checkboxcontrol", "checkbox"):
+                        if _bf_label in self._checked_fields:
+                            continue
+                        _bf_should_check = self._lookup_checkbox_should_check(_bf_label)
+                        if _bf_should_check is None:
+                            continue
+                        if _bf_should_check:
+                            _bf_bbox = _bf_el.get("bbox")
+                            if not _bf_bbox:
+                                continue
+                            try:
+                                import win32gui as _bfwg
+                                import win32api as _bfwa
+                                _bf_cx = (_bf_bbox[0] + _bf_bbox[2]) / 2
+                                _bf_cy = (_bf_bbox[1] + _bf_bbox[3]) / 2
+                                _bf_hw = _bfwg.WindowFromPoint((int(_bf_cx), int(_bf_cy)))
+                                if not _bf_hw:
+                                    continue
+                                _bfwa.SendMessage(_bf_hw, 0x00F1, 1, 0)  # BM_SETCHECK, BST_CHECKED
+                            except Exception as _bf_exc:
+                                logger.debug("Batch fast-fill checkbox check failed for %r — %s",
+                                             _bf_label, _bf_exc)
+                                continue
+                            logger.info("[OPT2] batch fast-fill checkbox '%s' → checked "
+                                        "(no transformer, no LLM, no click)", _bf_label)
+                        else:
+                            logger.info("[OPT2] batch fast-fill checkbox '%s' → leave unchecked "
+                                        "(no transformer, no LLM, no click)", _bf_label)
+                        self._checked_fields.add(_bf_label)
+                        self._mark_attempted(_bf_el, elements=state.get("elements", []))
+                        self._executor.execute({"action_type": "keyboard",
+                                                "key_count": 1, "keystrokes": ["tab"]})
+                        _bf_filled += 1
+                if _bf_filled > 0:
+                    logger.info("[OPT2] batch fast-fill: %d field(s) filled in one pass, no per-field re-observe.",
+                                _bf_filled)
+                    self._adaptive_settle_wait(self.step_delay * 0.2)
+                    continue
+
             # ── OPT2 FAST-FILL: skip the transformer AND the LLM entirely when
             # the focused field's value is already known via the same
             # deterministic lookup _ask_llm's own fast path already trusts.
@@ -6441,6 +6589,21 @@ class LLMAgent:
             return None
         return (field_name, current, expected)
 
+    def _lookup_checkbox_should_check(self, field_name: str) -> Optional[bool]:
+        """Look up a checkbox's known answer in background data and parse it
+        into a check/leave-unchecked decision. Returns None if not found
+        (let LLM decide). Extracted from _auto_check 2026-08-14 so batch-fill
+        can ask this question for ANY checkbox element, not just whichever
+        one happens to be focused right now — same parsing rule, one place."""
+        if not field_name:
+            return None
+        expected = self._lookup_field(field_name)
+        if not expected:
+            return None   # not in background data — let LLM decide
+        # "YES (check)", "yes", "true", "checked" → check it
+        ev = expected.lower().strip()
+        return ev.startswith("yes") or ev in {"check", "true", "1", "checked"}
+
     def _auto_check(self, state: Dict[str, Any]) -> Optional[tuple]:
         """
         If the focused element is a checkbox, look it up in BACKGROUND DATA.
@@ -6461,13 +6624,9 @@ class LLMAgent:
         if not field_name:
             return None
 
-        expected = self._lookup_field(field_name)
-        if not expected:
+        should_check = self._lookup_checkbox_should_check(field_name)
+        if should_check is None:
             return None   # not in background data — let LLM decide
-
-        # "YES (check)", "yes", "true", "checked" → check it
-        ev = expected.lower().strip()
-        should_check = ev.startswith("yes") or ev in {"check", "true", "1", "checked"}
         return (field_name, should_check)
 
     @staticmethod

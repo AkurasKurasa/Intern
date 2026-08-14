@@ -92,9 +92,42 @@ def find_visible_empty_target(
     UIA exposes the real answer directly (IsOffscreen); ui_observer.py now
     reads it into "visible" instead of hardcoding True. Trusting it here
     replaces a second geometric estimate with the authoritative one.
+
+    Thin wrapper over find_all_visible_empty_targets — one real
+    implementation of the eligibility rule, not two copies to keep in sync.
+    """
+    targets = find_all_visible_empty_targets(state, viewport_bottom, attempted_keys, attempt_key_fn)
+    return targets[0] if targets else None
+
+
+def find_all_visible_empty_targets(
+    state: Dict[str, Any],
+    viewport_bottom: float,
+    attempted_keys: Optional[Set[Any]] = None,
+    attempt_key_fn: Optional[Callable[[Dict[str, Any], List[Dict[str, Any]]], Any]] = None,
+) -> List[Dict[str, Any]]:
+    """
+    Every actionable, empty, not-yet-attempted field currently rendered
+    inside the visible viewport, in document order — not just the first.
+
+    Same eligibility rule find_visible_empty_target has always used
+    (fillable type, empty value, not yet attempted, on-screen geometry +
+    UIA's own visible flag); find_visible_empty_target is now a thin
+    wrapper around this so there is exactly one place that rule lives.
+
+    Added 2026-08-14, direct request ("it needs to be instant"): the
+    per-step OPT2 fast-fill was already skipping the model for known
+    values, but still paid one full observe()+act() cycle PER FIELD —
+    confirmed live (steps landing ~1s apart whether or not the model was
+    skipped) that this per-field walk, not reasoning, was the real
+    remaining cost. Returning the whole batch of currently-visible,
+    already-known-answer targets lets the caller fill all of them in one
+    pass — one observe(), many direct writes, no Tab-to-navigate between
+    them — instead of one observe() per field.
     """
     elements = state.get("elements", [])
     attempted_keys = attempted_keys or set()
+    out: List[Dict[str, Any]] = []
     for e in elements:
         if e.get("window_role") == "background":
             continue
@@ -112,8 +145,8 @@ def find_visible_empty_target(
             continue
         cy = (b[1] + b[3]) / 2
         if b[1] >= 0 and cy <= viewport_bottom:
-            return e
-    return None
+            out.append(e)
+    return out
 
 
 def has_visible_empty_target(

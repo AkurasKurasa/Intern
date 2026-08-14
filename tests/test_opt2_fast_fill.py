@@ -398,3 +398,124 @@ class TestCheckboxFastFill:
         checkbox_idx = _SOURCE.index("OPT2 CHECKBOX FAST-FILL")
         predict_idx = _SOURCE.index('t_pred = self._predict(state)')
         assert checkbox_idx < predict_idx
+
+
+class TestBatchFastFill:
+    """Tests for OPT2's BATCH fast-fill -- added 2026-08-14, direct request
+    ("it needs to be instant") after real log evidence showed the
+    single-field fast-fill above had already cut model calls to almost
+    nothing (16 transformer calls in a full run) yet total wall time barely
+    moved (4m09s vs the prior run's 4m33s): steps landed ~1s apart whether
+    or not the model was skipped, because each field still paid for its own
+    observe()+act() cycle. This fills EVERY currently-visible known-value
+    field in one pass -- one observe(), many direct writes, no per-field
+    re-observe -- using find_all_visible_empty_targets (navigation_
+    protocol.py) plus the exact same already-tested direct-write mechanisms
+    the single-field path above already uses (WM_SETTEXT / CB_SETCURSEL /
+    BM_SETCHECK), not a reimplementation."""
+
+    def _batch_window(self):
+        idx = _SOURCE.index("OPT2 BATCH FAST-FILL")
+        return _SOURCE[idx:idx + 12000]
+
+    def test_batch_block_exists_before_the_single_field_block(self):
+        batch_idx = _SOURCE.index("OPT2 BATCH FAST-FILL")
+        single_idx = _SOURCE.index("OPT2 FAST-FILL: skip the transformer")
+        assert batch_idx < single_idx
+
+    def test_gated_on_no_autohandlers(self):
+        window = self._batch_window()
+        assert "if self._no_autohandlers:" in window
+
+    def test_uses_the_real_find_all_visible_empty_targets(self):
+        """Must reuse the shared eligibility rule (navigation_protocol.py),
+        not a second, parallel scan that could silently drift from it."""
+        window = self._batch_window()
+        assert "self._navproto.find_all_visible_empty_targets(" in window
+        assert "attempted_keys=self._attempted_keys" in window
+        assert "attempt_key_fn=self._attempt_key" in window
+
+    def test_handles_all_three_known_fillable_types(self):
+        window = self._batch_window()
+        assert '_bf_ty == "editcontrol"' in window
+        assert '_bf_ty == "comboboxcontrol"' in window
+        assert '_bf_ty in ("checkboxcontrol", "checkbox")' in window
+
+    def test_editcontrol_uses_direct_fill_hwnd_no_click(self):
+        window = self._batch_window()
+        idx = window.index('_bf_ty == "editcontrol"')
+        section = window[idx:idx + 1600]
+        assert '"direct_fill_hwnd": _bf_hwnd' in section
+        assert '"action_type": "click"' not in section
+        assert "_bf_ctrl.SetFocus()" in section
+
+    def test_comboboxcontrol_uses_combobox_select_and_checks_success(self):
+        window = self._batch_window()
+        idx = window.index('_bf_ty == "comboboxcontrol"')
+        section = window[idx:idx + 1600]
+        assert '"action_type": "combobox_select"' in section
+        assert '"combobox_hwnd": _bf_hwnd' in section
+        assert "_bf_cb_result.success" in section
+
+    def test_checkbox_reuses_the_extracted_lookup_helper_not_auto_check(self):
+        """Batch can't use self._auto_check(state) directly -- that method
+        is hardwired to state['focused_element_id'], but batch must
+        evaluate checkboxes that AREN'T focused. Must call the extracted
+        per-field helper instead."""
+        window = self._batch_window()
+        assert "self._lookup_checkbox_should_check(_bf_label)" in window
+        assert "self._auto_check(state)" not in window
+
+    def test_checkbox_uses_the_same_bm_setcheck_mechanism_as_existing_sites(self):
+        window = self._batch_window()
+        idx = window.index('_bf_ty in ("checkboxcontrol", "checkbox")')
+        section = window[idx:idx + 1800]
+        assert "WindowFromPoint((int(_bf_cx), int(_bf_cy)))" in section
+        assert "SendMessage(_bf_hw, 0x00F1, 1, 0)" in section
+
+    def test_no_tab_keystroke_between_fields_no_reobserve_per_field(self):
+        """The whole point: N fields filled without N observe() calls.
+        self._observe() must not appear anywhere inside the batch loop
+        body itself (only the settle-wait/next-step observe outside it)."""
+        window = self._batch_window()
+        loop_idx = window.index("for _bf_el in _bf_targets:")
+        end_idx = window.index("if _bf_filled > 0:")
+        loop_body = window[loop_idx:end_idx]
+        assert "self._observe()" not in loop_body
+
+    def test_marks_attempted_for_every_filled_field(self):
+        window = self._batch_window()
+        assert window.count("self._mark_attempted(_bf_el") == 3
+
+    def test_settles_once_for_the_whole_batch_not_per_field(self):
+        """One settle-wait call gated on filled_count > 0, not one per
+        field written -- that's the entire point of batching."""
+        window = self._batch_window()
+        loop_idx = window.index("for _bf_el in _bf_targets:")
+        end_idx = window.index("if _bf_filled > 0:")
+        loop_body = window[loop_idx:end_idx]
+        assert "self._adaptive_settle_wait" not in loop_body
+        after = window[end_idx:end_idx + 300]
+        assert "self._adaptive_settle_wait(self.step_delay * 0.2)" in after
+        assert "continue" in after
+
+    def test_continue_only_reached_when_something_was_actually_filled(self):
+        window = self._batch_window()
+        idx = window.index("if _bf_filled > 0:")
+        section = window[idx:idx + 300]
+        assert "continue" in section
+        # nothing below the batch block's own scope short-circuits when
+        # filled_count stayed at 0 -- confirmed by the single-field block
+        # still being reachable right after this one in the source.
+        single_idx = _SOURCE.index("OPT2 FAST-FILL: skip the transformer")
+        batch_idx = _SOURCE.index("OPT2 BATCH FAST-FILL")
+        assert batch_idx < single_idx
+
+    def test_is_not_hardcoded_to_any_specific_field_name(self):
+        window = self._batch_window()
+        assert not re.search(r'_bf_label\s*==\s*[\'"]', window)
+
+    def test_is_gated_before_the_transformer_predict_call(self):
+        batch_idx = _SOURCE.index("OPT2 BATCH FAST-FILL")
+        predict_idx = _SOURCE.index('t_pred = self._predict(state)')
+        assert batch_idx < predict_idx

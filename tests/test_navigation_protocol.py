@@ -16,7 +16,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "components"))
 from agent.navigation_protocol import (
     NavAction, decide, has_visible_empty_target, visible_field_signature,
-    find_visible_empty_target, optimal_view_counts, find_scroll_target_element,
+    find_visible_empty_target, find_all_visible_empty_targets,
+    optimal_view_counts, find_scroll_target_element,
 )
 
 VIEWPORT_BOTTOM = 1000.0
@@ -373,6 +374,68 @@ class TestFindVisibleEmptyTarget:
         assert has_visible_empty_target(state_with, VIEWPORT_BOTTOM) is True
         assert find_visible_empty_target(state_with, VIEWPORT_BOTTOM) is not None
         assert has_visible_empty_target(state_without, VIEWPORT_BOTTOM) is False
+
+
+class TestFindAllVisibleEmptyTargets:
+    """Added 2026-08-14, direct request ("it needs to be instant"): the
+    single-field fast-fill path already had model calls down to almost
+    nothing, but a real run still showed steps landing ~1s apart whether or
+    not the model was skipped -- each field paid for its own observe()+act()
+    cycle regardless. This returns EVERY currently-visible eligible target
+    in one call so a caller (agent.py's batch fast-fill) can fill a whole
+    tab's worth of known fields with one observe() instead of one per field.
+    find_visible_empty_target is now a thin wrapper over this -- same
+    eligibility rule, one implementation."""
+
+    def test_returns_every_matching_element_in_order(self):
+        a = _field("First Name", bbox=(100, 100, 300, 130))
+        b = _field("Last Name", bbox=(100, 140, 300, 170))
+        c = _field("Email", bbox=(100, 180, 300, 210))
+        state = {"elements": [a, b, c]}
+        found = find_all_visible_empty_targets(state, VIEWPORT_BOTTOM)
+        assert found == [a, b, c]
+
+    def test_empty_list_when_nothing_matches(self):
+        state = {"elements": [_field("First Name", value="Alice")]}
+        assert find_all_visible_empty_targets(state, VIEWPORT_BOTTOM) == []
+
+    def test_already_filled_fields_are_excluded_but_others_remain(self):
+        filled = _field("First Name", value="Alice", bbox=(100, 100, 300, 130))
+        empty  = _field("Last Name", bbox=(100, 140, 300, 170))
+        state = {"elements": [filled, empty]}
+        assert find_all_visible_empty_targets(state, VIEWPORT_BOTTOM) == [empty]
+
+    def test_attempted_fields_are_excluded_but_others_remain(self):
+        attempted = _field("Suffix", bbox=(100, 100, 300, 130))
+        wanted    = _field("Marital Status", bbox=(100, 140, 300, 170))
+        state = {"elements": [attempted, wanted]}
+        found = find_all_visible_empty_targets(
+            state, VIEWPORT_BOTTOM,
+            attempted_keys={"suffix"},
+            attempt_key_fn=lambda e, els: (e.get("label") or "").lower(),
+        )
+        assert found == [wanted]
+
+    def test_fields_below_the_viewport_are_excluded(self):
+        onscreen  = _field("First Name", bbox=(100, 100, 300, 130))
+        offscreen = _field("Last Name", bbox=(100, 5000, 300, 5030))
+        state = {"elements": [onscreen, offscreen]}
+        assert find_all_visible_empty_targets(state, VIEWPORT_BOTTOM) == [onscreen]
+
+    def test_background_elements_are_ignored(self):
+        bg = _field("First Name", bbox=(100, 100, 300, 130))
+        bg["window_role"] = "background"
+        state = {"elements": [bg]}
+        assert find_all_visible_empty_targets(state, VIEWPORT_BOTTOM) == []
+
+    def test_find_visible_empty_target_agrees_with_the_first_element_of_all(self):
+        """find_visible_empty_target is now a thin wrapper -- same answer,
+        no drift between the two possible."""
+        a = _field("First Name", bbox=(100, 100, 300, 130))
+        b = _field("Last Name", bbox=(100, 140, 300, 170))
+        state = {"elements": [a, b]}
+        assert find_visible_empty_target(state, VIEWPORT_BOTTOM) == \
+            find_all_visible_empty_targets(state, VIEWPORT_BOTTOM)[0]
 
 
 class TestVisibleFlagTrustsUiaOverGeometry:
