@@ -72,10 +72,14 @@ class TestConvertedSitesUseAdaptiveSettleWait:
 
     def test_all_twelve_new_sites_call_adaptive_settle_wait(self):
         count = len(re.findall(r"self\._adaptive_settle_wait\(self\.step_delay", _SOURCE))
-        # 12 newly converted + the 1 original success-path call site.
-        assert count == 13, (
-            f"expected 13 total _adaptive_settle_wait(self.step_delay...) call "
-            f"sites (12 new + 1 original), found {count}"
+        # 12 sites converted in this batch + the 1 original success-path call
+        # site + 1 more added later the same night by the OPT2 fast-fill
+        # feature (tests/test_opt2_fast_fill.py) -- a floor, not an exact
+        # count, since further legitimate call sites may be added later.
+        assert count >= 14, (
+            f"expected at least 14 total _adaptive_settle_wait(self.step_delay...) "
+            f"call sites (12 from this batch + 1 original + 1 from OPT2 fast-fill), "
+            f"found {count}"
         )
 
     def test_dialog_guard_escape_site(self):

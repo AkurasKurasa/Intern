@@ -2377,6 +2377,62 @@ class LLMAgent:
                     time.sleep(self.step_delay)
                     continue
 
+            # ── OPT2 FAST-FILL: skip the transformer AND the LLM entirely when
+            # the focused field's value is already known via the same
+            # deterministic lookup _ask_llm's own fast path already trusts.
+            # Built 2026-08-14, direct request ("don't stop unless there's
+            # something to reason about", 3-day demo deadline). Mirrors the
+            # exact exclusion logic _t_is_type uses a few lines below
+            # (_attempt_key / _leave_blank_keys / _typed_keys) so this can
+            # never disagree with the existing reactive path about what's
+            # already handled or deliberately left blank. Falls through to
+            # the completely unmodified code below on ANY miss (no label, no
+            # known value, HWND resolution fails) -- reasoning only costs
+            # anything on genuine absence, never on a guess about the future.
+            # Deliberately scoped to editcontrol only: comboboxes were live-
+            # tested this session to silently reject the direct-write
+            # mechanism entirely, and checkboxes already have their own
+            # separate, working mechanism (BM_SETCHECK) -- both keep using
+            # today's existing path untouched.
+            if self._no_autohandlers:
+                _ff_fid = state.get("focused_element_id")
+                _ff_fel = next((e for e in state.get("elements", [])
+                                if e.get("element_id") == _ff_fid), None)
+                _ff_ty  = (_ff_fel.get("type") or "").lower() if _ff_fel else ""
+                _ff_val = (_ff_fel.get("value") or "").strip() if _ff_fel else ""
+                _ff_key = (self._attempt_key(_ff_fel, elements=state.get("elements", []))
+                           if _ff_fel else None)
+                if (_ff_fel and _ff_ty == "editcontrol" and not _ff_val
+                        and _ff_key not in self._leave_blank_keys
+                        and _ff_key not in self._typed_keys):
+                    _ff_label = (_ff_fel.get("label") or _ff_fel.get("text") or "").strip()
+                    _ff_sec   = self._detect_section(state, _ff_fel)
+                    _ff_val_known = self._lookup_field(_ff_label, section=_ff_sec) if _ff_label else ""
+                    if _ff_label and _ff_val_known:
+                        _ff_ctrl = self._find_uia_control_by_name(_ff_label, expected_bbox=_ff_fel.get("bbox"))
+                        _ff_hwnd = None
+                        if _ff_ctrl is not None:
+                            try:
+                                _ff_ctrl.SetFocus()
+                                _ff_hwnd = _ff_ctrl.NativeWindowHandle
+                            except Exception as _ff_exc:
+                                logger.debug("Fast-fill focus/handle resolution failed for %r — %s",
+                                             _ff_label, _ff_exc)
+                        if _ff_hwnd:
+                            self._ensure_foreground(state)
+                            logger.info("[OPT2] fast-fill '%s' → %r (no transformer, no LLM, no click)",
+                                        _ff_label, _ff_val_known[:40])
+                            self._executor.execute({
+                                "action_type": "keyboard", "text": _ff_val_known,
+                                "key_count": len(_ff_val_known), "keystrokes": list(_ff_val_known),
+                                "direct_fill_hwnd": _ff_hwnd,
+                            })
+                            self._mark_attempted(_ff_fel, elements=state.get("elements", []))
+                            self._executor.execute({"action_type": "keyboard",
+                                                    "key_count": 1, "keystrokes": ["tab"]})
+                            self._adaptive_settle_wait(self.step_delay * 0.4)
+                            continue
+
             # 2. Transformer always runs — learned behavioral engine
             llm_action = None
 
