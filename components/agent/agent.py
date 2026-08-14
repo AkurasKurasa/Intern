@@ -5561,7 +5561,39 @@ class LLMAgent:
           1. Visual cache (Gemini pre-scan) — used when available; no Win32 needed.
           2. Win32 Notepad text read → parse records.
           3. UIA background element blobs / OCR fallback.
+
+        Skips the whole read+parse when this exact record's cache is
+        already confirmed populated. Found live 2026-08-14 ("any more
+        improvements"): a single-record run logged 31 refreshes, every
+        one returning the IDENTICAL 176-field sample already sitting in
+        self._cached_record — 13 separate call sites across run()
+        (nearly every one a tab-advance handler, 7 tab-advances/record)
+        each pay for a real Win32 Notepad text read + full regex parse
+        on every single tab switch, even though the record's own data
+        never changes mid-record (this is a static intake snapshot, not
+        a live-edited file). self._attempted_record_num already tracks,
+        reliably, which record_num the cache last completed a genuine
+        structured parse for (set only after `_parse_records` actually
+        succeeds, a few lines below) — reusing that existing invariant
+        instead of inventing a new one. Skipping when it already matches
+        self._record_num returns exactly the same cache a real re-read
+        would have produced, just without paying for the read again.
+        Record-advance still refreshes for real: _record_num changes
+        before this is called for the new record, so the guard doesn't
+        match and the reset logic (attempted-keys, tab-idx, etc. — a few
+        lines below) still runs exactly as it always has.
+
+        Deliberately excludes visual_reader mode: that branch (below)
+        never touches self._attempted_record_num at all, so the
+        "confirmed populated" invariant this guard relies on was never
+        established for it -- skipping there would be trusting a
+        guarantee that path never actually made. Left exactly as it
+        already behaves today; not the path any real live run uses
+        (every log this session shows "VLM pre-scan skipped").
         """
+        if (not self._visual_reader and self._cached_record
+                and self._record_num == self._attempted_record_num):
+            return
         import re
 
         # When visual_reader is active, use ONLY what the VLM has seen on screen.
