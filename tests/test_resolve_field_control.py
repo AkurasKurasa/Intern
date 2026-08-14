@@ -21,6 +21,16 @@ expected_bbox=None, which takes _find_uia_control_by_name's own fast path
 instead. _find_uia_control_by_name itself is untouched -- this is purely
 about which argument gets passed to it, never a change to its own
 disambiguation guarantee.
+
+EXTENDED 2026-08-14 ("any more improvements"): now tries
+_resolve_control_via_point FIRST -- a WindowFromPoint-based resolution
+(see tests/test_resolve_control_via_point.py for that mechanism's own
+tests) that skips the UIA name-search entirely -- before ever falling
+back to _find_uia_control_by_name. Every test below explicitly mocks
+_resolve_control_via_point (rather than letting the real one run against
+whatever's actually on screen in the test environment) so these tests
+stay deterministic and test ONLY the routing logic between the two
+mechanisms, not real Win32 state.
 """
 import sys
 from pathlib import Path
@@ -31,7 +41,9 @@ from agent.agent import LLMAgent
 
 
 def _make_agent():
-    return LLMAgent(goal="test goal", dry_run=True, max_steps=1)
+    agent = LLMAgent(goal="test goal", dry_run=True, max_steps=1)
+    agent._resolve_control_via_point = MagicMock(return_value=None)
+    return agent
 
 
 def _field(label, bbox=(100, 100, 300, 130)):
@@ -39,7 +51,22 @@ def _field(label, bbox=(100, 100, 300, 130)):
             "text": label, "value": "", "bbox": list(bbox)}
 
 
-def test_unique_label_skips_the_disambiguation_bbox():
+def test_point_based_hit_short_circuits_before_any_uia_search():
+    """The whole point of the extension -- when the fast point-based
+    resolution succeeds, the slow name-search path must never run at
+    all, not even the disambiguation-aware version."""
+    agent = _make_agent()
+    agent._resolve_control_via_point = MagicMock(return_value="point_hit_control")
+    agent._find_uia_control_by_name = MagicMock()
+    state = {"elements": [_field("Policy Number")]}
+
+    result = agent._resolve_field_control(state, "Policy Number", (100, 100, 300, 130))
+
+    assert result == "point_hit_control"
+    agent._find_uia_control_by_name.assert_not_called()
+
+
+def test_point_based_miss_falls_back_to_unique_label_fast_path():
     agent = _make_agent()
     agent._find_uia_control_by_name = MagicMock(return_value="the_control")
     state = {"elements": [_field("Policy Number")]}
@@ -115,3 +142,10 @@ def test_real_find_uia_control_by_name_is_not_reimplemented():
     from agent.agent import LLMAgent as _LLMAgent
     src = inspect.getsource(_LLMAgent._resolve_field_control)
     assert "self._find_uia_control_by_name(" in src
+
+
+def test_real_resolve_control_via_point_is_tried_not_reimplemented():
+    import inspect
+    from agent.agent import LLMAgent as _LLMAgent
+    src = inspect.getsource(_LLMAgent._resolve_field_control)
+    assert "self._resolve_control_via_point(" in src

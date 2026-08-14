@@ -6837,7 +6837,94 @@ class LLMAgent:
         elements = state.get("elements", [])
         _dup = sum(1 for e in elements
                    if (e.get("label") or e.get("text") or "").strip() == label)
+        # Point-based fast path, added 2026-08-14 ("any more improvements"):
+        # try this FIRST, before ever falling back to the name-search below.
+        _point_ctrl = self._resolve_control_via_point(bbox, label)
+        if _point_ctrl is not None:
+            return _point_ctrl
         return self._find_uia_control_by_name(label, expected_bbox=bbox if _dup > 1 else None)
+
+    # Native window classes _resolve_control_via_point trusts as a real,
+    # known-type control under a point -- the same classes _keyboard_direct/
+    # _combobox_direct (executor.py) already check on the write side, kept
+    # here only as a coarse "is this a real edit/combobox control at all"
+    # gate. Deliberately loose (accepts either edit OR combobox classes
+    # regardless of which type the caller wanted) since the specific write
+    # mechanism re-verifies its own exact class before ever writing.
+    _POINT_RESOLVE_CLASSES = {"Edit", "RichEditD2DPT", "RichEdit20W", "RICHEDIT50W",
+                               "RICHEDIT60W", "RichEdit", "ComboBox"}
+
+    def _resolve_control_via_point(self, bbox, expected_label: str,
+                                    uia_mod=None, win32gui_mod=None, user32=None):
+        """Resolves a live UIA control directly from its own on-screen
+        position via WindowFromPoint -- the exact mechanism this file's
+        checkbox fast-fill already uses and has proven live -- instead of
+        a UIA accessible-Name SEARCH. WindowFromPoint is one plain, cheap
+        Win32 call (no accessibility-tree walk, no search timeout);
+        wrapping the resulting handle via UIA's ControlFromHandle (already
+        used inside _find_uia_control_by_name itself, on a handle FOUND by
+        searching -- here on a handle we already have from screen
+        position, no search involved either way) is likewise cheap.
+
+        Found live 2026-08-14, direct request ("any more improvements"):
+        checked a real log after the disambiguation-skip fix
+        (_resolve_field_control) shipped and total run time barely
+        moved. The SAME batch showed checkboxes (already using this exact
+        WindowFromPoint mechanism, never went through
+        _find_uia_control_by_name at all) landing 3 fields within about a
+        second, while editcontrol/comboboxcontrol fields right next to
+        them -- still doing a UIA name-search even after the
+        disambiguation fix -- landed roughly 1/second. Direct,
+        apples-to-apples evidence in the same batch that the search
+        itself, not the disambiguation loop around it, was the remaining
+        cost.
+
+        Verifies the resolved control's own native window class AND its
+        accessible Name before trusting it, so a stale bbox or an
+        unexpected control under that point (e.g. WindowFromPoint landing
+        on a parent panel instead of the field itself) can't silently
+        write into the wrong control -- returns None on any mismatch,
+        letting the caller fall back to the proven UIA-search path.
+        Writing the wrong TEXT into the wrong field is a worse failure
+        mode than checkboxes ever risked (a wrongly-checked box is still
+        visibly wrong and correctable; wrong text can look plausible), so
+        this checks more than the checkbox path does before trusting the
+        point-based hit.
+
+        `uia_mod`/`win32gui_mod`/`user32` are optional, test-injectable
+        overrides for the real `uiautomation`/`win32gui`/
+        `ctypes.windll.user32` -- same shape and same reason as
+        executor.py's own `user32=None` parameters (_try_semantic_click,
+        _keyboard_direct, _combobox_direct): `ctypes.windll.user32` is a
+        live, C-backed, process-wide object, unsafe to patch in place in
+        a test.
+        """
+        if not bbox or len(bbox) != 4 or not expected_label:
+            return None
+        try:
+            import ctypes
+            if uia_mod is None:
+                import uiautomation as uia_mod
+            if win32gui_mod is None:
+                import win32gui as win32gui_mod
+            if user32 is None:
+                user32 = ctypes.windll.user32
+            cx = (bbox[0] + bbox[2]) / 2
+            cy = (bbox[1] + bbox[3]) / 2
+            hwnd = win32gui_mod.WindowFromPoint((int(cx), int(cy)))
+            if not hwnd:
+                return None
+            buf = ctypes.create_unicode_buffer(256)
+            user32.GetClassNameW(hwnd, buf, 256)
+            if buf.value not in self._POINT_RESOLVE_CLASSES:
+                return None
+            ctrl = uia_mod.ControlFromHandle(hwnd)
+            if (ctrl.Name or "").strip().lower() != expected_label.strip().lower():
+                return None
+            return ctrl
+        except Exception as exc:
+            logger.debug("Point-based control resolution for %r failed — %s", expected_label, exc)
+            return None
 
     def _scroll_into_view_via_uia(self, label: str, expected_bbox=None) -> bool:
         """
