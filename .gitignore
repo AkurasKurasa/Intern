@@ -40,6 +40,11 @@ Thumbs.db
 test_data/
 *.pt
 !data/models/*.pt
+# Coworker's own trained matcher checkpoint (Scope #2 port) -- tiny (~8KB,
+# a 1,121-parameter network, not a training-scale checkpoint), part of his
+# real repo, kept for the same "exact unification" reason as everything
+# else ported alongside it.
+!components/scope2/data/models/*.pt
 
 # Dataset init cache (auto-generated, invalidated on new traces)
 .dataset_cache.pkl
