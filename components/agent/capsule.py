@@ -1,7 +1,12 @@
 """
 components/agent/capsule.py
 ===========================
-WorkflowCapsule — a named BC model checkpoint tied to a specific task type.
+WorkflowCapsule — a named, runnable workflow: either a BC model checkpoint
+tied to a specific task type (kind="agent", the original/default shape), or
+a standalone script with its own CLI args (kind="script") -- added for the
+Electron app's Workflow section to run Scope #2 (components/scope2/) the
+same way it runs Scope #1, without forcing a second, structurally different
+system to pretend it has a swappable .pt checkpoint.
 CapsuleRegistry — loads/saves capsule metadata, routes task → model_path.
 """
 
@@ -23,12 +28,45 @@ REGISTRY_PATH = os.path.join(
 class WorkflowCapsule:
     name:             str         # unique id: "form_filling", "excel", "email"
     description:      str         # human-readable purpose
-    model_path:       str         # path to .pt checkpoint
+    model_path:       str         # path to .pt checkpoint (kind="agent" only)
     trigger_keywords: List[str]   # match against goal string (lowercase)
     trigger_apps:     List[str]   # match against window_title (case-insensitive)
     trace_dir:        str = ""    # where training traces live
     created:          str = ""    # ISO timestamp
     emoji:            str = ""    # user-set display emoji; "" = show a placeholder
+    # kind="agent" (default): run_task.py --model <model_path>, the original
+    # Transformer+LLM capsule shape. kind="script": run entrypoint directly
+    # with args -- for a workflow that isn't an LLMAgent run at all.
+    kind:             str = "agent"
+    entrypoint:       str = ""              # relative path to a .py script (kind="script")
+    args:             List[str] = field(default_factory=list)
+    cwd:              str = ""              # relative to repo root; "" = repo root
+
+    def launch_command(self, repo_root: str) -> tuple[list[str], str]:
+        """Return (argv, cwd) to Popen for this capsule.
+
+        Raises FileNotFoundError if the target script/checkpoint doesn't
+        exist, so callers can turn that into a clean UI-facing error instead
+        of Popen failing deep inside subprocess machinery.
+        """
+        import sys
+
+        if self.kind == "script":
+            entrypoint_abs = os.path.join(repo_root, self.entrypoint)
+            if not os.path.isfile(entrypoint_abs):
+                raise FileNotFoundError(f"Entry point not found: {entrypoint_abs}")
+            argv = [sys.executable, "-u", entrypoint_abs] + list(self.args)
+            cwd = os.path.join(repo_root, self.cwd) if self.cwd else repo_root
+            return argv, cwd
+
+        # kind == "agent" (default) -- same shape run_capsule() has always used.
+        abs_model = self.model_path if os.path.isabs(self.model_path) \
+            else os.path.join(repo_root, self.model_path)
+        if not os.path.isfile(abs_model):
+            raise FileNotFoundError(f"Checkpoint not found: {abs_model}")
+        run_task_script = os.path.join(repo_root, "run_task.py")
+        argv = [sys.executable, "-u", run_task_script, "--model", abs_model]
+        return argv, repo_root
 
 
 class CapsuleRegistry:

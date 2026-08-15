@@ -20,6 +20,16 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "app"))
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "components"))
 
 import recorder_bridge as rb
+from agent.capsule import CapsuleRegistry, WorkflowCapsule
+
+
+def _registry_with_agent_capsule(tmp_path, checkpoint):
+    registry = CapsuleRegistry(registry_path=str(tmp_path / "registry.json"))
+    registry.register(WorkflowCapsule(
+        name="form_filling", description="x", model_path=str(checkpoint),
+        trigger_keywords=[], trigger_apps=[],
+    ))
+    return registry
 
 
 class _FakeProc:
@@ -63,10 +73,10 @@ class TestCapsuleActivityLogFile:
         monkeypatch.setattr(rb.subprocess, "Popen", lambda *a, **k: _FakeProc(lines=[]))
         log_path.write_text("stale content from a previous run\n")
 
-        bridge = rb.Bridge()
         checkpoint = tmp_path / "model.pt"
         checkpoint.write_bytes(b"fake")
-        bridge.run_capsule(str(checkpoint))
+        bridge = rb.Bridge(registry=_registry_with_agent_capsule(tmp_path, checkpoint))
+        bridge.run_capsule("form_filling")
 
         content = log_path.read_text()
         assert "stale content" not in content
@@ -79,10 +89,10 @@ class TestCapsuleActivityLogFile:
         fake_proc = _FakeProc(lines=["COUNTDOWN_BEGIN\n", "step 1 done\n"])
         monkeypatch.setattr(rb.subprocess, "Popen", lambda *a, **k: fake_proc)
 
-        bridge = rb.Bridge()
         checkpoint = tmp_path / "model.pt"
         checkpoint.write_bytes(b"fake")
-        bridge.run_capsule(str(checkpoint))
+        bridge = rb.Bridge(registry=_registry_with_agent_capsule(tmp_path, checkpoint))
+        bridge.run_capsule("form_filling")
 
         import time as _time
         _time.sleep(0.3)  # _pump runs on its own daemon thread -- give it a moment
@@ -119,9 +129,9 @@ class TestCapsuleActivityLogFile:
         monkeypatch.setattr(rb, "emit", lambda event, **fields: events.append({"event": event, **fields}))
         monkeypatch.setattr(rb.subprocess, "Popen", lambda *a, **k: _FakeProc(lines=[]))
 
-        bridge = rb.Bridge()
         checkpoint = tmp_path / "model.pt"
         checkpoint.write_bytes(b"fake")
-        bridge.run_capsule(str(checkpoint))  # must not raise
+        bridge = rb.Bridge(registry=_registry_with_agent_capsule(tmp_path, checkpoint))
+        bridge.run_capsule("form_filling")  # must not raise
 
         assert any(e["event"] == "capsule_started" for e in events)

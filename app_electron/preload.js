@@ -34,7 +34,7 @@ contextBridge.exposeInMainWorld("capsulesAPI", {
   deploy: (capsuleName, checkpointPath) =>
     ipcRenderer.invoke("capsules-deploy", capsuleName, checkpointPath),
   setEmoji: (capsuleName, emoji) => ipcRenderer.invoke("capsules-set-emoji", capsuleName, emoji),
-  run: (modelPath) => ipcRenderer.invoke("capsule-run", modelPath),
+  run: (capsuleName) => ipcRenderer.invoke("capsule-run", capsuleName),
   stop: () => ipcRenderer.invoke("capsule-stop"),
   openLog: () => ipcRenderer.invoke("capsule-open-log"),
   readLog: () => ipcRenderer.invoke("capsule-read-log"),
@@ -44,6 +44,6 @@ contextBridge.exposeInMainWorld("capsulesAPI", {
   // than picking its own target. setCurrent() keeps main.js's copy of
   // that in sync (called from the main renderer whenever the loaded
   // capsule changes); runCurrent() is what the widget's Play circle calls.
-  setCurrent: (modelPath) => ipcRenderer.invoke("capsule-set-current", modelPath),
+  setCurrent: (capsuleName) => ipcRenderer.invoke("capsule-set-current", capsuleName),
   runCurrent: () => ipcRenderer.invoke("capsule-run-current"),
 });

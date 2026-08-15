@@ -51,7 +51,7 @@ let activeSection = "home";
 // UI of its own) can act on "whatever's loaded" and show correct
 // enabled/running state immediately on open, without round-tripping
 // through the main renderer for every click.
-let currentCapsuleModelPath = null;
+let currentCapsuleName = null;
 let capsuleIsRunning = false;
 
 function startBridge() {
@@ -254,7 +254,7 @@ function createMiniWorkflowWindow() {
 function pushMiniWorkflowState() {
   if (!miniWorkflowWindow || miniWorkflowWindow.isDestroyed()) return;
   miniWorkflowWindow.webContents.send("mini-workflow-state", {
-    hasCapsule: !!currentCapsuleModelPath,
+    hasCapsule: !!currentCapsuleName,
     isRunning: capsuleIsRunning,
   });
 }
@@ -415,21 +415,21 @@ ipcMain.handle("capsules-deploy", (_evt, capsuleName, checkpointPath) =>
   deployCheckpoint(capsuleName, checkpointPath));
 ipcMain.handle("capsules-set-emoji", (_evt, capsuleName, emoji) =>
   setCapsuleEmoji(capsuleName, emoji));
-ipcMain.handle("capsule-run", (_evt, modelPath) => {
-  queueOrSend({ cmd: "run_capsule", model_path: modelPath });
+ipcMain.handle("capsule-run", (_evt, capsuleName) => {
+  queueOrSend({ cmd: "run_capsule", capsule_name: capsuleName });
 });
 ipcMain.handle("capsule-stop", () => {
   queueOrSend({ cmd: "stop_capsule" });
 });
-ipcMain.handle("capsule-set-current", (_evt, modelPath) => {
-  currentCapsuleModelPath = modelPath || null;
+ipcMain.handle("capsule-set-current", (_evt, capsuleName) => {
+  currentCapsuleName = capsuleName || null;
   pushMiniWorkflowState();
 });
 // The mini Play/Stop widget has no capsule-picker UI of its own -- Play
 // always means "run whatever's currently loaded in the main window's
 // Play panel," tracked via capsule-set-current above.
 ipcMain.handle("capsule-run-current", () => {
-  if (currentCapsuleModelPath) queueOrSend({ cmd: "run_capsule", model_path: currentCapsuleModelPath });
+  if (currentCapsuleName) queueOrSend({ cmd: "run_capsule", capsule_name: currentCapsuleName });
 });
 ipcMain.handle("set-active-section", (_evt, section) => {
   activeSection = section === "workflows" ? "workflows" : "home";

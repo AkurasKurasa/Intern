@@ -1,22 +1,33 @@
 """
 Regression tests for app/recorder_bridge.py's "run_capsule"/"stop_capsule"
-commands -- this is what "Play" actually means now: running the real
-trained agent (transformer decides WHERE, LLM decides WHAT, looping the
-whole form live), the same thing run_task.py does when the user runs it
-themselves from a terminal, not a replay of one recorded session's raw
-actions (that earlier version was explicitly reverted -- direct user
-correction: "I don't want to play per session... capsule meaning model").
+commands -- this is what "Play" actually means now: running the real,
+live process for a registered capsule, not a replay of one recorded
+session's raw actions (that earlier version was explicitly reverted --
+direct user correction: "I don't want to play per session... capsule
+meaning model").
 
-run_capsule() spawns `python run_task.py --model <checkpoint>` as a real
-subprocess rather than re-implementing LLMAgent construction in the bridge,
-so a Play run is exactly what the user would get running it themselves --
-one real implementation, not two that can quietly drift apart.
+Two capsule kinds are covered:
+  - kind="agent" (the original shape): spawns
+    `python run_task.py --model <checkpoint>`, the real trained agent
+    (transformer decides WHERE, LLM decides WHAT), same as run_task.py
+    run from a terminal -- one real implementation, not two that can
+    quietly drift apart.
+  - kind="script": spawns the capsule's own `entrypoint` with its own
+    `args` directly -- added so a structurally different workflow (Scope
+    #2's components/scope2/automate.py, no .pt checkpoint at all) can be
+    launched from the same Play button, without pretending to have a
+    swappable checkpoint it doesn't have.
+
+run_capsule() now takes a capsule NAME (looked up in the bridge's
+CapsuleRegistry), not a bare model_path -- WorkflowCapsule.launch_command()
+is the one place that turns a capsule into an actual argv/cwd, so both
+kinds share the exact same Popen call below.
 
 Only the safe, non-executing parts are covered here -- subprocess.Popen is
-monkeypatched out entirely so no test ever actually launches run_task.py or
-touches the real screen. Actually running a live capsule is a real
-GUI-automation action and is the user's call to make from the app, the
-same as every other live run in this project.
+monkeypatched out entirely so no test ever actually launches a real
+process or touches the real screen. Actually running a live capsule is a
+real GUI-automation action and is the user's call to make from the app,
+the same as every other live run in this project.
 """
 import signal
 import sys
@@ -28,12 +39,35 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "app"))
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "components"))
 
 import recorder_bridge as rb
+from agent.capsule import CapsuleRegistry, WorkflowCapsule
 
 
 def _events(monkeypatch):
     captured = []
     monkeypatch.setattr(rb, "emit", lambda event, **fields: captured.append({"event": event, **fields}))
     return captured
+
+
+def _registry(tmp_path, *capsules):
+    registry = CapsuleRegistry(registry_path=str(tmp_path / "registry.json"))
+    for c in capsules:
+        registry.register(c)
+    return registry
+
+
+def _agent_capsule(name, model_path):
+    return WorkflowCapsule(
+        name=name, description="x", model_path=str(model_path),
+        trigger_keywords=[], trigger_apps=[],
+    )
+
+
+def _script_capsule(name, entrypoint, args=None, cwd=""):
+    return WorkflowCapsule(
+        name=name, description="Sheet matcher", model_path="",
+        trigger_keywords=[], trigger_apps=[],
+        kind="script", entrypoint=entrypoint, args=args or [], cwd=cwd,
+    )
 
 
 class _FakeProc:
@@ -61,7 +95,7 @@ class TestRunCapsuleGuards:
         bridge = rb.Bridge()
         bridge._running = True
 
-        bridge.run_capsule("tasks/form_filling/model.pt")
+        bridge.run_capsule("form_filling")
 
         errors = [e for e in events if e["event"] == "error"]
         assert len(errors) == 1
@@ -72,17 +106,29 @@ class TestRunCapsuleGuards:
         bridge = rb.Bridge()
         bridge._capsule_proc = _FakeProc()  # poll() -> None -> still running
 
-        bridge.run_capsule("tasks/form_filling/model.pt")
+        bridge.run_capsule("form_filling")
 
         errors = [e for e in events if e["event"] == "error"]
         assert len(errors) == 1
         assert "already running" in errors[0]["message"].lower()
 
+    def test_refuses_unknown_capsule_name(self, monkeypatch, tmp_path):
+        events = _events(monkeypatch)
+        registry = _registry(tmp_path)  # empty
+        bridge = rb.Bridge(registry=registry)
+
+        bridge.run_capsule("nonexistent_capsule")
+
+        errors = [e for e in events if e["event"] == "error"]
+        assert len(errors) == 1
+        assert "not found" in errors[0]["message"].lower()
+
     def test_refuses_missing_checkpoint(self, monkeypatch, tmp_path):
         events = _events(monkeypatch)
-        bridge = rb.Bridge()
+        registry = _registry(tmp_path, _agent_capsule("form_filling", tmp_path / "nope.pt"))
+        bridge = rb.Bridge(registry=registry)
 
-        bridge.run_capsule(str(tmp_path / "nope.pt"))
+        bridge.run_capsule("form_filling")
 
         errors = [e for e in events if e["event"] == "error"]
         assert len(errors) == 1
@@ -92,9 +138,10 @@ class TestRunCapsuleGuards:
 class TestRunCapsuleSpawnsRunTaskCorrectly:
     def test_spawns_run_task_with_model_flag(self, monkeypatch, tmp_path):
         events = _events(monkeypatch)
-        bridge = rb.Bridge()
         checkpoint = tmp_path / "model.pt"
         checkpoint.write_bytes(b"fake")
+        registry = _registry(tmp_path, _agent_capsule("form_filling", checkpoint))
+        bridge = rb.Bridge(registry=registry)
 
         popen_calls = []
 
@@ -104,7 +151,7 @@ class TestRunCapsuleSpawnsRunTaskCorrectly:
 
         monkeypatch.setattr(rb.subprocess, "Popen", _fake_popen)
 
-        bridge.run_capsule(str(checkpoint))
+        bridge.run_capsule("form_filling")
 
         assert len(popen_calls) == 1
         args, kwargs = popen_calls[0]
@@ -135,6 +182,8 @@ class TestRunCapsuleSpawnsRunTaskCorrectly:
         subprocess hygiene independent of this specific bug."""
         checkpoint = tmp_path / "model.pt"
         checkpoint.write_bytes(b"fake")
+        registry = _registry(tmp_path, _agent_capsule("form_filling", checkpoint))
+        bridge = rb.Bridge(registry=registry)
         popen_calls = []
         monkeypatch.setattr(
             rb.subprocess, "Popen",
@@ -142,7 +191,7 @@ class TestRunCapsuleSpawnsRunTaskCorrectly:
         )
         monkeypatch.setattr(rb, "emit", lambda *a, **k: None)
 
-        rb.Bridge().run_capsule(str(checkpoint))
+        bridge.run_capsule("form_filling")
 
         _, kwargs = popen_calls[0]
         assert kwargs["stdin"] == rb.subprocess.DEVNULL
@@ -159,6 +208,8 @@ class TestRunCapsuleSpawnsRunTaskCorrectly:
         -- is sufficient to keep the hang fixed."""
         checkpoint = tmp_path / "model.pt"
         checkpoint.write_bytes(b"fake")
+        registry = _registry(tmp_path, _agent_capsule("form_filling", checkpoint))
+        bridge = rb.Bridge(registry=registry)
         popen_calls = []
         monkeypatch.setattr(
             rb.subprocess, "Popen",
@@ -166,33 +217,36 @@ class TestRunCapsuleSpawnsRunTaskCorrectly:
         )
         monkeypatch.setattr(rb, "emit", lambda *a, **k: None)
 
-        rb.Bridge().run_capsule(str(checkpoint))
+        bridge.run_capsule("form_filling")
 
         _, kwargs = popen_calls[0]
         assert kwargs["creationflags"] == rb.subprocess.CREATE_NEW_PROCESS_GROUP
 
     def test_capsule_started_emitted_synchronously(self, monkeypatch, tmp_path):
         events = _events(monkeypatch)
-        bridge = rb.Bridge()
         checkpoint = tmp_path / "model.pt"
         checkpoint.write_bytes(b"fake")
+        registry = _registry(tmp_path, _agent_capsule("form_filling", checkpoint))
+        bridge = rb.Bridge(registry=registry)
         monkeypatch.setattr(rb.subprocess, "Popen", lambda *a, **k: _FakeProc(lines=[]))
 
-        bridge.run_capsule(str(checkpoint))
+        bridge.run_capsule("form_filling")
 
         started = [e for e in events if e["event"] == "capsule_started"]
         assert len(started) == 1
-        assert started[0]["model_path"] == str(checkpoint)
+        assert "form_filling" in started[0]["label"]
+        assert checkpoint.name in started[0]["label"]
 
     def test_stdout_lines_stream_as_capsule_progress(self, monkeypatch, tmp_path):
         events = _events(monkeypatch)
-        bridge = rb.Bridge()
         checkpoint = tmp_path / "model.pt"
         checkpoint.write_bytes(b"fake")
+        registry = _registry(tmp_path, _agent_capsule("form_filling", checkpoint))
+        bridge = rb.Bridge(registry=registry)
         fake_proc = _FakeProc(lines=["step 1: click\n", "step 2: keyboard\n", ""])
         monkeypatch.setattr(rb.subprocess, "Popen", lambda *a, **k: fake_proc)
 
-        bridge.run_capsule(str(checkpoint))
+        bridge.run_capsule("form_filling")
 
         for _ in range(50):
             progress = [e for e in events if e["event"] == "capsule_progress"]
@@ -205,13 +259,14 @@ class TestRunCapsuleSpawnsRunTaskCorrectly:
 
     def test_capsule_done_emitted_with_exit_code(self, monkeypatch, tmp_path):
         events = _events(monkeypatch)
-        bridge = rb.Bridge()
         checkpoint = tmp_path / "model.pt"
         checkpoint.write_bytes(b"fake")
+        registry = _registry(tmp_path, _agent_capsule("form_filling", checkpoint))
+        bridge = rb.Bridge(registry=registry)
         fake_proc = _FakeProc(lines=[], exit_code=0)
         monkeypatch.setattr(rb.subprocess, "Popen", lambda *a, **k: fake_proc)
 
-        bridge.run_capsule(str(checkpoint))
+        bridge.run_capsule("form_filling")
 
         done = []
         for _ in range(50):
@@ -224,14 +279,15 @@ class TestRunCapsuleSpawnsRunTaskCorrectly:
         assert done[0]["code"] == 0
 
     def test_bridge_capsule_proc_cleared_after_done(self, monkeypatch, tmp_path):
-        bridge = rb.Bridge()
         checkpoint = tmp_path / "model.pt"
         checkpoint.write_bytes(b"fake")
+        registry = _registry(tmp_path, _agent_capsule("form_filling", checkpoint))
+        bridge = rb.Bridge(registry=registry)
         fake_proc = _FakeProc(lines=[])
         monkeypatch.setattr(rb.subprocess, "Popen", lambda *a, **k: fake_proc)
         monkeypatch.setattr(rb, "emit", lambda *a, **k: None)
 
-        bridge.run_capsule(str(checkpoint))
+        bridge.run_capsule("form_filling")
 
         for _ in range(50):
             if bridge._capsule_proc is None:
@@ -239,6 +295,72 @@ class TestRunCapsuleSpawnsRunTaskCorrectly:
             time.sleep(0.05)
 
         assert bridge._capsule_proc is None
+
+
+class TestRunScriptCapsule:
+    """kind="script" -- a capsule that isn't a Transformer+LLM agent run at
+    all (e.g. Scope #2's "Sheet-to-Portal Matcher" launching
+    components/scope2/automate.py). Uses the real repo's own
+    components/scope2/automate.py as the entrypoint, since
+    launch_command() genuinely checks the file exists on disk -- same
+    trust in rb._ROOT being the real project root that the agent-kind
+    tests above already rely on for run_task.py."""
+
+    ENTRYPOINT = "components/scope2/automate.py"
+
+    def test_spawns_entrypoint_with_args(self, monkeypatch, tmp_path):
+        args = ["--variant", "v0_base", "--commit", "--show", "--limit", "5"]
+        registry = _registry(tmp_path, _script_capsule("sheet_matcher", self.ENTRYPOINT, args=args))
+        bridge = rb.Bridge(registry=registry)
+        popen_calls = []
+        monkeypatch.setattr(rb.subprocess, "Popen", lambda a, **k: (popen_calls.append((a, k)), _FakeProc(lines=[]))[1])
+        monkeypatch.setattr(rb, "emit", lambda *a, **k: None)
+
+        bridge.run_capsule("sheet_matcher")
+
+        assert len(popen_calls) == 1
+        argv, kwargs = popen_calls[0]
+        assert argv[0] == sys.executable
+        assert argv[1] == "-u"
+        assert argv[2] == rb.os.path.join(rb._ROOT, self.ENTRYPOINT)
+        assert argv[3:] == args
+        assert kwargs["cwd"] == rb._ROOT
+
+    def test_cwd_override_is_relative_to_repo_root(self, monkeypatch, tmp_path):
+        registry = _registry(tmp_path, _script_capsule("sheet_matcher", self.ENTRYPOINT, cwd="components/scope2"))
+        bridge = rb.Bridge(registry=registry)
+        popen_calls = []
+        monkeypatch.setattr(rb.subprocess, "Popen", lambda a, **k: (popen_calls.append((a, k)), _FakeProc(lines=[]))[1])
+        monkeypatch.setattr(rb, "emit", lambda *a, **k: None)
+
+        bridge.run_capsule("sheet_matcher")
+
+        _, kwargs = popen_calls[0]
+        assert kwargs["cwd"] == rb.os.path.join(rb._ROOT, "components/scope2")
+
+    def test_refuses_missing_entrypoint(self, monkeypatch, tmp_path):
+        events = _events(monkeypatch)
+        registry = _registry(tmp_path, _script_capsule("sheet_matcher", "components/scope2/nonexistent_script.py"))
+        bridge = rb.Bridge(registry=registry)
+
+        bridge.run_capsule("sheet_matcher")
+
+        errors = [e for e in events if e["event"] == "error"]
+        assert len(errors) == 1
+        assert "not found" in errors[0]["message"].lower()
+
+    def test_capsule_started_label_uses_entrypoint_basename(self, monkeypatch, tmp_path):
+        events = _events(monkeypatch)
+        registry = _registry(tmp_path, _script_capsule("sheet_matcher", self.ENTRYPOINT))
+        bridge = rb.Bridge(registry=registry)
+        monkeypatch.setattr(rb.subprocess, "Popen", lambda *a, **k: _FakeProc(lines=[]))
+
+        bridge.run_capsule("sheet_matcher")
+
+        started = [e for e in events if e["event"] == "capsule_started"]
+        assert len(started) == 1
+        assert "sheet_matcher" in started[0]["label"]
+        assert "automate.py" in started[0]["label"]
 
 
 class TestStopCapsule:

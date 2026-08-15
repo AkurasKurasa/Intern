@@ -11,6 +11,12 @@ that same file everywhere else (CapsuleRegistry, run_task.py's routing).
 The one thing that could break silently: a strict dataclass constructor
 rejecting a JSON key it doesn't know, or rejecting an *old* registry entry
 that predates this field. Both are covered here.
+
+Also covers the `kind`/`entrypoint`/`args`/`cwd` fields added for the
+Electron Workflow-section integration of Scope #2 -- same backward-
+compatibility concern: a registry.json written before these fields
+existed must still load cleanly, defaulting `kind` to "agent" (the
+original Transformer+LLM capsule shape).
 """
 import json
 import sys
@@ -78,3 +84,57 @@ class TestRegistryBackwardCompatibility:
         }))
         registry = CapsuleRegistry(registry_path=str(registry_path))
         assert registry.list_capsules()[0].emoji == "🧩"
+
+
+class TestScriptKindFieldDefaults:
+    def test_kind_defaults_to_agent(self):
+        capsule = WorkflowCapsule(
+            name="form_filling", description="x", model_path="tasks/form_filling/model.pt",
+            trigger_keywords=[], trigger_apps=[],
+        )
+        assert capsule.kind == "agent"
+        assert capsule.entrypoint == ""
+        assert capsule.args == []
+        assert capsule.cwd == ""
+
+    def test_script_kind_fields_can_be_set_explicitly(self):
+        capsule = WorkflowCapsule(
+            name="sheet_matcher", description="x", model_path="",
+            trigger_keywords=[], trigger_apps=[],
+            kind="script", entrypoint="components/scope2/automate.py",
+            args=["--variant", "v0_base"], cwd="components/scope2",
+        )
+        assert capsule.kind == "script"
+        assert capsule.entrypoint == "components/scope2/automate.py"
+        assert capsule.args == ["--variant", "v0_base"]
+        assert capsule.cwd == "components/scope2"
+
+    def test_loads_a_legacy_registry_entry_with_no_kind_key_at_all(self, tmp_path):
+        registry_path = tmp_path / "registry.json"
+        registry_path.write_text(json.dumps({
+            "capsules": [{
+                "name": "form_filling", "description": "x",
+                "model_path": "tasks/form_filling/model.pt",
+                "trigger_keywords": [], "trigger_apps": [],
+            }]
+        }))
+        registry = CapsuleRegistry(registry_path=str(registry_path))
+        capsules = registry.list_capsules()
+        assert len(capsules) == 1
+        assert capsules[0].kind == "agent"
+
+    def test_register_then_reload_preserves_script_kind_fields(self, tmp_path):
+        registry_path = tmp_path / "registry.json"
+        registry = CapsuleRegistry(registry_path=str(registry_path))
+        registry.register(WorkflowCapsule(
+            name="sheet_matcher", description="x", model_path="",
+            trigger_keywords=[], trigger_apps=[],
+            kind="script", entrypoint="components/scope2/automate.py",
+            args=["--commit"], cwd="",
+        ))
+
+        reloaded = CapsuleRegistry(registry_path=str(registry_path))
+        capsule = reloaded.list_capsules()[0]
+        assert capsule.kind == "script"
+        assert capsule.entrypoint == "components/scope2/automate.py"
+        assert capsule.args == ["--commit"]

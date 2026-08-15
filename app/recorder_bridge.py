@@ -12,7 +12,7 @@ Commands (stdin, one per line)
   {"cmd": "start", "output_dir": "data/demos/eight_Tabs"}
   {"cmd": "stop"}
   {"cmd": "replay", "n": 10}
-  {"cmd": "run_capsule", "model_path": "tasks/form_filling/model.pt"}
+  {"cmd": "run_capsule", "capsule_name": "form_filling"}
   {"cmd": "stop_capsule"}
   {"cmd": "shutdown"}
 
@@ -24,7 +24,7 @@ Events (stdout, one per line)
   {"event": "saved", "steps": 42, "session_dir": "..."}
   {"event": "replay_progress", "current": 3, "total": 10}
   {"event": "replay_done", "made": 10, "steps_each": 42, "dest": "..."}
-  {"event": "capsule_started", "model_path": "..."}
+  {"event": "capsule_started", "label": "..."}
   {"event": "capsule_progress", "line": "..."}
   {"event": "capsule_done", "code": 0}
   {"event": "capsule_stopped"}
@@ -59,6 +59,7 @@ for _p in (_ROOT, _COMP):
         sys.path.insert(0, _p)
 
 from recorder.recorder import DemoRecorder
+from agent.capsule import CapsuleRegistry
 
 # Full, persisted transcript of everything the Play panel's Activity log
 # receives -- direct user request ("add a log feature... so you could
@@ -97,13 +98,17 @@ def emit(event: str, **fields) -> None:
 
 
 class Bridge:
-    def __init__(self) -> None:
+    # registry is injectable so tests can hand in a temp registry.json
+    # instead of monkeypatching the real project file -- same pattern as
+    # agent.py's injectable uia_mod/win32gui_mod/user32 params.
+    def __init__(self, registry: CapsuleRegistry | None = None) -> None:
         self._recorder: DemoRecorder | None = None
         self._running = False
         self._out_dir = os.path.join(_ROOT, "data", "demos", "eight_Tabs")
         self._poll_thread: threading.Thread | None = None
         self._poll_stop = threading.Event()
         self._capsule_proc: subprocess.Popen | None = None
+        self._registry = registry if registry is not None else CapsuleRegistry()
 
     # ── start / stop ─────────────────────────────────────────────────────────
     def start(self, output_dir: str | None = None) -> None:
@@ -195,36 +200,49 @@ class Bridge:
         emit("log", message=f"Replay = {made} copies of '{os.path.basename(src)}' "
                              f"({len(step_files)} steps each) -> data/demos/human", level="ok")
 
-    # ── capsule run (the real autonomous agent, same as run_task.py) ─────────
-    # "Play" means running the trained agent for a capsule (transformer
-    # decides WHERE, LLM decides WHAT, looping the whole form live) -- not
-    # replaying one recorded session's raw actions. Reuses run_task.py's own
-    # entry point as a subprocess rather than re-implementing LLMAgent
-    # construction here, so a Play run is byte-for-byte the same thing the
-    # user gets running it themselves from a terminal -- one real
-    # implementation, not two that can quietly drift apart.
-    def run_capsule(self, model_path: str) -> None:
+    # ── capsule run (either the real autonomous agent, same as run_task.py,
+    # or a standalone script capsule like components/scope2/automate.py) ────
+    # "Play" means running the capsule's real, live process -- not replaying
+    # one recorded session's raw actions. For kind="agent" this reuses
+    # run_task.py's own entry point as a subprocess rather than
+    # re-implementing LLMAgent construction here, so a Play run is
+    # byte-for-byte the same thing the user gets running it themselves from
+    # a terminal -- one real implementation, not two that can quietly drift
+    # apart. kind="script" capsules (e.g. Scope #2) get the same treatment:
+    # WorkflowCapsule.launch_command() is the one place that decides the
+    # actual argv, so both kinds share this exact Popen call.
+    def run_capsule(self, capsule_name: str) -> None:
         if self._running:
             emit("error", message="Stop recording before running a capsule.")
             return
         if self._capsule_proc is not None and self._capsule_proc.poll() is None:
             emit("error", message="A capsule is already running.")
             return
-        abs_model = model_path if os.path.isabs(model_path) else os.path.join(_ROOT, model_path)
-        if not os.path.isfile(abs_model):
-            emit("error", message=f"Checkpoint not found: {abs_model}")
+
+        capsule = next((c for c in self._registry.list_capsules() if c.name == capsule_name), None)
+        if capsule is None:
+            emit("error", message=f"Capsule not found: {capsule_name}")
             return
+        try:
+            argv, cwd = capsule.launch_command(_ROOT)
+        except FileNotFoundError as exc:
+            emit("error", message=str(exc))
+            return
+        # Show the checkpoint filename for an agent capsule (what the old
+        # model_path-keyed label showed) or the entrypoint filename for a
+        # script capsule -- either way, a quick "what's actually running".
+        target = capsule.model_path if capsule.kind != "script" else capsule.entrypoint
+        label = f"{capsule.name} — {os.path.basename(target)}"
 
         # Fresh transcript for this run -- truncate, don't append, so it
         # never grows unbounded and always matches "the run I just did."
         try:
             os.makedirs(os.path.dirname(_CAPSULE_LOG_PATH), exist_ok=True)
             with open(_CAPSULE_LOG_PATH, "w", encoding="utf-8") as f:
-                f.write(f"[{datetime.now():%H:%M:%S}] Capsule run starting — model={abs_model}\n")
+                f.write(f"[{datetime.now():%H:%M:%S}] Capsule run starting — {label}\n")
         except Exception:
             pass
 
-        run_task_script = os.path.join(_ROOT, "run_task.py")
         try:
             self._capsule_proc = subprocess.Popen(
                 # "-u" -- unbuffered stdout/stderr, same fix already applied
@@ -234,8 +252,8 @@ class Bridge:
                 # the child's own buffer well past when it's produced,
                 # arriving at _pump()'s `for line in proc.stdout` in
                 # delayed bursts instead of as it actually happens.
-                [sys.executable, "-u", run_task_script, "--model", abs_model],
-                cwd=_ROOT,
+                argv,
+                cwd=cwd,
                 # stdin=DEVNULL, explicit -- found live 2026-08-10: this
                 # Popen call never set stdin at all, so run_task.py
                 # inherited THIS bridge process's own stdin handle, which
@@ -312,8 +330,8 @@ class Bridge:
             emit("capsule_done", code=code)
 
         threading.Thread(target=_pump, daemon=True).start()
-        emit("capsule_started", model_path=abs_model)
-        emit("log", message=f"Capsule run started — model={os.path.basename(abs_model)}", level="ok")
+        emit("capsule_started", label=label)
+        emit("log", message=f"Capsule run started — {label}", level="ok")
 
     def stop_capsule(self) -> None:
         if self._capsule_proc is None or self._capsule_proc.poll() is not None:
@@ -322,12 +340,15 @@ class Bridge:
         try:
             # CTRL_BREAK_EVENT, not terminate() -- run_task.py's own run()
             # already catches KeyboardInterrupt to save partial results and
-            # write metrics/logs cleanly. A hard terminate() would skip all
-            # of that, the same loss a real Ctrl+C in a terminal would avoid.
+            # write metrics/logs cleanly, and a hard terminate() would skip
+            # all of that. A script-kind capsule (e.g. automate.py) has no
+            # such handler, so CTRL_BREAK_EVENT there just stops the process
+            # via Python's default SIGBREAK behavior -- still a clean stop,
+            # just without a documented "save partial results" guarantee.
             self._capsule_proc.send_signal(signal.CTRL_BREAK_EVENT)
             _log_capsule_line("Stop requested — CTRL_BREAK_EVENT sent.")
             emit("capsule_stopped")
-            emit("log", message="Capsule run interrupted — saving partial results…", level="dim")
+            emit("log", message="Capsule run interrupted…", level="dim")
         except Exception as exc:
             emit("error", message=f"Failed to stop capsule run: {exc}")
 
@@ -352,7 +373,7 @@ class Bridge:
             elif cmd == "replay":
                 self.replay(int(msg.get("n", 10)))
             elif cmd == "run_capsule":
-                self.run_capsule(msg.get("model_path", ""))
+                self.run_capsule(msg.get("capsule_name", ""))
             elif cmd == "stop_capsule":
                 self.stop_capsule()
             elif cmd == "shutdown":

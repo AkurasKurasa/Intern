@@ -135,7 +135,7 @@ window.recorderAPI.onEvent((event) => {
       break;
     case "capsule_started":
       hideCountdown();
-      capsuleLog(`▶ Running capsule — model=${event.model_path.split(/[\\/]/).pop()}`, "ok");
+      capsuleLog(`▶ Running — ${event.label}`, "ok");
       setCapsuleRunning(true);
       break;
     case "capsule_progress":
@@ -186,6 +186,7 @@ const ppCapsule      = document.getElementById("ppCapsule");
 const ppCapsuleEmoji = document.getElementById("ppCapsuleEmoji");
 const ppCapsuleName  = document.getElementById("ppCapsuleName");
 const ppCapsuleMeta  = document.getElementById("ppCapsuleMeta");
+const ppCheckpointGroup = document.getElementById("ppCheckpointGroup");
 const ppCheckpoint   = document.getElementById("ppCheckpoint");
 const btnPlay        = document.getElementById("btnPlay");
 const btnStopCapsule = document.getElementById("btnStopCapsule");
@@ -251,19 +252,24 @@ function setCapsuleRunning(isRunning) {
   btnPlay.disabled = isRunning || !currentCapsule;
   btnStopCapsule.disabled = !isRunning;
   // The mini Play/Stop widget has no capsule-picker UI of its own, so it
-  // needs to know which model_path "Play" should mean -- this is the one
+  // needs to know which capsule name "Play" should mean -- this is the one
   // place that's called both right after a capsule loads/deploys AND on
   // every run-state change, so it's the single spot that keeps main.js's
   // copy in sync rather than duplicating this call at every currentCapsule
   // assignment site.
-  window.capsulesAPI.setCurrent(currentCapsule ? currentCapsule.model_path : null);
+  window.capsulesAPI.setCurrent(currentCapsule ? currentCapsule.name : null);
 }
 
+// Script-kind capsules (e.g. Scope #2) get their own dedicated card in the
+// Workflow list (see loadWorkflows() below) and are loaded directly from
+// that click -- they're excluded here so an unrelated demo group never
+// falls back to guessing one of them.
 function findCapsuleForGroup(groupName) {
-  if (capsulesCache.length === 1) return capsulesCache[0];
-  const byName = capsulesCache.find((c) => c.name === groupName);
+  const agentCapsules = capsulesCache.filter((c) => c.kind !== "script");
+  if (agentCapsules.length === 1) return agentCapsules[0];
+  const byName = agentCapsules.find((c) => c.name === groupName);
   if (byName) return byName;
-  return capsulesCache[0] || null;
+  return agentCapsules[0] || null;
 }
 
 /* Loads a capsule into the play panel for real -- called once the fly
@@ -274,9 +280,23 @@ async function loadCapsuleIntoSlot(capsule) {
   ppCapsule.hidden = false;
   applyCapsuleEmojiDisplay(ppCapsuleEmoji, capsule.emoji);
   ppCapsuleName.textContent = capsule.name;
-  ppCapsuleMeta.textContent = capsule.description || capsule.model_path;
   ppSlot.classList.add("filled");
 
+  // Script-kind capsules (e.g. Scope #2) have no swappable .pt checkpoint --
+  // there's nothing to list or deploy, so the whole Checkpoint control is
+  // hidden and the meta line shows exactly what Play will actually run
+  // instead, so clicking it is never a surprise.
+  if (capsule.kind === "script") {
+    ppCheckpointGroup.hidden = true;
+    const argsText = (capsule.args || []).join(" ");
+    ppCapsuleMeta.textContent =
+      `${capsule.description || ""} — runs ${capsule.entrypoint} ${argsText}`.trim();
+    setCapsuleRunning(false);
+    return;
+  }
+
+  ppCheckpointGroup.hidden = false;
+  ppCapsuleMeta.textContent = capsule.description || capsule.model_path;
   ppCheckpoint.disabled = true;
   ppCheckpoint.innerHTML = '<option>Loading…</option>';
   btnDeploy.hidden = true;
@@ -437,7 +457,10 @@ ppCapsuleEmoji.addEventListener("click", () => {
    span -- cheaper than a full loadWorkflows() and doesn't collapse
    whatever the user has open. */
 function refreshGroupEmojis() {
-  workflowsListEl.querySelectorAll(".wf-group-head").forEach((headEl) => {
+  // Script-kind capsule cards (no dataset.groupName -- they're not a
+  // data/demos/ group) are skipped: their emoji is set directly from their
+  // own capsule object at render time, not looked up via findCapsuleForGroup.
+  workflowsListEl.querySelectorAll(".wf-group-head[data-group-name]").forEach((headEl) => {
     const capsule = findCapsuleForGroup(headEl.dataset.groupName);
     const emojiEl = headEl.querySelector(".wf-emoji");
     if (emojiEl) applyCapsuleEmojiDisplay(emojiEl, capsule ? capsule.emoji : "");
@@ -446,7 +469,7 @@ function refreshGroupEmojis() {
 
 btnPlay.addEventListener("click", () => {
   if (!currentCapsule) return;
-  window.capsulesAPI.run(currentCapsule.model_path);
+  window.capsulesAPI.run(currentCapsule.name);
 });
 
 btnStopCapsule.addEventListener("click", () => {
@@ -512,20 +535,55 @@ async function loadWorkflows() {
   try {
     groups = await window.workflowsAPI.list();
   } catch (e) {
+    groups = [];
     workflowsListEl.innerHTML = `<p class="muted">Couldn't read data/demos/ (${e.message || e}).</p>`;
-    return;
   }
   try {
     capsulesCache = await window.capsulesAPI.list();
   } catch (e) {
     capsulesCache = [];
   }
+
+  workflowsListEl.innerHTML = "";
+
+  // Script-kind capsules (e.g. Scope #2's "Sheet-to-Portal Matcher") aren't
+  // tied to a recorded data/demos/ group at all -- they get their own leaf
+  // card here, rendered unconditionally, so they still show up even when
+  // there are zero recorded demo groups.
+  const scriptCapsules = capsulesCache.filter((c) => c.kind === "script");
+  scriptCapsules.forEach((capsule) => {
+    const card = document.createElement("div");
+    card.className = "wf-group wf-group-script";
+
+    const head = document.createElement("div");
+    head.className = "wf-group-head";
+    head.title = "Click to load this workflow into Play";
+    const emojiValue = capsule.emoji || "";
+    const emojiText = emojiValue || PLACEHOLDER_EMOJI;
+    const emojiClass = "wf-emoji" + (emojiValue ? "" : " is-placeholder");
+    head.innerHTML =
+      `<span><span class="${emojiClass}">${emojiText}</span><span class="name">${escapeHtml(capsule.name)}</span></span>` +
+      `<span class="meta">${escapeHtml(capsule.description || "")}</span>`;
+    head.addEventListener("click", () => {
+      workflowsListEl.querySelectorAll(".wf-group.capsule-selected")
+        .forEach((el) => el.classList.remove("capsule-selected"));
+      card.classList.add("capsule-selected");
+      loadCapsuleIntoSlot(capsule);
+      flashPlaySlot();
+    });
+    card.appendChild(head);
+    workflowsListEl.appendChild(card);
+  });
+
   if (!groups || !groups.length) {
-    workflowsListEl.innerHTML = '<p class="muted">No recorded workflows yet — start one from the Recorder tab.</p>';
+    const empty = document.createElement("p");
+    empty.className = "muted";
+    empty.textContent = "No recorded workflows yet — start one from the Recorder tab.";
+    workflowsListEl.appendChild(empty);
+    workflowsLoaded = true;
     return;
   }
 
-  workflowsListEl.innerHTML = "";
   groups.forEach((g, gi) => {
     const card = document.createElement("div");
     card.className = "wf-group" + (gi === 0 ? " open" : "");

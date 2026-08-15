@@ -18,6 +18,20 @@
       "trace_dir": "tasks/form_filling/traces",
       "created": "2026-05-17T17:52:45",
       "emoji": "📋"
+    },
+    {
+      "name": "Sheet-to-Portal Matcher",
+      "description": "Match spreadsheet columns to web-portal fields automatically, induce any derived-value rules, then fill and verify every row (Scope #2)",
+      "model_path": "",
+      "trigger_keywords": [],
+      "trigger_apps": [],
+      "trace_dir": "",
+      "created": "2026-08-15T00:00:00",
+      "emoji": "🧮",
+      "kind": "script",
+      "entrypoint": "components/scope2/automate.py",
+      "args": ["--variant", "v0_base", "--commit", "--show", "--limit", "5"],
+      "cwd": ""
     }
   ]
 }
