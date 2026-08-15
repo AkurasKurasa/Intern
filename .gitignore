@@ -80,3 +80,9 @@ data/models/*.bin
 
 # Personal thesis document — kept local, not pushed to GitHub
 Thesis.docx
+
+# Scope #2 (coworker port) embedding cache — auto-generated on first
+# eval/run_variants.py run, same reason as embed_cache.pkl above: derived,
+# regenerable, invalidated whenever the underlying sentence-transformer
+# model or feature set changes.
+components/scope2/data/cache/

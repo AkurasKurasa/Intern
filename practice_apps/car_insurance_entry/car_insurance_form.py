@@ -1,8 +1,8 @@
 """
-car_insurance_entry/car_insurance_form.py
+practice_apps/car_insurance_entry/car_insurance_form.py
 ==========================================
 Mock Car Insurance Data Entry Form
-Run with: python car_insurance_entry/car_insurance_form.py
+Run with: python practice_apps/car_insurance_entry/car_insurance_form.py
 """
 
 import tkinter as tk

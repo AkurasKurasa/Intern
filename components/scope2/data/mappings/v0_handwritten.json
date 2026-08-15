@@ -1,0 +1,75 @@
+{
+  "_comment": [
+    "Milestone 3: the mapping written by hand, in the exact shape 2.5 specifies",
+    "for Resolver output. Nothing downstream knows it was not learned, so the",
+    "Resolver drops into this slot at Milestone 5 without touching the executor.",
+    "target_label values are the labels the Page Scanner reports for v0_base."
+  ],
+  "variant": "v0_base",
+  "sheet": {
+    "path": "data/sheets/grade_sheet.xlsx",
+    "sheet_name": "SUMMARY",
+    "header_row": 11,
+    "key_column": "STUDENT NUMBER"
+  },
+  "assignments": [
+    {
+      "source_header": "PROGRAM",
+      "target_label": "Course",
+      "score": 1.0,
+      "margin": 1.0,
+      "status": "auto"
+    },
+    {
+      "source_header": "YEAR LEVEL",
+      "target_label": "Year 1-5",
+      "score": 1.0,
+      "margin": 1.0,
+      "status": "auto"
+    },
+    {
+      "source_header": "FINAL GRADE",
+      "target_label": "Grade 0-100",
+      "score": 1.0,
+      "margin": 1.0,
+      "status": "auto"
+    }
+  ],
+  "derived_rules": [
+    {
+      "field": "Remarks",
+      "kind": "threshold",
+      "depends_on_field": "Grade 0-100",
+      "operator": ">=",
+      "cutoff": 75,
+      "if_true": "Passed",
+      "if_false": "Failed",
+      "observed_interval": [74, 75],
+      "status": "confirmed"
+    }
+  ],
+  "unmapped_fields": [
+    "Recommendations optional"
+  ],
+  "unmapped_columns": [
+    "No.",
+    "NAME OF STUDENT",
+    "MIDTERM",
+    "FINAL"
+  ],
+  "control_fields": [
+    "Select"
+  ],
+  "row_alignment": {
+    "_comment": [
+      "The sheet portal prints Student ID and Student Name rather than",
+      "accepting them as input, so STUDENT NUMBER is no longer a mappable",
+      "column - it is the key that aligns a sheet row to a portal row, and",
+      "NAME OF STUDENT verifies that alignment instead of being filled."
+    ],
+    "key_column": "STUDENT NUMBER",
+    "key_field": "Student ID",
+    "verify_column": "NAME OF STUDENT",
+    "verify_field": "Student Name"
+  }
+}

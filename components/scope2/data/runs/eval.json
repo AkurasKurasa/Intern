@@ -1,0 +1,393 @@
+{
+  "v0_base": {
+    "string": {
+      "mapped_correct": 0,
+      "mapped_total": 3,
+      "mapped_wrong": [
+        "PROGRAM->abstained (want course)",
+        "YEAR LEVEL->abstained (want year)",
+        "FINAL GRADE->abstained (want grade)"
+      ],
+      "abstain_correct": 5,
+      "abstain_total": 5,
+      "abstention_precision": 1.0,
+      "abstention_recall": 1.0
+    },
+    "cosine": {
+      "mapped_correct": 1,
+      "mapped_total": 3,
+      "mapped_wrong": [
+        "PROGRAM->abstained (want course)",
+        "YEAR LEVEL->abstained (want year)"
+      ],
+      "abstain_correct": 5,
+      "abstain_total": 5,
+      "abstention_precision": 1.0,
+      "abstention_recall": 1.0
+    },
+    "matcher": {
+      "mapped_correct": 3,
+      "mapped_total": 3,
+      "mapped_wrong": [],
+      "abstain_correct": 5,
+      "abstain_total": 5,
+      "abstention_precision": 1.0,
+      "abstention_recall": 1.0
+    },
+    "matcher-noPos": {
+      "mapped_correct": 3,
+      "mapped_total": 3,
+      "mapped_wrong": [],
+      "abstain_correct": 5,
+      "abstain_total": 5,
+      "abstention_precision": 1.0,
+      "abstention_recall": 1.0
+    }
+  },
+  "v1_reordered": {
+    "string": {
+      "mapped_correct": 0,
+      "mapped_total": 3,
+      "mapped_wrong": [
+        "PROGRAM->abstained (want course)",
+        "YEAR LEVEL->abstained (want year)",
+        "FINAL GRADE->abstained (want grade)"
+      ],
+      "abstain_correct": 5,
+      "abstain_total": 5,
+      "abstention_precision": 1.0,
+      "abstention_recall": 1.0
+    },
+    "cosine": {
+      "mapped_correct": 1,
+      "mapped_total": 3,
+      "mapped_wrong": [
+        "PROGRAM->abstained (want course)",
+        "YEAR LEVEL->abstained (want year)"
+      ],
+      "abstain_correct": 5,
+      "abstain_total": 5,
+      "abstention_precision": 1.0,
+      "abstention_recall": 1.0
+    },
+    "matcher": {
+      "mapped_correct": 1,
+      "mapped_total": 3,
+      "mapped_wrong": [
+        "PROGRAM->abstained (want course)",
+        "YEAR LEVEL->abstained (want year)"
+      ],
+      "abstain_correct": 5,
+      "abstain_total": 5,
+      "abstention_precision": 1.0,
+      "abstention_recall": 1.0
+    },
+    "matcher-noPos": {
+      "mapped_correct": 3,
+      "mapped_total": 3,
+      "mapped_wrong": [],
+      "abstain_correct": 5,
+      "abstain_total": 5,
+      "abstention_precision": 1.0,
+      "abstention_recall": 1.0
+    }
+  },
+  "v2_relabeled": {
+    "string": {
+      "mapped_correct": 0,
+      "mapped_total": 3,
+      "mapped_wrong": [
+        "PROGRAM->abstained (want course)",
+        "YEAR LEVEL->abstained (want year)",
+        "FINAL GRADE->abstained (want grade)"
+      ],
+      "abstain_correct": 5,
+      "abstain_total": 5,
+      "abstention_precision": 1.0,
+      "abstention_recall": 1.0
+    },
+    "cosine": {
+      "mapped_correct": 1,
+      "mapped_total": 3,
+      "mapped_wrong": [
+        "PROGRAM->abstained (want course)",
+        "FINAL GRADE->abstained (want grade)"
+      ],
+      "abstain_correct": 5,
+      "abstain_total": 5,
+      "abstention_precision": 1.0,
+      "abstention_recall": 1.0
+    },
+    "matcher": {
+      "mapped_correct": 2,
+      "mapped_total": 3,
+      "mapped_wrong": [
+        "FINAL GRADE->abstained (want grade)"
+      ],
+      "abstain_correct": 4,
+      "abstain_total": 5,
+      "abstention_precision": 0.8,
+      "abstention_recall": 0.8
+    },
+    "matcher-noPos": {
+      "mapped_correct": 2,
+      "mapped_total": 3,
+      "mapped_wrong": [
+        "FINAL GRADE->abstained (want grade)"
+      ],
+      "abstain_correct": 4,
+      "abstain_total": 5,
+      "abstention_precision": 0.8,
+      "abstention_recall": 0.8
+    }
+  },
+  "v3_extra_fields": {
+    "string": {
+      "mapped_correct": 0,
+      "mapped_total": 3,
+      "mapped_wrong": [
+        "PROGRAM->abstained (want course)",
+        "YEAR LEVEL->abstained (want year)",
+        "FINAL GRADE->abstained (want grade)"
+      ],
+      "abstain_correct": 5,
+      "abstain_total": 5,
+      "abstention_precision": 1.0,
+      "abstention_recall": 1.0
+    },
+    "cosine": {
+      "mapped_correct": 1,
+      "mapped_total": 3,
+      "mapped_wrong": [
+        "PROGRAM->abstained (want course)",
+        "YEAR LEVEL->abstained (want year)"
+      ],
+      "abstain_correct": 5,
+      "abstain_total": 5,
+      "abstention_precision": 1.0,
+      "abstention_recall": 1.0
+    },
+    "matcher": {
+      "mapped_correct": 0,
+      "mapped_total": 3,
+      "mapped_wrong": [
+        "PROGRAM->abstained (want course)",
+        "YEAR LEVEL->abstained (want year)",
+        "FINAL GRADE->abstained (want grade)"
+      ],
+      "abstain_correct": 4,
+      "abstain_total": 5,
+      "abstention_precision": 0.6667,
+      "abstention_recall": 0.8
+    },
+    "matcher-noPos": {
+      "mapped_correct": 2,
+      "mapped_total": 3,
+      "mapped_wrong": [
+        "PROGRAM->abstained (want course)"
+      ],
+      "abstain_correct": 4,
+      "abstain_total": 5,
+      "abstention_precision": 0.6667,
+      "abstention_recall": 0.8
+    }
+  },
+  "v4_unassociated": {
+    "string": {
+      "mapped_correct": 0,
+      "mapped_total": 3,
+      "mapped_wrong": [
+        "PROGRAM->abstained (want course)",
+        "YEAR LEVEL->abstained (want year)",
+        "FINAL GRADE->abstained (want grade)"
+      ],
+      "abstain_correct": 5,
+      "abstain_total": 5,
+      "abstention_precision": 1.0,
+      "abstention_recall": 1.0
+    },
+    "cosine": {
+      "mapped_correct": 1,
+      "mapped_total": 3,
+      "mapped_wrong": [
+        "PROGRAM->abstained (want course)",
+        "YEAR LEVEL->abstained (want year)"
+      ],
+      "abstain_correct": 5,
+      "abstain_total": 5,
+      "abstention_precision": 1.0,
+      "abstention_recall": 1.0
+    },
+    "matcher": {
+      "mapped_correct": 0,
+      "mapped_total": 3,
+      "mapped_wrong": [
+        "PROGRAM->abstained (want course)",
+        "YEAR LEVEL->abstained (want year)",
+        "FINAL GRADE->abstained (want grade)"
+      ],
+      "abstain_correct": 4,
+      "abstain_total": 5,
+      "abstention_precision": 0.8,
+      "abstention_recall": 0.8
+    },
+    "matcher-noPos": {
+      "mapped_correct": 2,
+      "mapped_total": 3,
+      "mapped_wrong": [
+        "YEAR LEVEL->abstained (want year)"
+      ],
+      "abstain_correct": 5,
+      "abstain_total": 5,
+      "abstention_precision": 1.0,
+      "abstention_recall": 1.0
+    }
+  },
+  "v5_near_duplicates": {
+    "string": {
+      "mapped_correct": 0,
+      "mapped_total": 3,
+      "mapped_wrong": [
+        "PROGRAM->abstained (want course)",
+        "YEAR LEVEL->abstained (want year)",
+        "FINAL GRADE->abstained (want grade)"
+      ],
+      "abstain_correct": 5,
+      "abstain_total": 5,
+      "abstention_precision": 1.0,
+      "abstention_recall": 1.0
+    },
+    "cosine": {
+      "mapped_correct": 0,
+      "mapped_total": 3,
+      "mapped_wrong": [
+        "PROGRAM->abstained (want course)",
+        "YEAR LEVEL->abstained (want year)",
+        "FINAL GRADE->abstained (want grade)"
+      ],
+      "abstain_correct": 5,
+      "abstain_total": 5,
+      "abstention_precision": 1.0,
+      "abstention_recall": 1.0
+    },
+    "matcher": {
+      "mapped_correct": 0,
+      "mapped_total": 3,
+      "mapped_wrong": [
+        "PROGRAM->abstained (want course)",
+        "YEAR LEVEL->abstained (want year)",
+        "FINAL GRADE->abstained (want grade)"
+      ],
+      "abstain_correct": 5,
+      "abstain_total": 5,
+      "abstention_precision": 1.0,
+      "abstention_recall": 1.0
+    },
+    "matcher-noPos": {
+      "mapped_correct": 1,
+      "mapped_total": 3,
+      "mapped_wrong": [
+        "YEAR LEVEL->year_enrolled (want year)",
+        "FINAL GRADE->abstained (want grade)"
+      ],
+      "abstain_correct": 5,
+      "abstain_total": 5,
+      "abstention_precision": 0.8333,
+      "abstention_recall": 1.0
+    }
+  },
+  "v6a_options": {
+    "string": {
+      "mapped_correct": 0,
+      "mapped_total": 3,
+      "mapped_wrong": [
+        "PROGRAM->abstained (want course)",
+        "YEAR LEVEL->abstained (want year)",
+        "FINAL GRADE->abstained (want grade)"
+      ],
+      "abstain_correct": 5,
+      "abstain_total": 5,
+      "abstention_precision": 1.0,
+      "abstention_recall": 1.0
+    },
+    "cosine": {
+      "mapped_correct": 1,
+      "mapped_total": 3,
+      "mapped_wrong": [
+        "PROGRAM->abstained (want course)",
+        "YEAR LEVEL->abstained (want year)"
+      ],
+      "abstain_correct": 5,
+      "abstain_total": 5,
+      "abstention_precision": 1.0,
+      "abstention_recall": 1.0
+    },
+    "matcher": {
+      "mapped_correct": 3,
+      "mapped_total": 3,
+      "mapped_wrong": [],
+      "abstain_correct": 5,
+      "abstain_total": 5,
+      "abstention_precision": 1.0,
+      "abstention_recall": 1.0
+    },
+    "matcher-noPos": {
+      "mapped_correct": 3,
+      "mapped_total": 3,
+      "mapped_wrong": [],
+      "abstain_correct": 5,
+      "abstain_total": 5,
+      "abstention_precision": 1.0,
+      "abstention_recall": 1.0
+    }
+  },
+  "v6b_scale": {
+    "string": {
+      "mapped_correct": 0,
+      "mapped_total": 3,
+      "mapped_wrong": [
+        "PROGRAM->abstained (want course)",
+        "YEAR LEVEL->abstained (want year)",
+        "FINAL GRADE->abstained (want grade)"
+      ],
+      "abstain_correct": 5,
+      "abstain_total": 5,
+      "abstention_precision": 1.0,
+      "abstention_recall": 1.0
+    },
+    "cosine": {
+      "mapped_correct": 1,
+      "mapped_total": 3,
+      "mapped_wrong": [
+        "PROGRAM->abstained (want course)",
+        "YEAR LEVEL->abstained (want year)"
+      ],
+      "abstain_correct": 5,
+      "abstain_total": 5,
+      "abstention_precision": 1.0,
+      "abstention_recall": 1.0
+    },
+    "matcher": {
+      "mapped_correct": 2,
+      "mapped_total": 3,
+      "mapped_wrong": [
+        "FINAL GRADE->abstained (want grade)"
+      ],
+      "abstain_correct": 5,
+      "abstain_total": 5,
+      "abstention_precision": 1.0,
+      "abstention_recall": 1.0
+    },
+    "matcher-noPos": {
+      "mapped_correct": 2,
+      "mapped_total": 3,
+      "mapped_wrong": [
+        "FINAL GRADE->abstained (want grade)"
+      ],
+      "abstain_correct": 5,
+      "abstain_total": 5,
+      "abstention_precision": 1.0,
+      "abstention_recall": 1.0
+    }
+  }
+}

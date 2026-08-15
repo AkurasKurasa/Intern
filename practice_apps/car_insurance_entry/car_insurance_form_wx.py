@@ -1,5 +1,5 @@
 """
-car_insurance_entry/car_insurance_form_wx.py
+practice_apps/car_insurance_entry/car_insurance_form_wx.py
 ============================================
 Car Insurance Data Entry Form — wxPython version.
 
@@ -7,7 +7,7 @@ wxPython uses native Windows controls so Windows UI Automation (UIA)
 exposes every field. Labels are always created before their corresponding
 controls so UIA auto-labeling assigns the correct Name to each field.
 
-Run with:  python car_insurance_entry/car_insurance_form_wx.py
+Run with:  python practice_apps/car_insurance_entry/car_insurance_form_wx.py
 """
 
 import wx

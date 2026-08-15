@@ -1,0 +1,52 @@
+{
+  "operator": {
+    "who": "Ralph",
+    "rpa_experience": "first time using an RPA tool"
+  },
+
+  "tool": {
+    "name": "Power Automate Desktop",
+    "version": null
+  },
+
+  "setup": {
+    "_note": "NOT MEASURED, and deliberately so. The flow was built by adding actions by hand with typed-in values, not by recording a demonstration, so it is not the same task this project's system performs. A setup-time comparison would not be like-for-like and is not reported.",
+    "human_demonstration_seconds": null,
+    "configuration_seconds": null,
+    "time_to_first_verified_row_seconds": null
+  },
+
+  "baseline_run": {
+    "_note": "The flow fills one student's row on v0_base. Not a 50-row run.",
+    "variant": "v0_base",
+    "rows_attempted": 1,
+    "rows_filled_correctly": null
+  },
+
+  "after_ui_change": {
+    "_note": "THIS IS THE RESULT. Same flow, unedited, pointed at each variant.",
+    "v1_reordered": {
+      "rows_filled_correctly": null,
+      "outcome": null
+    },
+    "v2_relabeled": {
+      "rows_filled_correctly": null,
+      "outcome": null
+    },
+    "v4_unassociated": {
+      "rows_filled_correctly": null,
+      "outcome": null
+    }
+  },
+
+  "reconfiguration": {
+    "v1_reordered_seconds": null,
+    "v2_relabeled_seconds": null,
+    "v4_unassociated_seconds": null
+  },
+
+  "notes": [
+    "Power Automate's auto-generated selector for the Remarks dropdown was 'tbody[Id=\"records-body\"] > tr > td > select[Name=\"remarks\"]'. The 'tr' has no row qualifier, so it matched all 50 rows and set every student to Passed in one action, with no error or warning - despite a unique id being present on the element that was captured.",
+    "Re-capturing the element regenerated the same ambiguous selector every time. Targeting a single row required editing the selector by hand."
+  ]
+}

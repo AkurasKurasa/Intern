@@ -48,7 +48,7 @@ SUBMISSIONS_DIR = ROOT / "data" / "output" / "submissions"
 _SKIP_FIELDS = {"_timestamp", "policy_number", "policy_status"}
 
 # Tab prefix → tab name mapping. Matches the real 8-tab wx form structure
-# (car_insurance_entry/car_insurance_form_wx.py) confirmed directly 2026-08-11
+# (practice_apps/car_insurance_entry/car_insurance_form_wx.py) confirmed directly 2026-08-11
 # while fixing scope1_tab_order -- there is no "Driver 1" tab (the
 # Policyholder IS the primary driver, ph_* fields), Driver 2 and Driver 3 are
 # two sections inside ONE "Drivers" tab (not two separate tabs), "disc_"
