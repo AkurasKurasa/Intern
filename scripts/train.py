@@ -5,9 +5,9 @@ Trains (or retrains) the TransformerAgentNetwork from recorded trace sessions.
 
 Usage
 -----
-    python train.py                                   # defaults
-    python train.py --trace_dir data/output/traces/live --epochs 50
-    python train.py --epochs 100 --batch_size 32 --device cpu
+    python scripts/train.py                                   # defaults
+    python scripts/train.py --trace_dir data/output/traces/live --epochs 50
+    python scripts/train.py --epochs 100 --batch_size 32 --device cpu
 
 Arguments
 ---------
@@ -34,7 +34,7 @@ import sys
 faulthandler.enable()  # print C-level traceback on segfault/SIGABRT
 
 # ── resolve paths so imports work from the project root ────────────────────────
-_ROOT = os.path.dirname(os.path.abspath(__file__))
+_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _COMP = os.path.join(_ROOT, "components")
 for _p in (_ROOT, _COMP):
     if _p not in sys.path:

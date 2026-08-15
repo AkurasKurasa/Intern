@@ -2,7 +2,7 @@
 Analyze video_state_sample.mp4 and generate a trace sequence.
 """
 import sys, os
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'components', 'trace_translator'))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(__file__)), 'components', 'trace_translator'))
 
 import cv2
 from trace_translator import TraceTranslator

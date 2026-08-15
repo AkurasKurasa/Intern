@@ -5,14 +5,14 @@ Records a human filling the form as (UI state, action) trace pairs.
 Output is identical to what _export_run_traces writes — train.py reads it directly.
 
 Usage:
-    python demo_recorder.py
+    python scripts/demo_recorder.py
 
 Controls:
     F9  — start / stop recording (toggle)
     F10 — save current session and quit
 
 Traces saved to: data/demos/human/session_<timestamp>/
-Train with:      python train.py --trace_dir data/demos/human --epochs 50
+Train with:      python scripts/train.py --trace_dir data/demos/human --epochs 50
 """
 
 from __future__ import annotations
@@ -31,7 +31,7 @@ try:
 except Exception:
     pass
 
-_ROOT = os.path.dirname(os.path.abspath(__file__))
+_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _COMP = os.path.join(_ROOT, "components")
 for _p in (_ROOT, _COMP):
     if _p not in sys.path:
@@ -271,7 +271,7 @@ def main():
             print("\n  Saving and quitting...")
             out = _save_session()
             print(f"\n  Done. {len(_steps)} steps saved to:\n  {out}")
-            print(f"\n  Train with:\n  python train.py --trace_dir data/demos/human --epochs 50\n")
+            print(f"\n  Train with:\n  python scripts/train.py --trace_dir data/demos/human --epochs 50\n")
             mouse_listener.stop()
             keyboard_listener.stop()
 

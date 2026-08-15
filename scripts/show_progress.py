@@ -43,7 +43,7 @@ def main():
     print("=" * 72)
     if not train_log:
         print("  No training runs recorded yet.")
-        print("  Run:  python train.py --trace_dir data/demos/human --epochs 50")
+        print("  Run:  python scripts/train.py --trace_dir data/demos/human --epochs 50")
     else:
         print(f"  {'#':<3}  {'Date':<19}  {'Samples':>8}  {'val_loss':>9}  {'val_acc':>8}  {'click_acc':>10}  {'Data source'}")
         print(f"  {'-'*3}  {'-'*19}  {'-'*8}  {'-'*9}  {'-'*8}  {'-'*10}  {'-'*30}")

@@ -5,7 +5,7 @@ and produce a diff visualization showing what changed.
 import json
 import os
 import sys
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'components', 'trace_translator'))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(__file__)), 'components', 'trace_translator'))
 
 from trace_translator import TraceTranslator
 from PIL import Image, ImageDraw, ImageFont

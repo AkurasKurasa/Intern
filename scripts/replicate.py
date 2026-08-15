@@ -2,15 +2,15 @@
 replicate.py — copy a recorded session N times (terminal, no GUI).
 
 Usage:
-    python replicate.py                 # newest session in data/demos/policy_clicks x10
-    python replicate.py <session_dir>   # that session x10
-    python replicate.py <session_dir> <count>
+    python scripts/replicate.py                 # newest session in data/demos/policy_clicks x10
+    python scripts/replicate.py <session_dir>   # that session x10
+    python scripts/replicate.py <session_dir> <count>
 """
 from __future__ import annotations
 import os, sys, glob, json, shutil
 from datetime import datetime
 
-_ROOT = os.path.dirname(os.path.abspath(__file__))
+_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(_ROOT, "components"))
 sys.path.insert(0, _ROOT)
 

@@ -6,13 +6,13 @@ as a named WorkflowCapsule so the agent loads it automatically.
 
 Usage
 -----
-  python build_capsule.py --name form_filling \
+  python scripts/build_capsule.py --name form_filling \
       --trace_dir tasks/form_filling/traces \
       --keywords "form,fill,insurance,data entry" \
       --apps "Car Insurance" \
       --description "Fill GUI forms from a data source"
 
-  python build_capsule.py --list          # show all registered capsules
+  python scripts/build_capsule.py --list          # show all registered capsules
 """
 
 from __future__ import annotations
@@ -22,7 +22,7 @@ import os
 import sys
 from datetime import datetime
 
-_ROOT = os.path.dirname(os.path.abspath(__file__))
+_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _COMP = os.path.join(_ROOT, "components")
 for _p in (_ROOT, _COMP):
     if _p not in sys.path:

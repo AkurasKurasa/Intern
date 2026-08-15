@@ -3,12 +3,12 @@ Quick script to generate a trace from trace_sample.png
 """
 import sys
 import os
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'components', 'trace_translator'))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(__file__)), 'components', 'trace_translator'))
 
 from trace_translator import TraceTranslator
 
 IMAGE_PATH = r"C:\Users\paula\OneDrive\Desktop\trace_sample.png"
-OUTPUT_PATH = os.path.join(os.path.dirname(__file__), 'data', 'output', 'traces', 'trace_sample_trace.json')
+OUTPUT_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data', 'output', 'traces', 'trace_sample_trace.json')
 
 translator = TraceTranslator(use_cv=True)
 

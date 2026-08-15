@@ -4,7 +4,7 @@ run_agent.py
 Entry point for running the LLMAgent on a live task.
 
 Run from the repo root in your own terminal (NOT via Claude Code):
-    python run_agent.py
+    python scripts/run_agent.py
 """
 
 from __future__ import annotations
@@ -21,7 +21,7 @@ import os
 import sys
 
 # ── path setup ────────────────────────────────────────────────────────────────
-_ROOT     = os.path.dirname(os.path.abspath(__file__))
+_ROOT     = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _COMP_DIR = os.path.join(_ROOT, "components")
 for _p in (_ROOT, _COMP_DIR):
     if _p not in sys.path:

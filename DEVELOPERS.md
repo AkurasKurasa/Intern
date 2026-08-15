@@ -147,7 +147,7 @@ The full loop for teaching Intern a task from human demonstrations.
 │     → model LEARNS to submit (no hardcoded completion rule). │
 │                      ↓                                      │
 │   STEP 3 — TRAIN                                            │
-│     python train.py --trace_dir <dir> --epochs 80 \         │
+│     python scripts/train.py --trace_dir <dir> --epochs 80 \ │
 │       --d_model 128 --num_layers 4 --dim_feedforward 256    │
 │     Trains TransformerAgentNetwork. Best checkpoint on       │
 │     (val_acc + click_acc).                                   │
@@ -324,11 +324,26 @@ scripts/
   augment_traces.py          Dataset augmentation (jitter)
   eval_metrics.py            TCR / field / value accuracy
   bc_fidelity.py             BC fidelity score vs gold standard
-run_task.py                  Agent entrypoint (transformer + LLM)
-replicate.py                 Duplicate a recorded session N× (terminal)
-train.py                     BC training entrypoint
-build_capsule.py             Package model + metadata into capsule
+  replicate.py               Duplicate a recorded session N× (terminal)
+  train.py                   BC training entrypoint
+  build_capsule.py           Package model + metadata into capsule
+  demo_recorder.py           Human demonstration recorder
+  record_trace.py            ScreenObserver launcher
+  run_agent.py                Generic LLMAgent entrypoint (older, more
+                              general than run_task.py — see its own note)
+  run_transformer.py         Transformer-only agent runner (no LLM)
+run_task.py                  Agent entrypoint (transformer + LLM) — the
+                              one script kept at repo root, run most often
 ```
+
+Every other root-level `.py` utility (`replicate.py`, `train.py`,
+`build_capsule.py`, `demo_recorder.py`, `record_trace.py`, `run_agent.py`,
+`run_transformer.py`, plus the trace/video diagnostics `analyze_video.py`,
+`generate_trace.py`, `generate_two_state_trace.py`,
+`generate_s1_s3_trace.py`, `inspect_diff.py`, `inspect_text_changes.py`,
+`visualize_trace.py`) moved into `scripts/` 2026-08-15, direct request
+("so many .py scripts [at root]... let's not do that"). `run_task.py`
+stays at root — the one script actually run most often, by far.
 
 ---
 
@@ -1498,6 +1513,14 @@ framework.
   **Confirmed correct end-to-end, same day.** The user asked to close PID 29192 directly ("Close whatever that is") after it turned out to still be alive despite an earlier intent to close it — confirmed via `Get-CimInstance` it was still the identical process before touching it, then `Stop-Process -Id 29192 -Force` (exact PID, not a name-based kill — this project has a documented history of a name-based `Stop-Process -Force` accidentally killing an unrelated Notepad window; targeting the exact confirmed PID avoided repeating that). A fresh live run immediately before the kill had already independently proven the diagnosability fix itself: it logged the real `err=1409` (not the old `err=0`) for the exact same contention. After the kill, `tests/test_emergency_stop_hotkey.py`'s real end-to-end test — the one that actually presses Ctrl+Alt+K via synthetic input against a spawned child process — passed clean: **4 passed**, confirming the failsafe now arms and force-kills correctly with no contention.
 
   Same live-run session also gave the tab-coverage fix its first real, non-synthetic confirmation: the user ran `scripts/recording_quality_gate.py` themselves and got a genuine per-tab report (avg 7.0/8 tabs covered across the 4 clean sessions, up from the earlier 4.0/8 reading now that all 4 clean sessions are being read correctly) — real numbers, not the old vacuous defaults, on the user's own terminal.
+
+- [x] `execution_root_directory_cleanup` — **2026-08-15, direct request** ("look at the root directory of our codebase with so many .py scripts, let's not do that and organize them under the scripts folder but keep the main most frequent script in the root directory"). 15 `.py` files sat at repo root; `run_task.py` (the actual live-run entry point, referenced constantly all session, the one script `run_task.py`'s own status bar and every log tonight is named after) is unambiguously "the main most frequent script" — kept in place. The other 14 (`train.py`, `build_capsule.py`, `demo_recorder.py`, `record_trace.py`, `replicate.py`, `run_agent.py`, `run_transformer.py`, plus the video/trace diagnostics `analyze_video.py`, `generate_trace.py`, `generate_two_state_trace.py`, `generate_s1_s3_trace.py`, `inspect_diff.py`, `inspect_text_changes.py`, `visualize_trace.py`) moved into `scripts/`.
+
+  **Real breakage found and fixed, not assumed safe**: every moved file that resolves its own repo root via `os.path.dirname(os.path.abspath(__file__))` (or the equivalent inline `os.path.dirname(__file__)` in the four video/trace scripts) was silently computing `scripts/` instead of the real root the moment it moved — a wrong root breaks every path built from it (`.env`, `components/`, `data/`, model checkpoints) without raising an obvious error. Matched the fix to the convention `scripts/objectives_report.py` already established (`Path(__file__).resolve().parent.parent`) — added one more `os.path.dirname(...)`/`.parent` to each of the 10 affected files, then verified by actually evaluating each computed root against the real one (not just reading the diff) — all 10 confirmed correct.
+
+  Also fixed: every `python <name>.py` usage instruction across the 14 files (several cross-reference each other, e.g. `demo_recorder.py`'s own docstring pointing at `record_trace.py`) and the one current-usage mention in this file's own Quick Start / pipeline diagram — historical incident entries elsewhere in this file that happen to mention one of these filenames were left untouched, same "don't rewrite the audit trail" principle as the `car_insurance_entry` move. `run_agent.py` — found to be a genuine second, older, more generic `LLMAgent` entry point (no `INSURANCE_SCOPE`/`disable_transformer` wiring, unlike `run_task.py`) rather than dead code — moved, not deleted, and noted honestly in the Repository Layout as older/more general.
+
+  No test imports any of the 14 by module name (checked directly, not assumed) — the only risk was the path-resolution bug above, now fixed and verified. Full suite: 1157 passed, 9 skipped, 0 failed — identical to before the move.
 
 ---
 

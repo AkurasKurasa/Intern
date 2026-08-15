@@ -6,7 +6,7 @@ Run this script to start recording your screen, mouse, and keyboard.
 Press Ctrl+C at any time to stop.  A trace JSON will be saved automatically.
 
 Usage:
-    python record_trace.py [options]
+    python scripts/record_trace.py [options]
 
 Options:
     --output    Output directory for trace JSONs  (default: data/output/traces/live)
@@ -16,9 +16,9 @@ Options:
     --duration  Auto-stop after N seconds         (optional, default: manual Ctrl+C)
 
 Examples:
-    python record_trace.py
-    python record_trace.py --interval 2 --type excel --output data/output/traces/excel
-    python record_trace.py --duration 30
+    python scripts/record_trace.py
+    python scripts/record_trace.py --interval 2 --type excel --output data/output/traces/excel
+    python scripts/record_trace.py --duration 30
 """
 
 import argparse
@@ -26,7 +26,7 @@ import sys
 import os
 
 # ── make sure the project root is on the path ─────────────────────────────────
-_ROOT = os.path.dirname(os.path.abspath(__file__))   # Intern/
+_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))   # Intern/
 _COMP = os.path.join(_ROOT, "components")             # components/
 for _p in (_ROOT, _COMP):
     if _p not in sys.path:

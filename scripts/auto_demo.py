@@ -236,7 +236,7 @@ class AutoDemoRunner:
                 time.sleep(1.0)
 
         print(f"\nDone. {self.sessions} sessions, {total} total steps saved to data/demos/human/")
-        print(f"Next: python train.py --trace_dir data/demos/human --epochs 50")
+        print(f"Next: python scripts/train.py --trace_dir data/demos/human --epochs 50")
 
 
 # ── CLI ───────────────────────────────────────────────────────────────────────

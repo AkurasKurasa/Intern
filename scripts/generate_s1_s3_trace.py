@@ -3,7 +3,7 @@ Generate a two-state trace from state_1.png -> state_3.png
 and produce a diff visualization.
 """
 import sys, os, json
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'components', 'trace_translator'))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(__file__)), 'components', 'trace_translator'))
 
 from trace_translator import TraceTranslator
 from PIL import Image, ImageDraw, ImageFont, ImageChops

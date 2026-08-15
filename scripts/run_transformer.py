@@ -5,8 +5,8 @@ Uses the trained BC checkpoint to fill forms autonomously.
 No API calls, no rate limits — runs fully locally.
 
 Usage:
-    python run_transformer.py
-    python run_transformer.py --steps 80 --delay 1.0 --dry_run
+    python scripts/run_transformer.py
+    python scripts/run_transformer.py --steps 80 --delay 1.0 --dry_run
 """
 
 from __future__ import annotations
@@ -24,7 +24,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger("run_transformer")
 
-_ROOT = os.path.dirname(os.path.abspath(__file__))
+_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _COMP = os.path.join(_ROOT, "components")
 _MODEL_DIR = os.path.join(_COMP, "intelligence", "model")
 for _p in (_ROOT, _COMP, _MODEL_DIR):
