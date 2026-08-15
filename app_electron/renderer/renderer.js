@@ -282,21 +282,27 @@ async function loadCapsuleIntoSlot(capsule) {
   ppCapsuleName.textContent = capsule.name;
   ppSlot.classList.add("filled");
 
-  // Script-kind capsules (e.g. Scope #2) have no swappable .pt checkpoint --
-  // there's nothing to list or deploy, so the whole Checkpoint control is
-  // hidden and the meta line shows exactly what Play will actually run
-  // instead, so clicking it is never a surprise.
-  if (capsule.kind === "script") {
+  // A script-kind capsule (e.g. Scope #2) may or may not have a real,
+  // swappable checkpoint -- Scope #2's matcher.pt is a genuine trained
+  // artifact with a load path (automate.py --matcher), so it gets the
+  // Checkpoint control just like an agent-kind capsule does. Whether the
+  // control shows is decided by "does this capsule have a model_path at
+  // all," not by kind -- a script-kind capsule with no checkpoint (nothing
+  // to swap) still hides it, same as before.
+  const runsSummary = capsule.kind === "script"
+    ? `runs ${capsule.entrypoint} ${(capsule.args || []).join(" ")}`.trim()
+    : "";
+
+  if (!capsule.model_path) {
     ppCheckpointGroup.hidden = true;
-    const argsText = (capsule.args || []).join(" ");
-    ppCapsuleMeta.textContent =
-      `${capsule.description || ""} — runs ${capsule.entrypoint} ${argsText}`.trim();
+    ppCapsuleMeta.textContent = [capsule.description, runsSummary].filter(Boolean).join(" — ");
     setCapsuleRunning(false);
     return;
   }
 
   ppCheckpointGroup.hidden = false;
-  ppCapsuleMeta.textContent = capsule.description || capsule.model_path;
+  ppCapsuleMeta.textContent = [capsule.description || capsule.model_path, runsSummary]
+    .filter(Boolean).join(" — ");
   ppCheckpoint.disabled = true;
   ppCheckpoint.innerHTML = '<option>Loading…</option>';
   btnDeploy.hidden = true;

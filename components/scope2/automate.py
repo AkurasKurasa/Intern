@@ -38,6 +38,7 @@ from executor.scanner import KIND_INPUT, scan_variants  # noqa: E402
 from executor.sheet_reader import read_sheet  # noqa: E402
 from features import encoders  # noqa: E402
 from features.extractor import FEATURE_NAMES  # noqa: E402
+from model.matcher import load as load_matcher  # noqa: E402
 from model.train import build_dataset, score_matrix, train  # noqa: E402
 from resolver.assign import BUCKET_DERIVED, resolve  # noqa: E402
 from rules.induce_from_session import induce_from_session  # noqa: E402
@@ -65,6 +66,9 @@ def main():
     ap.add_argument("--sheet", type=Path, default=SHEET)
     ap.add_argument("--session", type=Path, default=SESSION,
                     help="the recorded demonstration to learn from")
+    ap.add_argument("--matcher", type=Path, default=None,
+                    help="load a previously trained matcher instead of training "
+                         "one fresh from --session (see model/train.py --out)")
     ap.add_argument("--commit", action="store_true",
                     help="actually save; the default is a dry run")
     ap.add_argument("--limit", type=int, default=None,
@@ -119,8 +123,14 @@ def main():
 
     # ---------------------------------------------------------------- 3
     banner(4, "Matching columns to fields")
-    examples, _, _ = build_dataset(args.session, "v0_base", args.sheet)
-    model, _ = train(examples, feature_mask=FEATURE_MASK)
+    if args.matcher:
+        model, artifact = load_matcher(args.matcher)
+        meta = artifact.get("metadata", {})
+        print(f"  loaded {args.matcher.name} ({meta.get('examples', '?')} examples, "
+              f"final loss {meta.get('final_loss', float('nan')):.4f})")
+    else:
+        examples, _, _ = build_dataset(args.session, "v0_base", args.sheet)
+        model, _ = train(examples, feature_mask=FEATURE_MASK)
 
     scorable = [f for f in fields if f.label not in derived_labels]
     matrix = score_matrix(model, columns, scorable, FEATURE_MASK)

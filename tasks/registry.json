@@ -22,7 +22,7 @@
     {
       "name": "Sheet-to-Portal Matcher",
       "description": "Match spreadsheet columns to web-portal fields automatically, induce any derived-value rules, then fill and verify every row (Scope #2)",
-      "model_path": "",
+      "model_path": "components/scope2/data/models/matcher.pt",
       "trigger_keywords": [],
       "trigger_apps": [],
       "trace_dir": "",
@@ -31,6 +31,7 @@
       "kind": "script",
       "entrypoint": "components/scope2/automate.py",
       "args": ["--variant", "v0_base", "--commit", "--show", "--limit", "5"],
+      "checkpoint_flag": "--matcher",
       "cwd": ""
     }
   ]

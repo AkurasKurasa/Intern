@@ -41,6 +41,14 @@ class WorkflowCapsule:
     entrypoint:       str = ""              # relative path to a .py script (kind="script")
     args:             List[str] = field(default_factory=list)
     cwd:              str = ""              # relative to repo root; "" = repo root
+    # A kind="script" capsule can ALSO have a real, swappable checkpoint
+    # (e.g. Scope #2's matcher.pt) -- checkpoint_flag names the CLI flag
+    # the entrypoint uses to accept it (e.g. "--matcher"). Left "" for a
+    # script capsule with no such checkpoint. Resolved dynamically from
+    # model_path at launch time (not baked into `args`) so that deploying
+    # a different checkpoint via the UI actually changes what the next
+    # Play run uses.
+    checkpoint_flag:  str = ""
 
     def launch_command(self, repo_root: str) -> tuple[list[str], str]:
         """Return (argv, cwd) to Popen for this capsule.
@@ -56,6 +64,12 @@ class WorkflowCapsule:
             if not os.path.isfile(entrypoint_abs):
                 raise FileNotFoundError(f"Entry point not found: {entrypoint_abs}")
             argv = [sys.executable, "-u", entrypoint_abs] + list(self.args)
+            if self.checkpoint_flag and self.model_path:
+                abs_model = self.model_path if os.path.isabs(self.model_path) \
+                    else os.path.join(repo_root, self.model_path)
+                if not os.path.isfile(abs_model):
+                    raise FileNotFoundError(f"Checkpoint not found: {abs_model}")
+                argv += [self.checkpoint_flag, abs_model]
             cwd = os.path.join(repo_root, self.cwd) if self.cwd else repo_root
             return argv, cwd
 
@@ -95,10 +109,21 @@ class CapsuleRegistry:
 
     def route(self, goal: str, window_title: str,
               fallback: str = "tasks/form_filling/model.pt") -> str:
-        """Return model_path for best matching capsule, or fallback."""
+        """Return model_path for best matching capsule, or fallback.
+
+        Only ever considers kind="agent" capsules -- a script-kind capsule's
+        model_path (if any, e.g. Scope #2's matcher.pt) is a checkpoint for
+        a completely different model shape, never a BC transformer
+        checkpoint LLMAgent could load. Enforced here structurally, not
+        just by convention (empty trigger_keywords/trigger_apps), so a
+        future script capsule that happens to declare real triggers still
+        can't be routed into LLMAgent by mistake.
+        """
         goal_lower  = goal.lower()
         title_lower = window_title.lower()
         for capsule in self._capsules:
+            if capsule.kind != "agent":
+                continue
             if any(k in goal_lower  for k in capsule.trigger_keywords):
                 return capsule.model_path
             if any(a.lower() in title_lower for a in capsule.trigger_apps):

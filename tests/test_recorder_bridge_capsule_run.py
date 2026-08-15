@@ -62,11 +62,12 @@ def _agent_capsule(name, model_path):
     )
 
 
-def _script_capsule(name, entrypoint, args=None, cwd=""):
+def _script_capsule(name, entrypoint, args=None, cwd="", model_path="", checkpoint_flag=""):
     return WorkflowCapsule(
-        name=name, description="Sheet matcher", model_path="",
+        name=name, description="Sheet matcher", model_path=model_path,
         trigger_keywords=[], trigger_apps=[],
         kind="script", entrypoint=entrypoint, args=args or [], cwd=cwd,
+        checkpoint_flag=checkpoint_flag,
     )
 
 
@@ -361,6 +362,29 @@ class TestRunScriptCapsule:
         assert len(started) == 1
         assert "sheet_matcher" in started[0]["label"]
         assert "automate.py" in started[0]["label"]
+
+    def test_checkpoint_flag_flows_through_to_the_real_popen_argv(self, monkeypatch, tmp_path):
+        """End-to-end proof (not just launch_command() in isolation) that a
+        script capsule's checkpoint_flag + model_path -- Scope #2's actual
+        registry shape -- reaches the real Popen call via the bridge. Uses
+        the real, already-trained components/scope2/data/models/matcher.pt
+        (same trust in rb._ROOT as every other test in this class)."""
+        checkpoint_rel = "components/scope2/data/models/matcher.pt"
+        registry = _registry(tmp_path, _script_capsule(
+            "sheet_matcher", self.ENTRYPOINT, args=["--variant", "v0_base"],
+            model_path=checkpoint_rel, checkpoint_flag="--matcher",
+        ))
+        bridge = rb.Bridge(registry=registry)
+        popen_calls = []
+        monkeypatch.setattr(rb.subprocess, "Popen", lambda a, **k: (popen_calls.append((a, k)), _FakeProc(lines=[]))[1])
+        monkeypatch.setattr(rb, "emit", lambda *a, **k: None)
+
+        bridge.run_capsule("sheet_matcher")
+
+        assert len(popen_calls) == 1
+        argv, kwargs = popen_calls[0]
+        assert argv[-2] == "--matcher"
+        assert argv[-1] == rb.os.path.join(rb._ROOT, checkpoint_rel)
 
 
 class TestStopCapsule:

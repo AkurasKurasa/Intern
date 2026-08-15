@@ -96,18 +96,21 @@ class TestScriptKindFieldDefaults:
         assert capsule.entrypoint == ""
         assert capsule.args == []
         assert capsule.cwd == ""
+        assert capsule.checkpoint_flag == ""
 
     def test_script_kind_fields_can_be_set_explicitly(self):
         capsule = WorkflowCapsule(
-            name="sheet_matcher", description="x", model_path="",
+            name="sheet_matcher", description="x", model_path="components/scope2/data/models/matcher.pt",
             trigger_keywords=[], trigger_apps=[],
             kind="script", entrypoint="components/scope2/automate.py",
             args=["--variant", "v0_base"], cwd="components/scope2",
+            checkpoint_flag="--matcher",
         )
         assert capsule.kind == "script"
         assert capsule.entrypoint == "components/scope2/automate.py"
         assert capsule.args == ["--variant", "v0_base"]
         assert capsule.cwd == "components/scope2"
+        assert capsule.checkpoint_flag == "--matcher"
 
     def test_loads_a_legacy_registry_entry_with_no_kind_key_at_all(self, tmp_path):
         registry_path = tmp_path / "registry.json"

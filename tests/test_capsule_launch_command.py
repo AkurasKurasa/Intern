@@ -31,11 +31,12 @@ def _agent_capsule(model_path):
     )
 
 
-def _script_capsule(entrypoint, args=None, cwd=""):
+def _script_capsule(entrypoint, args=None, cwd="", model_path="", checkpoint_flag=""):
     return WorkflowCapsule(
-        name="sheet_matcher", description="x", model_path="",
+        name="sheet_matcher", description="x", model_path=model_path,
         trigger_keywords=[], trigger_apps=[],
         kind="script", entrypoint=entrypoint, args=args or [], cwd=cwd,
+        checkpoint_flag=checkpoint_flag,
     )
 
 
@@ -111,6 +112,73 @@ class TestLaunchCommandScriptKind:
             assert "not found" in str(exc).lower()
 
 
+class TestLaunchCommandScriptKindWithCheckpoint:
+    """A script-kind capsule can ALSO have a real, swappable checkpoint
+    (e.g. Scope #2's matcher.pt, loaded via automate.py --matcher) --
+    checkpoint_flag names the CLI flag, resolved dynamically from
+    model_path at launch time so a Deploy in the UI actually changes what
+    the next Play run uses, not just cosmetic."""
+
+    def test_checkpoint_flag_appends_flag_and_resolved_path(self, tmp_path):
+        script = tmp_path / "automate.py"
+        script.write_text("# fake")
+        checkpoint = tmp_path / "matcher.pt"
+        checkpoint.write_bytes(b"fake")
+        capsule = _script_capsule(
+            "automate.py", args=["--variant", "v0_base"],
+            model_path=str(checkpoint), checkpoint_flag="--matcher",
+        )
+
+        argv, cwd = capsule.launch_command(str(tmp_path))
+
+        assert argv == [sys.executable, "-u", str(script),
+                         "--variant", "v0_base", "--matcher", str(checkpoint)]
+
+    def test_relative_model_path_resolved_against_repo_root(self, tmp_path):
+        (tmp_path / "components" / "scope2" / "data" / "models").mkdir(parents=True)
+        script = tmp_path / "components" / "scope2" / "automate.py"
+        script.write_text("# fake")
+        checkpoint = tmp_path / "components" / "scope2" / "data" / "models" / "matcher.pt"
+        checkpoint.write_bytes(b"fake")
+        capsule = _script_capsule(
+            "components/scope2/automate.py",
+            model_path="components/scope2/data/models/matcher.pt",
+            checkpoint_flag="--matcher",
+        )
+
+        argv, cwd = capsule.launch_command(str(tmp_path))
+
+        assert Path(argv[-1]).resolve() == checkpoint.resolve()
+
+    def test_raises_file_not_found_for_missing_checkpoint(self, tmp_path):
+        script = tmp_path / "automate.py"
+        script.write_text("# fake")
+        capsule = _script_capsule(
+            "automate.py", model_path=str(tmp_path / "nope.pt"), checkpoint_flag="--matcher",
+        )
+
+        try:
+            capsule.launch_command(str(tmp_path))
+            assert False, "expected FileNotFoundError"
+        except FileNotFoundError as exc:
+            assert "not found" in str(exc).lower()
+
+    def test_model_path_ignored_without_checkpoint_flag(self, tmp_path):
+        """Backward compatibility: a script-kind capsule that only sets
+        model_path (no checkpoint_flag) must behave exactly as before --
+        model_path is simply not used, not an error."""
+        script = tmp_path / "automate.py"
+        script.write_text("# fake")
+        capsule = _script_capsule(
+            "automate.py", args=["--variant", "v0_base"],
+            model_path=str(tmp_path / "nope.pt"), checkpoint_flag="",
+        )
+
+        argv, cwd = capsule.launch_command(str(tmp_path))
+
+        assert argv == [sys.executable, "-u", str(script), "--variant", "v0_base"]
+
+
 class TestRouteNeverReturnsAScriptCapsule:
     """route() is only ever meant to pick a .pt checkpoint for LLMAgent --
     a script-kind capsule has no such checkpoint, so it must never be
@@ -140,3 +208,21 @@ class TestRouteNeverReturnsAScriptCapsule:
         result = registry.route("fill the insurance form", "some window", fallback="fallback.pt")
 
         assert result == "tasks/form_filling/model.pt"
+
+    def test_kind_is_checked_structurally_even_with_real_triggers_set(self, tmp_path):
+        """route() must skip a script-kind capsule by kind, not merely by
+        convention (empty trigger lists) -- proven directly by giving a
+        script-kind capsule real triggers and a real model_path (Scope #2's
+        matcher.pt is exactly this shape now) and confirming route() still
+        never returns it."""
+        registry = CapsuleRegistry(registry_path=str(tmp_path / "registry.json"))
+        registry.register(WorkflowCapsule(
+            name="sheet_matcher", description="x", model_path="components/scope2/data/models/matcher.pt",
+            trigger_keywords=["sheet", "matcher"], trigger_apps=["Grade Portal"],
+            kind="script", entrypoint="components/scope2/automate.py",
+            checkpoint_flag="--matcher",
+        ))
+
+        result = registry.route("run the sheet matcher", "Grade Portal", fallback="fallback.pt")
+
+        assert result == "fallback.pt"
