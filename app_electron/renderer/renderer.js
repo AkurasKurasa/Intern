@@ -546,14 +546,25 @@ async function loadWorkflows() {
 
   workflowsListEl.innerHTML = "";
 
-  // Script-kind capsules (e.g. Scope #2's "Sheet-to-Portal Matcher") aren't
-  // tied to a recorded data/demos/ group at all -- they get their own leaf
-  // card here, rendered unconditionally, so they still show up even when
-  // there are zero recorded demo groups.
-  const scriptCapsules = capsulesCache.filter((c) => c.kind === "script");
-  scriptCapsules.forEach((capsule) => {
+  // Every registered capsule -- agent-kind (Scope #1) and script-kind
+  // (Scope #2) alike -- gets its own direct, clickable card here, shown
+  // unconditionally. Originally this only applied to script-kind capsules
+  // (they have no recorded data/demos/ group to hang a card off of at
+  // all), but an agent-kind capsule with zero recorded demo sessions was
+  // just as invisible for the same reason -- the workflow is fully
+  // runnable, it just never got its own card until a session existed.
+  // Direct user report: "Workflow section only shows sheet-to-portal" with
+  // an empty data/demos/ -- the car insurance capsule needs the same
+  // unconditional treatment, not a second-class one.
+  if (capsulesCache.length) {
+    const capsulesHead = document.createElement("h3");
+    capsulesHead.className = "wf-section-head";
+    capsulesHead.textContent = "Workflows";
+    workflowsListEl.appendChild(capsulesHead);
+  }
+  capsulesCache.forEach((capsule) => {
     const card = document.createElement("div");
-    card.className = "wf-group wf-group-script";
+    card.className = "wf-group wf-group-capsule";
 
     const head = document.createElement("div");
     head.className = "wf-group-head";
@@ -575,14 +586,23 @@ async function loadWorkflows() {
     workflowsListEl.appendChild(card);
   });
 
-  if (!groups || !groups.length) {
+  if (!capsulesCache.length && (!groups || !groups.length)) {
     const empty = document.createElement("p");
     empty.className = "muted";
-    empty.textContent = "No recorded workflows yet — start one from the Recorder tab.";
+    empty.textContent = "No workflows yet — register a capsule or start a recording from the Recorder tab.";
     workflowsListEl.appendChild(empty);
     workflowsLoaded = true;
     return;
   }
+  if (!groups || !groups.length) {
+    workflowsLoaded = true;
+    return;
+  }
+
+  const sessionsHead = document.createElement("h3");
+  sessionsHead.className = "wf-section-head";
+  sessionsHead.textContent = "Recorded sessions";
+  workflowsListEl.appendChild(sessionsHead);
 
   groups.forEach((g, gi) => {
     const card = document.createElement("div");

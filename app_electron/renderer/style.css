@@ -432,6 +432,11 @@ html, body {
    sessions aren't playable. The GROUP is the capsule unit -- clicking a
    group header both expands it and loads/flies its capsule into Play. */
 .workflows-list { display: flex; flex-direction: column; }
+.wf-section-head {
+  margin: 14px 0 2px; font-size: 11px; color: var(--dim);
+  text-transform: uppercase; letter-spacing: .04em; font-weight: 600;
+}
+.wf-section-head:first-child { margin-top: 4px; }
 .wf-group {
   border-bottom: 1px solid var(--border);
   padding: 10px 2px;
