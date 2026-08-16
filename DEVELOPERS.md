@@ -653,7 +653,36 @@ Decision-making / conditional behavior — the strongest personalization claim
 (two users triage differently). Kept to decisions inferable from *visible*
 content (avoid hidden-intent).
 
-- [ ] `scope3_email_triage` — Email / ticket triage. *requires: `execution_action_space_big3_2`, `execution_control_flow_big3_3`*
+**Concrete shape decided 2026-08-15**, direct request ("What's a better #3
+scope for this project? Something that involves an email" → "merge this with
+master, ... switch to master and replace the Scope section's number 3 with
+that"). Doesn't replace the existing "personalized judgment" framing above —
+gives it a concrete mechanism instead of leaving it abstract:
+
+An email arrives (a claim submission, a request, possibly with an attached
+spreadsheet or scanned form). The agent reads it and makes the *triage
+decision itself*, learned from how **this specific user** has handled similar
+emails before — not a fixed if/else script. The decision routes the email's
+content into whichever downstream pipeline actually applies: [Scope #1](#task-list)'s
+form-filler if it's structured data destined for a GUI form, [Scope #2](#task-list)'s
+sheet-matcher if it's a spreadsheet that needs mapping onto a portal, or a
+plain reply/forward/flag if it needs a human. Once the routed action
+completes, it emails a confirmation back.
+
+This is deliberately not just plumbing between Scope #1 and #2 (though it is
+also that, and forces the system-level integration between them that's been
+flagged as deferred work every time it's come up) — the actual thesis claim
+is the *routing decision itself*: two users with the same inbox would triage
+differently, and that difference is what gets cloned from demonstration, the
+same personalization claim Scope #1's navigation order already makes.
+
+Still genuinely blocked, not just formally: needs a real action vocabulary
+beyond click/type/select (reply, forward, flag, attach) and real
+branching/conditional execution, not a linear demonstrated path — both are
+exactly what Big Three #2 and #3 below exist to build. Nothing here changes
+that dependency.
+
+- [ ] `scope3_email_triage` — Email / ticket triage: reads an inbox, decides (from demonstrated user behavior) whether an incoming email routes to Scope #1's form-filler, Scope #2's sheet-matcher, or a human, executes that decision, and confirms back by email. *requires: `execution_action_space_big3_2`, `execution_control_flow_big3_3`*
 
 ---
 
@@ -1989,7 +2018,10 @@ one form."
    conditional behavior; the strongest personalization claim (two users triage
    differently). Needs branching ([Big Three #3](#task-list)) + judgment
    cloning. Kept to decisions inferable from *visible* content (avoid hidden-intent,
-   Fundamental roadblock A).
+   Fundamental roadblock A). Concrete shape (2026-08-15): an inbound email gets
+   routed, by demonstrated user judgment, into Scope #1's form-fill or Scope #2's
+   sheet-match pipeline (or neither), then confirmed by reply — the routing
+   decision is the actual claim, the Scope #1/#2 hookup is a side effect of it.
 
 ### North Star — generalization (beyond the thesis)
 The thesis is *bounded* to those three, but the **architecture is built to
