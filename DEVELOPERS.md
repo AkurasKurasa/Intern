@@ -654,16 +654,18 @@ Decision-making / conditional behavior — the strongest personalization claim
 content (avoid hidden-intent).
 
 **Concrete shape (2026-08-15)**: an email arrives, and the agent decides —
-based on how *this* user has handled similar emails before, not a fixed
-script — whether to route it to [Scope #1](#task-list)'s form-filler,
-[Scope #2](#task-list)'s sheet-matcher, or a person, then confirms by reply.
-The decision is the actual claim; connecting Scope #1 and #2 is a side effect.
+based on how *this* user has actually handled similar messages before, not a
+fixed script — what it needs: routed into [Scope #1](#task-list)'s
+form-filler, routed into [Scope #2](#task-list)'s sheet-matcher, replied to
+directly, forwarded, flagged for a person, or left alone. Then it confirms
+the outcome by reply. The decision itself is the actual claim; connecting
+Scope #1 and #2 is a side effect of it, not the point.
 
 Still blocked on Big Three #2 (action space) and #3 (control flow) — needs
 more actions than click/type/select, and real branching instead of one
 linear demonstrated path.
 
-- [ ] `scope3_email_triage` — Reads an inbox, routes each email to Scope #1, Scope #2, or a human based on demonstrated user behavior, confirms by reply. *requires: `execution_action_space_big3_2`, `execution_control_flow_big3_3`*
+- [ ] `scope3_email_triage` — Reads an inbox and, based on how this user has actually handled similar messages before, decides what each incoming email needs — routed into Scope #1's form-filler, routed into Scope #2's sheet-matcher, replied to directly, forwarded, flagged for a person, or left alone — then confirms the outcome by reply. *requires: `execution_action_space_big3_2`, `execution_control_flow_big3_3`*
 
 ---
 
@@ -1995,12 +1997,13 @@ one form."
    transfer (web source → Excel grid); 2D target; mixed perception. Excel
    perception swap **PROVEN** (`ExcelObserver` normalizes to canonical); remaining
    = web source, action on cells, demos, train.
-3. **Email / Ticket Triage** — *not started ([Scope #3](#task-list)).* An email
-   routes to Scope #1's form-fill, Scope #2's sheet-match, or a person, based
-   on demonstrated user judgment, then confirms by reply. Needs branching
-   ([Big Three #3](#task-list)) + judgment cloning. Kept to decisions
-   inferable from *visible* content (avoid hidden-intent, Fundamental
-   roadblock A).
+3. **Email / Ticket Triage** — *not started ([Scope #3](#task-list)).* Based on
+   demonstrated user judgment, an incoming email is routed to Scope #1's
+   form-fill, routed to Scope #2's sheet-match, replied to directly,
+   forwarded, flagged for a person, or left alone — then the outcome is
+   confirmed by reply. Needs branching ([Big Three #3](#task-list)) + judgment
+   cloning. Kept to decisions inferable from *visible* content (avoid
+   hidden-intent, Fundamental roadblock A).
 
 ### North Star — generalization (beyond the thesis)
 The thesis is *bounded* to those three, but the **architecture is built to
