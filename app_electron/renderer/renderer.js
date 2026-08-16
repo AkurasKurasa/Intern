@@ -26,18 +26,44 @@ const emptyState = document.getElementById("emptyState");
 const workflowsWrap = document.getElementById("workflowsWrap");
 const recorderPanel = document.getElementById("recorderPanel");
 const playPanel = document.getElementById("playPanel");
+const runningView = document.getElementById("runningView");
+const finishedView = document.getElementById("finishedView");
+const btnHomeStartRecording = document.getElementById("btnHomeStartRecording");
+const btnHomeBrowseTasks = document.getElementById("btnHomeBrowseTasks");
+const homeTaskCountEl = document.getElementById("homeTaskCount");
+const tasksCountLineEl = document.getElementById("tasksCountLine");
+
+// The three mutually-exclusive views inside the Tasks section (list of
+// tasks / a live run / the just-finished summary) -- separate from
+// showMain()'s Home-vs-Tasks split, since Running/Finished only make sense
+// once a capsule is loaded and playing. Passing "" hides all three, used
+// when leaving the Tasks section entirely (see showMain() below).
+function showTasksSubview(name) {
+  workflowsWrap.hidden = name !== "list";
+  runningView.hidden = name !== "running";
+  finishedView.hidden = name !== "finished";
+}
 
 function showMain(name) {
   const toHome = name === "home";
   emptyState.hidden = !toHome;
-  workflowsWrap.hidden = toHome;
   recorderPanel.hidden = !toHome;
   playPanel.hidden = toHome;
   navRecorder.classList.toggle("active", toHome);
   navWorkflows.classList.toggle("active", !toHome);
   navRecorder.setAttribute("aria-current", toHome ? "page" : "false");
   navWorkflows.setAttribute("aria-current", !toHome ? "page" : "false");
-  if (!toHome) loadWorkflows();
+  if (toHome) {
+    showTasksSubview("");
+    refreshTaskCount();
+  } else {
+    // A capsule already running (e.g. the user switched to Home mid-run
+    // and is coming back) should still show the running view, not reset
+    // to the list -- btnStopCapsule's disabled state is the single
+    // existing source of truth for "is a capsule running right now."
+    showTasksSubview(!btnStopCapsule.disabled ? "running" : "list");
+    loadWorkflows();
+  }
   // Tells main.js which mini overlay to show if the window gets
   // minimized from here -- recorder Start/Stop from Recorder, the round
   // Play/Stop widget from Workflows.
@@ -45,6 +71,8 @@ function showMain(name) {
 }
 navRecorder.addEventListener("click", () => showMain("home"));
 navWorkflows.addEventListener("click", () => showMain("workflows"));
+btnHomeStartRecording.addEventListener("click", () => btnStart.click());
+btnHomeBrowseTasks.addEventListener("click", () => navWorkflows.click());
 
 /* ── Recorder panel (always visible, right column) ────────────────────── */
 const statusDot   = document.getElementById("statusDot");
@@ -85,6 +113,10 @@ function setRecording(isRecording) {
   btnStop.disabled = !isRecording;
   statusDot.className = "dot" + (isRecording ? " recording" : "");
   statStatus.textContent = isRecording ? "Recording" : "Idle";
+  // Drives the Start button's ink -> clay swap in style.css -- recording
+  // shares the agent-control signal colour because the take being captured
+  // is what will later drive the agent.
+  recorderPanel.classList.toggle("is-recording", isRecording);
 }
 
 btnStart.addEventListener("click", () => {
@@ -135,6 +167,8 @@ window.recorderAPI.onEvent((event) => {
       break;
     case "capsule_started":
       hideCountdown();
+      wasUserStopped = false;
+      progressLineCount = 0;
       capsuleLog(`▶ Running — ${event.label}`, "ok");
       setCapsuleRunning(true);
       break;
@@ -143,10 +177,14 @@ window.recorderAPI.onEvent((event) => {
       break;
     case "capsule_done":
       hideCountdown();
+      stopElapsedTimer();
+      tbAgentPill.hidden = true;
       capsuleLog(`Run ended (exit code ${event.code}).`, event.code === 0 ? "ok" : "err");
       setCapsuleRunning(false);
+      showFinished(event.code);
       break;
     case "capsule_stopped":
+      wasUserStopped = true;
       capsuleLog("Stopping — saving partial results…", "dim");
       break;
     case "log":
@@ -159,6 +197,8 @@ window.recorderAPI.onEvent((event) => {
       capsuleLog(event.message, "err");
       setCapsuleRunning(false);
       hideCountdown();
+      stopElapsedTimer();
+      tbAgentPill.hidden = true;
       break;
     default:
       console.log("Unhandled event:", event);
@@ -197,6 +237,156 @@ const ppCountdownNumber = document.getElementById("ppCountdownNumber");
 const ppCountdownHint   = document.getElementById("ppCountdownHint");
 const btnCopyLog        = document.getElementById("btnCopyLog");
 const btnOpenLog        = document.getElementById("btnOpenLog");
+
+// ── Running / Finished views + the full-window Handover overlay ─────────
+// The overlay and the titlebar's "AGENT HAS CONTROL" pill both key off the
+// exact same COUNTDOWN_BEGIN/COUNTDOWN N/COUNTDOWN_END lines that already
+// drove #ppCountdown -- see handleCapsuleProgressLine() below -- so they
+// can never show something that isn't actually happening on the real
+// backend process.
+const tbAgentPill        = document.getElementById("tbAgentPill");
+const handoverOverlay    = document.getElementById("handoverOverlay");
+const handoverCountdownEl= document.getElementById("handoverCountdown");
+const handoverTaskNameEl = document.getElementById("handoverTaskName");
+const btnHandoverCancel  = document.getElementById("btnHandoverCancel");
+const btnTakeBackControl = document.getElementById("btnTakeBackControl");
+const runningElapsedEl   = document.getElementById("runningElapsed");
+const stepFeedEl         = document.getElementById("stepFeed");
+const finishedHeadlineEl = document.getElementById("finishedHeadline");
+const finishedBodyEl     = document.getElementById("finishedBody");
+const finishedDurationEl = document.getElementById("finishedDuration");
+const finishedLineCountEl= document.getElementById("finishedLineCount");
+const btnRunAgain        = document.getElementById("btnRunAgain");
+const btnBackToTasks     = document.getElementById("btnBackToTasks");
+
+let runStartedAt = null;
+let elapsedTimerId = null;
+let progressLineCount = 0;
+let wasUserStopped = false;
+
+function formatElapsed(ms) {
+  const s = Math.max(0, Math.floor(ms / 1000));
+  const mm = String(Math.floor(s / 60)).padStart(2, "0");
+  const ss = String(s % 60).padStart(2, "0");
+  return `${mm}:${ss}`;
+}
+function startElapsedTimer() {
+  runStartedAt = Date.now();
+  runningElapsedEl.textContent = "00:00";
+  elapsedTimerId = setInterval(() => {
+    runningElapsedEl.textContent = formatElapsed(Date.now() - runStartedAt);
+  }, 1000);
+}
+function stopElapsedTimer() {
+  if (elapsedTimerId) { clearInterval(elapsedTimerId); elapsedTimerId = null; }
+}
+
+// Appends a raw progress line to the step feed, neutral styling -- used
+// for anything prettifyProgressLine() below can't confidently classify.
+// The full verbatim transcript still lives in #capsuleLog either way; this
+// is an additive, friendlier rendering of the same stream, never a
+// replacement for it.
+function addStepFeedRaw(line) {
+  const row = document.createElement("div");
+  row.className = "step-feed-item";
+  const label = document.createElement("span");
+  label.className = "sf-label";
+  label.textContent = line;
+  const time = document.createElement("span");
+  time.className = "sf-time";
+  time.textContent = new Date().toLocaleTimeString();
+  row.appendChild(label);
+  row.appendChild(time);
+  stepFeedEl.appendChild(row);
+  stepFeedEl.scrollTop = stepFeedEl.scrollHeight;
+}
+
+// components/agent/agent.py logs "── Step N/MAX (K elements) ──" on every
+// live iteration -- MAX is run_task.py's MAX_STEPS ceiling (currently
+// 1000), not a real total (the actual step count is only known once a run
+// ends), so only the numerator is ever shown here. Never render "N of
+// MAX" -- it would read as a real progress fraction when it isn't one.
+const STEP_LINE_RE = /Step (\d+)\/\d+\s+\((\d+) elements\)/;
+
+function prettifyProgressLine(line) {
+  const match = STEP_LINE_RE.exec(line);
+  if (!match) {
+    addStepFeedRaw(line);
+    return;
+  }
+  const prevCurrent = stepFeedEl.querySelector(".step-feed-item.current");
+  if (prevCurrent) {
+    prevCurrent.classList.replace("current", "done");
+    prevCurrent.querySelector(".sf-icon").innerHTML =
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 13l4 4L19 7"/></svg>';
+  }
+  const row = document.createElement("div");
+  row.className = "step-feed-item current";
+  const icon = document.createElement("span");
+  icon.className = "sf-icon";
+  const label = document.createElement("span");
+  label.className = "sf-label";
+  label.dataset.stepLabel = `STEP ${match[1]}`;
+  label.textContent = `Looking at ${match[2]} elements on screen…`;
+  row.appendChild(icon);
+  row.appendChild(label);
+  stepFeedEl.appendChild(row);
+  stepFeedEl.scrollTop = stepFeedEl.scrollHeight;
+}
+
+function showFinished(code) {
+  finishedDurationEl.textContent = runStartedAt ? formatElapsed(Date.now() - runStartedAt) : "—";
+  finishedLineCountEl.textContent = String(progressLineCount);
+  if (wasUserStopped) {
+    finishedHeadlineEl.textContent = "Stopped — you have control again.";
+    finishedBodyEl.textContent = "Intern stopped partway through. Anything already typed or clicked stays as it was.";
+  } else if (code === 0) {
+    finishedHeadlineEl.textContent = "Finished — you have control again.";
+    finishedBodyEl.textContent = "Intern completed the task and handed control back to you.";
+  } else {
+    finishedHeadlineEl.textContent = "Stopped early — you have control again.";
+    finishedBodyEl.textContent = `Intern's run ended unexpectedly (exit code ${code}). Check the activity log below for details.`;
+  }
+  showTasksSubview("finished");
+}
+
+// Esc, "Take back control" (on the running banner) and "Cancel" (on the
+// handover overlay) all resolve to the exact same guarded path the
+// existing Stop button already uses, rather than calling
+// capsulesAPI.stop() directly -- one source of truth for "stop the run."
+function stopIfRunning() {
+  if (!btnStopCapsule.disabled) btnStopCapsule.click();
+}
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") stopIfRunning();
+});
+btnTakeBackControl.addEventListener("click", stopIfRunning);
+btnHandoverCancel.addEventListener("click", stopIfRunning);
+btnBackToTasks.addEventListener("click", () => showTasksSubview("list"));
+btnRunAgain.addEventListener("click", () => {
+  if (!currentCapsule) return;
+  window.capsulesAPI.run(currentCapsule.name);
+});
+
+// ── Home hero / Tasks header live counts ─────────────────────────────────
+// A "task" is anything the user can think of as one job Intern knows:
+// every registered capsule, plus any recorded data/demos/ group that
+// doesn't have a capsule yet (recorded but not yet trained/registered).
+async function computeTaskCount() {
+  let groups = [];
+  let capsules = [];
+  try { groups = await window.workflowsAPI.list(); } catch (e) { /* counted as 0 */ }
+  try { capsules = await window.capsulesAPI.list(); } catch (e) { /* counted as 0 */ }
+  const capsuleNames = new Set(capsules.map((c) => c.name));
+  const groupOnly = groups.filter((g) => !capsuleNames.has(g.name)).length;
+  return capsules.length + groupOnly;
+}
+async function refreshTaskCount() {
+  const n = await computeTaskCount();
+  homeTaskCountEl.textContent = `(${n})`;
+  tasksCountLineEl.textContent = `${n} TASK${n === 1 ? "" : "S"}`;
+}
+refreshTaskCount();
 
 const PLACEHOLDER_EMOJI = "🧩";
 
@@ -240,6 +430,15 @@ function handleCapsuleProgressLine(line) {
   if (line === "COUNTDOWN_BEGIN") {
     ppCountdown.hidden = false;
     countdownHintPending = true;
+    // The real handover moment: the process is about to click into the
+    // target window and start typing. Everything below is driven off this
+    // exact same event, not a separate client-side timer.
+    tbAgentPill.hidden = false;
+    handoverTaskNameEl.textContent = currentCapsule ? currentCapsule.name : "—";
+    handoverOverlay.hidden = false;
+    stepFeedEl.innerHTML = "";
+    showTasksSubview("running");
+    startElapsedTimer();
     return;
   }
   if (line === "COUNTDOWN_END") {
@@ -253,6 +452,10 @@ function handleCapsuleProgressLine(line) {
     ppCountdownNumber.classList.remove("pp-countdown-tick");
     void ppCountdownNumber.offsetWidth; // restart the animation on every tick
     ppCountdownNumber.classList.add("pp-countdown-tick");
+    handoverCountdownEl.textContent = tick[1];
+    handoverCountdownEl.classList.remove("pp-countdown-tick");
+    void handoverCountdownEl.offsetWidth;
+    handoverCountdownEl.classList.add("pp-countdown-tick");
     return;
   }
   if (countdownHintPending) {
@@ -260,10 +463,13 @@ function handleCapsuleProgressLine(line) {
     countdownHintPending = false;
   }
   capsuleLog(line, "dim");
+  progressLineCount += 1;
+  prettifyProgressLine(line);
 }
 
 function hideCountdown() {
   ppCountdown.hidden = true;
+  handoverOverlay.hidden = true;
 }
 
 function setCapsuleRunning(isRunning) {
@@ -583,7 +789,7 @@ async function loadWorkflows() {
   if (capsulesCache.length) {
     const capsulesHead = document.createElement("h3");
     capsulesHead.className = "wf-section-head";
-    capsulesHead.textContent = "Workflows";
+    capsulesHead.textContent = "Tasks";
     workflowsListEl.appendChild(capsulesHead);
   }
   capsulesCache.forEach((capsule) => {
@@ -613,19 +819,21 @@ async function loadWorkflows() {
   if (!capsulesCache.length && (!groups || !groups.length)) {
     const empty = document.createElement("p");
     empty.className = "muted";
-    empty.textContent = "No workflows yet — register a capsule or start a recording from the Recorder tab.";
+    empty.textContent = "No tasks yet — register a capsule or start a recording from the Recorder tab.";
     workflowsListEl.appendChild(empty);
     workflowsLoaded = true;
+    refreshTaskCount();
     return;
   }
   if (!groups || !groups.length) {
     workflowsLoaded = true;
+    refreshTaskCount();
     return;
   }
 
   const sessionsHead = document.createElement("h3");
   sessionsHead.className = "wf-section-head";
-  sessionsHead.textContent = "Recorded sessions";
+  sessionsHead.textContent = "Takes";
   workflowsListEl.appendChild(sessionsHead);
 
   groups.forEach((g, gi) => {
@@ -647,7 +855,7 @@ async function loadWorkflows() {
       card.classList.toggle("open");
       const capsule = findCapsuleForGroup(g.name);
       if (!capsule) {
-        capsuleLog(`No capsule registered yet for '${g.name}'.`, "dim");
+        capsuleLog(`No task registered yet for '${g.name}'.`, "dim");
         return;
       }
       workflowsListEl.querySelectorAll(".wf-group.capsule-selected")
@@ -683,6 +891,7 @@ async function loadWorkflows() {
     workflowsListEl.appendChild(card);
   });
   workflowsLoaded = true;
+  refreshTaskCount();
 }
 
 function escapeHtml(s) {

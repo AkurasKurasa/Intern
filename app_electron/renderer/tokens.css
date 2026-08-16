@@ -1,0 +1,80 @@
+/* ── Intern design tokens ─────────────────────────────────────────────────
+   Single source of truth for index.html, mini.html and mini-workflow.html.
+   "Editorial calm / quiet office instrument": one reserved signal colour
+   (clay) means "the agent has control of your mouse and keyboard" and
+   appears nowhere else in the product. Every other action is near-black
+   ink. Do not add new colour roles here without checking that rule first.
+
+   Archivo (headings/UI) + JetBrains Mono (numbers/timestamps/eyebrows) are
+   self-hosted as variable fonts (both SIL OFL) under ./fonts/ -- Google's
+   css2 endpoint serves the same physical woff2 per family regardless of
+   which static weight is requested, so each is declared once here with a
+   font-weight range rather than as separate per-weight files. */
+
+@font-face {
+  font-family: "Archivo";
+  src: url("fonts/archivo/archivo-variable.woff2") format("woff2");
+  font-weight: 400 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "JetBrains Mono";
+  src: url("fonts/jetbrains-mono/jetbrains-mono-variable.woff2") format("woff2");
+  font-weight: 400 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  /* surfaces */
+  --desk-bg: #F0EDE6;
+  --app-bg: #F7F5F0;
+  --card: #FFFFFF;
+  --sunk: #EDEAE2;
+  --rail: #EFECE5;
+
+  /* borders */
+  --border: #E2DED4;
+  --border-strong: #CFC9BC;
+  --border-hairline: #E9E5DC;
+
+  /* text / ink */
+  --ink: #16150F;
+  --text-secondary: #57534E;
+  --text-muted: #9A9488;
+  --text-faint: #B5AEA0;
+
+  /* clay -- agent-in-control states ONLY. Never use as a decorative accent. */
+  --clay: #B4441E;
+  --clay-hover: #933618;
+  --clay-tint-bg: #FFF3EE;
+  --clay-tint-border: #F0CBBB;
+  --clay-tint-text: #7C3A1E;
+
+  /* interactive accent -- hover-on-ink, selection state */
+  --accent-blue: #2E4A7D;
+  --accent-blue-tint-bg: #EAEFF7;
+  --accent-blue-tint-border: #C9D5E8;
+
+  /* status */
+  --success: #2F6B3A;
+  --error: #DC2626;
+
+  /* handover overlay (full-window, covers titlebar) */
+  --handover-bg: #14130F;
+  --handover-eyebrow: #E1795A;
+
+  /* type */
+  --font-ui: "Archivo", -apple-system, sans-serif;
+  --font-mono: "JetBrains Mono", Consolas, monospace;
+
+  /* shape */
+  --radius-sm: 8px;
+  --radius-lg: 12px;
+
+  /* motion */
+  --motion-blip: 1s;
+  --motion-pulse: 2s;
+  --motion-sweep: 2s;
+}

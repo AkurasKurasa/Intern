@@ -126,12 +126,12 @@ function createWindow() {
     height: 720,
     minWidth: 760,
     minHeight: 560,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "#F7F5F0",
     // Native min/max/close buttons stay native, but the strip they sit in
-    // (and its full width) paints orange instead of the default OS chrome.
+    // (and its full width) paints ink instead of the default OS chrome.
     titleBarStyle: "hidden",
     titleBarOverlay: {
-      color: "#F97316",
+      color: "#16150F",
       symbolColor: "#FFFFFF",
       height: 34,
     },
@@ -176,7 +176,7 @@ function createMiniWindow() {
     alwaysOnTop: true,
     skipTaskbar: true,
     frame: false,
-    backgroundColor: "#F6F6F4",
+    backgroundColor: "#F7F5F0",
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,

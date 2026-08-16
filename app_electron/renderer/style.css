@@ -1,50 +1,74 @@
-:root {
-  --orange: #F97316;
-  --orange-dark: #C2410C;
-  --orange-tint: #FFF1E7;
-  --white: #FFFFFF;
-  --page-bg: #F6F6F4;
-  --chip-bg: #EFEFEC;
-  --border: #EDEDED;
-  --border-strong: #E2E2E2;
-  --ink: #1C1917;
-  --dim: #8A8580;
-  --green: #16A34A;
-  --red: #DC2626;
-}
-
 * { box-sizing: border-box; }
 
 html, body {
   margin: 0;
   height: 100%;
-  background: var(--white);
+  background: var(--app-bg);
   color: var(--ink);
-  font-family: "Segoe UI", -apple-system, sans-serif;
+  font-family: var(--font-ui);
   font-size: 14px;
   overflow: hidden;
 }
+h1, h2, h3 { text-wrap: balance; }
+p { text-wrap: pretty; }
 
-/* ── Custom titlebar strip ────────────────────────────────────────────── */
-/* Matches the native titleBarOverlay color (main.js) so the whole top edge,
-   including the min/max/close button cluster the OS draws over the right
-   side, reads as one continuous orange bar. */
+.mono-eyebrow {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin: 0;
+}
+.mono-count { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+
+/* ── Titlebar — near-black ink strip. Matches main.js's titleBarOverlay
+   color so the native min/max/close cluster the OS draws over the right
+   side reads as one continuous strip. The clay "AGENT HAS CONTROL" pill is
+   the one place clay appears in chrome that's otherwise always visible --
+   deliberate, since it's the single most important thing to communicate
+   while it's true. ────────────────────────────────────────────────────── */
 .titlebar {
   height: 34px; flex: none;
-  background: var(--orange);
-  display: flex; align-items: center;
-  padding-left: 14px;
-  font-size: 12px; font-weight: 600; color: white; letter-spacing: .02em;
+  background: var(--ink);
+  display: flex; align-items: center; gap: 8px;
+  padding-left: 12px;
   -webkit-app-region: drag;
   user-select: none;
 }
+.tb-mark {
+  width: 18px; height: 18px; border-radius: 5px;
+  background: var(--app-bg); color: var(--ink);
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--font-mono); font-weight: 700; font-size: 11px;
+  flex: none;
+}
+.tb-label {
+  font-family: var(--font-mono); font-size: 11px; font-weight: 500;
+  letter-spacing: .12em; color: rgba(255,255,255,.82);
+}
+.tb-agent-pill {
+  display: flex; align-items: center; gap: 6px;
+  background: var(--clay); color: white;
+  border-radius: 999px; padding: 3px 10px 3px 8px;
+  font-family: var(--font-mono); font-size: 10px; font-weight: 600;
+  letter-spacing: .1em;
+  -webkit-app-region: no-drag;
+}
+.tb-agent-pill[hidden] { display: none; }
+.tb-agent-dot {
+  width: 6px; height: 6px; border-radius: 50%; background: white;
+  animation: blip var(--motion-blip) ease-in-out infinite;
+}
+@keyframes blip { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
 
-/* ── Splash / landing screen — flat orange, no glossy highlight, cute entry moment ── */
+/* ── Splash / landing screen ───────────────────────────────────────────── */
 .splash {
   position: fixed; top: 34px; left: 0; right: 0; bottom: 0; z-index: 50;
   display: flex; flex-direction: column; align-items: center; justify-content: center;
   gap: 10px;
-  background: linear-gradient(165deg, var(--orange) 0%, var(--orange-dark) 100%);
+  background: var(--handover-bg);
   color: white;
   transition: opacity .5s ease, visibility .5s ease;
 }
@@ -52,22 +76,23 @@ html, body {
 
 .splash-mark {
   position: relative;
-  width: 76px; height: 76px;
+  width: 72px; height: 72px;
   display: flex; align-items: center; justify-content: center;
   margin-bottom: 10px;
   animation: splashBounceIn .7s cubic-bezier(.34,1.56,.64,1) both,
              splashBob 2.6s ease-in-out 1s infinite;
 }
 .splash-i {
-  font-size: 32px; font-weight: 800; color: var(--orange-dark);
-  background: white; width: 100%; height: 100%; border-radius: 22px;
+  font-family: var(--font-mono);
+  font-size: 28px; font-weight: 700; color: var(--handover-bg);
+  background: white; width: 100%; height: 100%; border-radius: 18px;
   display: flex; align-items: center; justify-content: center;
-  box-shadow: 0 10px 24px rgba(0, 0, 0, .18);
+  box-shadow: 0 10px 24px rgba(0,0,0,.35);
 }
 .splash-ring {
   position: absolute; inset: -9px;
-  border: 1.5px solid rgba(255, 255, 255, .45);
-  border-radius: 28px;
+  border: 1.5px solid rgba(255,255,255,.28);
+  border-radius: 24px;
   animation: splashGlow 2.6s ease-in-out 1s infinite;
 }
 @keyframes splashBounceIn {
@@ -75,54 +100,44 @@ html, body {
   60%  { transform: scale(1.08); opacity: 1; }
   100% { transform: scale(1); opacity: 1; }
 }
-@keyframes splashBob {
-  0%, 100% { transform: translateY(0); }
-  50%      { transform: translateY(-6px); }
-}
-@keyframes splashGlow {
-  0%, 100% { transform: scale(1);   opacity: .5; }
-  50%      { transform: scale(1.1); opacity: .1; }
-}
+@keyframes splashBob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
+@keyframes splashGlow { 0%, 100% { transform: scale(1); opacity: .5; } 50% { transform: scale(1.1); opacity: .1; } }
 
 .splash-title {
-  margin: 0; font-size: 26px; font-weight: 700; letter-spacing: .01em; color: white;
+  margin: 0; font-size: 24px; font-weight: 700; letter-spacing: -.01em; color: white;
   animation: splashFade .6s ease .15s both;
 }
 .splash-tag {
-  margin: 0 0 18px; font-size: 13px; color: rgba(255,255,255,.85);
+  margin: 0 0 18px; font-size: 13px; color: rgba(255,255,255,.6);
   animation: splashFade .6s ease .3s both;
 }
-@keyframes splashFade {
-  from { opacity: 0; transform: translateY(6px); }
-  to   { opacity: 1; transform: none; }
-}
+@keyframes splashFade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 
-/* Three-dot bounce loader — small, simple, cute. */
 .splash-dots {
   display: flex; gap: 6px; height: 10px; align-items: flex-end;
   animation: splashFade .6s ease .4s both;
 }
 .splash-dots > i {
-  display: block; width: 7px; height: 7px; border-radius: 50%;
-  background: white;
+  display: block; width: 6px; height: 6px; border-radius: 50%;
+  background: rgba(255,255,255,.7);
   animation: splashDotBounce 1.1s ease-in-out infinite;
 }
 .splash-dots > i:nth-child(1) { animation-delay: 0s; }
 .splash-dots > i:nth-child(2) { animation-delay: .15s; }
 .splash-dots > i:nth-child(3) { animation-delay: .3s; }
 @keyframes splashDotBounce {
-  0%, 60%, 100% { transform: translateY(0);   opacity: .6; }
+  0%, 60%, 100% { transform: translateY(0); opacity: .5; }
   30%           { transform: translateY(-7px); opacity: 1; }
 }
 
 .splash-status {
-  margin: 10px 0 0; font-size: 11.5px; color: rgba(255,255,255,.8);
-  font-family: Consolas, monospace;
+  margin: 10px 0 0; font-size: 11px; color: rgba(255,255,255,.5);
+  font-family: var(--font-mono);
   animation: splashFade .6s ease .4s both;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .splash-mark, .splash-ring, .splash-dots > i { animation: none; }
+  .splash-mark, .splash-ring, .splash-dots > i, .tb-agent-dot { animation: none; }
 }
 
 /* ── Shell: icon rail | main area | recorder panel ────────────────────── */
@@ -137,72 +152,120 @@ html, body {
 .sidebar {
   flex: none;
   width: 60px;
-  background: var(--white);
+  background: var(--rail);
   border-right: 1px solid var(--border);
   display: flex; flex-direction: column; align-items: center;
   padding: 16px 0;
   gap: 8px;
 }
 .side-mark {
-  width: 32px; height: 32px; border-radius: 9px;
-  background: var(--white); color: var(--orange);
-  border: 1.5px solid var(--orange);
+  width: 30px; height: 30px; border-radius: 8px;
+  background: var(--card); color: var(--ink);
+  border: 1px solid var(--border-strong);
   display: flex; align-items: center; justify-content: center;
-  font-weight: 700; font-size: 14px;
+  font-family: var(--font-mono); font-weight: 700; font-size: 13px;
   margin-bottom: 12px;
 }
 .side-btn {
-  width: 40px; height: 40px; border-radius: 10px;
-  border: 1px solid transparent; background: transparent; color: var(--dim);
+  width: 40px; height: 40px; border-radius: var(--radius-sm);
+  border: 1px solid transparent; background: transparent; color: var(--text-muted);
   display: flex; align-items: center; justify-content: center;
   cursor: pointer;
-  transition: background .15s ease, color .15s ease, border-color .15s ease;
+  transition: background .15s ease, color .15s ease;
 }
-.side-btn:hover { background: var(--orange-tint); color: var(--orange-dark); }
-.side-btn.active { background: var(--orange-tint); color: var(--orange); border-color: var(--orange); }
-.side-btn:focus-visible { outline: 2px solid var(--orange); outline-offset: 2px; }
+.side-btn:hover { background: var(--sunk); color: var(--ink); }
+/* Active tab: solid ink square behind a white icon -- the one deliberately
+   heavy element in the rail, everything else stays quiet. */
+.side-btn.active { background: var(--ink); color: white; }
+.side-btn:focus-visible { outline: 2px solid var(--accent-blue); outline-offset: 2px; }
 
 .side-status {
   margin-top: auto;
-  width: 40px; height: 40px;
-  display: flex; align-items: center; justify-content: center;
+  width: 40px; height: 22px;
+  display: flex; align-items: center; justify-content: center; gap: 4px;
   border-top: 1px solid var(--border);
+  padding-top: 10px;
+  font-family: var(--font-mono); font-size: 9px; color: var(--text-muted); letter-spacing: .08em;
 }
-.side-status .dot { width: 8px; height: 8px; }
+.side-status .dot { width: 7px; height: 7px; }
 
-/* ── Main area — middle column, content TBD ───────────────────────────── */
+/* ── Main area ─────────────────────────────────────────────────────────── */
 .main-area {
   flex: 1;
   min-width: 0;
   position: relative;
   overflow: hidden;
-  background: var(--white);
+  background: var(--app-bg);
 }
 
+/* An author `display` rule always beats the browser's built-in
+   [hidden]{display:none} default regardless of specificity -- without
+   this, hidden panels stay stacked on top of each other no matter what
+   `hidden` is set to. Every view panel toggled via JS needs this pair. */
+.empty-state[hidden], .mid-panel[hidden] { display: none; }
+
+/* ── Home hero ─────────────────────────────────────────────────────────── */
 .empty-state {
   position: absolute; inset: 0;
-  display: flex; flex-direction: column; align-items: center; justify-content: center;
-  gap: 14px;
+  overflow-y: auto;
+  display: flex; flex-direction: column; align-items: center;
+  padding: 64px 32px 32px;
 }
-/* JS toggles visibility via the `hidden` attribute, but an author-stylesheet
-   `display` rule always beats the browser's built-in [hidden]{display:none}
-   default regardless of specificity — without this, both panels stayed
-   permanently stacked on top of each other no matter what `hidden` was set to. */
-.empty-state[hidden], .mid-panel[hidden] { display: none; }
-.empty-mark {
-  width: 52px; height: 52px; border-radius: 14px;
-  background: var(--chip-bg); color: var(--dim);
+.home-eyebrow { margin-bottom: 18px; }
+.home-headline {
+  margin: 0 0 10px; text-align: center;
+  font-size: 34px; font-weight: 700; letter-spacing: -.02em; line-height: 1.1;
+  max-width: 22ch;
+}
+.home-sub {
+  margin: 0 0 32px; text-align: center;
+  font-size: 14px; color: var(--text-secondary); max-width: 44ch;
+}
+.home-cards {
+  display: flex; gap: 16px; width: 100%; max-width: 620px; margin-bottom: 36px;
+}
+.home-card {
+  flex: 1;
+  background: var(--card); border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  display: flex; flex-direction: column; gap: 8px;
+}
+.home-card-num {
+  width: 24px; height: 24px; border-radius: 50%;
+  background: var(--sunk); color: var(--ink);
+  font-family: var(--font-mono); font-size: 12px; font-weight: 600;
   display: flex; align-items: center; justify-content: center;
-  font-weight: 700; font-size: 22px;
+  margin-bottom: 4px;
 }
-.empty-text { color: var(--dim); font-size: 13px; margin: 0; }
+.home-card h3 { margin: 0; font-size: 15px; font-weight: 600; }
+.home-card p { margin: 0 0 6px; font-size: 12.5px; color: var(--text-secondary); line-height: 1.5; }
+.home-card .btn { flex: none; align-self: flex-start; }
 
-.mid-panel { position: absolute; inset: 0; display: flex; flex-direction: column; padding: 18px 22px; }
-.mid-head {
-  display: flex; align-items: baseline; justify-content: space-between;
-  padding-bottom: 12px; margin-bottom: 14px; border-bottom: 1px solid var(--border-strong);
+.home-glossary {
+  width: 100%; max-width: 620px; margin: 0;
+  border: 1px solid var(--border); border-radius: var(--radius-lg);
+  overflow: hidden;
 }
-.mid-head h2 { margin: 0; font-size: 18px; }
+.home-glossary > div {
+  display: flex; gap: 14px; padding: 12px 16px;
+  border-bottom: 1px solid var(--border-hairline);
+}
+.home-glossary > div:last-child { border-bottom: none; }
+.home-glossary dt {
+  flex: none; width: 64px;
+  font-family: var(--font-mono); font-size: 11px; font-weight: 600;
+  letter-spacing: .1em; text-transform: uppercase; color: var(--ink);
+}
+.home-glossary dd { margin: 0; font-size: 12.5px; color: var(--text-secondary); }
+
+.mid-panel { position: absolute; inset: 0; display: flex; flex-direction: column; padding: 20px 24px; overflow-y: auto; }
+.mid-head {
+  display: flex; align-items: flex-end; justify-content: space-between;
+  padding-bottom: 14px; margin-bottom: 16px; border-bottom: 1px solid var(--border-strong);
+  flex: none;
+}
+.mid-head h2 { margin: 4px 0 0; font-size: 24px; font-weight: 700; letter-spacing: -.01em; }
 .mid-head-actions { display: flex; gap: 8px; flex: none; }
 .mid-body { flex: 1; min-height: 0; overflow-y: auto; }
 
@@ -210,100 +273,90 @@ html, body {
 .wf-create-form[hidden] { display: none; }
 .wf-create-form .field { flex: 1; }
 
-.hint { font-size: 11.5px; color: var(--dim); margin: 3px 0 0; }
+.hint { font-size: 11.5px; color: var(--text-muted); margin: 3px 0 0; }
 
-/* ── Recorder panel — small, rightmost, hidden while on Workflows ──────── */
-.recorder-panel {
+/* ── Recorder / Play panel — shared right-column shell ──────────────────── */
+.recorder-panel, .play-panel {
   flex: none;
-  width: 260px;
-  background: var(--page-bg);
+  width: 300px;
+  background: var(--rail);
   border-left: 1px solid var(--border-strong);
   display: flex; flex-direction: column;
   padding: 16px 16px 14px;
   gap: 10px;
   overflow: hidden;
 }
-/* Same override-[hidden] pattern as .empty-state/.mid-panel above --
-   an author `display` rule is needed for the attribute toggle to stick. */
-.recorder-panel[hidden] { display: none; }
-
-/* ── Play panel — same slot as the recorder panel, shown on Workflows ──── */
-.play-panel {
-  flex: none;
-  width: 260px;
-  background: var(--page-bg);
-  border-left: 1px solid var(--border-strong);
-  display: flex; flex-direction: column;
-  padding: 16px 16px 14px;
-  gap: 10px;
-}
-.play-panel[hidden] { display: none; }
+.recorder-panel[hidden], .play-panel[hidden] { display: none; }
 
 .pp-slot {
   min-height: 92px;
   border: 1.5px dashed var(--border-strong);
-  border-radius: 10px;
+  border-radius: var(--radius-sm);
   display: flex; align-items: center; justify-content: center;
   padding: 12px;
   transition: border-color .2s ease, background .2s ease;
 }
-.pp-slot.filled { border-style: solid; background: var(--white); }
-.pp-slot-hint { font-size: 11.5px; color: var(--dim); text-align: center; margin: 0; }
+.pp-slot.filled { border-style: solid; background: var(--card); }
+.pp-slot-hint { font-size: 11.5px; color: var(--text-muted); text-align: center; margin: 0; }
 
 .pp-capsule { display: flex; align-items: center; gap: 10px; width: 100%; }
 .pp-capsule-icon {
   width: 30px; height: 30px; border-radius: 50%; flex: none;
-  background: var(--orange-tint); color: var(--orange);
+  background: var(--sunk); color: var(--ink);
   display: flex; align-items: center; justify-content: center;
   font-size: 15px; line-height: 1;
   border: 1px solid transparent; padding: 0; cursor: pointer;
   transition: border-color .12s ease;
 }
-.pp-capsule-icon:hover { border-color: var(--orange); }
-/* Unset ("template") emoji -- gray chrome around the glyph. Note this can
-   only ever be the background/border: real emoji render via the OS's own
-   color emoji font, which ignores CSS `color`, so the glyph itself can't
-   be recolored either way -- gray or otherwise. */
-.pp-capsule-icon.is-placeholder { background: var(--chip-bg); color: var(--dim); }
-.pp-capsule-icon.is-placeholder:hover { border-color: var(--dim); }
+.pp-capsule-icon:hover { border-color: var(--ink); }
+.pp-capsule-icon.is-placeholder { background: var(--sunk); color: var(--text-muted); }
+.pp-capsule-icon.is-placeholder:hover { border-color: var(--text-muted); }
 .pp-capsule-text { display: flex; flex-direction: column; min-width: 0; gap: 1px; }
 .pp-capsule-name {
   font-size: 12.5px; font-weight: 600; color: var(--ink);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-.pp-capsule-meta { font-size: 10.5px; color: var(--dim); }
+.pp-capsule-meta { font-size: 10.5px; color: var(--text-muted); }
 
-/* Calm feedback for the panel updating -- no element travels across the
-   screen (tried twice, both read as too intense/uncomfortable even after
-   a proper FLIP implementation -- the discomfort was the travel itself,
-   not the easing or timing). Just a brief border/background pulse on the
-   slot, right where the user is already looking. */
+/* Arrival cue when a capsule flies into the slot -- accent-blue, not clay:
+   this is "you selected something," not "the agent has control." */
 @keyframes pp-slot-flash {
-  0%   { border-color: var(--orange); background: var(--orange-tint); }
-  100% { border-color: var(--border-strong); background: var(--white); }
+  0%   { border-color: var(--accent-blue); background: var(--accent-blue-tint-bg); }
+  100% { border-color: var(--border-strong); background: var(--card); }
 }
 .pp-slot.pp-slot-flash { animation: pp-slot-flash .5s ease; }
 
-/* Pre-run countdown -- deliberately a plain in-place number, not
-   anything that travels or scales far: the fly-to-Play animation
-   elsewhere in this file was dropped specifically because fast motion
-   covering real screen distance was uncomfortable to look at, even once
-   smoothly implemented. Each tick just gets a brief, small pulse --
-   opacity/scale settling back to rest within .3s -- nothing moves
-   position at all. */
+/* "This takes over your screen" -- the one static warning card between the
+   checkpoint picker and the countdown, always visible in the Play panel so
+   the stakes are read before Play is ever clicked, not just at the moment
+   of countdown. */
+.pp-warning {
+  background: var(--clay-tint-bg); border: 1px solid var(--clay-tint-border);
+  border-radius: var(--radius-sm); padding: 10px 12px;
+}
+.pp-warning strong { display: block; font-size: 12.5px; color: var(--clay-tint-text); margin-bottom: 3px; }
+.pp-warning p { margin: 0; font-size: 11.5px; color: var(--clay-tint-text); line-height: 1.5; }
+.pp-warning kbd {
+  font-family: var(--font-mono); font-size: 10.5px; background: white;
+  border: 1px solid var(--clay-tint-border); border-radius: 4px; padding: 1px 5px;
+}
+
+/* Pre-run countdown -- deliberately a plain in-place number, nothing that
+   travels or scales far. Clay here because this genuinely IS the moment
+   control is handing over. */
 .pp-countdown {
   display: flex; flex-direction: column; align-items: center; gap: 4px;
-  padding: 14px; border-radius: 10px;
-  background: var(--orange-tint); border: 1px solid var(--orange);
+  padding: 14px; border-radius: var(--radius-sm);
+  background: var(--clay-tint-bg); border: 1px solid var(--clay-tint-border);
 }
 .pp-countdown[hidden] { display: none; }
 .pp-countdown-hint {
   margin: 0; font-size: 11.5px; font-weight: 600;
-  color: var(--orange-dark); text-align: center;
+  color: var(--clay-tint-text); text-align: center;
 }
 .pp-countdown-number {
-  font-size: 34px; font-weight: 800; line-height: 1;
-  color: var(--orange); font-family: Consolas, monospace;
+  font-size: 34px; font-weight: 700; line-height: 1;
+  color: var(--clay); font-family: var(--font-mono);
 }
 @keyframes pp-countdown-tick {
   0%   { transform: scale(1.12); opacity: .55; }
@@ -311,16 +364,12 @@ html, body {
 }
 .pp-countdown-number.pp-countdown-tick { animation: pp-countdown-tick .3s ease; }
 
-/* Emoji picker -- "a section that displays all the available emojis" to
-   click, opened from .pp-capsule-icon. Positioned via inline left/top set
-   in JS (anchored just under the bubble that opened it), not CSS, since
-   the anchor point depends on where the panel actually is on screen. */
 .emoji-picker {
   position: fixed; z-index: 200;
   display: grid; grid-template-columns: repeat(6, 28px); gap: 4px;
-  background: var(--white); border: 1px solid var(--border-strong);
-  border-radius: 10px; padding: 8px;
-  box-shadow: 0 10px 28px rgba(28,25,23,.18);
+  background: var(--card); border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm); padding: 8px;
+  box-shadow: 0 10px 28px rgba(22,21,15,.18);
 }
 .emoji-picker-tile {
   width: 28px; height: 28px; border-radius: 7px;
@@ -329,112 +378,129 @@ html, body {
   font-size: 15px; line-height: 1; padding: 0; cursor: pointer;
   transition: background .1s ease, border-color .1s ease;
 }
-.emoji-picker-tile:hover { background: var(--chip-bg); border-color: var(--border-strong); }
+.emoji-picker-tile:hover { background: var(--sunk); border-color: var(--border-strong); }
 .emoji-picker-tile.is-placeholder {
-  background: var(--chip-bg); color: var(--dim);
+  background: var(--sunk); color: var(--text-muted);
   grid-column: 1 / -1; width: auto; justify-self: stretch;
 }
-.emoji-picker-tile.is-placeholder:hover { border-color: var(--dim); }
+.emoji-picker-tile.is-placeholder:hover { border-color: var(--text-muted); }
 
 .rp-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 2px; }
-.rp-head h2 { margin: 0; font-size: 14px; font-weight: 700; }
-.clock { font-family: Consolas, monospace; font-size: 10.5px; color: var(--dim); }
+.rp-head h2 {
+  margin: 0; font-size: 11px; font-weight: 500;
+  font-family: var(--font-mono); letter-spacing: .16em; text-transform: uppercase;
+  color: var(--text-muted);
+}
+.clock { font-family: var(--font-mono); font-size: 10.5px; color: var(--text-muted); }
 
 .rp-status {
   display: flex; align-items: center; gap: 7px;
-  background: var(--white); border: 1px solid var(--border-strong);
-  border-radius: 8px; padding: 7px 10px;
+  background: var(--card); border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm); padding: 7px 10px;
   font-size: 12.5px; font-weight: 600;
 }
 .rp-stats {
-  font-size: 11.5px; color: var(--dim); font-family: Consolas, monospace;
+  font-size: 11.5px; color: var(--text-muted); font-family: var(--font-mono);
   display: flex; align-items: baseline; gap: 4px;
 }
 .rp-stats span:first-child, .rp-stats span:nth-child(4) { color: var(--ink); font-weight: 600; }
 .rp-stats-label { margin-right: 2px; }
 .rp-sep { margin: 0 2px; }
-.rp-pending { margin-left: 6px; font-size: 11px; color: var(--orange); font-style: italic; }
+/* Deliberately not clay -- this is the human's own typing being captured,
+   not the agent taking control. */
+.rp-pending { margin-left: 6px; font-size: 11px; color: var(--text-muted); font-style: italic; }
 
-.field-label { display: block; font-size: 11px; color: var(--dim); margin: 2px 0 0; }
+.field-label { display: block; font-size: 11px; color: var(--text-muted); margin: 2px 0 0; }
 .field {
   width: 100%;
   padding: 7px 9px;
   border: 1px solid var(--border-strong);
   border-radius: 7px;
-  font-family: Consolas, monospace;
+  font-family: var(--font-mono);
   font-size: 11.5px;
   color: var(--ink);
-  background: var(--white);
+  background: var(--card);
 }
-.field:focus { outline: none; border-color: var(--orange); }
+.field:focus { outline: none; border-color: var(--ink); }
 
 .rp-btn-row { display: flex; gap: 8px; }
 .rp-replay { width: 100%; }
 .rp-hint { margin: 2px 0 0; }
 
-.rp-log-head { margin: 4px 0 0; font-size: 11px; color: var(--dim); text-transform: uppercase; letter-spacing: .04em; }
-.rp-log-head-row {
-  display: flex; align-items: center; justify-content: space-between;
-  margin: 4px 0 0;
-}
+.rp-log-head { margin: 4px 0 0; font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .08em; font-family: var(--font-mono); font-weight: 500; }
+.rp-log-head-row { display: flex; align-items: center; justify-content: space-between; margin: 4px 0 0; }
 .rp-log-head-row .rp-log-head { margin: 0; }
 .rp-log-actions { display: flex; gap: 4px; }
 .btn-icon {
-  border: 1px solid var(--border-strong); background: var(--white);
-  border-radius: 6px; width: 22px; height: 22px;
+  border: 1px solid var(--border-strong); background: var(--card);
+  border-radius: 6px; width: 24px; height: 24px;
   display: flex; align-items: center; justify-content: center;
-  font-size: 11px; line-height: 1; padding: 0; cursor: pointer;
+  padding: 0; cursor: pointer;
   transition: border-color .12s ease, background .12s ease;
 }
-.btn-icon:hover { border-color: var(--orange); background: var(--orange-tint); }
+.btn-icon:hover { border-color: var(--ink); background: var(--sunk); }
+.btn-icon svg { width: 13px; height: 13px; }
 .rp-section-head { margin-top: 10px; }
 
-.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--dim); display: inline-block; flex: none; }
-.dot.recording { background: var(--green); box-shadow: 0 0 6px var(--green); }
-.dot.error { background: var(--red); }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--text-muted); display: inline-block; flex: none; }
+/* Named clay explicitly (not just "active") -- while recording, the human
+   is being observed and the resulting take will later drive the agent, so
+   this dot shares the same signal colour as the agent-control states. */
+.dot.recording { background: var(--clay); box-shadow: 0 0 6px rgba(180,68,30,.5); animation: blip var(--motion-blip) ease-in-out infinite; }
+.dot.error { background: var(--error); }
 
 .log {
   flex: 1; min-height: 0;
   overflow-y: auto;
-  font-family: Consolas, monospace;
+  font-family: var(--font-mono);
   font-size: 10.5px;
-  line-height: 1.5;
+  line-height: 1.6;
 }
 .log-entry { margin-bottom: 6px; }
-.log-time { color: var(--dim); }
-.log-ok { color: var(--green); }
-.log-err { color: var(--red); }
-.log-dim { color: var(--dim); }
+.log-time { color: var(--text-faint); }
+.log-ok { color: var(--success); }
+.log-err { color: var(--error); }
+.log-dim { color: var(--text-secondary); }
 
+/* ── Buttons — ink is the only "primary" colour; clay is reserved for the
+   recording/running state swap below, never a default button skin. ────── */
 .btn {
   border: 1px solid transparent;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   padding: 8px 14px;
+  font-family: var(--font-ui);
   font-size: 12.5px;
   font-weight: 600;
   cursor: pointer;
-  transition: filter 0.12s ease, background .12s ease;
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  transition: filter .12s ease, background .12s ease, border-color .12s ease;
   flex: 1;
 }
-.btn:hover:not(:disabled) { filter: brightness(0.96); }
-.btn:disabled { opacity: 0.4; cursor: not-allowed; }
-.btn-primary { background: var(--orange); color: white; }
-.btn-danger { background: var(--white); color: var(--red); border-color: var(--red); }
-.btn-danger:not(:disabled):hover { background: #FDF2F2; }
-.btn-ghost { background: var(--white); color: var(--ink); border-color: var(--border-strong); }
+.btn:hover:not(:disabled) { filter: brightness(1.15); }
+.btn:disabled { opacity: .4; cursor: not-allowed; }
+.btn:focus-visible { outline: 2px solid var(--accent-blue); outline-offset: 2px; }
+.btn svg { width: 14px; height: 14px; flex: none; }
+.btn-primary { background: var(--ink); color: white; }
+.btn-danger { background: var(--card); color: var(--error); border-color: var(--error); }
+.btn-danger:not(:disabled):hover { background: #FDF2F2; filter: none; }
+.btn-ghost { background: var(--card); color: var(--ink); border-color: var(--border-strong); }
+.btn-outline { background: transparent; color: white; border-color: rgba(255,255,255,.35); }
+.btn-outline:not(:disabled):hover { background: rgba(255,255,255,.08); filter: none; }
 .btn-sm { padding: 6px 12px; font-size: 12px; flex: none; }
 
-.muted { color: var(--dim); font-size: 13px; line-height: 1.6; margin: 0; }
+/* Recorder Start button swaps ink -> clay while actually recording -- the
+   one place a PRIMARY button is allowed to be clay, because recording
+   really is "capturing the take that will drive the agent." */
+.recorder-panel.is-recording #btnStart { background: var(--clay); }
 
-/* ── Workflows list (shown in the main area) ────────────────────────────
-   Deliberately quiet: a plain list with thin dividers, not bordered/
-   shadowed "cards" — the sessions are reference data to skim, individual
-   sessions aren't playable. The GROUP is the capsule unit -- clicking a
-   group header both expands it and loads/flies its capsule into Play. */
+.muted { color: var(--text-muted); font-size: 13px; line-height: 1.6; margin: 0; }
+
+/* ── Tasks list ────────────────────────────────────────────────────────── */
 .workflows-list { display: flex; flex-direction: column; }
 .wf-section-head {
-  margin: 14px 0 2px; font-size: 11px; color: var(--dim);
-  text-transform: uppercase; letter-spacing: .04em; font-weight: 600;
+  margin: 14px 0 2px; font-size: 11px; color: var(--text-muted);
+  text-transform: uppercase; letter-spacing: .08em; font-weight: 500;
+  font-family: var(--font-mono);
 }
 .wf-section-head:first-child { margin-top: 4px; }
 .wf-group {
@@ -449,18 +515,28 @@ html, body {
   padding: 4px 6px; border-radius: 6px;
   transition: background .12s ease;
 }
-.wf-group-head:hover { background: var(--chip-bg); }
-.wf-group.capsule-selected .wf-group-head { background: var(--orange-tint); }
-.wf-group.capsule-selected .wf-group-head .name { color: var(--orange-dark); font-weight: 600; }
+.wf-group-head:hover { background: var(--sunk); }
+.wf-group.capsule-selected .wf-group-head { background: var(--accent-blue-tint-bg); }
+.wf-group.capsule-selected .wf-group-head .name { color: var(--accent-blue); font-weight: 600; }
+/* SELECTED chip -- pure CSS, no markup needed: the state is already the
+   `.capsule-selected` class toggled from renderer.js. */
+.wf-group.capsule-selected .wf-group-head .meta::after {
+  content: "SELECTED";
+  margin-left: 8px;
+  font-family: var(--font-mono); font-size: 9px; font-weight: 700; letter-spacing: .08em;
+  color: var(--accent-blue); background: var(--accent-blue-tint-bg);
+  border: 1px solid var(--accent-blue-tint-border);
+  border-radius: 4px; padding: 1px 5px;
+}
 .wf-group-head .name { font-size: 13px; font-weight: 500; color: var(--ink); }
-.wf-group-head .meta { font-size: 11px; color: var(--dim); }
-.wf-group-head .chev { font-size: 9px; color: var(--dim); margin-right: 6px; }
+.wf-group-head .meta { font-size: 11px; color: var(--text-muted); font-family: var(--font-mono); }
+.wf-group-head .chev { font-size: 9px; color: var(--text-muted); margin-right: 6px; }
 .wf-group-head .wf-emoji {
   margin-right: 6px; font-size: 13px;
   display: inline-flex; align-items: center; justify-content: center;
   width: 18px; height: 18px; border-radius: 5px;
 }
-.wf-group-head .wf-emoji.is-placeholder { background: var(--chip-bg); }
+.wf-group-head .wf-emoji.is-placeholder { background: var(--sunk); }
 
 .wf-sessions { margin-top: 8px; display: none; }
 .wf-group.open .wf-sessions { display: block; }
@@ -468,6 +544,110 @@ html, body {
   display: flex; align-items: center; justify-content: space-between;
   padding: 5px 0 5px 16px; font-size: 12px;
 }
-.wf-session .sname { color: var(--dim); }
-.wf-session .ssteps { color: var(--dim); font-size: 11px; }
+.wf-session .sname { color: var(--text-secondary); }
+.wf-session .ssteps { color: var(--text-muted); font-size: 11px; font-family: var(--font-mono); }
 .wf-empty-hint { padding: 4px 0 4px 16px; }
+
+/* ── Running view ─────────────────────────────────────────────────────── */
+.running-banner {
+  display: flex; align-items: center; gap: 14px;
+  background: var(--clay); color: white;
+  border-radius: var(--radius-lg);
+  padding: 14px 18px;
+  margin-bottom: 18px;
+  flex: none;
+}
+.running-banner-text { flex: 1; font-size: 13.5px; font-weight: 600; }
+.running-banner .mono-count { color: rgba(255,255,255,.85); font-size: 12px; }
+.running-banner .btn { flex: none; background: rgba(255,255,255,.14); color: white; border-color: rgba(255,255,255,.3); }
+.running-banner .btn:hover:not(:disabled) { background: rgba(255,255,255,.24); filter: none; }
+
+.step-feed { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; }
+.step-feed-item {
+  border: 1px solid var(--border); border-radius: var(--radius-sm);
+  padding: 10px 14px;
+  display: flex; align-items: center; gap: 10px;
+  background: var(--card);
+  font-size: 12.5px; color: var(--text-secondary);
+}
+.step-feed-item .sf-icon { flex: none; width: 16px; height: 16px; }
+.step-feed-item .sf-label { flex: 1; }
+.step-feed-item .sf-time { font-family: var(--font-mono); font-size: 10.5px; color: var(--text-faint); flex: none; }
+/* Current step -- the one clay-highlighted row, with a sweeping progress
+   bar along its bottom edge. There is no known total step count (the
+   backend can't provide one ahead of a run), so this is deliberately an
+   open-ended "what's happening right now" indicator, never a fake
+   "step N of TOTAL". */
+.step-feed-item.current {
+  position: relative; overflow: hidden;
+  border-color: var(--clay-tint-border); background: var(--clay-tint-bg);
+  font-weight: 600; color: var(--clay-tint-text);
+  padding-bottom: 12px;
+}
+.step-feed-item.current .sf-label::before {
+  content: attr(data-step-label); font-family: var(--font-mono); font-weight: 700; margin-right: 6px;
+}
+.step-feed-item.current::after {
+  content: ""; position: absolute; left: 0; bottom: 0; height: 2px; width: 40%;
+  background: var(--clay);
+  animation: sf-sweep var(--motion-sweep) ease-in-out infinite;
+}
+@keyframes sf-sweep {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(250%); }
+}
+.step-feed-item.done { color: var(--text-secondary); }
+.step-feed-item.done .sf-icon { color: var(--success); }
+
+/* ── Finished view ────────────────────────────────────────────────────── */
+.finished-summary {
+  flex: 1; display: flex; flex-direction: column; align-items: center;
+  justify-content: center; text-align: center; gap: 6px; padding-bottom: 24px;
+}
+.finished-check { width: 40px; height: 40px; color: var(--success); margin-bottom: 6px; }
+.finished-summary h2 { margin: 0 0 4px; font-size: 26px; font-weight: 700; letter-spacing: -.01em; }
+.finished-summary > p { margin: 0 0 18px; font-size: 13px; color: var(--text-secondary); max-width: 42ch; }
+.mono-facts {
+  display: flex; gap: 24px; margin: 0;
+  border-top: 1px solid var(--border); padding-top: 14px;
+}
+.mono-facts > div { display: flex; flex-direction: column; gap: 2px; }
+.mono-facts dt { font-family: var(--font-mono); font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: var(--text-muted); }
+.mono-facts dd { margin: 0; font-family: var(--font-mono); font-size: 15px; font-weight: 600; color: var(--ink); }
+
+/* ── Handover overlay — full window, covers the titlebar too. Its
+   countdown number is written from the SAME real COUNTDOWN N ticks that
+   drive .pp-countdown-number (see renderer.js) -- one real event, rendered
+   in two places, so it can never show something that isn't actually
+   happening. ─────────────────────────────────────────────────────────── */
+.handover-overlay {
+  position: fixed; inset: 0; z-index: 100;
+  background: var(--handover-bg); color: white;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 10px; text-align: center; padding: 24px;
+}
+.handover-overlay[hidden] { display: none; }
+.handover-eyebrow {
+  font-family: var(--font-mono); font-size: 11px; font-weight: 600; letter-spacing: .18em;
+  text-transform: uppercase; color: var(--handover-eyebrow); margin: 0 0 6px;
+}
+.handover-countdown {
+  font-family: var(--font-mono); font-size: 132px; font-weight: 700; line-height: 1;
+  color: white; font-variant-numeric: tabular-nums;
+}
+.handover-sentence { margin: 6px 0 0; font-size: 19px; max-width: 30ch; }
+.handover-facts { justify-content: center; border-top-color: rgba(255,255,255,.15); margin-top: 18px; }
+.handover-facts dt { color: rgba(255,255,255,.45); }
+.handover-facts dd { color: white; }
+#btnHandoverCancel { margin-top: 22px; padding: 10px 28px; }
+.handover-esc-hint { margin: 14px 0 0; font-size: 11.5px; color: rgba(255,255,255,.5); }
+.handover-esc-hint kbd {
+  font-family: var(--font-mono); font-size: 10.5px; background: rgba(255,255,255,.1);
+  border: 1px solid rgba(255,255,255,.25); border-radius: 4px; padding: 1px 6px;
+}
+@keyframes handover-tick { 0% { transform: scale(1.08); opacity: .6; } 100% { transform: scale(1); opacity: 1; } }
+.handover-countdown.pp-countdown-tick { animation: handover-tick .3s ease; }
+@media (prefers-reduced-motion: reduce) {
+  .step-feed-item.current::after, .dot.recording { animation: none; }
+  .handover-countdown.pp-countdown-tick { animation: none; }
+}
