@@ -27,6 +27,7 @@ import argparse
 import json
 import sys
 import tempfile
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -56,6 +57,39 @@ RULE = "-" * 74
 
 def banner(number, title):
     print(f"\n{RULE}\n {number}. {title}\n{RULE}")
+
+
+def _flush_safe_print(text: str) -> None:
+    """Write, then attempt-and-ignore the flush. When this script is
+    launched by the Electron app's Play button (app/recorder_bridge.py
+    spawns it with windowsHide=True, no console window), an explicit
+    stdout.flush() can raise OSError: [Errno 22] Invalid argument on
+    Windows even though the write itself already succeeded -- the same
+    failure run_task.py's own print_countdown() hit and fixed the same
+    way; this script gets spawned through the identical no-console chain,
+    so it needs the identical guard."""
+    print(text)
+    try:
+        sys.stdout.flush()
+    except OSError:
+        pass
+
+
+def print_countdown(seconds: int = 5) -> None:
+    """Pre-run countdown, mirroring run_task.py's own print_countdown() --
+    added for consistency between the two Electron workflows, even though
+    this script has no real window to click into (it drives its own
+    isolated browser, not the user's screen). COUNTDOWN_BEGIN/COUNTDOWN N/
+    COUNTDOWN_END are the exact sentinel lines the Play panel's
+    handleCapsuleProgressLine() already parses -- reusing them means the
+    existing countdown widget picks this up with zero changes on the
+    Electron side."""
+    _flush_safe_print("COUNTDOWN_BEGIN")
+    _flush_safe_print("Starting the matcher -- no window to click, it opens its own browser.")
+    for i in range(seconds, 0, -1):
+        _flush_safe_print(f"COUNTDOWN {i}")
+        time.sleep(1)
+    _flush_safe_print("COUNTDOWN_END")
 
 
 def main():
@@ -89,6 +123,8 @@ def main():
     print(f"  portal       {args.variant}")
     print(f"  learned from {args.session.name}")
     print(f"  mode         {'COMMIT' if args.commit else 'dry run'}")
+
+    print_countdown()
 
     # ---------------------------------------------------------------- 1
     banner(1, "Reading the grade sheet")

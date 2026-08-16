@@ -636,6 +636,16 @@ perception.
 
   Full capsule test group re-verified: 46 tests (`test_capsule_emoji_field.py`, `test_capsule_launch_command.py`, `test_recorder_bridge_capsule_run.py`, `test_recorder_bridge_capsule_log_file.py`), including a new end-to-end test proving `checkpoint_flag` reaches the real `Popen` argv through the bridge, not just `launch_command()` in isolation. Full project suite re-run for regressions.
 
+  **EXTENDED further still 2026-08-15, direct request** ("Add a countdown as well to support consistency" — after I explained Scope #1's 5-second pre-run countdown exists because it's driving the user's real mouse/keyboard on the real screen, while Scope #2 drives its own isolated browser and has nothing to click into first). User wanted the same visual treatment anyway, for consistency between the two Play workflows.
+
+  `components/scope2/automate.py` gained its own `print_countdown()`, mirroring `run_task.py`'s exact sentinel format (`COUNTDOWN_BEGIN` / `COUNTDOWN N` / `COUNTDOWN_END`) — the Play panel's `handleCapsuleProgressLine()` already parsed these generically, so the existing countdown widget picked this up with **zero changes needed on the Electron side**, proving out the "genuinely reusable, not `run_task.py`-specific" design noted when this mechanism was first investigated. Also replicated `_flush_safe_print()`'s `OSError` guard from `run_task.py` — this script is spawned through the identical `windowsHide` no-console Electron chain, so it was exposed to the exact same flush-crash risk that fix was originally written for.
+
+  **One real bug caught by actually running it, not assumed from the code**: the informational line printed alongside the countdown ("Starting the matcher — no window to click...") used a real em-dash character, which came out as `�` in the piped subprocess output — a Windows console-encoding mismatch between the child process's default stdout encoding and what a redirected pipe preserves. `run_task.py`'s own countdown message never hit this because its text is plain ASCII. Fixed by switching to a plain `--` (the same ASCII-dash convention already used everywhere else in this codebase's own comments and prose), not by touching Python's stdout encoding configuration — the smaller, better-understood fix.
+
+  **The widget's hint text was hardcoded** to "Click the target window now" — accurate for Scope #1, actively wrong for Scope #2. Rather than leave one workflow's countdown lying to the user, or generalize the wording into something vague enough to fit both, the widget's hint line is now populated dynamically from the line each script prints right after `COUNTDOWN_BEGIN` (still also logged normally in the Activity log below, same as before) — each workflow states its own accurate instruction, with a neutral static fallback ("Get ready…") for any future script that emits the sentinel without one.
+
+  Verified directly: ran `automate.py --matcher ... --commit --limit 5` end to end after both fixes — countdown prints cleanly (no garbled characters), 5/5 rows still filled and verified, identical to every prior run. Full project suite re-run for regressions.
+
 ---
 
 ### Scope #3 — Email / Ticket Triage *(not started)*

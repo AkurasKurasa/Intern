@@ -194,6 +194,7 @@ const btnDeploy      = document.getElementById("btnDeploy");
 const capsuleLogEl   = document.getElementById("capsuleLog");
 const ppCountdown       = document.getElementById("ppCountdown");
 const ppCountdownNumber = document.getElementById("ppCountdownNumber");
+const ppCountdownHint   = document.getElementById("ppCountdownHint");
 const btnCopyLog        = document.getElementById("btnCopyLog");
 const btnOpenLog        = document.getElementById("btnOpenLog");
 
@@ -219,13 +220,26 @@ function capsuleLog(message, level = "dim") {
   capsuleLogEl.scrollTop = capsuleLogEl.scrollHeight;
 }
 
-/* run_task.py's pre-run countdown prints structured COUNTDOWN_BEGIN /
-   COUNTDOWN N / COUNTDOWN_END lines specifically so this can render an
+/* Both run_task.py and components/scope2/automate.py print the same
+   structured COUNTDOWN_BEGIN / COUNTDOWN N / COUNTDOWN_END sentinel lines
+   (added to automate.py for consistency between the two Play workflows,
+   even though it has no real window to click into) so this can render an
    actual countdown indicator instead of 5 seconds of scrolling log text
-   -- everything else on capsule_progress still just logs normally. */
+   -- everything else on capsule_progress still just logs normally.
+
+   The one line immediately after COUNTDOWN_BEGIN is each script's own
+   plain-text explanation of what's about to happen ("Click on the target
+   window NOW." for run_task.py; a different, accurate line for
+   automate.py, which has nothing to click) -- captured here and shown as
+   the widget's hint text instead of a single hardcoded string that would
+   only ever be true for one of the two workflows. Still also logged
+   normally below, same as any other progress line. */
+let countdownHintPending = false;
+
 function handleCapsuleProgressLine(line) {
   if (line === "COUNTDOWN_BEGIN") {
     ppCountdown.hidden = false;
+    countdownHintPending = true;
     return;
   }
   if (line === "COUNTDOWN_END") {
@@ -240,6 +254,10 @@ function handleCapsuleProgressLine(line) {
     void ppCountdownNumber.offsetWidth; // restart the animation on every tick
     ppCountdownNumber.classList.add("pp-countdown-tick");
     return;
+  }
+  if (countdownHintPending) {
+    ppCountdownHint.textContent = line;
+    countdownHintPending = false;
   }
   capsuleLog(line, "dim");
 }
