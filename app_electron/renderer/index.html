@@ -46,6 +46,12 @@
           <rect x="13" y="13" width="7" height="7" rx="1.5" />
         </svg>
       </button>
+      <button class="side-btn" id="navInbox" type="button" title="Inbox" aria-label="Inbox">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6">
+          <rect x="3" y="5" width="18" height="14" rx="2" />
+          <path d="M3 7l9 6 9-6" />
+        </svg>
+      </button>
       <div class="side-status" id="sideStatus" title="Backend disconnected">
         <i class="dot" id="sideStatusDot"></i>ON
       </div>
@@ -131,6 +137,27 @@
         <div class="rp-btn-row">
           <button class="btn btn-primary" id="btnRunAgain" type="button">Run again</button>
           <button class="btn btn-ghost" id="btnBackToTasks" type="button">Back to tasks</button>
+        </div>
+      </div>
+
+      <!-- Inbox (Scope #3) -->
+      <div class="mid-panel" id="inboxWrap" hidden>
+        <header class="mid-head">
+          <div>
+            <p class="mono-eyebrow" id="inboxCountLine">0 ROUTED</p>
+            <h2>Inbox</h2>
+          </div>
+          <div class="mid-head-actions">
+            <button class="btn btn-primary btn-sm" id="btnInboxStart" type="button">Start</button>
+            <button class="btn btn-danger btn-sm" id="btnInboxStop" type="button" disabled>Stop</button>
+            <button class="btn btn-ghost btn-sm" id="btnInboxRefresh" type="button">Refresh</button>
+          </div>
+        </header>
+        <p class="mono-eyebrow inbox-provider-label" id="inboxProviderLabel">MOCK GMAIL — no live credentials</p>
+        <div class="mid-body">
+          <div id="inboxList" class="inbox-list">
+            <p class="muted">Not started. Click Start to begin routing mail.</p>
+          </div>
         </div>
       </div>
     </main>

@@ -17,6 +17,11 @@ const REGISTRY_PATH = path.join(REPO_ROOT, "tasks", "registry.json");
 // lines) -- everything run_task.py logs also flows through this process's
 // merged stdout, so one button covers both.
 const CAPSULE_LOG_PATH = path.join(REPO_ROOT, "logs", "capsule_activity.log");
+// Written only by components/inbox_router/router.py (single writer);
+// main.js only ever reads it, same "no bridge round-trip for a plain disk
+// read" precedent as readRegistry()/listWorkflows() below.
+const INBOX_HISTORY_PATH = path.join(REPO_ROOT, "components", "inbox_router", "data", "routed_history.json");
+const INBOX_LOG_PATH = path.join(REPO_ROOT, "logs", "inbox_activity.log");
 
 function resolvePython() {
   const candidates = [
@@ -381,6 +386,22 @@ function setCapsuleEmoji(capsuleName, emoji) {
   return capsule;
 }
 
+// ── Inbox Router (Scope #3) -- routed_history.json is owned entirely by
+// components/inbox_router/router.py; read directly here exactly like
+// readRegistry() above, never written from this process.
+function readInboxHistory() {
+  if (!fs.existsSync(INBOX_HISTORY_PATH)) return { messages: [] };
+  try {
+    return JSON.parse(fs.readFileSync(INBOX_HISTORY_PATH, "utf8"));
+  } catch (e) {
+    console.error("Failed to parse routed_history.json:", e);
+    return { messages: [] };
+  }
+}
+function listInboxMessages() {
+  return readInboxHistory().messages || [];
+}
+
 app.whenReady().then(() => {
   startBridge();
   createWindow();
@@ -452,6 +473,29 @@ ipcMain.handle("capsule-read-log", () => {
   } catch (e) {
     return "";
   }
+});
+ipcMain.handle("inbox-start", () => {
+  queueOrSend({ cmd: "start_inbox_router" });
+});
+ipcMain.handle("inbox-stop", () => {
+  queueOrSend({ cmd: "stop_inbox_router" });
+});
+ipcMain.handle("inbox-list", () => listInboxMessages());
+ipcMain.handle("inbox-confirm", (_evt, messageId, decision) => {
+  queueOrSend({ cmd: "inbox_confirm_suggestion", message_id: messageId, decision });
+});
+ipcMain.handle("inbox-override", (_evt, messageId, newDecision, reason) => {
+  queueOrSend({
+    cmd: "inbox_override_decision", message_id: messageId,
+    new_decision: newDecision, reason: reason || "",
+  });
+});
+ipcMain.handle("inbox-open-log", () => {
+  if (!fs.existsSync(INBOX_LOG_PATH)) {
+    return { ok: false, error: "No Inbox Router log yet -- start it first." };
+  }
+  shell.openPath(INBOX_LOG_PATH);
+  return { ok: true };
 });
 ipcMain.handle("restore-main", () => {
   if (mainWindow && !mainWindow.isDestroyed()) {

@@ -14,6 +14,10 @@ Commands (stdin, one per line)
   {"cmd": "replay", "n": 10}
   {"cmd": "run_capsule", "capsule_name": "form_filling"}
   {"cmd": "stop_capsule"}
+  {"cmd": "start_inbox_router"}
+  {"cmd": "stop_inbox_router"}
+  {"cmd": "inbox_confirm_suggestion", "message_id": "...", "decision": "..."}
+  {"cmd": "inbox_override_decision", "message_id": "...", "new_decision": "...", "reason": ""}
   {"cmd": "shutdown"}
 
 Events (stdout, one per line)
@@ -30,6 +34,10 @@ Events (stdout, one per line)
   {"event": "capsule_stopped"}
   {"event": "log", "message": "...", "level": "ok" | "err" | "dim"}
   {"event": "error", "message": "..."}
+  {"event": "inbox_*"}  -- see components/inbox_router/router.py's own docstring;
+                           every line router.py's child process prints on
+                           stdout is re-emitted here verbatim (it already
+                           speaks {"event": ...} JSON itself).
 """
 from __future__ import annotations
 
@@ -80,6 +88,24 @@ def _log_capsule_line(text: str) -> None:
         pass  # never let logging itself break a capsule run
 
 
+# Own log file, not _CAPSULE_LOG_PATH -- Inbox Router is a long-lived
+# background poller, not a one-shot Play run, and conflating its transcript
+# with capsule_activity.log (truncated fresh per capsule run) would either
+# lose the poller's history on the next unrelated Play click or make
+# capsule runs' logs unpredictably long.
+_INBOX_LOG_PATH = os.path.join(_ROOT, "logs", "inbox_activity.log")
+_INBOX_SCRIPT = os.path.join(_COMP, "inbox_router", "router.py")
+
+
+def _log_inbox_line(text: str) -> None:
+    try:
+        os.makedirs(os.path.dirname(_INBOX_LOG_PATH), exist_ok=True)
+        with open(_INBOX_LOG_PATH, "a", encoding="utf-8") as f:
+            f.write(f"[{datetime.now():%H:%M:%S}] {text}\n")
+    except Exception:
+        pass
+
+
 def emit(event: str, **fields) -> None:
     # write() then a separately-guarded flush() -- not print(..., flush=True)
     # directly. This exact bridge process is spawned by main.js with
@@ -109,6 +135,7 @@ class Bridge:
         self._poll_stop = threading.Event()
         self._capsule_proc: subprocess.Popen | None = None
         self._registry = registry if registry is not None else CapsuleRegistry()
+        self._inbox_proc: subprocess.Popen | None = None
 
     # ── start / stop ─────────────────────────────────────────────────────────
     def start(self, output_dir: str | None = None) -> None:
@@ -352,6 +379,85 @@ class Bridge:
         except Exception as exc:
             emit("error", message=f"Failed to stop capsule run: {exc}")
 
+    # ── inbox router (Scope #3) -- a continuous background poller, not a
+    # one-shot capsule Play run, so it gets its own start/stop lifecycle
+    # rather than going through run_capsule()/stop_capsule() above. Same
+    # Popen/stdout-pump shape as run_capsule() with one deliberate
+    # difference: stdin=PIPE, not DEVNULL, since router.py is long-lived
+    # and interactive (it needs to keep receiving confirm/override commands
+    # while running), not fire-and-forget. ───────────────────────────────────
+    def start_inbox_router(self) -> None:
+        if self._inbox_proc is not None and self._inbox_proc.poll() is None:
+            emit("error", message="Inbox Router is already running.")
+            return
+        try:
+            os.makedirs(os.path.dirname(_INBOX_LOG_PATH), exist_ok=True)
+            with open(_INBOX_LOG_PATH, "w", encoding="utf-8") as f:
+                f.write(f"[{datetime.now():%H:%M:%S}] Inbox Router starting…\n")
+        except Exception:
+            pass
+        try:
+            self._inbox_proc = subprocess.Popen(
+                [sys.executable, "-u", _INBOX_SCRIPT],
+                cwd=_ROOT,
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
+                bufsize=1,
+                creationflags=subprocess.CREATE_NEW_PROCESS_GROUP,
+            )
+        except Exception as exc:
+            _log_inbox_line(f"Failed to start Inbox Router: {exc}")
+            emit("error", message=f"Failed to start Inbox Router: {exc}")
+            return
+        threading.Thread(target=self._pump_inbox, daemon=True).start()
+
+    def _pump_inbox(self) -> None:
+        proc = self._inbox_proc
+        try:
+            for line in proc.stdout:
+                line = line.rstrip("\n")
+                if not line:
+                    continue
+                _log_inbox_line(line)
+                try:
+                    payload = json.loads(line)
+                except json.JSONDecodeError:
+                    emit("inbox_log", line=line, level="dim")
+                    continue
+                # router.py already speaks the same {"event": ...} shape
+                # this bridge does -- pass it straight through rather than
+                # re-wrapping it.
+                event = payload.pop("event", "inbox_log")
+                emit(event, **payload)
+        except Exception:
+            pass
+        code = proc.wait()
+        self._inbox_proc = None
+        _log_inbox_line(f"Inbox Router exited (code {code}).")
+
+    def stop_inbox_router(self) -> None:
+        if self._inbox_proc is None or self._inbox_proc.poll() is not None:
+            emit("error", message="Inbox Router is not running.")
+            return
+        self._send_inbox_cmd({"cmd": "shutdown"})
+
+    def inbox_confirm_suggestion(self, message_id: str, decision: str) -> None:
+        self._send_inbox_cmd({"cmd": "confirm", "message_id": message_id, "decision": decision})
+
+    def inbox_override_decision(self, message_id: str, new_decision: str, reason: str = "") -> None:
+        self._send_inbox_cmd({"cmd": "override", "message_id": message_id,
+                               "new_decision": new_decision, "reason": reason})
+
+    def _send_inbox_cmd(self, cmd: dict) -> None:
+        if self._inbox_proc is None or self._inbox_proc.poll() is not None:
+            emit("error", message="Inbox Router is not running.")
+            return
+        try:
+            self._inbox_proc.stdin.write(json.dumps(cmd) + "\n")
+            self._inbox_proc.stdin.flush()
+        except Exception as exc:
+            emit("error", message=f"Failed to send Inbox Router command: {exc}")
+
     # ── main loop ────────────────────────────────────────────────────────────
     def run(self) -> None:
         emit("ready")
@@ -376,6 +482,15 @@ class Bridge:
                 self.run_capsule(msg.get("capsule_name", ""))
             elif cmd == "stop_capsule":
                 self.stop_capsule()
+            elif cmd == "start_inbox_router":
+                self.start_inbox_router()
+            elif cmd == "stop_inbox_router":
+                self.stop_inbox_router()
+            elif cmd == "inbox_confirm_suggestion":
+                self.inbox_confirm_suggestion(msg.get("message_id", ""), msg.get("decision", ""))
+            elif cmd == "inbox_override_decision":
+                self.inbox_override_decision(msg.get("message_id", ""), msg.get("new_decision", ""),
+                                              msg.get("reason", ""))
             elif cmd == "shutdown":
                 if self._running and self._recorder is not None:
                     self._recorder._quit_event.set()
@@ -384,6 +499,15 @@ class Bridge:
                         self._capsule_proc.send_signal(signal.CTRL_BREAK_EVENT)
                     except Exception:
                         pass
+                if self._inbox_proc is not None and self._inbox_proc.poll() is None:
+                    try:
+                        self._inbox_proc.stdin.write(json.dumps({"cmd": "shutdown"}) + "\n")
+                        self._inbox_proc.stdin.flush()
+                    except Exception:
+                        try:
+                            self._inbox_proc.send_signal(signal.CTRL_BREAK_EVENT)
+                        except Exception:
+                            pass
                 break
             else:
                 emit("error", message=f"Unknown command: {cmd!r}")

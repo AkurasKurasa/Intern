@@ -22,8 +22,10 @@ setTimeout(() => { bridgeIsReady = true; maybeDismissSplash(); }, 4000);
    hidden on the Workflows tab -- that tab plays sessions instead. */
 const navRecorder = document.getElementById("navRecorder");
 const navWorkflows = document.getElementById("navWorkflows");
+const navInbox = document.getElementById("navInbox");
 const emptyState = document.getElementById("emptyState");
 const workflowsWrap = document.getElementById("workflowsWrap");
+const inboxWrap = document.getElementById("inboxWrap");
 const recorderPanel = document.getElementById("recorderPanel");
 const playPanel = document.getElementById("playPanel");
 const runningView = document.getElementById("runningView");
@@ -46,16 +48,24 @@ function showTasksSubview(name) {
 
 function showMain(name) {
   const toHome = name === "home";
+  const toInbox = name === "inbox";
+  const toWorkflows = name === "workflows";
   emptyState.hidden = !toHome;
+  inboxWrap.hidden = !toInbox;
   recorderPanel.hidden = !toHome;
-  playPanel.hidden = toHome;
+  playPanel.hidden = toHome || toInbox;
   navRecorder.classList.toggle("active", toHome);
-  navWorkflows.classList.toggle("active", !toHome);
+  navWorkflows.classList.toggle("active", toWorkflows);
+  navInbox.classList.toggle("active", toInbox);
   navRecorder.setAttribute("aria-current", toHome ? "page" : "false");
-  navWorkflows.setAttribute("aria-current", !toHome ? "page" : "false");
+  navWorkflows.setAttribute("aria-current", toWorkflows ? "page" : "false");
+  navInbox.setAttribute("aria-current", toInbox ? "page" : "false");
   if (toHome) {
     showTasksSubview("");
     refreshTaskCount();
+  } else if (toInbox) {
+    showTasksSubview("");
+    loadInboxMessages();
   } else {
     // A capsule already running (e.g. the user switched to Home mid-run
     // and is coming back) should still show the running view, not reset
@@ -66,11 +76,15 @@ function showMain(name) {
   }
   // Tells main.js which mini overlay to show if the window gets
   // minimized from here -- recorder Start/Stop from Recorder, the round
-  // Play/Stop widget from Workflows.
-  window.recorderAPI.setActiveSection(toHome ? "home" : "workflows");
+  // Play/Stop widget from Workflows. Inbox has no mini overlay of its own,
+  // so it falls into the same plain-recorder-widget branch "workflows"
+  // used to be the only alternative to -- main.js's minimize handler
+  // already treats anything other than "workflows" that way.
+  window.recorderAPI.setActiveSection(toWorkflows ? "workflows" : (toInbox ? "inbox" : "home"));
 }
 navRecorder.addEventListener("click", () => showMain("home"));
 navWorkflows.addEventListener("click", () => showMain("workflows"));
+navInbox.addEventListener("click", () => showMain("inbox"));
 btnHomeStartRecording.addEventListener("click", () => btnStart.click());
 btnHomeBrowseTasks.addEventListener("click", () => navWorkflows.click());
 
@@ -199,6 +213,32 @@ window.recorderAPI.onEvent((event) => {
       hideCountdown();
       stopElapsedTimer();
       tbAgentPill.hidden = true;
+      break;
+    // Inbox Router (Scope #3) events -- deliberately their own event names,
+    // not "error"/"log", since those two already carry recorder/capsule-
+    // specific side effects (setRecording, setCapsuleRunning, hideCountdown)
+    // that must never fire for an unrelated inbox problem.
+    case "inbox_poll_started":
+      setInboxRunning(true);
+      inboxProviderLabel.textContent = event.provider === "real"
+        ? "LIVE GMAIL" : "MOCK GMAIL — no live credentials";
+      break;
+    case "inbox_routed":
+      upsertInboxRow(event);
+      break;
+    case "inbox_confirm_applied":
+      markInboxRowConfirmed(event.message_id, event.decision);
+      break;
+    case "inbox_override_applied":
+      markInboxRowOverridden(event.message_id, event.new_decision);
+      break;
+    case "inbox_stopped":
+      setInboxRunning(false);
+      break;
+    case "inbox_log":
+      break; // dev-detail stream; the plain-language row is what the UI shows
+    case "inbox_error":
+      log(`Inbox Router: ${event.message}`, "err");
       break;
     default:
       console.log("Unhandled event:", event);
@@ -933,3 +973,125 @@ wfCreateSubmit.addEventListener("click", async () => {
     capsuleLog(`Couldn't create workflow: ${e.message || e}`, "err");
   }
 });
+
+/* ── Inbox (Scope #3) ──────────────────────────────────────────────────── */
+const inboxCountLineEl = document.getElementById("inboxCountLine");
+const inboxProviderLabel = document.getElementById("inboxProviderLabel");
+const btnInboxStart = document.getElementById("btnInboxStart");
+const btnInboxStop = document.getElementById("btnInboxStop");
+const btnInboxRefresh = document.getElementById("btnInboxRefresh");
+const inboxListEl = document.getElementById("inboxList");
+
+const DECISION_LABELS = {
+  route_scope1: "Routed to form-filler", route_scope2: "Routed to sheet-matcher",
+  reply: "Reply suggested", forward: "Forward suggested",
+  flag: "Flagged for review", leave_alone: "Left alone",
+};
+
+function decisionLabel(decision) {
+  return DECISION_LABELS[decision] || decision;
+}
+
+function setInboxRunning(isRunning) {
+  btnInboxStart.disabled = isRunning;
+  btnInboxStop.disabled = !isRunning;
+}
+
+async function loadInboxMessages() {
+  let messages = [];
+  try {
+    messages = await window.inboxAPI.list();
+  } catch (e) {
+    inboxListEl.innerHTML = `<p class="muted">Couldn't read Inbox Router history (${e.message || e}).</p>`;
+    return;
+  }
+  inboxListEl.innerHTML = "";
+  if (!messages.length) {
+    inboxListEl.innerHTML = '<p class="muted">Not started. Click Start to begin routing mail.</p>';
+  } else {
+    // Newest first.
+    messages.slice().reverse().forEach((msg) => inboxListEl.appendChild(buildInboxRow(msg)));
+  }
+  inboxCountLineEl.textContent = `${messages.length} ROUTED`;
+}
+
+// Pure builder -- returns a detached row element, doesn't touch the DOM
+// itself. loadInboxMessages() appends in order; upsertInboxRow() below
+// prepends a single row live as inbox_routed events arrive.
+function buildInboxRow(msg) {
+  const row = document.createElement("div");
+  row.className = "inbox-row";
+  row.dataset.messageId = msg.message_id;
+
+  const main = document.createElement("div");
+  main.className = "inbox-row-main";
+  const chipClass = "inbox-decision-chip" +
+    (msg.status === "confirmed" ? " confirmed" : "") +
+    (msg.decision === "flag" ? " flag" : "");
+  main.innerHTML =
+    `<span class="inbox-row-subject">${escapeHtml(msg.subject || "(no subject)")}</span>` +
+    `<span class="inbox-row-sender">${escapeHtml(msg.sender || "")}</span>` +
+    `<span class="${chipClass}">${escapeHtml(decisionLabel(msg.decision))}</span>` +
+    `<span class="inbox-row-rationale">${escapeHtml(msg.rationale || "")}</span>`;
+  row.appendChild(main);
+
+  if (msg.status === "pending") {
+    const actions = document.createElement("div");
+    actions.className = "inbox-row-actions";
+    const confirmBtn = document.createElement("button");
+    confirmBtn.className = "btn btn-primary btn-sm";
+    confirmBtn.type = "button";
+    confirmBtn.textContent = "Confirm";
+    confirmBtn.addEventListener("click", () => onInboxConfirmClick(msg));
+    actions.appendChild(confirmBtn);
+    row.appendChild(actions);
+  }
+  return row;
+}
+
+// The Scope #1/#2 handoff reuses the existing, unmodified capsule-run IPC
+// call verbatim -- Inbox Router itself does nothing Gmail-side for these
+// two decisions; router.py's confirm_suggestion() only records that this
+// happened and feeds the pattern profile.
+function onInboxConfirmClick(msg) {
+  if ((msg.decision === "route_scope1" || msg.decision === "route_scope2") && msg.capsule_name) {
+    window.capsulesAPI.run(msg.capsule_name);
+  }
+  window.inboxAPI.confirm(msg.message_id, msg.decision);
+}
+
+function upsertInboxRow(msg) {
+  const existing = inboxListEl.querySelector(`[data-message-id="${CSS.escape(msg.message_id)}"]`);
+  if (existing) existing.remove();
+  const empty = inboxListEl.querySelector(".muted");
+  if (empty) empty.remove();
+  inboxListEl.insertBefore(buildInboxRow(msg), inboxListEl.firstChild);
+  refreshInboxCount();
+}
+
+function refreshInboxCount() {
+  inboxCountLineEl.textContent = `${inboxListEl.querySelectorAll(".inbox-row").length} ROUTED`;
+}
+
+function markInboxRowConfirmed(messageId, decision) {
+  const row = inboxListEl.querySelector(`[data-message-id="${CSS.escape(messageId)}"]`);
+  if (!row) return;
+  const chip = row.querySelector(".inbox-decision-chip");
+  if (chip) {
+    chip.classList.add("confirmed");
+    chip.textContent = decisionLabel(decision);
+  }
+  const actions = row.querySelector(".inbox-row-actions");
+  if (actions) actions.remove();
+}
+
+function markInboxRowOverridden(messageId, newDecision) {
+  const row = inboxListEl.querySelector(`[data-message-id="${CSS.escape(messageId)}"]`);
+  if (!row) return;
+  const chip = row.querySelector(".inbox-decision-chip");
+  if (chip) chip.textContent = decisionLabel(newDecision);
+}
+
+btnInboxStart.addEventListener("click", () => window.inboxAPI.start());
+btnInboxStop.addEventListener("click", () => window.inboxAPI.stop());
+btnInboxRefresh.addEventListener("click", () => loadInboxMessages());

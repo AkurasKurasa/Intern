@@ -47,3 +47,15 @@ contextBridge.exposeInMainWorld("capsulesAPI", {
   setCurrent: (capsuleName) => ipcRenderer.invoke("capsule-set-current", capsuleName),
   runCurrent: () => ipcRenderer.invoke("capsule-run-current"),
 });
+
+contextBridge.exposeInMainWorld("inboxAPI", {
+  start: () => ipcRenderer.invoke("inbox-start"),
+  stop: () => ipcRenderer.invoke("inbox-stop"),
+  list: () => ipcRenderer.invoke("inbox-list"),
+  confirm: (messageId, decision) => ipcRenderer.invoke("inbox-confirm", messageId, decision),
+  override: (messageId, newDecision, reason) =>
+    ipcRenderer.invoke("inbox-override", messageId, newDecision, reason),
+  openLog: () => ipcRenderer.invoke("inbox-open-log"),
+  // No onEvent() of its own -- inbox_* events arrive through the same
+  // recorderAPI.onEvent() stream every other bridge event already uses.
+});

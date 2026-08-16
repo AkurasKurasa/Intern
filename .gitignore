@@ -91,3 +91,15 @@ Thesis.docx
 # regenerable, invalidated whenever the underlying sentence-transformer
 # model or feature set changes.
 components/scope2/data/cache/
+
+# Inbox Router (Scope #3) — real Google OAuth credentials/tokens, and any
+# local state that carries real personal inbox content once Phase B (a real
+# Gmail account) is wired in. Never committed, same principle as .env above.
+components/inbox_router/credentials/client_secret.json
+components/inbox_router/credentials/token.json
+components/inbox_router/data/pattern_profile.json
+components/inbox_router/data/routed_history.json
+# Mock-fixture generated state — mock_inbox.json itself IS committed
+# (synthetic test data), only what it generates at runtime is ignored.
+components/inbox_router/data/mock_state.json
+components/inbox_router/data/mock_drafts.json
