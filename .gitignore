@@ -109,5 +109,7 @@ components/inbox_router/data/mock_state.json
 components/inbox_router/data/mock_drafts.json
 
 # Exported Electron build (electron-builder --dir output, copied to root
-# on request) — a ~266MB local artifact, never something to commit.
-/Intern-app/
+# on request) — local build artifacts, never something to commit.
+/output/
+/Intern-app.zip
+/Intern.lnk
