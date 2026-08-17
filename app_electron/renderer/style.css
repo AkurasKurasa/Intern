@@ -294,13 +294,13 @@ p { text-wrap: pretty; }
   border: 1.5px dashed var(--border-strong);
   border-radius: var(--radius-sm);
   display: flex; align-items: center; justify-content: center;
-  padding: 12px;
+  padding: 18px 16px;
   transition: border-color .2s ease, background .2s ease;
 }
 .pp-slot.filled { border-style: solid; background: var(--card); }
 .pp-slot-hint { font-size: 11.5px; color: var(--text-muted); text-align: center; margin: 0; }
 
-.pp-capsule { display: flex; align-items: center; gap: 10px; width: 100%; }
+.pp-capsule { display: flex; align-items: center; gap: 12px; width: 100%; }
 .pp-capsule-icon {
   width: 30px; height: 30px; border-radius: 50%; flex: none;
   background: var(--sunk); color: var(--ink);
@@ -334,7 +334,7 @@ p { text-wrap: pretty; }
    of countdown. */
 .pp-warning {
   background: var(--clay-tint-bg); border: 1px solid var(--clay-tint-border);
-  border-radius: var(--radius-sm); padding: 10px 12px;
+  border-radius: var(--radius-sm); padding: 14px 16px;
 }
 .pp-warning strong { display: block; font-size: 12.5px; color: var(--clay-tint-text); margin-bottom: 3px; }
 .pp-warning p { margin: 0; font-size: 11.5px; color: var(--clay-tint-text); line-height: 1.5; }
@@ -425,6 +425,14 @@ p { text-wrap: pretty; }
    not the agent taking control. */
 .rp-pending { margin-left: 6px; font-size: 11px; color: var(--text-muted); font-style: italic; }
 
+/* Checkpoint/Test groups had zero CSS of their own -- plain block divs,
+   so their label/select/button children were touching with no gap at all
+   (relying only on each child's own margin, which none of them actually
+   had). Real cause of "everything is spaced together" in the Play panel,
+   not just a global padding tweak. */
+#ppCheckpointGroup, #ppTestGroup {
+  display: flex; flex-direction: column; gap: 10px;
+}
 .field-label { display: block; font-size: 11px; color: var(--text-muted); margin: 2px 0 0; }
 .field {
   width: 100%;
@@ -438,7 +446,7 @@ p { text-wrap: pretty; }
 }
 .field:focus { outline: none; border-color: var(--ink); }
 
-.rp-btn-row { display: flex; gap: 8px; }
+.rp-btn-row { display: flex; gap: 12px; }
 .rp-replay { width: 100%; }
 .rp-hint { margin: 2px 0 0; }
 
@@ -548,15 +556,23 @@ p { text-wrap: pretty; }
   gap: 14px;
   margin-top: 6px;
 }
+/* Actual chip SILHOUETTE, not just a dark rounded card -- a body rect
+   plus 12 small "pin" rects along all four edges, applied as a mask so
+   the whole element (background texture included) is clipped into that
+   shape. Direct correction: "I meant I want it shaped like a microchip,
+   you added a background and called it finished." aspect-ratio:1 keeps
+   it square so the pin pattern isn't stretched off-proportion. */
+.task-chip-mask {
+  --chip-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect x='12' y='12' width='76' height='76' rx='8' fill='%23fff'/%3E%3Crect x='1' y='20' width='13' height='6' fill='%23fff'/%3E%3Crect x='1' y='47' width='13' height='6' fill='%23fff'/%3E%3Crect x='1' y='74' width='13' height='6' fill='%23fff'/%3E%3Crect x='86' y='20' width='13' height='6' fill='%23fff'/%3E%3Crect x='86' y='47' width='13' height='6' fill='%23fff'/%3E%3Crect x='86' y='74' width='13' height='6' fill='%23fff'/%3E%3Crect x='20' y='1' width='6' height='13' fill='%23fff'/%3E%3Crect x='47' y='1' width='6' height='13' fill='%23fff'/%3E%3Crect x='74' y='1' width='6' height='13' fill='%23fff'/%3E%3Crect x='20' y='86' width='6' height='13' fill='%23fff'/%3E%3Crect x='47' y='86' width='6' height='13' fill='%23fff'/%3E%3Crect x='74' y='86' width='6' height='13' fill='%23fff'/%3E%3C/svg%3E");
+}
 .task-chip {
   position: relative;
   overflow: hidden;
   display: flex; flex-direction: column; justify-content: space-between; align-items: flex-start; gap: 14px;
   text-align: left;
-  min-height: 148px;
-  border: 1px solid transparent;
-  border-radius: var(--radius-lg);
-  padding: 14px;
+  aspect-ratio: 1;
+  border: none;
+  padding: 27px 23px;
   cursor: pointer;
   font: inherit;
   color: white;
@@ -566,11 +582,27 @@ p { text-wrap: pretty; }
     repeating-linear-gradient(115deg, rgba(255,255,255,.055) 0 1.5px, transparent 1.5px 30px),
     repeating-linear-gradient(25deg, rgba(255,255,255,.04) 0 1.5px, transparent 1.5px 36px),
     var(--ink);
-  transition: transform .12s ease, box-shadow .12s ease, border-color .12s ease;
+  -webkit-mask-image: var(--chip-mask);
+  -webkit-mask-size: 100% 100%;
+  -webkit-mask-repeat: no-repeat;
+  mask-image: var(--chip-mask);
+  mask-size: 100% 100%;
+  mask-repeat: no-repeat;
+  transition: transform .12s ease, filter .12s ease;
 }
-.task-chip:hover { transform: translateY(-2px); box-shadow: 0 8px 18px rgba(22,21,15,.22); }
-.task-chip:focus-visible { outline: 2px solid var(--accent-blue); outline-offset: 2px; }
-.task-chip.capsule-selected { border-color: var(--accent-blue); box-shadow: 0 0 0 3px var(--accent-blue-tint-bg); }
+.task-chip:hover { transform: translateY(-2px); filter: brightness(1.08); }
+.task-chip:focus-visible { outline: 2px solid var(--accent-blue); outline-offset: 3px; }
+/* Selected state changes the fill colour itself rather than an outer
+   border/box-shadow -- those paint outside the masked silhouette and
+   would draw as a rectangle around it instead of hugging the chip shape. */
+.task-chip.capsule-selected {
+  background:
+    radial-gradient(circle at 88% 18%, rgba(255,255,255,.12) 0 2.5px, transparent 3px),
+    radial-gradient(circle at 12% 82%, rgba(255,255,255,.09) 0 2.5px, transparent 3px),
+    repeating-linear-gradient(115deg, rgba(255,255,255,.07) 0 1.5px, transparent 1.5px 30px),
+    repeating-linear-gradient(25deg, rgba(255,255,255,.05) 0 1.5px, transparent 1.5px 36px),
+    var(--accent-blue);
+}
 .task-chip-kicker {
   font-family: var(--font-mono); font-size: 9px; font-weight: 600;
   letter-spacing: .1em; text-transform: uppercase;
