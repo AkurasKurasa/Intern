@@ -207,7 +207,18 @@ def scan_variants(names, base_url=None):
     results = {}
     with sync_playwright() as p:
         browser = p.chromium.launch(
-            executable_path=str(CHROMIUM) if CHROMIUM.exists() else None
+            executable_path=str(CHROMIUM) if CHROMIUM.exists() else None,
+            # Explicit, not relying on the default -- "old" headless mode
+            # can briefly flash a real window on Windows before hiding it
+            # (a known Chromium quirk). automate.py calls this scan stage
+            # separately from -- and before -- executor/runner.py's own,
+            # later browser launch (the one --show is actually meant to
+            # control), so a flash here reads as "the window disappeared
+            # and reappeared" even though it's genuinely two different
+            # browser launches, not one glitching. "new" headless mode
+            # never creates an OS window at all, so there's nothing to flash.
+            headless=True,
+            args=["--headless=new"],
         )
         page = browser.new_page()
         try:
