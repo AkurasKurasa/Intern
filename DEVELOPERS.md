@@ -674,6 +674,16 @@ perception.
 
   Verified directly: ran `automate.py --matcher ... --commit --limit 5` end to end after both fixes — countdown prints cleanly (no garbled characters), 5/5 rows still filled and verified, identical to every prior run. Full project suite re-run for regressions.
 
+  **EXTENDED 2026-08-17, on `feature/inbox-router`** (checked out to inspect/build on top of the branch-mate's Scope #3 implementation + full visual redesign). Three direct requests handled in sequence:
+
+  1. **"Add a Test section... where you launch the mockups."** Play panel gained a "Test" block below Checkpoint, shown for any loaded task: Task Filler opens the real Car Insurance wx form + Notepad on the intake file (the exact two windows `run_task.py`'s countdown expects already open); Sheet-to-Portal Matcher opens the source spreadsheet + the mock portal's landing page (judgment call — it drives its own browser, nothing to "get ready" the way Scope #1 needs).
+
+  2. **"Add a Settings tab... load LM Studio and use Qwen 2.5-7b Instruct (allow to choose)."** New sidebar tab drives LM Studio's own `lms` CLI (found already installed at `~/.lmstudio/bin/lms.exe`) — server status, a model dropdown built from `lms ls --llm --json` (not hardcoded to one model), start-server and load-model buttons. Verified the CLI's real commands and JSON output shape directly before wiring anything up.
+
+  3. **Real bug found and fixed, direct user report** ("I pressed on the Firefox and it didn't fill it"). `logs/capsule_activity.log` showed the fill and Save both succeeded, then `EOFError` on `input()` — `executor/runner.py`'s `--show` path waits for a real terminal Enter-press before closing the browser, and there is no real terminal when launched via the Electron bridge (`stdin=DEVNULL`, same class of bug already fixed once for `run_task.py`'s countdown). The `finally: browser.close()` fired immediately after, closing the window ~2 seconds after it opened — the user clicked in just after it was already gone.
+
+     Two wrong turns caught before shipping, not assumed away: skipping `browser.close()` alone doesn't work — verified directly that exiting the enclosing `with sync_playwright()` block kills every launched browser regardless. And `sys.stdin.isatty()` as an upfront check is unreliable in this environment — verified directly that it reported `True` even under `stdin=DEVNULL` in a real subprocess chain, which would have silently reintroduced the same crash. The real fix catches the actual `EOFError` and waits (10 minutes, bounded, not forever) inside the still-open `with` block instead of returning early. Verified twice, end to end, spawned exactly the way the bridge spawns it (`stdin=DEVNULL`) — the browser genuinely stays alive afterward. New regression test (`test_show_mode_survives_no_interactive_stdin`) added to `tests/scope2/test_scope2_executor.py`.
+
 ---
 
 ### Scope #3 — Email / Ticket Triage

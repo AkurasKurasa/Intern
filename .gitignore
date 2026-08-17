@@ -92,6 +92,10 @@ Thesis.docx
 # model or feature set changes.
 components/scope2/data/cache/
 
+# Excel's own transient lock file, created whenever a workbook is open --
+# appears now that the Play panel's "Test" section can open grade_sheet.xlsx.
+~$*.xlsx
+
 # Inbox Router (Scope #3) — real Google OAuth credentials/tokens, and any
 # local state that carries real personal inbox content once Phase B (a real
 # Gmail account) is wired in. Never committed, same principle as .env above.

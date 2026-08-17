@@ -46,6 +46,10 @@ contextBridge.exposeInMainWorld("capsulesAPI", {
   // capsule changes); runCurrent() is what the widget's Play circle calls.
   setCurrent: (capsuleName) => ipcRenderer.invoke("capsule-set-current", capsuleName),
   runCurrent: () => ipcRenderer.invoke("capsule-run-current"),
+  // "Test" section -- opens the real target apps for a workflow so the
+  // user can get the environment ready (or just look around) before
+  // pressing Play.
+  launchTestMockups: (capsuleName) => ipcRenderer.invoke("test-launch-mockups", capsuleName),
 });
 
 contextBridge.exposeInMainWorld("inboxAPI", {
@@ -58,4 +62,10 @@ contextBridge.exposeInMainWorld("inboxAPI", {
   openLog: () => ipcRenderer.invoke("inbox-open-log"),
   // No onEvent() of its own -- inbox_* events arrive through the same
   // recorderAPI.onEvent() stream every other bridge event already uses.
+});
+
+contextBridge.exposeInMainWorld("settingsAPI", {
+  refreshLmStudio: () => ipcRenderer.invoke("settings-lmstudio-refresh"),
+  startLmStudioServer: () => ipcRenderer.invoke("settings-lmstudio-start-server"),
+  loadLmStudioModel: (modelKey) => ipcRenderer.invoke("settings-lmstudio-load-model", modelKey),
 });

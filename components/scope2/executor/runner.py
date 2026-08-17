@@ -24,6 +24,7 @@ import argparse
 import json
 import re
 import sys
+import time
 from dataclasses import dataclass, field, asdict
 from datetime import datetime, timezone
 from pathlib import Path
@@ -432,7 +433,44 @@ def run(variant, mapping_path, dry_run=True, base_url=None, limit=None,
             if show:
                 print("\n  The filled portal is on screen - scroll through it.")
                 print("  Press Enter here to close it...")
-                input()
+                try:
+                    input()
+                except EOFError:
+                    # No real terminal attached to stdin -- e.g. launched
+                    # as a subprocess by the Electron app's Play button
+                    # (app/recorder_bridge.py spawns it with
+                    # stdin=DEVNULL, same reason run_task.py's own
+                    # countdown had to stop blocking on stdin once). Found
+                    # live: input() raised EOFError instantly, and the
+                    # finally-block close() right below slammed the
+                    # browser shut about 2 seconds after it opened -- the
+                    # user clicked into the window just after it had
+                    # already closed and reported "it didn't fill," even
+                    # though the fill and the Save click above both
+                    # already succeeded.
+                    #
+                    # sys.stdin.isatty() looked like the obvious upfront
+                    # check instead of try/except, but verified directly
+                    # that it's unreliable here -- it reported True even
+                    # under stdin=DEVNULL in this environment's subprocess
+                    # chain, which would have silently reintroduced the
+                    # exact same crash. Reacting to the real EOFError
+                    # input() actually raises is the reliable signal.
+                    #
+                    # Skipping browser.close() alone isn't enough either --
+                    # verified directly: exiting the enclosing
+                    # `with sync_playwright() as p:` block (p.stop()) kills
+                    # every browser it launched regardless of whether
+                    # .close() was called explicitly. So this has to
+                    # actually wait, inside that block, not just skip the
+                    # close and return. Bounded (not forever) so an
+                    # unattended run doesn't hold a browser + this whole
+                    # process open indefinitely; pressing Stop in the
+                    # Electron app (CTRL_BREAK to the whole process group)
+                    # still tears it down cleanly before the timeout.
+                    print("  (no interactive terminal -- leaving it open for 10 minutes,"
+                          " or until Stop is pressed)")
+                    time.sleep(600)
         finally:
             browser.close()
 

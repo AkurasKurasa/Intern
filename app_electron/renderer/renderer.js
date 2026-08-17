@@ -23,9 +23,11 @@ setTimeout(() => { bridgeIsReady = true; maybeDismissSplash(); }, 4000);
 const navRecorder = document.getElementById("navRecorder");
 const navWorkflows = document.getElementById("navWorkflows");
 const navInbox = document.getElementById("navInbox");
+const navSettings = document.getElementById("navSettings");
 const emptyState = document.getElementById("emptyState");
 const workflowsWrap = document.getElementById("workflowsWrap");
 const inboxWrap = document.getElementById("inboxWrap");
+const settingsWrap = document.getElementById("settingsWrap");
 const recorderPanel = document.getElementById("recorderPanel");
 const playPanel = document.getElementById("playPanel");
 const runningView = document.getElementById("runningView");
@@ -49,23 +51,30 @@ function showTasksSubview(name) {
 function showMain(name) {
   const toHome = name === "home";
   const toInbox = name === "inbox";
+  const toSettings = name === "settings";
   const toWorkflows = name === "workflows";
   emptyState.hidden = !toHome;
   inboxWrap.hidden = !toInbox;
+  settingsWrap.hidden = !toSettings;
   recorderPanel.hidden = !toHome;
-  playPanel.hidden = toHome || toInbox;
+  playPanel.hidden = !toWorkflows;
   navRecorder.classList.toggle("active", toHome);
   navWorkflows.classList.toggle("active", toWorkflows);
   navInbox.classList.toggle("active", toInbox);
+  navSettings.classList.toggle("active", toSettings);
   navRecorder.setAttribute("aria-current", toHome ? "page" : "false");
   navWorkflows.setAttribute("aria-current", toWorkflows ? "page" : "false");
   navInbox.setAttribute("aria-current", toInbox ? "page" : "false");
+  navSettings.setAttribute("aria-current", toSettings ? "page" : "false");
   if (toHome) {
     showTasksSubview("");
     refreshTaskCount();
   } else if (toInbox) {
     showTasksSubview("");
     loadInboxMessages();
+  } else if (toSettings) {
+    showTasksSubview("");
+    loadSettingsPanel();
   } else {
     // A capsule already running (e.g. the user switched to Home mid-run
     // and is coming back) should still show the running view, not reset
@@ -76,15 +85,16 @@ function showMain(name) {
   }
   // Tells main.js which mini overlay to show if the window gets
   // minimized from here -- recorder Start/Stop from Recorder, the round
-  // Play/Stop widget from Workflows. Inbox has no mini overlay of its own,
-  // so it falls into the same plain-recorder-widget branch "workflows"
-  // used to be the only alternative to -- main.js's minimize handler
-  // already treats anything other than "workflows" that way.
+  // Play/Stop widget from Workflows. Inbox/Settings have no mini overlay
+  // of their own, so they fall into the same plain-recorder-widget branch
+  // "workflows" used to be the only alternative to -- main.js's minimize
+  // handler already treats anything other than "workflows" that way.
   window.recorderAPI.setActiveSection(toWorkflows ? "workflows" : (toInbox ? "inbox" : "home"));
 }
 navRecorder.addEventListener("click", () => showMain("home"));
 navWorkflows.addEventListener("click", () => showMain("workflows"));
 navInbox.addEventListener("click", () => showMain("inbox"));
+navSettings.addEventListener("click", () => showMain("settings"));
 btnHomeStartRecording.addEventListener("click", () => btnStart.click());
 btnHomeBrowseTasks.addEventListener("click", () => navWorkflows.click());
 
@@ -268,6 +278,8 @@ const ppCapsuleName  = document.getElementById("ppCapsuleName");
 const ppCapsuleMeta  = document.getElementById("ppCapsuleMeta");
 const ppCheckpointGroup = document.getElementById("ppCheckpointGroup");
 const ppCheckpoint   = document.getElementById("ppCheckpoint");
+const ppTestGroup    = document.getElementById("ppTestGroup");
+const btnLaunchMockups = document.getElementById("btnLaunchMockups");
 const btnPlay        = document.getElementById("btnPlay");
 const btnStopCapsule = document.getElementById("btnStopCapsule");
 const btnDeploy      = document.getElementById("btnDeploy");
@@ -515,6 +527,9 @@ function hideCountdown() {
 function setCapsuleRunning(isRunning) {
   btnPlay.disabled = isRunning || !currentCapsule;
   btnStopCapsule.disabled = !isRunning;
+  // Disabled while a run is live -- popping more windows while the agent
+  // is actively driving the mouse/keyboard (Scope #1) would be disruptive.
+  btnLaunchMockups.disabled = isRunning;
   // The mini Play/Stop widget has no capsule-picker UI of its own, so it
   // needs to know which capsule name "Play" should mean -- this is the one
   // place that's called both right after a capsule loads/deploys AND on
@@ -545,6 +560,9 @@ async function loadCapsuleIntoSlot(capsule) {
   applyCapsuleEmojiDisplay(ppCapsuleEmoji, capsule.emoji);
   ppCapsuleName.textContent = capsule.name;
   ppSlot.classList.add("filled");
+  // "Test" shows for any loaded task, unlike Checkpoint -- it's not tied
+  // to having a swappable model, just to a task being selected at all.
+  ppTestGroup.hidden = false;
 
   // A script-kind capsule (e.g. Scope #2) may or may not have a real,
   // swappable checkpoint -- Scope #2's matcher.pt is a genuine trained
@@ -616,6 +634,23 @@ btnDeploy.addEventListener("click", async () => {
     loadCapsuleIntoSlot(currentCapsule);
   } catch (e) {
     capsuleLog(`Deploy failed: ${e.message || e}`, "err");
+  }
+});
+
+btnLaunchMockups.addEventListener("click", async () => {
+  if (!currentCapsule) return;
+  btnLaunchMockups.disabled = true;
+  try {
+    const result = await window.capsulesAPI.launchTestMockups(currentCapsule.name);
+    if (result.ok) {
+      capsuleLog(`Opened: ${result.opened.join(", ")}`, "ok");
+    } else {
+      capsuleLog(result.error, "err");
+    }
+  } catch (e) {
+    capsuleLog(`Couldn't launch mockups: ${e.message || e}`, "err");
+  } finally {
+    btnLaunchMockups.disabled = false;
   }
 });
 
@@ -1095,3 +1130,94 @@ function markInboxRowOverridden(messageId, newDecision) {
 btnInboxStart.addEventListener("click", () => window.inboxAPI.start());
 btnInboxStop.addEventListener("click", () => window.inboxAPI.stop());
 btnInboxRefresh.addEventListener("click", () => loadInboxMessages());
+
+/* ── Settings tab -- LM Studio server/model control ───────────────────── */
+const btnSettingsRefresh      = document.getElementById("btnSettingsRefresh");
+const lmStudioServerDot       = document.getElementById("lmStudioServerDot");
+const lmStudioServerLabel     = document.getElementById("lmStudioServerLabel");
+const btnStartLmStudioServer  = document.getElementById("btnStartLmStudioServer");
+const lmStudioModelSelect     = document.getElementById("lmStudioModelSelect");
+const btnLoadLmStudioModel    = document.getElementById("btnLoadLmStudioModel");
+const lmStudioLoadedLabel     = document.getElementById("lmStudioLoadedLabel");
+
+async function loadSettingsPanel() {
+  lmStudioServerLabel.textContent = "Checking…";
+  lmStudioServerDot.className = "dot";
+  lmStudioModelSelect.disabled = true;
+  lmStudioModelSelect.innerHTML = "<option>Loading…</option>";
+  btnLoadLmStudioModel.disabled = true;
+
+  let status;
+  try {
+    status = await window.settingsAPI.refreshLmStudio();
+  } catch (e) {
+    lmStudioServerLabel.textContent = `Couldn't reach LM Studio: ${e.message || e}`;
+    lmStudioServerDot.classList.add("error");
+    lmStudioModelSelect.innerHTML = "<option>—</option>";
+    return;
+  }
+
+  lmStudioServerDot.classList.add(status.serverRunning ? "ok" : "error");
+  lmStudioServerLabel.textContent = status.serverRunning
+    ? "Server running"
+    : "Server not running";
+  btnStartLmStudioServer.hidden = status.serverRunning;
+
+  lmStudioModelSelect.innerHTML = "";
+  if (!status.models.length) {
+    lmStudioModelSelect.innerHTML = '<option value="">No models downloaded</option>';
+    lmStudioModelSelect.disabled = true;
+    btnLoadLmStudioModel.disabled = true;
+  } else {
+    status.models.forEach((m) => {
+      const opt = document.createElement("option");
+      opt.value = m.modelKey;
+      const isLoaded = status.loadedModelKeys.includes(m.modelKey);
+      opt.textContent = m.displayName + (isLoaded ? "  (loaded)" : "");
+      lmStudioModelSelect.appendChild(opt);
+    });
+    // Prefer whatever's already loaded as the selected option, so the
+    // dropdown reflects real state rather than always defaulting to the
+    // first entry.
+    const loadedOpt = Array.from(lmStudioModelSelect.options)
+      .find((o) => status.loadedModelKeys.includes(o.value));
+    if (loadedOpt) lmStudioModelSelect.value = loadedOpt.value;
+    lmStudioModelSelect.disabled = false;
+    btnLoadLmStudioModel.disabled = false;
+  }
+
+  lmStudioLoadedLabel.textContent = status.loadedModelKeys.length
+    ? `Loaded: ${status.loadedModelKeys.join(", ")}`
+    : "No model loaded";
+}
+
+btnSettingsRefresh.addEventListener("click", () => loadSettingsPanel());
+
+btnStartLmStudioServer.addEventListener("click", async () => {
+  btnStartLmStudioServer.disabled = true;
+  lmStudioServerLabel.textContent = "Starting…";
+  try {
+    const result = await window.settingsAPI.startLmStudioServer();
+    if (!result.ok) lmStudioServerLabel.textContent = result.error;
+  } catch (e) {
+    lmStudioServerLabel.textContent = `Couldn't start server: ${e.message || e}`;
+  } finally {
+    btnStartLmStudioServer.disabled = false;
+    loadSettingsPanel();
+  }
+});
+
+btnLoadLmStudioModel.addEventListener("click", async () => {
+  const modelKey = lmStudioModelSelect.value;
+  if (!modelKey) return;
+  btnLoadLmStudioModel.disabled = true;
+  lmStudioLoadedLabel.textContent = "Loading…";
+  try {
+    const result = await window.settingsAPI.loadLmStudioModel(modelKey);
+    lmStudioLoadedLabel.textContent = result.ok ? "Loaded." : result.error;
+  } catch (e) {
+    lmStudioLoadedLabel.textContent = `Couldn't load model: ${e.message || e}`;
+  } finally {
+    loadSettingsPanel();
+  }
+});

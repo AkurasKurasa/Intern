@@ -52,6 +52,12 @@
           <path d="M3 7l9 6 9-6" />
         </svg>
       </button>
+      <button class="side-btn" id="navSettings" type="button" title="Settings" aria-label="Settings">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6">
+          <circle cx="12" cy="12" r="3.2" />
+          <path d="M19.4 13a7.6 7.6 0 0 0 0-2l2-1.6-2-3.4-2.4 1a7.6 7.6 0 0 0-1.7-1L15 3h-6l-.3 2.3a7.6 7.6 0 0 0-1.7 1l-2.4-1-2 3.4L4.6 11a7.6 7.6 0 0 0 0 2l-2 1.6 2 3.4 2.4-1a7.6 7.6 0 0 0 1.7 1L9 21h6l.3-2.3a7.6 7.6 0 0 0 1.7-1l2.4 1 2-3.4z" />
+        </svg>
+      </button>
       <div class="side-status" id="sideStatus" title="Backend disconnected">
         <i class="dot" id="sideStatusDot"></i>ON
       </div>
@@ -160,6 +166,40 @@
           </div>
         </div>
       </div>
+
+      <!-- Settings -->
+      <div class="mid-panel" id="settingsWrap" hidden>
+        <header class="mid-head">
+          <div>
+            <p class="mono-eyebrow">CONFIGURATION</p>
+            <h2>Settings</h2>
+          </div>
+          <div class="mid-head-actions">
+            <button class="btn btn-ghost btn-sm" id="btnSettingsRefresh" type="button">Refresh</button>
+          </div>
+        </header>
+        <div class="mid-body">
+          <section class="settings-section">
+            <h3 class="rp-log-head">LM Studio</h3>
+            <p class="settings-hint">The local model server your tasks use for the LLM (the "WHAT to type/decide" half) when the provider is set to LM Studio.</p>
+
+            <div class="settings-row">
+              <span class="dot" id="lmStudioServerDot"></span>
+              <span id="lmStudioServerLabel">Checking…</span>
+              <button class="btn btn-primary btn-sm" id="btnStartLmStudioServer" type="button" hidden>Start server</button>
+            </div>
+
+            <label class="field-label" for="lmStudioModelSelect">Model</label>
+            <select class="field" id="lmStudioModelSelect" disabled>
+              <option>Loading…</option>
+            </select>
+            <div class="settings-row">
+              <button class="btn btn-primary btn-sm" id="btnLoadLmStudioModel" type="button" disabled>Load model</button>
+              <span id="lmStudioLoadedLabel" class="settings-hint"></span>
+            </div>
+          </section>
+        </div>
+      </div>
     </main>
 
     <!-- Right — recorder utility panel, hidden while viewing Tasks -->
@@ -223,6 +263,17 @@
         <label class="field-label" for="ppCheckpoint">Checkpoint</label>
         <select class="field" id="ppCheckpoint" disabled></select>
         <button class="btn btn-ghost btn-sm rp-replay" id="btnDeploy" type="button" hidden>Deploy this checkpoint</button>
+      </div>
+
+      <!-- Shown once a task is loaded into the slot above. Opens the real
+           target apps for that task -- for Task Filler, the Car Insurance
+           form + Notepad (the exact window run_task.py's countdown asks
+           you to already have open); for Sheet-to-Portal Matcher, the
+           source sheet + the mock portal, to look at before running. -->
+      <div id="ppTestGroup" hidden>
+        <label class="field-label">Test</label>
+        <p class="pp-test-hint" id="ppTestHint">Open the practice apps for this task.</p>
+        <button class="btn btn-ghost btn-sm" id="btnLaunchMockups" type="button">Launch mockups</button>
       </div>
 
       <div class="pp-warning">

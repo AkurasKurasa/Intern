@@ -1,5 +1,5 @@
 const { app, BrowserWindow, ipcMain, shell } = require("electron");
-const { spawn } = require("child_process");
+const { spawn, execFile } = require("child_process");
 const path = require("path");
 const fs = require("fs");
 const os = require("os");
@@ -34,6 +34,36 @@ function resolvePython() {
     return c;
   }
   return "python";
+}
+
+// Same shape as resolvePython() -- LM Studio's own CLI (bundled with the
+// desktop app, not on PATH by default) lives at ~/.lmstudio/bin/lms.exe.
+// Falls back to "lms" in case it's ever added to PATH directly.
+function resolveLmsCli() {
+  const candidates = [
+    path.join(os.homedir(), ".lmstudio", "bin", "lms.exe"),
+    "lms.exe",
+    "lms",
+  ];
+  for (const c of candidates) {
+    if (c.includes(path.sep) && !fs.existsSync(c)) continue;
+    return c;
+  }
+  return "lms";
+}
+
+// One-shot lms CLI call -- distinct from startBridge()'s long-lived
+// recorder_bridge.py process. execFile (not spawn) because every command
+// used here (server status/start, ls --json, ps --json, load) is a
+// bounded, one-shot call with output that fits comfortably in memory --
+// no need for streaming line-by-line the way capsule runs do.
+function runLmsCli(args, timeoutMs = 15000) {
+  return new Promise((resolve) => {
+    execFile(resolveLmsCli(), args, { timeout: timeoutMs, windowsHide: true },
+      (error, stdout, stderr) => {
+        resolve({ ok: !error, stdout: (stdout || "").trim(), stderr: (stderr || "").trim(), error });
+      });
+  });
 }
 
 let mainWindow = null;
@@ -446,6 +476,122 @@ ipcMain.handle("capsule-set-current", (_evt, capsuleName) => {
   currentCapsuleName = capsuleName || null;
   pushMiniWorkflowState();
 });
+// "Test" section (Play panel, below Checkpoint) -- lets the user open the
+// real target apps for a workflow themselves, before pressing Play, e.g.
+// to confirm the environment is ready or just to look around. Keyed by
+// capsule name, one source of truth here rather than duplicated in the
+// renderer. For form_filling (Scope #1) this opens the exact two apps
+// run_task.py's own countdown asks the user to already have open --
+// SOURCE_WINDOW's "Notepad" match and the wx Car Insurance form
+// (registry.json's trigger_apps: "Car Insurance"). For the
+// Sheet-to-Portal Matcher (Scope #2) there's no real screen-automation
+// target to "get ready" the way Scope #1 has -- automate.py opens its own
+// playwright browser itself -- so this opens the source spreadsheet and
+// the mock portal's own landing page instead, purely for the user to look
+// at, same source+target pairing as Scope #1's just for inspection.
+const TEST_MOCKUPS = {
+  form_filling: [
+    { type: "python", script: path.join(REPO_ROOT, "practice_apps", "car_insurance_entry", "car_insurance_form_wx.py") },
+    { type: "notepad", target: path.join(REPO_ROOT, "data_entry_tasks", "data_entry_intake.txt") },
+  ],
+  "Sheet-to-Portal Matcher": [
+    { type: "open", target: path.join(REPO_ROOT, "components", "scope2", "data", "sheets", "grade_sheet.xlsx") },
+    { type: "open", target: path.join(REPO_ROOT, "practice_apps", "mocksite", "index.html") },
+  ],
+};
+
+ipcMain.handle("test-launch-mockups", (_evt, capsuleName) => {
+  const targets = TEST_MOCKUPS[capsuleName];
+  if (!targets) {
+    return { ok: false, error: `No test mockups defined for '${capsuleName}'.` };
+  }
+  const opened = [];
+  try {
+    for (const t of targets) {
+      if (t.type === "python") {
+        const pythonExe = resolvePython();
+        const child = spawn(pythonExe, [t.script], {
+          cwd: REPO_ROOT, detached: true, stdio: "ignore", windowsHide: false,
+        });
+        child.unref();
+        opened.push(path.basename(t.script));
+      } else if (t.type === "notepad") {
+        // Explicit notepad.exe, not shell.openPath()'s default-app
+        // association -- run_task.py's SOURCE_WINDOW match requires the
+        // literal "Notepad" window title, which a different default .txt
+        // handler wouldn't produce.
+        const child = spawn("notepad.exe", [t.target], { detached: true, stdio: "ignore" });
+        child.unref();
+        opened.push(path.basename(t.target));
+      } else {
+        shell.openPath(t.target);
+        opened.push(path.basename(t.target));
+      }
+    }
+  } catch (e) {
+    return { ok: false, error: `Failed to launch mockups: ${e.message}` };
+  }
+  return { ok: true, opened };
+});
+
+// ── Settings tab -- LM Studio control via its own CLI (lms.exe), not a
+// new HTTP client of our own -- the exact same local server run_task.py's
+// LLMAgent already talks to at http://localhost:1234/v1 once it's running
+// with a model loaded. This tab exists so getting that server into a
+// working state doesn't require a separate terminal.
+ipcMain.handle("settings-lmstudio-refresh", async () => {
+  const [status, models, loaded] = await Promise.all([
+    runLmsCli(["server", "status"]),
+    runLmsCli(["ls", "--llm", "--json"]),
+    runLmsCli(["ps", "--json"]),
+  ]);
+  // "server status" has no --json form -- its stdout is a short, stable
+  // sentence ("The server is running on port 1234." / a not-running
+  // message), so this checks for the one substring that actually matters
+  // rather than parsing free text further.
+  const serverRunning = status.ok && /running/i.test(status.stdout);
+
+  let modelList = [];
+  try {
+    modelList = models.ok ? JSON.parse(models.stdout) : [];
+  } catch (e) {
+    modelList = [];
+  }
+  let loadedModels = [];
+  try {
+    loadedModels = loaded.ok ? JSON.parse(loaded.stdout) : [];
+  } catch (e) {
+    loadedModels = [];
+  }
+
+  return {
+    serverRunning,
+    serverMessage: status.stdout || status.stderr || "Couldn't reach lms CLI.",
+    models: modelList.map((m) => ({ modelKey: m.modelKey, displayName: m.displayName || m.modelKey })),
+    loadedModelKeys: loadedModels.map((m) => m.modelKey || m.identifier).filter(Boolean),
+  };
+});
+
+ipcMain.handle("settings-lmstudio-start-server", async () => {
+  const result = await runLmsCli(["server", "start"]);
+  if (!result.ok) {
+    return { ok: false, error: result.stderr || result.stdout || "Failed to start the LM Studio server." };
+  }
+  return { ok: true };
+});
+
+ipcMain.handle("settings-lmstudio-load-model", async (_evt, modelKey) => {
+  if (!modelKey) return { ok: false, error: "No model selected." };
+  // -y: non-interactive (the CLI otherwise prompts if the key matches
+  // more than one variant) -- loading itself can take a while for a
+  // multi-GB model, hence the longer timeout than the other lms calls.
+  const result = await runLmsCli(["load", modelKey, "-y"], 120000);
+  if (!result.ok) {
+    return { ok: false, error: result.stderr || result.stdout || `Failed to load ${modelKey}.` };
+  }
+  return { ok: true, message: result.stdout };
+});
+
 // The mini Play/Stop widget has no capsule-picker UI of its own -- Play
 // always means "run whatever's currently loaded in the main window's
 // Play panel," tracked via capsule-set-current above.
