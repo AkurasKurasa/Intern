@@ -22,11 +22,10 @@ setTimeout(() => { bridgeIsReady = true; maybeDismissSplash(); }, 4000);
    hidden on the Workflows tab -- that tab plays sessions instead. */
 const navRecorder = document.getElementById("navRecorder");
 const navWorkflows = document.getElementById("navWorkflows");
-const navInbox = document.getElementById("navInbox");
 const navSettings = document.getElementById("navSettings");
 const emptyState = document.getElementById("emptyState");
+const recordingView = document.getElementById("recordingView");
 const workflowsWrap = document.getElementById("workflowsWrap");
-const inboxWrap = document.getElementById("inboxWrap");
 const settingsWrap = document.getElementById("settingsWrap");
 const recorderPanel = document.getElementById("recorderPanel");
 const playPanel = document.getElementById("playPanel");
@@ -48,34 +47,42 @@ function showTasksSubview(name) {
   finishedView.hidden = name !== "finished";
 }
 
+// The two mutually-exclusive views inside Home -- the empty-state hero, or
+// the big-pane recording feed (mirrors showTasksSubview()'s running view --
+// same "the activity belongs in the big pane, not a cramped sidebar log"
+// treatment, direct user request).
+function showHomeSubview(name) {
+  emptyState.hidden = name !== "empty";
+  recordingView.hidden = name !== "recording";
+}
+
 function showMain(name) {
   const toHome = name === "home";
-  const toInbox = name === "inbox";
   const toSettings = name === "settings";
   const toWorkflows = name === "workflows";
-  emptyState.hidden = !toHome;
-  inboxWrap.hidden = !toInbox;
   settingsWrap.hidden = !toSettings;
   recorderPanel.hidden = !toHome;
   playPanel.hidden = !toWorkflows;
   navRecorder.classList.toggle("active", toHome);
   navWorkflows.classList.toggle("active", toWorkflows);
-  navInbox.classList.toggle("active", toInbox);
   navSettings.classList.toggle("active", toSettings);
   navRecorder.setAttribute("aria-current", toHome ? "page" : "false");
   navWorkflows.setAttribute("aria-current", toWorkflows ? "page" : "false");
-  navInbox.setAttribute("aria-current", toInbox ? "page" : "false");
   navSettings.setAttribute("aria-current", toSettings ? "page" : "false");
   if (toHome) {
+    // Recording already in progress (e.g. switched away and back) should
+    // still show the recording feed, not reset to the empty state --
+    // btnStop's disabled state is the existing source of truth for "is a
+    // recording actually running right now."
+    showHomeSubview(!btnStop.disabled ? "recording" : "empty");
     showTasksSubview("");
     refreshTaskCount();
-  } else if (toInbox) {
-    showTasksSubview("");
-    loadInboxMessages();
   } else if (toSettings) {
+    showHomeSubview("");
     showTasksSubview("");
-    loadSettingsPanel();
+    updateLlmProviderView();
   } else {
+    showHomeSubview("");
     // A capsule already running (e.g. the user switched to Home mid-run
     // and is coming back) should still show the running view, not reset
     // to the list -- btnStopCapsule's disabled state is the single
@@ -85,20 +92,20 @@ function showMain(name) {
   }
   // Tells main.js which mini overlay to show if the window gets
   // minimized from here -- recorder Start/Stop from Recorder, the round
-  // Play/Stop widget from Workflows. Inbox/Settings have no mini overlay
-  // of their own, so they fall into the same plain-recorder-widget branch
+  // Play/Stop widget from Workflows. Settings has no mini overlay of its
+  // own, so it falls into the same plain-recorder-widget branch
   // "workflows" used to be the only alternative to -- main.js's minimize
   // handler already treats anything other than "workflows" that way.
-  window.recorderAPI.setActiveSection(toWorkflows ? "workflows" : (toInbox ? "inbox" : "home"));
+  window.recorderAPI.setActiveSection(toWorkflows ? "workflows" : "home");
 }
 navRecorder.addEventListener("click", () => showMain("home"));
 navWorkflows.addEventListener("click", () => showMain("workflows"));
-navInbox.addEventListener("click", () => showMain("inbox"));
 navSettings.addEventListener("click", () => showMain("settings"));
 btnHomeStartRecording.addEventListener("click", () => btnStart.click());
 btnHomeBrowseTasks.addEventListener("click", () => navWorkflows.click());
 
 /* ── Recorder panel (always visible, right column) ────────────────────── */
+const statusBar   = document.getElementById("statusBar");
 const statusDot   = document.getElementById("statusDot");
 const statStatus  = document.getElementById("statStatus");
 const statFrames  = document.getElementById("statFrames");
@@ -107,7 +114,7 @@ const statSessions= document.getElementById("statSessions");
 const outDirInput = document.getElementById("outDir");
 const btnStart    = document.getElementById("btnStart");
 const btnStop     = document.getElementById("btnStop");
-const logEl       = document.getElementById("log");
+const recordingFeedEl = document.getElementById("recordingFeed");
 const clockEl     = document.getElementById("clock");
 const sideStatusDot = document.getElementById("sideStatusDot");
 const sideStatus     = document.getElementById("sideStatus");
@@ -123,13 +130,23 @@ function tickClock() {
 }
 tickClock();
 
+// Big-pane treatment (same pattern as the Play panel's stepFeed/
+// addStepFeedRaw below) instead of the old cramped sidebar log -- direct
+// user request ("implement it the same way you implemented the activity
+// when in the Workflow page, it gets viewed to the bigger pane").
 function log(message, level = "dim") {
   const row = document.createElement("div");
-  row.className = "log-entry";
-  const time = new Date().toLocaleTimeString();
-  row.innerHTML = `<span class="log-time">[${time}]</span> <span class="log-${level}">${message}</span>`;
-  logEl.appendChild(row);
-  logEl.scrollTop = logEl.scrollHeight;
+  row.className = "step-feed-item";
+  const label = document.createElement("span");
+  label.className = `sf-label log-${level}`;
+  label.textContent = message;
+  const time = document.createElement("span");
+  time.className = "sf-time";
+  time.textContent = new Date().toLocaleTimeString();
+  row.appendChild(label);
+  row.appendChild(time);
+  recordingFeedEl.appendChild(row);
+  recordingFeedEl.scrollTop = recordingFeedEl.scrollHeight;
 }
 
 function setRecording(isRecording) {
@@ -137,6 +154,12 @@ function setRecording(isRecording) {
   btnStop.disabled = !isRecording;
   statusDot.className = "dot" + (isRecording ? " recording" : "");
   statStatus.textContent = isRecording ? "Recording" : "Idle";
+  statusBar.classList.toggle("is-recording", isRecording);
+  // Swaps Home's big pane the moment recording actually starts/stops, not
+  // just on next navigation -- harmless to call even while Home isn't the
+  // currently-visible page, since showMain() re-derives this same state
+  // from btnStop.disabled on every visit anyway.
+  showHomeSubview(isRecording ? "recording" : "empty");
   // Drives the Start button's ink -> clay swap in style.css -- recording
   // shares the agent-control signal colour because the take being captured
   // is what will later drive the agent.
@@ -224,31 +247,18 @@ window.recorderAPI.onEvent((event) => {
       stopElapsedTimer();
       tbAgentPill.hidden = true;
       break;
-    // Inbox Router (Scope #3) events -- deliberately their own event names,
-    // not "error"/"log", since those two already carry recorder/capsule-
-    // specific side effects (setRecording, setCapsuleRunning, hideCountdown)
-    // that must never fire for an unrelated inbox problem.
+    // Inbox Router (Scope #3) events still arrive on this same stream from
+    // the backend (untouched -- this pass only removed the UI, not
+    // components/inbox_router/ or its bridge commands) but there's no
+    // longer any UI element for them to update, so they're silently
+    // ignored here rather than crashing on a null element lookup.
     case "inbox_poll_started":
-      setInboxRunning(true);
-      inboxProviderLabel.textContent = event.provider === "real"
-        ? "LIVE GMAIL" : "MOCK GMAIL — no live credentials";
-      break;
     case "inbox_routed":
-      upsertInboxRow(event);
-      break;
     case "inbox_confirm_applied":
-      markInboxRowConfirmed(event.message_id, event.decision);
-      break;
     case "inbox_override_applied":
-      markInboxRowOverridden(event.message_id, event.new_decision);
-      break;
     case "inbox_stopped":
-      setInboxRunning(false);
-      break;
     case "inbox_log":
-      break; // dev-detail stream; the plain-language row is what the UI shows
     case "inbox_error":
-      log(`Inbox Router: ${event.message}`, "err");
       break;
     default:
       console.log("Unhandled event:", event);
@@ -445,14 +455,6 @@ const PLACEHOLDER_EMOJI = "🧩";
 let capsulesCache = [];      // last fetched capsule list, from capsulesAPI.list()
 let currentCapsule = null;   // the one loaded in the play panel right now
 
-function timeAgo(ms) {
-  const s = Math.max(0, (Date.now() - ms) / 1000);
-  if (s < 60) return "just now";
-  if (s < 3600) return Math.floor(s / 60) + "m ago";
-  if (s < 86400) return Math.floor(s / 3600) + "h ago";
-  return Math.floor(s / 86400) + "d ago";
-}
-
 function capsuleLog(message, level = "dim") {
   const row = document.createElement("div");
   row.className = "log-entry";
@@ -537,18 +539,6 @@ function setCapsuleRunning(isRunning) {
   // copy in sync rather than duplicating this call at every currentCapsule
   // assignment site.
   window.capsulesAPI.setCurrent(currentCapsule ? currentCapsule.name : null);
-}
-
-// Script-kind capsules (e.g. Scope #2) get their own dedicated card in the
-// Workflow list (see loadWorkflows() below) and are loaded directly from
-// that click -- they're excluded here so an unrelated demo group never
-// falls back to guessing one of them.
-function findCapsuleForGroup(groupName) {
-  const agentCapsules = capsulesCache.filter((c) => c.kind !== "script");
-  if (agentCapsules.length === 1) return agentCapsules[0];
-  const byName = agentCapsules.find((c) => c.name === groupName);
-  if (byName) return byName;
-  return agentCapsules[0] || null;
 }
 
 /* Loads a capsule into the play panel for real -- called once the fly
@@ -694,7 +684,7 @@ async function chooseEmojiForCurrentCapsule(value) {
     const idx = capsulesCache.findIndex((c) => c.name === updated.name);
     if (idx !== -1) capsulesCache[idx] = updated;
     applyCapsuleEmojiDisplay(ppCapsuleEmoji, updated.emoji);
-    refreshGroupEmojis();
+    refreshChipEmojis();
   } catch (e) {
     capsuleLog(`Couldn't set emoji: ${e.message || e}`, "err");
   }
@@ -758,16 +748,13 @@ ppCapsuleEmoji.addEventListener("click", () => {
   document.addEventListener("keydown", handlePickerEscape, true);
 });
 
-/* Re-reads each visible group's mapped capsule and patches just its emoji
+/* Re-reads each visible task chip's own capsule and patches just its emoji
    span -- cheaper than a full loadWorkflows() and doesn't collapse
    whatever the user has open. */
-function refreshGroupEmojis() {
-  // Script-kind capsule cards (no dataset.groupName -- they're not a
-  // data/demos/ group) are skipped: their emoji is set directly from their
-  // own capsule object at render time, not looked up via findCapsuleForGroup.
-  workflowsListEl.querySelectorAll(".wf-group-head[data-group-name]").forEach((headEl) => {
-    const capsule = findCapsuleForGroup(headEl.dataset.groupName);
-    const emojiEl = headEl.querySelector(".wf-emoji");
+function refreshChipEmojis() {
+  workflowsListEl.querySelectorAll(".task-chip").forEach((chipEl) => {
+    const capsule = capsulesCache.find((c) => c.name === chipEl.dataset.capsuleName);
+    const emojiEl = chipEl.querySelector(".task-chip-emoji");
     if (emojiEl) applyCapsuleEmojiDisplay(emojiEl, capsule ? capsule.emoji : "");
   });
 }
@@ -834,15 +821,13 @@ async function populateOutDirOptions() {
 }
 populateOutDirOptions();
 
+// Tasks are shown as a grid of compact chips -- one per registered
+// capsule (agent-kind and script-kind alike), each a direct, clickable
+// tile into the Play panel. No nested "Takes" (recorded session) list
+// here anymore -- direct request to remove it; browsing individual
+// recordings isn't part of the Tasks page's job.
 async function loadWorkflows() {
   workflowsListEl.innerHTML = '<p class="muted">Loading…</p>';
-  let groups;
-  try {
-    groups = await window.workflowsAPI.list();
-  } catch (e) {
-    groups = [];
-    workflowsListEl.innerHTML = `<p class="muted">Couldn't read data/demos/ (${e.message || e}).</p>`;
-  }
   try {
     capsulesCache = await window.capsulesAPI.list();
   } catch (e) {
@@ -851,122 +836,44 @@ async function loadWorkflows() {
 
   workflowsListEl.innerHTML = "";
 
-  // Every registered capsule -- agent-kind (Scope #1) and script-kind
-  // (Scope #2) alike -- gets its own direct, clickable card here, shown
-  // unconditionally. Originally this only applied to script-kind capsules
-  // (they have no recorded data/demos/ group to hang a card off of at
-  // all), but an agent-kind capsule with zero recorded demo sessions was
-  // just as invisible for the same reason -- the workflow is fully
-  // runnable, it just never got its own card until a session existed.
-  // Direct user report: "Workflow section only shows sheet-to-portal" with
-  // an empty data/demos/ -- the car insurance capsule needs the same
-  // unconditional treatment, not a second-class one.
-  if (capsulesCache.length) {
-    const capsulesHead = document.createElement("h3");
-    capsulesHead.className = "wf-section-head";
-    capsulesHead.textContent = "Tasks";
-    workflowsListEl.appendChild(capsulesHead);
-  }
-  capsulesCache.forEach((capsule) => {
-    const card = document.createElement("div");
-    card.className = "wf-group wf-group-capsule";
-
-    const head = document.createElement("div");
-    head.className = "wf-group-head";
-    head.title = "Click to load this workflow into Play";
-    const emojiValue = capsule.emoji || "";
-    const emojiText = emojiValue || PLACEHOLDER_EMOJI;
-    const emojiClass = "wf-emoji" + (emojiValue ? "" : " is-placeholder");
-    head.innerHTML =
-      `<span><span class="${emojiClass}">${emojiText}</span><span class="name">${escapeHtml(capsule.name)}</span></span>` +
-      `<span class="meta">${escapeHtml(capsule.description || "")}</span>`;
-    head.addEventListener("click", () => {
-      workflowsListEl.querySelectorAll(".wf-group.capsule-selected")
-        .forEach((el) => el.classList.remove("capsule-selected"));
-      card.classList.add("capsule-selected");
-      loadCapsuleIntoSlot(capsule);
-      flashPlaySlot();
-    });
-    card.appendChild(head);
-    workflowsListEl.appendChild(card);
-  });
-
-  if (!capsulesCache.length && (!groups || !groups.length)) {
-    const empty = document.createElement("p");
-    empty.className = "muted";
-    empty.textContent = "No tasks yet — register a capsule or start a recording from the Recorder tab.";
-    workflowsListEl.appendChild(empty);
-    workflowsLoaded = true;
-    refreshTaskCount();
-    return;
-  }
-  if (!groups || !groups.length) {
+  if (!capsulesCache.length) {
+    workflowsListEl.innerHTML =
+      '<p class="muted">No tasks yet — register a capsule or start a recording from the Recorder tab.</p>';
     workflowsLoaded = true;
     refreshTaskCount();
     return;
   }
 
-  const sessionsHead = document.createElement("h3");
-  sessionsHead.className = "wf-section-head";
-  sessionsHead.textContent = "Takes";
-  workflowsListEl.appendChild(sessionsHead);
+  const grid = document.createElement("div");
+  grid.className = "task-chip-grid";
+  capsulesCache.forEach((capsule) => grid.appendChild(buildTaskChip(capsule)));
+  workflowsListEl.appendChild(grid);
 
-  groups.forEach((g, gi) => {
-    const card = document.createElement("div");
-    card.className = "wf-group" + (gi === 0 ? " open" : "");
-
-    const head = document.createElement("div");
-    head.className = "wf-group-head";
-    head.title = "Click to expand and load this capsule into Play";
-    head.dataset.groupName = g.name;
-    const headCapsule = findCapsuleForGroup(g.name);
-    const headEmojiValue = headCapsule ? headCapsule.emoji : "";
-    const headEmojiText = headEmojiValue || PLACEHOLDER_EMOJI;
-    const headEmojiClass = "wf-emoji" + (headEmojiValue ? "" : " is-placeholder");
-    head.innerHTML =
-      `<span><span class="chev">▸</span><span class="${headEmojiClass}">${headEmojiText}</span><span class="name">${escapeHtml(g.name)}</span></span>` +
-      `<span class="meta">${g.sessionCount} session${g.sessionCount===1?"":"s"} · ${g.totalSteps.toLocaleString()} steps</span>`;
-    head.addEventListener("click", () => {
-      card.classList.toggle("open");
-      const capsule = findCapsuleForGroup(g.name);
-      if (!capsule) {
-        capsuleLog(`No task registered yet for '${g.name}'.`, "dim");
-        return;
-      }
-      workflowsListEl.querySelectorAll(".wf-group.capsule-selected")
-        .forEach((el) => el.classList.remove("capsule-selected"));
-      card.classList.add("capsule-selected");
-      loadCapsuleIntoSlot(capsule);
-      flashPlaySlot();
-    });
-    card.appendChild(head);
-
-    const body = document.createElement("div");
-    body.className = "wf-sessions";
-    if (!g.sessions.length) {
-      const empty = document.createElement("p");
-      empty.className = "muted wf-empty-hint";
-      empty.textContent = "No sessions yet — record one from the Recorder tab.";
-      body.appendChild(empty);
-    }
-    g.sessions.forEach((s) => {
-      const row = document.createElement("div");
-      row.className = "wf-session";
-      const left = document.createElement("span");
-      left.className = "sname";
-      left.textContent = s.name;
-      const right = document.createElement("span");
-      right.className = "ssteps";
-      right.textContent = `${s.steps.toLocaleString()} steps · ${timeAgo(s.mtime)}`;
-      row.appendChild(left);
-      row.appendChild(right);
-      body.appendChild(row);
-    });
-    card.appendChild(body);
-    workflowsListEl.appendChild(card);
-  });
   workflowsLoaded = true;
   refreshTaskCount();
+}
+
+function buildTaskChip(capsule) {
+  const chip = document.createElement("button");
+  chip.type = "button";
+  chip.className = "task-chip";
+  chip.title = "Click to load this task into Play";
+  chip.dataset.capsuleName = capsule.name;
+  const emojiValue = capsule.emoji || "";
+  const emojiText = emojiValue || PLACEHOLDER_EMOJI;
+  const emojiClass = "task-chip-emoji" + (emojiValue ? "" : " is-placeholder");
+  chip.innerHTML =
+    `<span class="${emojiClass}">${emojiText}</span>` +
+    `<span class="task-chip-name">${escapeHtml(capsule.name)}</span>` +
+    `<span class="task-chip-desc">${escapeHtml(capsule.description || "")}</span>`;
+  chip.addEventListener("click", () => {
+    workflowsListEl.querySelectorAll(".task-chip.capsule-selected")
+      .forEach((el) => el.classList.remove("capsule-selected"));
+    chip.classList.add("capsule-selected");
+    loadCapsuleIntoSlot(capsule);
+    flashPlaySlot();
+  });
+  return chip;
 }
 
 function escapeHtml(s) {
@@ -1008,128 +915,6 @@ wfCreateSubmit.addEventListener("click", async () => {
     capsuleLog(`Couldn't create workflow: ${e.message || e}`, "err");
   }
 });
-
-/* ── Inbox (Scope #3) ──────────────────────────────────────────────────── */
-const inboxCountLineEl = document.getElementById("inboxCountLine");
-const inboxProviderLabel = document.getElementById("inboxProviderLabel");
-const btnInboxStart = document.getElementById("btnInboxStart");
-const btnInboxStop = document.getElementById("btnInboxStop");
-const btnInboxRefresh = document.getElementById("btnInboxRefresh");
-const inboxListEl = document.getElementById("inboxList");
-
-const DECISION_LABELS = {
-  route_scope1: "Routed to form-filler", route_scope2: "Routed to sheet-matcher",
-  reply: "Reply suggested", forward: "Forward suggested",
-  flag: "Flagged for review", leave_alone: "Left alone",
-};
-
-function decisionLabel(decision) {
-  return DECISION_LABELS[decision] || decision;
-}
-
-function setInboxRunning(isRunning) {
-  btnInboxStart.disabled = isRunning;
-  btnInboxStop.disabled = !isRunning;
-}
-
-async function loadInboxMessages() {
-  let messages = [];
-  try {
-    messages = await window.inboxAPI.list();
-  } catch (e) {
-    inboxListEl.innerHTML = `<p class="muted">Couldn't read Inbox Router history (${e.message || e}).</p>`;
-    return;
-  }
-  inboxListEl.innerHTML = "";
-  if (!messages.length) {
-    inboxListEl.innerHTML = '<p class="muted">Not started. Click Start to begin routing mail.</p>';
-  } else {
-    // Newest first.
-    messages.slice().reverse().forEach((msg) => inboxListEl.appendChild(buildInboxRow(msg)));
-  }
-  inboxCountLineEl.textContent = `${messages.length} ROUTED`;
-}
-
-// Pure builder -- returns a detached row element, doesn't touch the DOM
-// itself. loadInboxMessages() appends in order; upsertInboxRow() below
-// prepends a single row live as inbox_routed events arrive.
-function buildInboxRow(msg) {
-  const row = document.createElement("div");
-  row.className = "inbox-row";
-  row.dataset.messageId = msg.message_id;
-
-  const main = document.createElement("div");
-  main.className = "inbox-row-main";
-  const chipClass = "inbox-decision-chip" +
-    (msg.status === "confirmed" ? " confirmed" : "") +
-    (msg.decision === "flag" ? " flag" : "");
-  main.innerHTML =
-    `<span class="inbox-row-subject">${escapeHtml(msg.subject || "(no subject)")}</span>` +
-    `<span class="inbox-row-sender">${escapeHtml(msg.sender || "")}</span>` +
-    `<span class="${chipClass}">${escapeHtml(decisionLabel(msg.decision))}</span>` +
-    `<span class="inbox-row-rationale">${escapeHtml(msg.rationale || "")}</span>`;
-  row.appendChild(main);
-
-  if (msg.status === "pending") {
-    const actions = document.createElement("div");
-    actions.className = "inbox-row-actions";
-    const confirmBtn = document.createElement("button");
-    confirmBtn.className = "btn btn-primary btn-sm";
-    confirmBtn.type = "button";
-    confirmBtn.textContent = "Confirm";
-    confirmBtn.addEventListener("click", () => onInboxConfirmClick(msg));
-    actions.appendChild(confirmBtn);
-    row.appendChild(actions);
-  }
-  return row;
-}
-
-// The Scope #1/#2 handoff reuses the existing, unmodified capsule-run IPC
-// call verbatim -- Inbox Router itself does nothing Gmail-side for these
-// two decisions; router.py's confirm_suggestion() only records that this
-// happened and feeds the pattern profile.
-function onInboxConfirmClick(msg) {
-  if ((msg.decision === "route_scope1" || msg.decision === "route_scope2") && msg.capsule_name) {
-    window.capsulesAPI.run(msg.capsule_name);
-  }
-  window.inboxAPI.confirm(msg.message_id, msg.decision);
-}
-
-function upsertInboxRow(msg) {
-  const existing = inboxListEl.querySelector(`[data-message-id="${CSS.escape(msg.message_id)}"]`);
-  if (existing) existing.remove();
-  const empty = inboxListEl.querySelector(".muted");
-  if (empty) empty.remove();
-  inboxListEl.insertBefore(buildInboxRow(msg), inboxListEl.firstChild);
-  refreshInboxCount();
-}
-
-function refreshInboxCount() {
-  inboxCountLineEl.textContent = `${inboxListEl.querySelectorAll(".inbox-row").length} ROUTED`;
-}
-
-function markInboxRowConfirmed(messageId, decision) {
-  const row = inboxListEl.querySelector(`[data-message-id="${CSS.escape(messageId)}"]`);
-  if (!row) return;
-  const chip = row.querySelector(".inbox-decision-chip");
-  if (chip) {
-    chip.classList.add("confirmed");
-    chip.textContent = decisionLabel(decision);
-  }
-  const actions = row.querySelector(".inbox-row-actions");
-  if (actions) actions.remove();
-}
-
-function markInboxRowOverridden(messageId, newDecision) {
-  const row = inboxListEl.querySelector(`[data-message-id="${CSS.escape(messageId)}"]`);
-  if (!row) return;
-  const chip = row.querySelector(".inbox-decision-chip");
-  if (chip) chip.textContent = decisionLabel(newDecision);
-}
-
-btnInboxStart.addEventListener("click", () => window.inboxAPI.start());
-btnInboxStop.addEventListener("click", () => window.inboxAPI.stop());
-btnInboxRefresh.addEventListener("click", () => loadInboxMessages());
 
 /* ── Settings tab -- LM Studio server/model control ───────────────────── */
 const btnSettingsRefresh      = document.getElementById("btnSettingsRefresh");
@@ -1191,7 +976,23 @@ async function loadSettingsPanel() {
     : "No model loaded";
 }
 
-btnSettingsRefresh.addEventListener("click", () => loadSettingsPanel());
+// ── LLM provider dropdown -- LM Studio keeps its full working panel above;
+// other providers are real, known providers (agent.py already supports
+// anthropic/groq/gemini/lmstudio) but aren't configurable from this screen
+// yet -- honestly labeled as .env-only rather than faked with dead controls.
+const llmProviderSelect  = document.getElementById("llmProviderSelect");
+const llmProviderLmStudio = document.getElementById("llmProviderLmStudio");
+const llmProviderOther   = document.getElementById("llmProviderOther");
+
+function updateLlmProviderView() {
+  const isLmStudio = llmProviderSelect.value === "lmstudio";
+  llmProviderLmStudio.hidden = !isLmStudio;
+  llmProviderOther.hidden = isLmStudio;
+  if (isLmStudio) loadSettingsPanel();
+}
+llmProviderSelect.addEventListener("change", updateLlmProviderView);
+
+btnSettingsRefresh.addEventListener("click", () => updateLlmProviderView());
 
 btnStartLmStudioServer.addEventListener("click", async () => {
   btnStartLmStudioServer.disabled = true;
@@ -1221,3 +1022,36 @@ btnLoadLmStudioModel.addEventListener("click", async () => {
     loadSettingsPanel();
   }
 });
+
+// ── Vision section -- perception backend preference. Real, working
+// control (persists via localStorage), but honestly scoped: run_task.py's
+// own --perception uia|vision flag exists, but nothing in the bridge/IPC
+// chain passes it through for a live Play run yet -- that's a real,
+// separate backend change, not part of this UI pass. Excel is included
+// as a 4th option alongside the three requested (UIA Tree/VLM/OCR)
+// because it's a real, already-built perception backend in this project
+// (ExcelObserver, proven for Scope #2), not an invented one.
+const visionOptions = document.getElementById("visionOptions");
+const visionSavedHint = document.getElementById("visionSavedHint");
+const VISION_STORAGE_KEY = "intern.visionBackend";
+const VISION_LABELS = { uia: "UIA Tree", vlm: "VLM", ocr: "OCR", excel: "Excel" };
+
+function loadVisionPreference() {
+  let saved = "uia";
+  try {
+    saved = localStorage.getItem(VISION_STORAGE_KEY) || "uia";
+  } catch (e) { /* localStorage unavailable -- fall back to the default */ }
+  const radio = visionOptions.querySelector(`input[value="${saved}"]`);
+  if (radio) radio.checked = true;
+  visionSavedHint.textContent =
+    `Saved: ${VISION_LABELS[saved] || saved} (preference only — not yet wired into a live run).`;
+}
+visionOptions.addEventListener("change", (e) => {
+  if (e.target.name !== "vision") return;
+  try {
+    localStorage.setItem(VISION_STORAGE_KEY, e.target.value);
+  } catch (err) { /* localStorage unavailable -- selection still applies visually */ }
+  visionSavedHint.textContent =
+    `Saved: ${VISION_LABELS[e.target.value] || e.target.value} (preference only — not yet wired into a live run).`;
+});
+loadVisionPreference();

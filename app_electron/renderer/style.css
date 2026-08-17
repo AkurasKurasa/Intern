@@ -259,15 +259,16 @@ p { text-wrap: pretty; }
 }
 .home-glossary dd { margin: 0; font-size: 12.5px; color: var(--text-secondary); }
 
-.mid-panel { position: absolute; inset: 0; display: flex; flex-direction: column; padding: 20px 24px; overflow-y: auto; }
+.mid-panel { position: absolute; inset: 0; display: flex; flex-direction: column; padding: 26px 30px; overflow-y: auto; }
 .mid-head {
   display: flex; align-items: flex-end; justify-content: space-between;
-  padding-bottom: 14px; margin-bottom: 16px; border-bottom: 1px solid var(--border-strong);
+  padding-bottom: 18px; margin-bottom: 22px; border-bottom: 1px solid var(--border-strong);
   flex: none;
 }
-.mid-head h2 { margin: 4px 0 0; font-size: 24px; font-weight: 700; letter-spacing: -.01em; }
-.mid-head-actions { display: flex; gap: 8px; flex: none; }
+.mid-head h2 { margin: 6px 0 0; font-size: 24px; font-weight: 700; letter-spacing: -.01em; }
+.mid-head-actions { display: flex; gap: 10px; flex: none; }
 .mid-body { flex: 1; min-height: 0; overflow-y: auto; }
+.mid-body .settings-section + .settings-section { margin-top: 28px; }
 
 .wf-create-form { display: flex; gap: 8px; margin: 0 0 14px; }
 .wf-create-form[hidden] { display: none; }
@@ -394,12 +395,25 @@ p { text-wrap: pretty; }
 }
 .clock { font-family: var(--font-mono); font-size: 10.5px; color: var(--text-muted); }
 
+/* Idle/Recording indicator -- a real status badge (bigger dot, mono
+   uppercase label, tinted background while active) rather than a small
+   dot + plain word, so the current state reads at a glance. */
 .rp-status {
-  display: flex; align-items: center; gap: 7px;
+  display: flex; align-items: center; gap: 8px;
   background: var(--card); border: 1px solid var(--border-strong);
-  border-radius: var(--radius-sm); padding: 7px 10px;
+  border-radius: var(--radius-sm); padding: 9px 12px;
   font-size: 12.5px; font-weight: 600;
+  transition: background .15s ease, border-color .15s ease;
 }
+.rp-status .dot { width: 10px; height: 10px; }
+.rp-status-text {
+  font-family: var(--font-mono); text-transform: uppercase; letter-spacing: .07em;
+  font-size: 11.5px; color: var(--text-secondary);
+}
+.rp-status.is-recording {
+  background: var(--clay-tint-bg); border-color: var(--clay-tint-border);
+}
+.rp-status.is-recording .rp-status-text { color: var(--clay-tint-text); font-weight: 700; }
 .rp-stats {
   font-size: 11.5px; color: var(--text-muted); font-family: var(--font-mono);
   display: flex; align-items: baseline; gap: 4px;
@@ -451,9 +465,25 @@ p { text-wrap: pretty; }
 .dot.error { background: var(--error); }
 .dot.ok { background: var(--success); }
 
-.settings-section { max-width: 480px; }
-.settings-hint { font-size: 11.5px; color: var(--text-muted); margin: 4px 0 10px; }
-.settings-row { display: flex; align-items: center; gap: 8px; margin: 6px 0 12px; }
+.settings-section { max-width: 560px; }
+.settings-hint { font-size: 11.5px; color: var(--text-muted); margin: 4px 0 14px; }
+.settings-row { display: flex; align-items: center; gap: 8px; margin: 8px 0 16px; }
+.settings-section .rp-log-head { margin-bottom: 4px; }
+
+/* ── Vision section — a card per perception backend, radio-driven ────── */
+.vision-options { display: flex; flex-direction: column; gap: 10px; margin-top: 10px; }
+.vision-option {
+  display: grid; grid-template-columns: auto 1fr; column-gap: 10px; row-gap: 2px;
+  align-items: start;
+  border: 1px solid var(--border-strong); border-radius: var(--radius-sm);
+  padding: 12px 14px; cursor: pointer;
+  transition: border-color .12s ease, background .12s ease;
+}
+.vision-option:hover { border-color: var(--ink); }
+.vision-option:has(input:checked) { border-color: var(--accent-blue); background: var(--accent-blue-tint-bg); }
+.vision-option input { grid-row: 1 / 3; margin-top: 3px; accent-color: var(--accent-blue); }
+.vision-option-name { font-size: 13px; font-weight: 600; color: var(--ink); }
+.vision-option-desc { font-size: 11.5px; color: var(--text-muted); line-height: 1.4; }
 
 .log {
   flex: 1; min-height: 0;
@@ -501,87 +531,49 @@ p { text-wrap: pretty; }
 
 .muted { color: var(--text-muted); font-size: 13px; line-height: 1.6; margin: 0; }
 
-/* ── Tasks list ────────────────────────────────────────────────────────── */
+/* ── Tasks list — chip grid ────────────────────────────────────────────
+   Each task is a compact, self-contained tile rather than a stacked list
+   row -- direct request ("turn them into microchips, let's try that").
+   No nested "Takes" list anymore either (separate direct request) -- a
+   chip is a leaf, not an expandable row. */
 .workflows-list { display: flex; flex-direction: column; }
-.wf-section-head {
-  margin: 14px 0 2px; font-size: 11px; color: var(--text-muted);
-  text-transform: uppercase; letter-spacing: .08em; font-weight: 500;
-  font-family: var(--font-mono);
+.task-chip-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(152px, 1fr));
+  gap: 14px;
+  margin-top: 6px;
 }
-.wf-section-head:first-child { margin-top: 4px; }
-.wf-group {
-  border-bottom: 1px solid var(--border);
-  padding: 10px 2px;
-  border-radius: 6px;
+.task-chip {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 8px;
+  text-align: left;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  background: var(--card);
+  padding: 16px;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+  transition: border-color .12s ease, background .12s ease, transform .12s ease, box-shadow .12s ease;
 }
-.wf-group:last-child { border-bottom: none; }
-.wf-group-head {
-  display: flex; align-items: baseline; justify-content: space-between;
-  cursor: pointer; user-select: none;
-  padding: 4px 6px; border-radius: 6px;
-  transition: background .12s ease;
+.task-chip:hover { border-color: var(--ink); transform: translateY(-1px); box-shadow: 0 4px 10px rgba(22,21,15,.06); }
+.task-chip:focus-visible { outline: 2px solid var(--accent-blue); outline-offset: 2px; }
+.task-chip.capsule-selected {
+  border-color: var(--accent-blue); background: var(--accent-blue-tint-bg);
 }
-.wf-group-head:hover { background: var(--sunk); }
-.wf-group.capsule-selected .wf-group-head { background: var(--accent-blue-tint-bg); }
-.wf-group.capsule-selected .wf-group-head .name { color: var(--accent-blue); font-weight: 600; }
-/* SELECTED chip -- pure CSS, no markup needed: the state is already the
-   `.capsule-selected` class toggled from renderer.js. */
-.wf-group.capsule-selected .wf-group-head .meta::after {
-  content: "SELECTED";
-  margin-left: 8px;
-  font-family: var(--font-mono); font-size: 9px; font-weight: 700; letter-spacing: .08em;
-  color: var(--accent-blue); background: var(--accent-blue-tint-bg);
-  border: 1px solid var(--accent-blue-tint-border);
-  border-radius: 4px; padding: 1px 5px;
-}
-.wf-group-head .name { font-size: 13px; font-weight: 500; color: var(--ink); }
-.wf-group-head .meta { font-size: 11px; color: var(--text-muted); font-family: var(--font-mono); }
-.wf-group-head .chev { font-size: 9px; color: var(--text-muted); margin-right: 6px; }
-.wf-group-head .wf-emoji {
-  margin-right: 6px; font-size: 13px;
+.task-chip-emoji {
+  font-size: 22px;
   display: inline-flex; align-items: center; justify-content: center;
-  width: 18px; height: 18px; border-radius: 5px;
+  width: 42px; height: 42px; border-radius: var(--radius-sm);
+  background: var(--sunk);
 }
-.wf-group-head .wf-emoji.is-placeholder { background: var(--sunk); }
-
-.wf-sessions { margin-top: 8px; display: none; }
-.wf-group.open .wf-sessions { display: block; }
-.wf-session {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 5px 0 5px 16px; font-size: 12px;
+.task-chip-emoji.is-placeholder { opacity: .5; }
+.task-chip-name { font-size: 13.5px; font-weight: 600; color: var(--ink); }
+.task-chip.capsule-selected .task-chip-name { color: var(--accent-blue); }
+.task-chip-desc {
+  font-size: 11.5px; color: var(--text-muted); line-height: 1.4;
+  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical;
+  overflow: hidden;
 }
-.wf-session .sname { color: var(--text-secondary); }
-.wf-session .ssteps { color: var(--text-muted); font-size: 11px; font-family: var(--font-mono); }
-.wf-empty-hint { padding: 4px 0 4px 16px; }
-
-/* ── Inbox (Scope #3) — no clay anywhere here: a routing decision being
-   made is not "the agent has control of your mouse and keyboard" in the
-   Play/Record sense, so this reuses ink/success/muted/accent-blue only. ── */
-.inbox-provider-label { margin: 2px 0 12px; }
-.inbox-list { display: flex; flex-direction: column; gap: 10px; }
-.inbox-row {
-  border: 1px solid var(--border); border-radius: var(--radius-sm);
-  padding: 12px 14px; background: var(--card);
-  display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;
-}
-.inbox-row-main { min-width: 0; flex: 1; }
-.inbox-row-subject { font-size: 13.5px; font-weight: 600; color: var(--ink); }
-.inbox-row-sender {
-  font-size: 11px; color: var(--text-muted); font-family: var(--font-mono);
-  margin-left: 8px;
-}
-.inbox-decision-chip {
-  display: inline-block; margin-top: 5px;
-  font-family: var(--font-mono); font-size: 10px; font-weight: 700; letter-spacing: .06em;
-  text-transform: uppercase; border-radius: 4px; padding: 2px 7px;
-  background: var(--accent-blue-tint-bg); color: var(--accent-blue);
-  border: 1px solid var(--accent-blue-tint-border);
-}
-.inbox-decision-chip.confirmed { background: #EAF3EC; color: var(--success); border-color: #C9E0CD; }
-.inbox-decision-chip.flag { background: var(--sunk); color: var(--text-secondary); border-color: var(--border-strong); }
-.inbox-row-rationale { display: block; font-size: 11.5px; color: var(--text-secondary); margin-top: 4px; }
-.inbox-row-actions { display: flex; flex-direction: column; gap: 6px; flex: none; }
-.inbox-row-actions .btn { flex: none; padding: 5px 10px; font-size: 11.5px; }
 
 /* ── Running view ─────────────────────────────────────────────────────── */
 .running-banner {
