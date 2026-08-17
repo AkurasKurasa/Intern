@@ -107,3 +107,7 @@ components/inbox_router/data/routed_history.json
 # (synthetic test data), only what it generates at runtime is ignored.
 components/inbox_router/data/mock_state.json
 components/inbox_router/data/mock_drafts.json
+
+# Exported Electron build (electron-builder --dir output, copied to root
+# on request) — a ~266MB local artifact, never something to commit.
+/Intern-app/

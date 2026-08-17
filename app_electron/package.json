@@ -23,6 +23,14 @@
       "main.js",
       "preload.js",
       "renderer/**/*"
+    ],
+    "extraResources": [
+      { "from": "../app", "to": "app", "filter": ["**/*", "!**/__pycache__/**"] },
+      { "from": "../components", "to": "components", "filter": ["**/*", "!**/__pycache__/**"] },
+      { "from": "../tasks", "to": "tasks", "filter": ["**/*", "!**/__pycache__/**", "!**/traces/**", "!**/traces_aug/**", "!**/submissions/**"] },
+      { "from": "../practice_apps", "to": "practice_apps", "filter": ["**/*", "!**/__pycache__/**"] },
+      { "from": "../data_entry_tasks", "to": "data_entry_tasks", "filter": ["**/*"] },
+      { "from": "../run_task.py", "to": "run_task.py" }
     ]
   }
 }

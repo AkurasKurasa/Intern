@@ -1,0 +1,557 @@
+{
+  "variant": "v0_base",
+  "mapping": "C:\\Users\\paula\\AppData\\Local\\Temp\\tmpqud655ht\\induced_mapping.json",
+  "started": "2026-08-17T03:15:10+00:00",
+  "dry_run": false,
+  "rows": [
+    {
+      "row": 1,
+      "student_id": "2021-10001",
+      "status": "filled",
+      "reason": "",
+      "filled": {
+        "Year 1-5": "2",
+        "Grade 0-100": "85",
+        "Course": "BS Information Systems",
+        "Remarks": "Passed"
+      },
+      "verified": {
+        "Year 1-5": "2",
+        "Grade 0-100": "85",
+        "Course": "BS Information Systems",
+        "Remarks": "Passed"
+      },
+      "escalations": []
+    },
+    {
+      "row": 2,
+      "student_id": "2021-10008",
+      "status": "filled",
+      "reason": "",
+      "filled": {
+        "Year 1-5": "2",
+        "Grade 0-100": "96",
+        "Course": "BS Information Systems",
+        "Remarks": "Passed"
+      },
+      "verified": {
+        "Year 1-5": "2",
+        "Grade 0-100": "96",
+        "Course": "BS Information Systems",
+        "Remarks": "Passed"
+      },
+      "escalations": []
+    },
+    {
+      "row": 3,
+      "student_id": "2021-10015",
+      "status": "filled",
+      "reason": "",
+      "filled": {
+        "Year 1-5": "3",
+        "Grade 0-100": "95",
+        "Course": "BS Information Systems",
+        "Remarks": "Passed"
+      },
+      "verified": {
+        "Year 1-5": "3",
+        "Grade 0-100": "95",
+        "Course": "BS Information Systems",
+        "Remarks": "Passed"
+      },
+      "escalations": []
+    },
+    {
+      "row": 4,
+      "student_id": "2021-10022",
+      "status": "filled",
+      "reason": "",
+      "filled": {
+        "Year 1-5": "2",
+        "Grade 0-100": "87",
+        "Course": "BS Information Technology",
+        "Remarks": "Passed"
+      },
+      "verified": {
+        "Year 1-5": "2",
+        "Grade 0-100": "87",
+        "Course": "BS Information Technology",
+        "Remarks": "Passed"
+      },
+      "escalations": []
+    },
+    {
+      "row": 5,
+      "student_id": "2021-10029",
+      "status": "filled",
+      "reason": "",
+      "filled": {
+        "Year 1-5": "1",
+        "Grade 0-100": "72",
+        "Course": "BS Information Systems",
+        "Remarks": "Failed"
+      },
+      "verified": {
+        "Year 1-5": "1",
+        "Grade 0-100": "72",
+        "Course": "BS Information Systems",
+        "Remarks": "Failed"
+      },
+      "escalations": []
+    }
+  ],
+  "committed": true,
+  "commit_status": "Saved 5 rows.",
+  "portal_state": [
+    {
+      "student_id": "2021-10001",
+      "student_name": "Abad, Andrea A.",
+      "course": "BS Information Systems",
+      "year": "2",
+      "grade": "85",
+      "remarks": "Passed",
+      "recommendations": ""
+    },
+    {
+      "student_id": "2021-10008",
+      "student_name": "Aguilar, Benjamin L.",
+      "course": "BS Information Systems",
+      "year": "2",
+      "grade": "96",
+      "remarks": "Passed",
+      "recommendations": ""
+    },
+    {
+      "student_id": "2021-10015",
+      "student_name": "Alonzo, Camille W.",
+      "course": "BS Information Systems",
+      "year": "3",
+      "grade": "95",
+      "remarks": "Passed",
+      "recommendations": ""
+    },
+    {
+      "student_id": "2021-10022",
+      "student_name": "Bautista, Daniel H.",
+      "course": "BS Information Technology",
+      "year": "2",
+      "grade": "87",
+      "remarks": "Passed",
+      "recommendations": ""
+    },
+    {
+      "student_id": "2021-10029",
+      "student_name": "Bernardo, Elaine S.",
+      "course": "BS Information Systems",
+      "year": "1",
+      "grade": "72",
+      "remarks": "Failed",
+      "recommendations": ""
+    },
+    {
+      "student_id": "2021-10036",
+      "student_name": "Cabrera, Francis D.",
+      "course": "",
+      "year": "",
+      "grade": "",
+      "remarks": "",
+      "recommendations": ""
+    },
+    {
+      "student_id": "2021-10043",
+      "student_name": "Castillo, Grace O.",
+      "course": "",
+      "year": "",
+      "grade": "",
+      "remarks": "",
+      "recommendations": ""
+    },
+    {
+      "student_id": "2021-10050",
+      "student_name": "Concepcion, Hector Z.",
+      "course": "",
+      "year": "",
+      "grade": "",
+      "remarks": "",
+      "recommendations": ""
+    },
+    {
+      "student_id": "2021-10057",
+      "student_name": "Cruz, Isabel K.",
+      "course": "",
+      "year": "",
+      "grade": "",
+      "remarks": "",
+      "recommendations": ""
+    },
+    {
+      "student_id": "2021-10064",
+      "student_name": "Dacanay, Joaquin V.",
+      "course": "",
+      "year": "",
+      "grade": "",
+      "remarks": "",
+      "recommendations": ""
+    },
+    {
+      "student_id": "2021-10071",
+      "student_name": "Dela Cruz, Katrina G.",
+      "course": "",
+      "year": "",
+      "grade": "",
+      "remarks": "",
+      "recommendations": ""
+    },
+    {
+      "student_id": "2021-10078",
+      "student_name": "Domingo, Lorenzo R.",
+      "course": "",
+      "year": "",
+      "grade": "",
+      "remarks": "",
+      "recommendations": ""
+    },
+    {
+      "student_id": "2021-10085",
+      "student_name": "Escobar, Marielle C.",
+      "course": "",
+      "year": "",
+      "grade": "",
+      "remarks": "",
+      "recommendations": ""
+    },
+    {
+      "student_id": "2021-10092",
+      "student_name": "Espiritu, Nathaniel N.",
+      "course": "",
+      "year": "",
+      "grade": "",
+      "remarks": "",
+      "recommendations": ""
+    },
+    {
+      "student_id": "2021-10099",
+      "student_name": "Fernandez, Odette Y.",
+      "course": "",
+      "year": "",
+      "grade": "",
+      "remarks": "",
+      "recommendations": ""
+    },
+    {
+      "student_id": "2021-10106",
+      "student_name": "Flores, Patricia J.",
+      "course": "",
+      "year": "",
+      "grade": "",
+      "remarks": "",
+      "recommendations": ""
+    },
+    {
+      "student_id": "2021-10113",
+      "student_name": "Gabriel, Quennie U.",
+      "course": "",
+      "year": "",
+      "grade": "",
+      "remarks": "",
+      "recommendations": ""
+    },
+    {
+      "student_id": "2021-10120",
+      "student_name": "Garcia, Rafael F.",
+      "course": "",
+      "year": "",
+      "grade": "",
+      "remarks": "",
+      "recommendations": ""
+    },
+    {
+      "student_id": "2021-10127",
+      "student_name": "Gonzales, Sofia Q.",
+      "course": "",
+      "year": "",
+      "grade": "",
+      "remarks": "",
+      "recommendations": ""
+    },
+    {
+      "student_id": "2021-10134",
+      "student_name": "Hernandez, Teodoro B.",
+      "course": "",
+      "year": "",
+      "grade": "",
+      "remarks": "",
+      "recommendations": ""
+    },
+    {
+      "student_id": "2021-10141",
+      "student_name": "Ilagan, Ursula M.",
+      "course": "",
+      "year": "",
+      "grade": "",
+      "remarks": "",
+      "recommendations": ""
+    },
+    {
+      "student_id": "2021-10148",
+      "student_name": "Jimenez, Vicente X.",
+      "course": "",
+      "year": "",
+      "grade": "",
+      "remarks": "",
+      "recommendations": ""
+    },
+    {
+      "student_id": "2021-10155",
+      "student_name": "Lacsamana, Wilma I.",
+      "course": "",
+      "year": "",
+      "grade": "",
+      "remarks": "",
+      "recommendations": ""
+    },
+    {
+      "student_id": "2021-10162",
+      "student_name": "Lazaro, Xavier T.",
+      "course": "",
+      "year": "",
+      "grade": "",
+      "remarks": "",
+      "recommendations": ""
+    },
+    {
+      "student_id": "2021-10169",
+      "student_name": "Legaspi, Yvonne E.",
+      "course": "",
+      "year": "",
+      "grade": "",
+      "remarks": "",
+      "recommendations": ""
+    },
+    {
+      "student_id": "2021-10176",
+      "student_name": "Macaraeg, Zenaida P.",
+      "course": "",
+      "year": "",
+      "grade": "",
+      "remarks": "",
+      "recommendations": ""
+    },
+    {
+      "student_id": "2021-10183",
+      "student_name": "Magsino, Arnel A.",
+      "course": "",
+      "year": "",
+      "grade": "",
+      "remarks": "",
+      "recommendations": ""
+    },
+    {
+      "student_id": "2021-10190",
+      "student_name": "Manalo, Bianca L.",
+      "course": "",
+      "year": "",
+      "grade": "",
+      "remarks": "",
+      "recommendations": ""
+    },
+    {
+      "student_id": "2021-10197",
+      "student_name": "Mendoza, Carlo W.",
+      "course": "",
+      "year": "",
+      "grade": "",
+      "remarks": "",
+      "recommendations": ""
+    },
+    {
+      "student_id": "2021-10204",
+      "student_name": "Nacpil, Divina H.",
+      "course": "",
+      "year": "",
+      "grade": "",
+      "remarks": "",
+      "recommendations": ""
+    },
+    {
+      "student_id": "2021-10211",
+      "student_name": "Navarro, Emilio S.",
+      "course": "",
+      "year": "",
+      "grade": "",
+      "remarks": "",
+      "recommendations": ""
+    },
+    {
+      "student_id": "2021-10218",
+      "student_name": "Ocampo, Fatima D.",
+      "course": "",
+      "year": "",
+      "grade": "",
+      "remarks": "",
+      "recommendations": ""
+    },
+    {
+      "student_id": "2021-10225",
+      "student_name": "Olivares, Gerald O.",
+      "course": "",
+      "year": "",
+      "grade": "",
+      "remarks": "",
+      "recommendations": ""
+    },
+    {
+      "student_id": "2021-10232",
+      "student_name": "Padilla, Hazel Z.",
+      "course": "",
+      "year": "",
+      "grade": "",
+      "remarks": "",
+      "recommendations": ""
+    },
+    {
+      "student_id": "2021-10239",
+      "student_name": "Pascual, Ignacio K.",
+      "course": "",
+      "year": "",
+      "grade": "",
+      "remarks": "",
+      "recommendations": ""
+    },
+    {
+      "student_id": "2021-10246",
+      "student_name": "Quinto, Jasmine V.",
+      "course": "",
+      "year": "",
+      "grade": "",
+      "remarks": "",
+      "recommendations": ""
+    },
+    {
+      "student_id": "2021-10253",
+      "student_name": "Ramos, Kevin G.",
+      "course": "",
+      "year": "",
+      "grade": "",
+      "remarks": "",
+      "recommendations": ""
+    },
+    {
+      "student_id": "2021-10260",
+      "student_name": "Reyes, Liza R.",
+      "course": "",
+      "year": "",
+      "grade": "",
+      "remarks": "",
+      "recommendations": ""
+    },
+    {
+      "student_id": "2021-10267",
+      "student_name": "Rivera, Miguel C.",
+      "course": "",
+      "year": "",
+      "grade": "",
+      "remarks": "",
+      "recommendations": ""
+    },
+    {
+      "student_id": "2021-10274",
+      "student_name": "Salazar, Nadine N.",
+      "course": "",
+      "year": "",
+      "grade": "",
+      "remarks": "",
+      "recommendations": ""
+    },
+    {
+      "student_id": "2021-10281",
+      "student_name": "Santiago, Oscar Y.",
+      "course": "",
+      "year": "",
+      "grade": "",
+      "remarks": "",
+      "recommendations": ""
+    },
+    {
+      "student_id": "2021-10288",
+      "student_name": "Santos, Pamela J.",
+      "course": "",
+      "year": "",
+      "grade": "",
+      "remarks": "",
+      "recommendations": ""
+    },
+    {
+      "student_id": "2021-10295",
+      "student_name": "Soriano, Ramon U.",
+      "course": "",
+      "year": "",
+      "grade": "",
+      "remarks": "",
+      "recommendations": ""
+    },
+    {
+      "student_id": "2021-10302",
+      "student_name": "Tolentino, Sheila F.",
+      "course": "",
+      "year": "",
+      "grade": "",
+      "remarks": "",
+      "recommendations": ""
+    },
+    {
+      "student_id": "2021-10309",
+      "student_name": "Torres, Tomas Q.",
+      "course": "",
+      "year": "",
+      "grade": "",
+      "remarks": "",
+      "recommendations": ""
+    },
+    {
+      "student_id": "2021-10316",
+      "student_name": "Valdez, Ulysses B.",
+      "course": "",
+      "year": "",
+      "grade": "",
+      "remarks": "",
+      "recommendations": ""
+    },
+    {
+      "student_id": "2021-10323",
+      "student_name": "Velasco, Veronica M.",
+      "course": "",
+      "year": "",
+      "grade": "",
+      "remarks": "",
+      "recommendations": ""
+    },
+    {
+      "student_id": "2021-10330",
+      "student_name": "Villanueva, Warren X.",
+      "course": "",
+      "year": "",
+      "grade": "",
+      "remarks": "",
+      "recommendations": ""
+    },
+    {
+      "student_id": "2021-10337",
+      "student_name": "Ybanez, Ysabel I.",
+      "course": "",
+      "year": "",
+      "grade": "",
+      "remarks": "",
+      "recommendations": ""
+    },
+    {
+      "student_id": "2021-10344",
+      "student_name": "Zamora, Zoe T.",
+      "course": "",
+      "year": "",
+      "grade": "",
+      "remarks": "",
+      "recommendations": ""
+    }
+  ]
+}
