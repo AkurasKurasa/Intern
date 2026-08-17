@@ -22,29 +22,81 @@ setTimeout(() => { bridgeIsReady = true; maybeDismissSplash(); }, 4000);
    hidden on the Workflows tab -- that tab plays sessions instead. */
 const navRecorder = document.getElementById("navRecorder");
 const navWorkflows = document.getElementById("navWorkflows");
+const navInbox = document.getElementById("navInbox");
+const navSettings = document.getElementById("navSettings");
 const emptyState = document.getElementById("emptyState");
 const workflowsWrap = document.getElementById("workflowsWrap");
+const inboxWrap = document.getElementById("inboxWrap");
+const settingsWrap = document.getElementById("settingsWrap");
 const recorderPanel = document.getElementById("recorderPanel");
 const playPanel = document.getElementById("playPanel");
+const runningView = document.getElementById("runningView");
+const finishedView = document.getElementById("finishedView");
+const btnHomeStartRecording = document.getElementById("btnHomeStartRecording");
+const btnHomeBrowseTasks = document.getElementById("btnHomeBrowseTasks");
+const homeTaskCountEl = document.getElementById("homeTaskCount");
+const tasksCountLineEl = document.getElementById("tasksCountLine");
+
+// The three mutually-exclusive views inside the Tasks section (list of
+// tasks / a live run / the just-finished summary) -- separate from
+// showMain()'s Home-vs-Tasks split, since Running/Finished only make sense
+// once a capsule is loaded and playing. Passing "" hides all three, used
+// when leaving the Tasks section entirely (see showMain() below).
+function showTasksSubview(name) {
+  workflowsWrap.hidden = name !== "list";
+  runningView.hidden = name !== "running";
+  finishedView.hidden = name !== "finished";
+}
 
 function showMain(name) {
   const toHome = name === "home";
+  const toInbox = name === "inbox";
+  const toSettings = name === "settings";
+  const toWorkflows = name === "workflows";
   emptyState.hidden = !toHome;
-  workflowsWrap.hidden = toHome;
+  inboxWrap.hidden = !toInbox;
+  settingsWrap.hidden = !toSettings;
   recorderPanel.hidden = !toHome;
-  playPanel.hidden = toHome;
+  playPanel.hidden = !toWorkflows;
   navRecorder.classList.toggle("active", toHome);
-  navWorkflows.classList.toggle("active", !toHome);
+  navWorkflows.classList.toggle("active", toWorkflows);
+  navInbox.classList.toggle("active", toInbox);
+  navSettings.classList.toggle("active", toSettings);
   navRecorder.setAttribute("aria-current", toHome ? "page" : "false");
-  navWorkflows.setAttribute("aria-current", !toHome ? "page" : "false");
-  if (!toHome) loadWorkflows();
+  navWorkflows.setAttribute("aria-current", toWorkflows ? "page" : "false");
+  navInbox.setAttribute("aria-current", toInbox ? "page" : "false");
+  navSettings.setAttribute("aria-current", toSettings ? "page" : "false");
+  if (toHome) {
+    showTasksSubview("");
+    refreshTaskCount();
+  } else if (toInbox) {
+    showTasksSubview("");
+    loadInboxMessages();
+  } else if (toSettings) {
+    showTasksSubview("");
+    loadSettingsPanel();
+  } else {
+    // A capsule already running (e.g. the user switched to Home mid-run
+    // and is coming back) should still show the running view, not reset
+    // to the list -- btnStopCapsule's disabled state is the single
+    // existing source of truth for "is a capsule running right now."
+    showTasksSubview(!btnStopCapsule.disabled ? "running" : "list");
+    loadWorkflows();
+  }
   // Tells main.js which mini overlay to show if the window gets
   // minimized from here -- recorder Start/Stop from Recorder, the round
-  // Play/Stop widget from Workflows.
-  window.recorderAPI.setActiveSection(toHome ? "home" : "workflows");
+  // Play/Stop widget from Workflows. Inbox/Settings have no mini overlay
+  // of their own, so they fall into the same plain-recorder-widget branch
+  // "workflows" used to be the only alternative to -- main.js's minimize
+  // handler already treats anything other than "workflows" that way.
+  window.recorderAPI.setActiveSection(toWorkflows ? "workflows" : (toInbox ? "inbox" : "home"));
 }
 navRecorder.addEventListener("click", () => showMain("home"));
 navWorkflows.addEventListener("click", () => showMain("workflows"));
+navInbox.addEventListener("click", () => showMain("inbox"));
+navSettings.addEventListener("click", () => showMain("settings"));
+btnHomeStartRecording.addEventListener("click", () => btnStart.click());
+btnHomeBrowseTasks.addEventListener("click", () => navWorkflows.click());
 
 /* ── Recorder panel (always visible, right column) ────────────────────── */
 const statusDot   = document.getElementById("statusDot");
@@ -85,6 +137,10 @@ function setRecording(isRecording) {
   btnStop.disabled = !isRecording;
   statusDot.className = "dot" + (isRecording ? " recording" : "");
   statStatus.textContent = isRecording ? "Recording" : "Idle";
+  // Drives the Start button's ink -> clay swap in style.css -- recording
+  // shares the agent-control signal colour because the take being captured
+  // is what will later drive the agent.
+  recorderPanel.classList.toggle("is-recording", isRecording);
 }
 
 btnStart.addEventListener("click", () => {
@@ -135,6 +191,8 @@ window.recorderAPI.onEvent((event) => {
       break;
     case "capsule_started":
       hideCountdown();
+      wasUserStopped = false;
+      progressLineCount = 0;
       capsuleLog(`▶ Running — ${event.label}`, "ok");
       setCapsuleRunning(true);
       break;
@@ -143,10 +201,14 @@ window.recorderAPI.onEvent((event) => {
       break;
     case "capsule_done":
       hideCountdown();
+      stopElapsedTimer();
+      tbAgentPill.hidden = true;
       capsuleLog(`Run ended (exit code ${event.code}).`, event.code === 0 ? "ok" : "err");
       setCapsuleRunning(false);
+      showFinished(event.code);
       break;
     case "capsule_stopped":
+      wasUserStopped = true;
       capsuleLog("Stopping — saving partial results…", "dim");
       break;
     case "log":
@@ -159,6 +221,34 @@ window.recorderAPI.onEvent((event) => {
       capsuleLog(event.message, "err");
       setCapsuleRunning(false);
       hideCountdown();
+      stopElapsedTimer();
+      tbAgentPill.hidden = true;
+      break;
+    // Inbox Router (Scope #3) events -- deliberately their own event names,
+    // not "error"/"log", since those two already carry recorder/capsule-
+    // specific side effects (setRecording, setCapsuleRunning, hideCountdown)
+    // that must never fire for an unrelated inbox problem.
+    case "inbox_poll_started":
+      setInboxRunning(true);
+      inboxProviderLabel.textContent = event.provider === "real"
+        ? "LIVE GMAIL" : "MOCK GMAIL — no live credentials";
+      break;
+    case "inbox_routed":
+      upsertInboxRow(event);
+      break;
+    case "inbox_confirm_applied":
+      markInboxRowConfirmed(event.message_id, event.decision);
+      break;
+    case "inbox_override_applied":
+      markInboxRowOverridden(event.message_id, event.new_decision);
+      break;
+    case "inbox_stopped":
+      setInboxRunning(false);
+      break;
+    case "inbox_log":
+      break; // dev-detail stream; the plain-language row is what the UI shows
+    case "inbox_error":
+      log(`Inbox Router: ${event.message}`, "err");
       break;
     default:
       console.log("Unhandled event:", event);
@@ -188,6 +278,8 @@ const ppCapsuleName  = document.getElementById("ppCapsuleName");
 const ppCapsuleMeta  = document.getElementById("ppCapsuleMeta");
 const ppCheckpointGroup = document.getElementById("ppCheckpointGroup");
 const ppCheckpoint   = document.getElementById("ppCheckpoint");
+const ppTestGroup    = document.getElementById("ppTestGroup");
+const btnLaunchMockups = document.getElementById("btnLaunchMockups");
 const btnPlay        = document.getElementById("btnPlay");
 const btnStopCapsule = document.getElementById("btnStopCapsule");
 const btnDeploy      = document.getElementById("btnDeploy");
@@ -197,6 +289,156 @@ const ppCountdownNumber = document.getElementById("ppCountdownNumber");
 const ppCountdownHint   = document.getElementById("ppCountdownHint");
 const btnCopyLog        = document.getElementById("btnCopyLog");
 const btnOpenLog        = document.getElementById("btnOpenLog");
+
+// ── Running / Finished views + the full-window Handover overlay ─────────
+// The overlay and the titlebar's "AGENT HAS CONTROL" pill both key off the
+// exact same COUNTDOWN_BEGIN/COUNTDOWN N/COUNTDOWN_END lines that already
+// drove #ppCountdown -- see handleCapsuleProgressLine() below -- so they
+// can never show something that isn't actually happening on the real
+// backend process.
+const tbAgentPill        = document.getElementById("tbAgentPill");
+const handoverOverlay    = document.getElementById("handoverOverlay");
+const handoverCountdownEl= document.getElementById("handoverCountdown");
+const handoverTaskNameEl = document.getElementById("handoverTaskName");
+const btnHandoverCancel  = document.getElementById("btnHandoverCancel");
+const btnTakeBackControl = document.getElementById("btnTakeBackControl");
+const runningElapsedEl   = document.getElementById("runningElapsed");
+const stepFeedEl         = document.getElementById("stepFeed");
+const finishedHeadlineEl = document.getElementById("finishedHeadline");
+const finishedBodyEl     = document.getElementById("finishedBody");
+const finishedDurationEl = document.getElementById("finishedDuration");
+const finishedLineCountEl= document.getElementById("finishedLineCount");
+const btnRunAgain        = document.getElementById("btnRunAgain");
+const btnBackToTasks     = document.getElementById("btnBackToTasks");
+
+let runStartedAt = null;
+let elapsedTimerId = null;
+let progressLineCount = 0;
+let wasUserStopped = false;
+
+function formatElapsed(ms) {
+  const s = Math.max(0, Math.floor(ms / 1000));
+  const mm = String(Math.floor(s / 60)).padStart(2, "0");
+  const ss = String(s % 60).padStart(2, "0");
+  return `${mm}:${ss}`;
+}
+function startElapsedTimer() {
+  runStartedAt = Date.now();
+  runningElapsedEl.textContent = "00:00";
+  elapsedTimerId = setInterval(() => {
+    runningElapsedEl.textContent = formatElapsed(Date.now() - runStartedAt);
+  }, 1000);
+}
+function stopElapsedTimer() {
+  if (elapsedTimerId) { clearInterval(elapsedTimerId); elapsedTimerId = null; }
+}
+
+// Appends a raw progress line to the step feed, neutral styling -- used
+// for anything prettifyProgressLine() below can't confidently classify.
+// The full verbatim transcript still lives in #capsuleLog either way; this
+// is an additive, friendlier rendering of the same stream, never a
+// replacement for it.
+function addStepFeedRaw(line) {
+  const row = document.createElement("div");
+  row.className = "step-feed-item";
+  const label = document.createElement("span");
+  label.className = "sf-label";
+  label.textContent = line;
+  const time = document.createElement("span");
+  time.className = "sf-time";
+  time.textContent = new Date().toLocaleTimeString();
+  row.appendChild(label);
+  row.appendChild(time);
+  stepFeedEl.appendChild(row);
+  stepFeedEl.scrollTop = stepFeedEl.scrollHeight;
+}
+
+// components/agent/agent.py logs "── Step N/MAX (K elements) ──" on every
+// live iteration -- MAX is run_task.py's MAX_STEPS ceiling (currently
+// 1000), not a real total (the actual step count is only known once a run
+// ends), so only the numerator is ever shown here. Never render "N of
+// MAX" -- it would read as a real progress fraction when it isn't one.
+const STEP_LINE_RE = /Step (\d+)\/\d+\s+\((\d+) elements\)/;
+
+function prettifyProgressLine(line) {
+  const match = STEP_LINE_RE.exec(line);
+  if (!match) {
+    addStepFeedRaw(line);
+    return;
+  }
+  const prevCurrent = stepFeedEl.querySelector(".step-feed-item.current");
+  if (prevCurrent) {
+    prevCurrent.classList.replace("current", "done");
+    prevCurrent.querySelector(".sf-icon").innerHTML =
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 13l4 4L19 7"/></svg>';
+  }
+  const row = document.createElement("div");
+  row.className = "step-feed-item current";
+  const icon = document.createElement("span");
+  icon.className = "sf-icon";
+  const label = document.createElement("span");
+  label.className = "sf-label";
+  label.dataset.stepLabel = `STEP ${match[1]}`;
+  label.textContent = `Looking at ${match[2]} elements on screen…`;
+  row.appendChild(icon);
+  row.appendChild(label);
+  stepFeedEl.appendChild(row);
+  stepFeedEl.scrollTop = stepFeedEl.scrollHeight;
+}
+
+function showFinished(code) {
+  finishedDurationEl.textContent = runStartedAt ? formatElapsed(Date.now() - runStartedAt) : "—";
+  finishedLineCountEl.textContent = String(progressLineCount);
+  if (wasUserStopped) {
+    finishedHeadlineEl.textContent = "Stopped — you have control again.";
+    finishedBodyEl.textContent = "Intern stopped partway through. Anything already typed or clicked stays as it was.";
+  } else if (code === 0) {
+    finishedHeadlineEl.textContent = "Finished — you have control again.";
+    finishedBodyEl.textContent = "Intern completed the task and handed control back to you.";
+  } else {
+    finishedHeadlineEl.textContent = "Stopped early — you have control again.";
+    finishedBodyEl.textContent = `Intern's run ended unexpectedly (exit code ${code}). Check the activity log below for details.`;
+  }
+  showTasksSubview("finished");
+}
+
+// Esc, "Take back control" (on the running banner) and "Cancel" (on the
+// handover overlay) all resolve to the exact same guarded path the
+// existing Stop button already uses, rather than calling
+// capsulesAPI.stop() directly -- one source of truth for "stop the run."
+function stopIfRunning() {
+  if (!btnStopCapsule.disabled) btnStopCapsule.click();
+}
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") stopIfRunning();
+});
+btnTakeBackControl.addEventListener("click", stopIfRunning);
+btnHandoverCancel.addEventListener("click", stopIfRunning);
+btnBackToTasks.addEventListener("click", () => showTasksSubview("list"));
+btnRunAgain.addEventListener("click", () => {
+  if (!currentCapsule) return;
+  window.capsulesAPI.run(currentCapsule.name);
+});
+
+// ── Home hero / Tasks header live counts ─────────────────────────────────
+// A "task" is anything the user can think of as one job Intern knows:
+// every registered capsule, plus any recorded data/demos/ group that
+// doesn't have a capsule yet (recorded but not yet trained/registered).
+async function computeTaskCount() {
+  let groups = [];
+  let capsules = [];
+  try { groups = await window.workflowsAPI.list(); } catch (e) { /* counted as 0 */ }
+  try { capsules = await window.capsulesAPI.list(); } catch (e) { /* counted as 0 */ }
+  const capsuleNames = new Set(capsules.map((c) => c.name));
+  const groupOnly = groups.filter((g) => !capsuleNames.has(g.name)).length;
+  return capsules.length + groupOnly;
+}
+async function refreshTaskCount() {
+  const n = await computeTaskCount();
+  homeTaskCountEl.textContent = `(${n})`;
+  tasksCountLineEl.textContent = `${n} TASK${n === 1 ? "" : "S"}`;
+}
+refreshTaskCount();
 
 const PLACEHOLDER_EMOJI = "🧩";
 
@@ -240,6 +482,15 @@ function handleCapsuleProgressLine(line) {
   if (line === "COUNTDOWN_BEGIN") {
     ppCountdown.hidden = false;
     countdownHintPending = true;
+    // The real handover moment: the process is about to click into the
+    // target window and start typing. Everything below is driven off this
+    // exact same event, not a separate client-side timer.
+    tbAgentPill.hidden = false;
+    handoverTaskNameEl.textContent = currentCapsule ? currentCapsule.name : "—";
+    handoverOverlay.hidden = false;
+    stepFeedEl.innerHTML = "";
+    showTasksSubview("running");
+    startElapsedTimer();
     return;
   }
   if (line === "COUNTDOWN_END") {
@@ -253,6 +504,10 @@ function handleCapsuleProgressLine(line) {
     ppCountdownNumber.classList.remove("pp-countdown-tick");
     void ppCountdownNumber.offsetWidth; // restart the animation on every tick
     ppCountdownNumber.classList.add("pp-countdown-tick");
+    handoverCountdownEl.textContent = tick[1];
+    handoverCountdownEl.classList.remove("pp-countdown-tick");
+    void handoverCountdownEl.offsetWidth;
+    handoverCountdownEl.classList.add("pp-countdown-tick");
     return;
   }
   if (countdownHintPending) {
@@ -260,15 +515,21 @@ function handleCapsuleProgressLine(line) {
     countdownHintPending = false;
   }
   capsuleLog(line, "dim");
+  progressLineCount += 1;
+  prettifyProgressLine(line);
 }
 
 function hideCountdown() {
   ppCountdown.hidden = true;
+  handoverOverlay.hidden = true;
 }
 
 function setCapsuleRunning(isRunning) {
   btnPlay.disabled = isRunning || !currentCapsule;
   btnStopCapsule.disabled = !isRunning;
+  // Disabled while a run is live -- popping more windows while the agent
+  // is actively driving the mouse/keyboard (Scope #1) would be disruptive.
+  btnLaunchMockups.disabled = isRunning;
   // The mini Play/Stop widget has no capsule-picker UI of its own, so it
   // needs to know which capsule name "Play" should mean -- this is the one
   // place that's called both right after a capsule loads/deploys AND on
@@ -299,6 +560,9 @@ async function loadCapsuleIntoSlot(capsule) {
   applyCapsuleEmojiDisplay(ppCapsuleEmoji, capsule.emoji);
   ppCapsuleName.textContent = capsule.name;
   ppSlot.classList.add("filled");
+  // "Test" shows for any loaded task, unlike Checkpoint -- it's not tied
+  // to having a swappable model, just to a task being selected at all.
+  ppTestGroup.hidden = false;
 
   // A script-kind capsule (e.g. Scope #2) may or may not have a real,
   // swappable checkpoint -- Scope #2's matcher.pt is a genuine trained
@@ -370,6 +634,23 @@ btnDeploy.addEventListener("click", async () => {
     loadCapsuleIntoSlot(currentCapsule);
   } catch (e) {
     capsuleLog(`Deploy failed: ${e.message || e}`, "err");
+  }
+});
+
+btnLaunchMockups.addEventListener("click", async () => {
+  if (!currentCapsule) return;
+  btnLaunchMockups.disabled = true;
+  try {
+    const result = await window.capsulesAPI.launchTestMockups(currentCapsule.name);
+    if (result.ok) {
+      capsuleLog(`Opened: ${result.opened.join(", ")}`, "ok");
+    } else {
+      capsuleLog(result.error, "err");
+    }
+  } catch (e) {
+    capsuleLog(`Couldn't launch mockups: ${e.message || e}`, "err");
+  } finally {
+    btnLaunchMockups.disabled = false;
   }
 });
 
@@ -583,7 +864,7 @@ async function loadWorkflows() {
   if (capsulesCache.length) {
     const capsulesHead = document.createElement("h3");
     capsulesHead.className = "wf-section-head";
-    capsulesHead.textContent = "Workflows";
+    capsulesHead.textContent = "Tasks";
     workflowsListEl.appendChild(capsulesHead);
   }
   capsulesCache.forEach((capsule) => {
@@ -613,19 +894,21 @@ async function loadWorkflows() {
   if (!capsulesCache.length && (!groups || !groups.length)) {
     const empty = document.createElement("p");
     empty.className = "muted";
-    empty.textContent = "No workflows yet — register a capsule or start a recording from the Recorder tab.";
+    empty.textContent = "No tasks yet — register a capsule or start a recording from the Recorder tab.";
     workflowsListEl.appendChild(empty);
     workflowsLoaded = true;
+    refreshTaskCount();
     return;
   }
   if (!groups || !groups.length) {
     workflowsLoaded = true;
+    refreshTaskCount();
     return;
   }
 
   const sessionsHead = document.createElement("h3");
   sessionsHead.className = "wf-section-head";
-  sessionsHead.textContent = "Recorded sessions";
+  sessionsHead.textContent = "Takes";
   workflowsListEl.appendChild(sessionsHead);
 
   groups.forEach((g, gi) => {
@@ -647,7 +930,7 @@ async function loadWorkflows() {
       card.classList.toggle("open");
       const capsule = findCapsuleForGroup(g.name);
       if (!capsule) {
-        capsuleLog(`No capsule registered yet for '${g.name}'.`, "dim");
+        capsuleLog(`No task registered yet for '${g.name}'.`, "dim");
         return;
       }
       workflowsListEl.querySelectorAll(".wf-group.capsule-selected")
@@ -683,6 +966,7 @@ async function loadWorkflows() {
     workflowsListEl.appendChild(card);
   });
   workflowsLoaded = true;
+  refreshTaskCount();
 }
 
 function escapeHtml(s) {
@@ -722,5 +1006,218 @@ wfCreateSubmit.addEventListener("click", async () => {
     await populateOutDirOptions();
   } catch (e) {
     capsuleLog(`Couldn't create workflow: ${e.message || e}`, "err");
+  }
+});
+
+/* ── Inbox (Scope #3) ──────────────────────────────────────────────────── */
+const inboxCountLineEl = document.getElementById("inboxCountLine");
+const inboxProviderLabel = document.getElementById("inboxProviderLabel");
+const btnInboxStart = document.getElementById("btnInboxStart");
+const btnInboxStop = document.getElementById("btnInboxStop");
+const btnInboxRefresh = document.getElementById("btnInboxRefresh");
+const inboxListEl = document.getElementById("inboxList");
+
+const DECISION_LABELS = {
+  route_scope1: "Routed to form-filler", route_scope2: "Routed to sheet-matcher",
+  reply: "Reply suggested", forward: "Forward suggested",
+  flag: "Flagged for review", leave_alone: "Left alone",
+};
+
+function decisionLabel(decision) {
+  return DECISION_LABELS[decision] || decision;
+}
+
+function setInboxRunning(isRunning) {
+  btnInboxStart.disabled = isRunning;
+  btnInboxStop.disabled = !isRunning;
+}
+
+async function loadInboxMessages() {
+  let messages = [];
+  try {
+    messages = await window.inboxAPI.list();
+  } catch (e) {
+    inboxListEl.innerHTML = `<p class="muted">Couldn't read Inbox Router history (${e.message || e}).</p>`;
+    return;
+  }
+  inboxListEl.innerHTML = "";
+  if (!messages.length) {
+    inboxListEl.innerHTML = '<p class="muted">Not started. Click Start to begin routing mail.</p>';
+  } else {
+    // Newest first.
+    messages.slice().reverse().forEach((msg) => inboxListEl.appendChild(buildInboxRow(msg)));
+  }
+  inboxCountLineEl.textContent = `${messages.length} ROUTED`;
+}
+
+// Pure builder -- returns a detached row element, doesn't touch the DOM
+// itself. loadInboxMessages() appends in order; upsertInboxRow() below
+// prepends a single row live as inbox_routed events arrive.
+function buildInboxRow(msg) {
+  const row = document.createElement("div");
+  row.className = "inbox-row";
+  row.dataset.messageId = msg.message_id;
+
+  const main = document.createElement("div");
+  main.className = "inbox-row-main";
+  const chipClass = "inbox-decision-chip" +
+    (msg.status === "confirmed" ? " confirmed" : "") +
+    (msg.decision === "flag" ? " flag" : "");
+  main.innerHTML =
+    `<span class="inbox-row-subject">${escapeHtml(msg.subject || "(no subject)")}</span>` +
+    `<span class="inbox-row-sender">${escapeHtml(msg.sender || "")}</span>` +
+    `<span class="${chipClass}">${escapeHtml(decisionLabel(msg.decision))}</span>` +
+    `<span class="inbox-row-rationale">${escapeHtml(msg.rationale || "")}</span>`;
+  row.appendChild(main);
+
+  if (msg.status === "pending") {
+    const actions = document.createElement("div");
+    actions.className = "inbox-row-actions";
+    const confirmBtn = document.createElement("button");
+    confirmBtn.className = "btn btn-primary btn-sm";
+    confirmBtn.type = "button";
+    confirmBtn.textContent = "Confirm";
+    confirmBtn.addEventListener("click", () => onInboxConfirmClick(msg));
+    actions.appendChild(confirmBtn);
+    row.appendChild(actions);
+  }
+  return row;
+}
+
+// The Scope #1/#2 handoff reuses the existing, unmodified capsule-run IPC
+// call verbatim -- Inbox Router itself does nothing Gmail-side for these
+// two decisions; router.py's confirm_suggestion() only records that this
+// happened and feeds the pattern profile.
+function onInboxConfirmClick(msg) {
+  if ((msg.decision === "route_scope1" || msg.decision === "route_scope2") && msg.capsule_name) {
+    window.capsulesAPI.run(msg.capsule_name);
+  }
+  window.inboxAPI.confirm(msg.message_id, msg.decision);
+}
+
+function upsertInboxRow(msg) {
+  const existing = inboxListEl.querySelector(`[data-message-id="${CSS.escape(msg.message_id)}"]`);
+  if (existing) existing.remove();
+  const empty = inboxListEl.querySelector(".muted");
+  if (empty) empty.remove();
+  inboxListEl.insertBefore(buildInboxRow(msg), inboxListEl.firstChild);
+  refreshInboxCount();
+}
+
+function refreshInboxCount() {
+  inboxCountLineEl.textContent = `${inboxListEl.querySelectorAll(".inbox-row").length} ROUTED`;
+}
+
+function markInboxRowConfirmed(messageId, decision) {
+  const row = inboxListEl.querySelector(`[data-message-id="${CSS.escape(messageId)}"]`);
+  if (!row) return;
+  const chip = row.querySelector(".inbox-decision-chip");
+  if (chip) {
+    chip.classList.add("confirmed");
+    chip.textContent = decisionLabel(decision);
+  }
+  const actions = row.querySelector(".inbox-row-actions");
+  if (actions) actions.remove();
+}
+
+function markInboxRowOverridden(messageId, newDecision) {
+  const row = inboxListEl.querySelector(`[data-message-id="${CSS.escape(messageId)}"]`);
+  if (!row) return;
+  const chip = row.querySelector(".inbox-decision-chip");
+  if (chip) chip.textContent = decisionLabel(newDecision);
+}
+
+btnInboxStart.addEventListener("click", () => window.inboxAPI.start());
+btnInboxStop.addEventListener("click", () => window.inboxAPI.stop());
+btnInboxRefresh.addEventListener("click", () => loadInboxMessages());
+
+/* ── Settings tab -- LM Studio server/model control ───────────────────── */
+const btnSettingsRefresh      = document.getElementById("btnSettingsRefresh");
+const lmStudioServerDot       = document.getElementById("lmStudioServerDot");
+const lmStudioServerLabel     = document.getElementById("lmStudioServerLabel");
+const btnStartLmStudioServer  = document.getElementById("btnStartLmStudioServer");
+const lmStudioModelSelect     = document.getElementById("lmStudioModelSelect");
+const btnLoadLmStudioModel    = document.getElementById("btnLoadLmStudioModel");
+const lmStudioLoadedLabel     = document.getElementById("lmStudioLoadedLabel");
+
+async function loadSettingsPanel() {
+  lmStudioServerLabel.textContent = "Checking…";
+  lmStudioServerDot.className = "dot";
+  lmStudioModelSelect.disabled = true;
+  lmStudioModelSelect.innerHTML = "<option>Loading…</option>";
+  btnLoadLmStudioModel.disabled = true;
+
+  let status;
+  try {
+    status = await window.settingsAPI.refreshLmStudio();
+  } catch (e) {
+    lmStudioServerLabel.textContent = `Couldn't reach LM Studio: ${e.message || e}`;
+    lmStudioServerDot.classList.add("error");
+    lmStudioModelSelect.innerHTML = "<option>—</option>";
+    return;
+  }
+
+  lmStudioServerDot.classList.add(status.serverRunning ? "ok" : "error");
+  lmStudioServerLabel.textContent = status.serverRunning
+    ? "Server running"
+    : "Server not running";
+  btnStartLmStudioServer.hidden = status.serverRunning;
+
+  lmStudioModelSelect.innerHTML = "";
+  if (!status.models.length) {
+    lmStudioModelSelect.innerHTML = '<option value="">No models downloaded</option>';
+    lmStudioModelSelect.disabled = true;
+    btnLoadLmStudioModel.disabled = true;
+  } else {
+    status.models.forEach((m) => {
+      const opt = document.createElement("option");
+      opt.value = m.modelKey;
+      const isLoaded = status.loadedModelKeys.includes(m.modelKey);
+      opt.textContent = m.displayName + (isLoaded ? "  (loaded)" : "");
+      lmStudioModelSelect.appendChild(opt);
+    });
+    // Prefer whatever's already loaded as the selected option, so the
+    // dropdown reflects real state rather than always defaulting to the
+    // first entry.
+    const loadedOpt = Array.from(lmStudioModelSelect.options)
+      .find((o) => status.loadedModelKeys.includes(o.value));
+    if (loadedOpt) lmStudioModelSelect.value = loadedOpt.value;
+    lmStudioModelSelect.disabled = false;
+    btnLoadLmStudioModel.disabled = false;
+  }
+
+  lmStudioLoadedLabel.textContent = status.loadedModelKeys.length
+    ? `Loaded: ${status.loadedModelKeys.join(", ")}`
+    : "No model loaded";
+}
+
+btnSettingsRefresh.addEventListener("click", () => loadSettingsPanel());
+
+btnStartLmStudioServer.addEventListener("click", async () => {
+  btnStartLmStudioServer.disabled = true;
+  lmStudioServerLabel.textContent = "Starting…";
+  try {
+    const result = await window.settingsAPI.startLmStudioServer();
+    if (!result.ok) lmStudioServerLabel.textContent = result.error;
+  } catch (e) {
+    lmStudioServerLabel.textContent = `Couldn't start server: ${e.message || e}`;
+  } finally {
+    btnStartLmStudioServer.disabled = false;
+    loadSettingsPanel();
+  }
+});
+
+btnLoadLmStudioModel.addEventListener("click", async () => {
+  const modelKey = lmStudioModelSelect.value;
+  if (!modelKey) return;
+  btnLoadLmStudioModel.disabled = true;
+  lmStudioLoadedLabel.textContent = "Loading…";
+  try {
+    const result = await window.settingsAPI.loadLmStudioModel(modelKey);
+    lmStudioLoadedLabel.textContent = result.ok ? "Loaded." : result.error;
+  } catch (e) {
+    lmStudioLoadedLabel.textContent = `Couldn't load model: ${e.message || e}`;
+  } finally {
+    loadSettingsPanel();
   }
 });

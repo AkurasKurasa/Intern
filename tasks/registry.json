@@ -30,7 +30,14 @@
       "emoji": "🧮",
       "kind": "script",
       "entrypoint": "components/scope2/automate.py",
-      "args": ["--variant", "v0_base", "--commit", "--show", "--limit", "5"],
+      "args": [
+        "--variant",
+        "v0_base",
+        "--commit",
+        "--show",
+        "--limit",
+        "5"
+      ],
       "checkpoint_flag": "--matcher",
       "cwd": ""
     }

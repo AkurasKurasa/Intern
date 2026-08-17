@@ -1,0 +1,132 @@
+{
+  "inbox": [
+    {
+      "id": "mock-001",
+      "thread_id": "thread-001",
+      "sender": "Jordan Reyes <jordan.reyes@acmebroker.com>",
+      "sender_email": "jordan.reyes@acmebroker.com",
+      "subject": "New policy application - Delgado, James",
+      "snippet": "Attached is the completed intake form for the new car insurance application...",
+      "body_text": "Hi,\n\nAttached is the completed intake form for the new car insurance application (Delgado, James). Please process this data entry as soon as you can.\n\nThanks,\nJordan",
+      "received_at": "2026-08-16T09:12:00-07:00",
+      "labels": ["INBOX", "UNREAD"]
+    },
+    {
+      "id": "mock-002",
+      "thread_id": "thread-002",
+      "sender": "Registrar Office <registrar@campusportal.edu>",
+      "sender_email": "registrar@campusportal.edu",
+      "subject": "Grades ready for portal upload - Section 4B",
+      "snippet": "The final grade spreadsheet for Section 4B is attached and ready...",
+      "body_text": "Hello,\n\nThe final grade spreadsheet for Section 4B is attached and ready to be matched and uploaded to the student portal. Let me know once it's posted.\n\nBest,\nRegistrar Office",
+      "received_at": "2026-08-16T10:05:00-07:00",
+      "labels": ["INBOX", "UNREAD"]
+    },
+    {
+      "id": "mock-003",
+      "thread_id": "thread-003",
+      "sender": "Priya Raman <priya.raman@vendorco.com>",
+      "sender_email": "priya.raman@vendorco.com",
+      "subject": "Quick question about the March invoice",
+      "snippet": "Do you have a minute to confirm the line item on page 2?",
+      "body_text": "Hi,\n\nDo you have a minute to confirm the line item on page 2 of the March invoice? Want to make sure it's booked correctly before we close the month.\n\nThanks,\nPriya",
+      "received_at": "2026-08-16T11:30:00-07:00",
+      "labels": ["INBOX", "UNREAD"]
+    },
+    {
+      "id": "mock-004",
+      "thread_id": "thread-004",
+      "sender": "IT Alerts <it-alerts@thirdpartyvendor.com>",
+      "sender_email": "it-alerts@thirdpartyvendor.com",
+      "subject": "Scheduled maintenance window - Aug 20",
+      "snippet": "Our platform will be unavailable for scheduled maintenance...",
+      "body_text": "This is an automated notice. Our platform will be unavailable for scheduled maintenance on Aug 20, 11pm-1am PT.",
+      "received_at": "2026-08-16T08:00:00-07:00",
+      "labels": ["INBOX", "UNREAD"]
+    },
+    {
+      "id": "mock-005",
+      "thread_id": "thread-005",
+      "sender": "Legal Notices <notices@somefirm-legal.com>",
+      "sender_email": "notices@somefirm-legal.com",
+      "subject": "Formal notice regarding account #48213",
+      "snippet": "This letter serves as formal notice concerning account #48213...",
+      "body_text": "This letter serves as formal notice concerning account #48213. Please review the attached documents and respond within 10 business days.",
+      "received_at": "2026-08-16T07:45:00-07:00",
+      "labels": ["INBOX", "UNREAD"]
+    },
+    {
+      "id": "mock-006",
+      "thread_id": "thread-006",
+      "sender": "InsurTech Weekly <newsletter@industrynews.com>",
+      "sender_email": "newsletter@industrynews.com",
+      "subject": "This Week in InsurTech",
+      "snippet": "Your weekly roundup of insurance technology news...",
+      "body_text": "Your weekly roundup of insurance technology news is here. Top story: AI adoption trends in 2026.",
+      "received_at": "2026-08-16T06:00:00-07:00",
+      "labels": ["INBOX", "UNREAD"]
+    }
+  ],
+  "sent": [
+    {
+      "id": "mock-sent-101",
+      "thread_id": "thread-101",
+      "sender": "me@example.com",
+      "sender_email": "me@example.com",
+      "subject": "Re: Invoice question - February",
+      "snippet": "Confirmed, that line item is correct.",
+      "body_text": "Confirmed, that line item is correct. Go ahead and close the month.\n",
+      "received_at": "2026-07-10T14:20:00-07:00",
+      "labels": ["SENT"],
+      "to": "priya.raman@vendorco.com"
+    },
+    {
+      "id": "mock-sent-102",
+      "thread_id": "thread-102",
+      "sender": "me@example.com",
+      "sender_email": "me@example.com",
+      "subject": "Re: Contract renewal terms",
+      "snippet": "Thanks Priya, terms look good.",
+      "body_text": "Thanks Priya, terms look good on our end.\n",
+      "received_at": "2026-07-22T09:05:00-07:00",
+      "labels": ["SENT"],
+      "to": "priya.raman@vendorco.com"
+    },
+    {
+      "id": "mock-sent-103",
+      "thread_id": "thread-103",
+      "sender": "me@example.com",
+      "sender_email": "me@example.com",
+      "subject": "Re: January invoice line items",
+      "snippet": "Got it, replying with the correction.",
+      "body_text": "Got it, replying with the correction below.\n",
+      "received_at": "2026-08-01T16:40:00-07:00",
+      "labels": ["SENT"],
+      "to": "priya.raman@vendorco.com"
+    },
+    {
+      "id": "mock-sent-104",
+      "thread_id": "thread-104",
+      "sender": "me@example.com",
+      "sender_email": "me@example.com",
+      "subject": "Fwd: Scheduled maintenance window - Aug 6",
+      "snippet": "FYI, heads up for Aug 6.",
+      "body_text": "FYI, heads up for the Aug 6 maintenance window.\n\n---------- Forwarded message ----------\nFrom: IT Alerts <it-alerts@thirdpartyvendor.com>",
+      "received_at": "2026-08-06T08:15:00-07:00",
+      "labels": ["SENT"],
+      "to": "ops-team@example.com"
+    },
+    {
+      "id": "mock-sent-105",
+      "thread_id": "thread-105",
+      "sender": "me@example.com",
+      "sender_email": "me@example.com",
+      "subject": "Fwd: Scheduled maintenance window - Jul 23",
+      "snippet": "Forwarding for visibility.",
+      "body_text": "Forwarding for visibility.\n\n---------- Forwarded message ----------\nFrom: IT Alerts <it-alerts@thirdpartyvendor.com>",
+      "received_at": "2026-07-23T08:10:00-07:00",
+      "labels": ["SENT"],
+      "to": "ops-team@example.com"
+    }
+  ]
+}

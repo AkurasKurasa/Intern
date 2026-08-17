@@ -3,25 +3,16 @@
 <head>
 <meta charset="UTF-8" />
 <title>Intern — mini</title>
+<link rel="stylesheet" href="tokens.css" />
 <style>
-  :root {
-    --orange: #F97316;
-    --white: #FFFFFF;
-    --page-bg: #F6F6F4;
-    --border-strong: #E2E2E2;
-    --ink: #1C1917;
-    --dim: #8A8580;
-    --green: #16A34A;
-    --red: #DC2626;
-  }
   * { box-sizing: border-box; }
   html, body {
     margin: 0; height: 100%;
-    background: var(--page-bg);
+    background: var(--app-bg);
     border: 1px solid var(--border-strong);
-    border-radius: 10px;
+    border-radius: var(--radius-lg);
     overflow: hidden;
-    font-family: "Segoe UI", -apple-system, sans-serif;
+    font-family: var(--font-ui);
     color: var(--ink);
   }
   .mini {
@@ -36,52 +27,59 @@
   }
   .mini-head .brand {
     display: flex; align-items: center; gap: 6px;
-    font-size: 12px; font-weight: 700;
+    font-family: var(--font-mono); font-size: 11px; font-weight: 500; letter-spacing: .1em;
   }
   .mini-mark {
     width: 16px; height: 16px; border-radius: 5px;
-    background: var(--white); color: var(--orange);
-    border: 1.2px solid var(--orange);
+    background: var(--ink); color: white;
     display: flex; align-items: center; justify-content: center;
-    font-weight: 800; font-size: 10px;
+    font-family: var(--font-mono); font-weight: 700; font-size: 10px;
   }
   .restore-btn {
     -webkit-app-region: no-drag;
     width: 20px; height: 20px; border-radius: 6px;
-    border: none; background: transparent; color: var(--dim);
+    border: none; background: transparent; color: var(--text-muted);
     display: flex; align-items: center; justify-content: center;
     cursor: pointer;
   }
-  .restore-btn:hover { background: var(--white); color: var(--ink); }
+  .restore-btn:hover { background: var(--card); color: var(--ink); }
+  .restore-btn svg { width: 12px; height: 12px; }
 
   .mini-status {
     display: flex; align-items: center; gap: 7px;
-    background: var(--white); border: 1px solid var(--border-strong);
-    border-radius: 8px; padding: 6px 10px;
+    background: var(--card); border: 1px solid var(--border-strong);
+    border-radius: var(--radius-sm); padding: 6px 10px;
     font-size: 12px; font-weight: 600;
   }
-  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--dim); flex: none; }
-  .dot.recording { background: var(--green); box-shadow: 0 0 6px var(--green); }
-  .dot.error { background: var(--red); }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--text-muted); flex: none; }
+  /* Same signal as the main window's recorder dot: clay while capturing a
+     take, since that take is what will later drive the agent. */
+  .dot.recording { background: var(--clay); box-shadow: 0 0 6px rgba(180,68,30,.5); animation: blip 1s ease-in-out infinite; }
+  .dot.error { background: var(--error); }
+  @keyframes blip { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
 
-  .mini-frames { font-size: 11px; color: var(--dim); font-family: Consolas, monospace; }
+  .mini-frames { font-family: var(--font-mono); font-size: 11px; color: var(--text-muted); }
   .mini-frames b { color: var(--ink); }
 
   .mini-btn-row { display: flex; gap: 8px; margin-top: auto; }
   .btn {
-    flex: 1; border: 1px solid transparent; border-radius: 8px;
-    padding: 7px 10px; font-size: 12px; font-weight: 600; cursor: pointer;
+    flex: 1; border: 1px solid transparent; border-radius: var(--radius-sm);
+    padding: 7px 10px; font-family: var(--font-ui); font-size: 12px; font-weight: 600; cursor: pointer;
+    display: inline-flex; align-items: center; justify-content: center; gap: 5px;
   }
+  .btn svg { width: 11px; height: 11px; }
   .btn:disabled { opacity: .4; cursor: not-allowed; }
-  .btn-primary { background: var(--orange); color: white; }
-  .btn-danger { background: var(--white); color: var(--red); border-color: var(--red); }
+  .btn-primary { background: var(--ink); color: white; }
+  .btn-danger { background: var(--card); color: var(--error); border-color: var(--error); }
 </style>
 </head>
 <body>
   <div class="mini">
     <div class="mini-head">
-      <div class="brand"><span class="mini-mark">I</span>Intern</div>
-      <button class="restore-btn" id="btnRestore" title="Restore window" aria-label="Restore window">▢</button>
+      <div class="brand"><span class="mini-mark">I</span>RECORDING</div>
+      <button class="restore-btn" id="btnRestore" title="Restore window" aria-label="Restore window">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="5" width="14" height="14" rx="2"/></svg>
+      </button>
     </div>
 
     <div class="mini-status">
@@ -92,8 +90,14 @@
     <div class="mini-frames"><b id="statFrames">0</b> frames</div>
 
     <div class="mini-btn-row">
-      <button class="btn btn-primary" id="btnStart">● Start</button>
-      <button class="btn btn-danger" id="btnStop" disabled>■ Stop</button>
+      <button class="btn btn-primary" id="btnStart">
+        <svg viewBox="0 0 24 24" width="11" height="11" fill="currentColor"><circle cx="12" cy="12" r="7"/></svg>
+        Start
+      </button>
+      <button class="btn btn-danger" id="btnStop" disabled>
+        <svg viewBox="0 0 24 24" width="11" height="11" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="1.5"/></svg>
+        Stop
+      </button>
     </div>
   </div>
 

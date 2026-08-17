@@ -16,6 +16,7 @@ import pytest
 REPO = Path(__file__).resolve().parent.parent.parent / "components" / "scope2"
 sys.path.insert(0, str(REPO))
 
+import executor.runner as runner_module  # noqa: E402
 from executor.runner import (  # noqa: E402
     apply_rule, fill_order, load_mapping, normalize_value, resolve_option,
     run, sheet_value,
@@ -164,6 +165,44 @@ def test_dry_run_verifies_but_commits_nothing():
     assert "dry run" in log.commit_status
     # 3.10: dry-run "fill and verify but never submit" - so no record commits.
     assert all(r["grade"] == "" for r in log.portal_state)
+
+
+def test_show_mode_survives_no_interactive_stdin(monkeypatch):
+    """Direct regression, found live 2026-08-17: launched as a subprocess
+    with no real stdin (app/recorder_bridge.py spawns automate.py with
+    stdin=DEVNULL, same as the Electron Play button already does for
+    run_task.py), input() raised EOFError instantly and the finally-block
+    close() slammed the browser shut ~2 seconds after it opened -- the
+    user clicked into the window a moment too late and reported "it
+    didn't fill," even though the fill and the Save click had both
+    already succeeded by then.
+
+    Verified directly, not assumed, before trusting this fix: skipping
+    browser.close() alone isn't enough -- exiting the enclosing
+    `with sync_playwright()` block kills every launched browser
+    regardless of whether .close() was called. sys.stdin.isatty() also
+    looked like a viable upfront check but was verified unreliable (it
+    reported True even under stdin=DEVNULL in one real subprocess chain
+    tested directly) -- reacting to the actual EOFError input() raises is
+    the only signal confirmed to work. This test proves the real fix
+    (wait, don't return early) actually executes, without sitting through
+    the real 600-second wait."""
+    if not SHEET.exists():
+        pytest.skip("run data/sheets/make_sheets.py first")
+
+    def _no_stdin():
+        raise EOFError
+    monkeypatch.setattr("builtins.input", _no_stdin)
+
+    sleep_calls = []
+    monkeypatch.setattr(runner_module.time, "sleep", lambda s: sleep_calls.append(s))
+
+    log = run("v0_base", MAPPING_PATH, dry_run=False, limit=1,
+              capture_state=True, show=True)
+
+    assert sleep_calls == [600]
+    assert log.rows and log.rows[0].status == "filled"
+    assert log.committed is True
 
 
 # ------------------------------------------------- readback, proved

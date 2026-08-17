@@ -25,6 +25,19 @@ numpy>=1.24.0
 # LLM providers (lmstudio needs no key; others need one in .env)
 openai>=1.0.0
 
+# Inbox Router (Scope #3) -- Gmail API + OAuth2 for RealGmailClient.
+# anthropic / google-genai added here too: llm_classifier.py wants
+# Claude/Gemini and neither is a hard requirement elsewhere in this repo --
+# agent.py only ever soft-imports them (falls back to transformer-only if
+# absent). groq deliberately NOT added as its own package: the
+# already-installed openai package reaches Groq's OpenAI-compatible
+# endpoint directly (same trick this project already uses for LM Studio).
+google-api-python-client>=2.100.0
+google-auth-oauthlib>=1.2.0
+google-auth-httplib2>=0.2.0
+anthropic>=0.40.0
+google-genai>=0.3.0
+
 # Metrics — statistical significance testing (scripts/compare_baseline.py)
 scipy>=1.10.0
 

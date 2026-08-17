@@ -306,6 +306,12 @@ components/
   recorder/
     recorder.py              DemoRecorder (on-demand subprocess snapshots)
     correction_handler/      DAgger: watch-for-user-correction on failure
+  inbox_router/              Scope #3 — Gmail triage (rules + LLM hybrid)
+    router.py                 InboxRouter — poll loop, stdin/stdout protocol
+    gmail_client.py            GmailClientBase / MockGmailClient / RealGmailClient
+    pattern_profile.py         Passive per-sender learning from Sent folder
+    rules.py                   Deterministic first pass
+    llm_classifier.py          LLM fallback/tiebreaker
 tasks/
   registry.json              Global capsule registry (goal → model path)
   form_filling/
@@ -372,6 +378,28 @@ stays at root — the one script actually run most often, by far.
 - **Vision Observer / Visual Data Reader** — Screenshot → VLM → JSON of visible
   field/value pairs. The slot for the future vision *perception adapter*.
 - **OCR fallback** — Tesseract over background pixels when UIA returns empty.
+
+### Inbox Router (Scope #3)
+- **`components/inbox_router/gmail_client.py`** — `GmailClientBase` (no `send()`
+  method anywhere in the interface — structurally, not just by convention, this
+  subsystem cannot send real email). `MockGmailClient` backs a committed fixture;
+  `RealGmailClient` is the standard `google-auth-oauthlib` Desktop-app OAuth flow.
+  `get_gmail_client()` picks between them based on whether
+  `credentials/client_secret.json` exists — the entire Phase A → Phase B swap.
+- **`components/inbox_router/pattern_profile.py`** — `PatternProfile`, built
+  passively from the Sent folder correlated against recent inbox threads (no
+  manual labeling), nudged incrementally on every user confirmation/override.
+- **`components/inbox_router/rules.py`** — `RuleLayer`, the deterministic first
+  pass (sender pattern lopsidedness, then keyword match against
+  `tasks/registry.json`'s own capsule triggers).
+- **`components/inbox_router/llm_classifier.py`** — `LLMClassifier`, same
+  multi-provider shape as `LLMAgent` (re-implemented, not imported — same
+  choice already made for Scope #2), only called when rules don't confidently
+  resolve.
+- **`components/inbox_router/router.py`** — `InboxRouter`, the orchestrator;
+  spawned as a child process by `app/recorder_bridge.py`'s
+  `start_inbox_router()`, same shape as a capsule Play run. `confirm_suggestion()`
+  is the only place a Gmail draft is ever created — draft-only, never auto-send.
 
 ### Recorder & Corrections
 - **`components/recorder/recorder.py`** — `DemoRecorder`. On-demand subprocess
@@ -646,26 +674,59 @@ perception.
 
   Verified directly: ran `automate.py --matcher ... --commit --limit 5` end to end after both fixes — countdown prints cleanly (no garbled characters), 5/5 rows still filled and verified, identical to every prior run. Full project suite re-run for regressions.
 
+  **EXTENDED 2026-08-17, on `feature/inbox-router`** (checked out to inspect/build on top of the branch-mate's Scope #3 implementation + full visual redesign). Three direct requests handled in sequence:
+
+  1. **"Add a Test section... where you launch the mockups."** Play panel gained a "Test" block below Checkpoint, shown for any loaded task: Task Filler opens the real Car Insurance wx form + Notepad on the intake file (the exact two windows `run_task.py`'s countdown expects already open); Sheet-to-Portal Matcher opens the source spreadsheet + the mock portal's landing page (judgment call — it drives its own browser, nothing to "get ready" the way Scope #1 needs).
+
+  2. **"Add a Settings tab... load LM Studio and use Qwen 2.5-7b Instruct (allow to choose)."** New sidebar tab drives LM Studio's own `lms` CLI (found already installed at `~/.lmstudio/bin/lms.exe`) — server status, a model dropdown built from `lms ls --llm --json` (not hardcoded to one model), start-server and load-model buttons. Verified the CLI's real commands and JSON output shape directly before wiring anything up.
+
+  3. **Real bug found and fixed, direct user report** ("I pressed on the Firefox and it didn't fill it"). `logs/capsule_activity.log` showed the fill and Save both succeeded, then `EOFError` on `input()` — `executor/runner.py`'s `--show` path waits for a real terminal Enter-press before closing the browser, and there is no real terminal when launched via the Electron bridge (`stdin=DEVNULL`, same class of bug already fixed once for `run_task.py`'s countdown). The `finally: browser.close()` fired immediately after, closing the window ~2 seconds after it opened — the user clicked in just after it was already gone.
+
+     Two wrong turns caught before shipping, not assumed away: skipping `browser.close()` alone doesn't work — verified directly that exiting the enclosing `with sync_playwright()` block kills every launched browser regardless. And `sys.stdin.isatty()` as an upfront check is unreliable in this environment — verified directly that it reported `True` even under `stdin=DEVNULL` in a real subprocess chain, which would have silently reintroduced the same crash. The real fix catches the actual `EOFError` and waits (10 minutes, bounded, not forever) inside the still-open `with` block instead of returning early. Verified twice, end to end, spawned exactly the way the bridge spawns it (`stdin=DEVNULL`) — the browser genuinely stays alive afterward. New regression test (`test_show_mode_survives_no_interactive_stdin`) added to `tests/scope2/test_scope2_executor.py`.
+
+  **Second real bug, same evening, direct user report** ("Google Chrome mocksite disappears and reappears"). Root cause, found by reading the code, not guessed: `automate.py` launches **two separate browser instances**, not one — `executor/scanner.py`'s `scan_variants()` (stage 2, gathering field descriptors, functionally required — its output feeds the actual column-matching) launches its own browser and closes it, then `executor/runner.py`'s `run()` (stage 5/6, the fill) launches an entirely different one. The scan browser's default ("old") headless mode can briefly flash a real window on Windows before hiding it, which reads as "the window disappeared and reappeared" even though it's genuinely two separate launches. Fixed by forcing modern headless mode (`headless=True, args=["--headless=new"]`) on the scan browser specifically — the newer mode never creates an OS window at all, so there's nothing left to flash. Verified directly: `scan_variants(["v0_base"])` still returns the correct descriptors with the flag set. (Separately: the "only fills 5 rows" half of the same report wasn't a bug — `--limit 5` in the example command given earlier does exactly what its name says; dropping it fills the full sheet.)
+
 ---
 
-### Scope #3 — Email / Ticket Triage *(not started)*
+### Scope #3 — Email / Ticket Triage
 Decision-making / conditional behavior — the strongest personalization claim
-(two users triage differently). Kept to decisions inferable from *visible*
-content (avoid hidden-intent).
+(two users triage differently).
 
-**Concrete shape (2026-08-15)**: an email arrives, and the agent decides —
-based on how *this* user has actually handled similar messages before, not a
-fixed script — what it needs: routed into [Scope #1](#task-list)'s
-form-filler, routed into [Scope #2](#task-list)'s sheet-matcher, replied to
-directly, forwarded, flagged for a person, or left alone. Then it confirms
-the outcome by reply. The decision itself is the actual claim; connecting
-Scope #1 and #2 is a side effect of it, not the point.
+**Concrete shape decided (2026-08-15)**: an email arrives, and the agent
+decides — based on how *this* user has actually handled similar messages
+before, not a fixed script — what it needs: routed into
+[Scope #1](#task-list)'s form-filler, routed into [Scope #2](#task-list)'s
+sheet-matcher, replied to directly, forwarded, flagged for a person, or left
+alone. Then it confirms the outcome by reply. The decision itself is the
+actual claim; connecting Scope #1 and #2 is a side effect of it, not the
+point.
 
-Still blocked on Big Three #2 (action space) and #3 (control flow) — needs
-more actions than click/type/select, and real branching instead of one
-linear demonstrated path.
+**CHOSEN APPROACH, implemented (2026-08-16), from that exact spec:** Inbox
+Router — reads Gmail via OAuth2, learns a per-sender pattern profile
+passively from the Sent folder (no manual labeling), classifies each
+incoming email with a rules-first/LLM-fallback hybrid, and routes it to
+Scope #1's form-filler, Scope #2's sheet-matcher, a reply, a forward, a flag,
+or leave-alone — draft-only, never auto-send, same standing rule as
+`run_task.py`: real outward action is the user's confirmation, not
+automatic. Polling, not Gmail push/watch (this app has no server
+infrastructure to receive a webhook). See `components/inbox_router/`. **This
+is NOT gated on Action-Space (Big Three #2) or Control-Flow (Big Three
+#3)** — it's a legitimate alternative that unblocks Scope #3 rather than
+waiting on them.
 
-- [ ] `scope3_email_triage` — Reads an inbox and, based on how this user has actually handled similar messages before, decides what each incoming email needs — routed into Scope #1's form-filler, routed into Scope #2's sheet-matcher, replied to directly, forwarded, flagged for a person, or left alone — then confirms the outcome by reply. *requires: `execution_action_space_big3_2`, `execution_control_flow_big3_3`*
+- [x] `scope3_gmail_api_triage` — Inbox Router: Gmail API + OAuth2 + a
+  locally-learned pattern profile, rules+LLM hybrid classification,
+  draft-only confirm-to-act UI, calls into Scope #1/#2's existing capsule
+  IPC to hand off rather than duplicating it. Phase A (`MockGmailClient`,
+  zero live credentials) implemented; Phase B (`RealGmailClient`) is a
+  drop-in swap once a Google Cloud OAuth client exists — see
+  `components/inbox_router/gmail_client.py`'s `get_gmail_client()`.
+- [ ] `scope3_email_triage` *(superseded framing — predates the concrete
+  shape above)*: the very original bare stub, a GUI-demonstration-based
+  triage system (watch UIA/screen state the way Scope #1/#2 do). Still a
+  real possible future complement once Big Three #2/#3 land, but no longer
+  the active plan. *requires: `execution_action_space_big3_2`,
+  `execution_control_flow_big3_3`*
 
 ---
 
@@ -1997,13 +2058,16 @@ one form."
    transfer (web source → Excel grid); 2D target; mixed perception. Excel
    perception swap **PROVEN** (`ExcelObserver` normalizes to canonical); remaining
    = web source, action on cells, demos, train.
-3. **Email / Ticket Triage** — *not started ([Scope #3](#task-list)).* Based on
-   demonstrated user judgment, an incoming email is routed to Scope #1's
-   form-fill, routed to Scope #2's sheet-match, replied to directly,
-   forwarded, flagged for a person, or left alone — then the outcome is
-   confirmed by reply. Needs branching ([Big Three #3](#task-list)) + judgment
-   cloning. Kept to decisions inferable from *visible* content (avoid
-   hidden-intent, Fundamental roadblock A).
+3. **Email / Ticket Triage** — *in progress ([Scope #3](#task-list)), Inbox
+   Router approach.* Based on a passively-learned per-sender pattern profile
+   (Gmail API + OAuth2, no manual labeling), an incoming email is routed to
+   Scope #1's form-fill, routed to Scope #2's sheet-match, replied to
+   directly, forwarded, flagged for a person, or left alone — then the
+   outcome is confirmed by reply. Chosen approach (2026-08-16) doesn't need
+   branching ([Big Three #3](#task-list)) at all, unlike the
+   originally-planned GUI-demonstration path — decisions come from Gmail API
+   classification, not a cloned UI action loop. Kept to decisions inferable
+   from *visible* content (avoid hidden-intent, Fundamental roadblock A).
 
 ### North Star — generalization (beyond the thesis)
 The thesis is *bounded* to those three, but the **architecture is built to
@@ -2117,9 +2181,11 @@ aggregate → retrain → repeat. Labeling is the only real choice:
   We proved Excel *perception* conforms (zero edits). The stronger claim — a model
   actually completing a task on a 2nd app — needs action + demos + training. How
   much does the thesis require?
-- **Scope #3 (triage) is blocked on un-scheduled roadblocks** — Action-Space (#2)
-  and Control-Flow (#3) are parked in North Star but triage *depends* on both.
-  They must be scheduled, or scope #3 stalls.
+- **Scope #3 (triage) is no longer stalled.** The originally-planned
+  GUI-demonstration path is still genuinely blocked on Action-Space (#2) and
+  Control-Flow (#3) — those remain parked in North Star. But the chosen
+  Inbox Router approach (Gmail API + OAuth2, see Task List) doesn't depend
+  on either one, so Scope #3 is actively moving without waiting for them.
 - **Web perception may force the vision adapter early.** Scope #2's web source may
   lack a clean accessibility tree → could pull Big Three #1 (vision) forward of
   plan. De-risk: probe the web source's tree before committing.

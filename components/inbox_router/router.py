@@ -1,0 +1,314 @@
+"""
+components/inbox_router/router.py
+====================================
+Standalone entrypoint, spawned as a child process by
+app/recorder_bridge.py's start_inbox_router() -- the same shape as
+run_task.py being spawned for a capsule Play run. Reads {"cmd": ...} lines
+from stdin, emits {"event": ...} lines on stdout. Runs from repo root:
+
+    python components/inbox_router/router.py
+
+Commands (stdin, one per line)
+-------------------------------
+  {"cmd": "confirm", "message_id": "...", "decision": "..."}
+  {"cmd": "override", "message_id": "...", "new_decision": "...", "reason": ""}
+  {"cmd": "shutdown"}
+
+Events (stdout, one per line)
+-------------------------------
+  {"event": "ready"}
+  {"event": "inbox_poll_started", "provider": "mock"|"real", "poll_interval_s": 30}
+  {"event": "inbox_routed", "message_id":..., "subject":..., "sender":...,
+   "decision":..., "confidence":..., "rationale":..., "layer": "rule"|"llm", ...}
+  {"event": "inbox_draft_created", "message_id":..., "draft_id":..., "decision":...}
+  {"event": "inbox_confirm_applied", "message_id":..., "decision":..., "draft_id":...}
+  {"event": "inbox_override_applied", "message_id":..., "old_decision":..., "new_decision":..., "reason":...}
+  {"event": "inbox_log", "line":"...", "level":"ok"|"err"|"dim"}
+  {"event": "inbox_error", "message":"..."}
+  {"event": "inbox_stopped"}
+"""
+from __future__ import annotations
+
+import json
+import os
+import sys
+import threading
+import time
+from datetime import datetime, timezone
+from typing import Optional
+
+_THIS_DIR = os.path.dirname(os.path.abspath(__file__))
+_ROOT = os.path.dirname(os.path.dirname(_THIS_DIR))
+_COMP = os.path.join(_ROOT, "components")
+for _p in (_ROOT, _COMP, _THIS_DIR):
+    if _p not in sys.path:
+        sys.path.insert(0, _p)
+
+# Same hand-rolled .env loader as run_task.py -- no python-dotenv anywhere
+# in this project.
+_env_path = os.path.join(_ROOT, ".env")
+if os.path.exists(_env_path):
+    with open(_env_path) as _f:
+        for _line in _f:
+            _line = _line.strip()
+            if _line and not _line.startswith("#") and "=" in _line:
+                _k, _v = _line.split("=", 1)
+                os.environ.setdefault(_k.strip(), _v.strip())
+
+if hasattr(sys.stdout, "reconfigure"):
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+        sys.stdin.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+
+from gmail_client import EmailMessage, GmailClientBase, RealGmailClient, get_gmail_client
+from llm_classifier import LLMClassifier
+from pattern_profile import PatternProfile
+from routing_rules import RuleLayer
+
+HISTORY_PATH = os.path.join(_THIS_DIR, "data", "routed_history.json")
+SENT_LOOKBACK_DAYS = 90
+DEFAULT_POLL_INTERVAL_S = 30.0
+
+
+def emit(event: str, **fields) -> None:
+    # write() then a separately-guarded flush() -- same reasoning as
+    # recorder_bridge.py's emit(): this process is spawned with no console,
+    # and an unguarded stdout.flush() can raise OSError there on Windows.
+    print(json.dumps({"event": event, **fields}))
+    try:
+        sys.stdout.flush()
+    except OSError:
+        pass
+
+
+def _pick_provider() -> tuple[str, str]:
+    """Same preference order as this project's other entry points: prefer
+    whichever real API key is actually set, else local LM Studio, else no
+    LLM at all (RuleLayer + "flag everything the rules can't resolve"
+    still works with zero LLM configured)."""
+    if os.environ.get("ANTHROPIC_API_KEY"):
+        return "anthropic", os.environ["ANTHROPIC_API_KEY"]
+    if os.environ.get("GROQ_API_KEY"):
+        return "groq", os.environ["GROQ_API_KEY"]
+    if os.environ.get("GEMINI_API_KEY"):
+        return "gemini", os.environ["GEMINI_API_KEY"]
+    return "lmstudio", ""
+
+
+class InboxRouter:
+    def __init__(self, gmail_client: GmailClientBase, profile: PatternProfile,
+                 rule_layer: RuleLayer, llm_classifier: LLMClassifier,
+                 history_path: str = HISTORY_PATH,
+                 poll_interval_s: float = DEFAULT_POLL_INTERVAL_S) -> None:
+        self._gmail = gmail_client
+        self._profile = profile
+        self._rules = rule_layer
+        self._llm = llm_classifier
+        self._history_path = history_path
+        self._poll_interval_s = poll_interval_s
+        self._stop = False
+        # In-memory cache of what this process has routed, so confirm/
+        # override don't need a disk round-trip in the common case --
+        # _find_history_entry() below is still the fallback for a command
+        # referencing a message routed in an earlier process lifetime.
+        self._pending: dict[str, dict] = {}
+
+    def bootstrap(self) -> None:
+        """The "learned passively, no manual labeling" step -- runs once at
+        startup, before the first poll."""
+        since_dt = datetime.fromtimestamp(
+            datetime.now(timezone.utc).timestamp() - SENT_LOOKBACK_DAYS * 86400, tz=timezone.utc,
+        )
+        since_iso = since_dt.isoformat()
+        sent = self._gmail.list_sent(since_iso)
+        inbox = self._gmail.list_recent_inbox(since_iso)
+        self._profile.observe_sent_history(sent, inbox)
+        emit("inbox_log",
+             line=f"Pattern profile bootstrapped from {len(sent)} sent + {len(inbox)} inbox messages.",
+             level="dim")
+
+    def poll_once(self) -> list:
+        routed = []
+        for message in self._gmail.list_inbox_unprocessed():
+            entry = self._classify_and_record(message)
+            self._gmail.mark_processed(message.id)
+            emit("inbox_routed", **entry)
+            routed.append(entry)
+        return routed
+
+    def _classify_and_record(self, message: EmailMessage) -> dict:
+        rule_result = self._rules.classify(message)
+        if rule_result.decision:
+            decision, confidence, rationale = rule_result.decision, rule_result.confidence, rule_result.rationale
+            capsule_name, forward_to, layer = rule_result.capsule_name, rule_result.forward_to, "rule"
+        else:
+            pattern = self._profile.pattern_for(message.sender_email)
+            llm_result = self._llm.classify(message, pattern, rule_result, self._rules.load_capsules())
+            decision, confidence, rationale = llm_result.decision, llm_result.confidence, llm_result.rationale
+            capsule_name, forward_to, layer = llm_result.capsule_name, llm_result.forward_to, "llm"
+
+        # Defensive guard against a hallucinated capsule name -- never
+        # surface a route_scope1/2 suggestion the UI couldn't actually act
+        # on because window.capsulesAPI.run() would just fail on it.
+        if decision in ("route_scope1", "route_scope2"):
+            valid_names = {c.get("name") for c in self._rules.load_capsules()}
+            if capsule_name not in valid_names:
+                capsule_name = ""
+                decision = "flag"
+                rationale = (rationale + " (capsule name could not be verified — flagged instead)").strip()
+
+        entry = {
+            "message_id": message.id, "thread_id": message.thread_id,
+            "subject": message.subject, "sender": message.sender,
+            "sender_email": message.sender_email, "received_at": message.received_at,
+            "decision": decision, "capsule_name": capsule_name, "confidence": confidence,
+            "rationale": rationale, "layer": layer, "forward_to": forward_to,
+            "status": "pending", "draft_id": "",
+            "routed_at": datetime.now(timezone.utc).isoformat(),
+        }
+        self._pending[message.id] = entry
+        self._append_history(entry)
+        return entry
+
+    # ── confirm / override -- the only place create_draft() is ever called ──
+    def confirm_suggestion(self, message_id: str, decision: str) -> None:
+        entry = self._pending.get(message_id) or self._find_history_entry(message_id)
+        if entry is None:
+            emit("inbox_error", message=f"Unknown message id: {message_id}")
+            return
+        message = self._gmail.get_message(message_id)
+        draft_id = ""
+        if decision in ("reply", "forward") and message is not None:
+            body = self._llm.draft_message(message, decision, entry.get("forward_to", ""))
+            to = entry.get("forward_to", "") if decision == "forward" else message.sender_email
+            subject = ("Fwd: " if decision == "forward" else "Re: ") + message.subject
+            draft_id = self._gmail.create_draft(to=to, subject=subject, body=body, thread_id=message.thread_id)
+            emit("inbox_draft_created", message_id=message_id, draft_id=draft_id, decision=decision)
+        # route_scope1/route_scope2: nothing Gmail-side happens here at all
+        # -- the real capsule run already happened client-side (see
+        # renderer.js's onInboxConfirmClick -> window.capsulesAPI.run())
+        # before this command was ever sent. flag/leave_alone need no
+        # Gmail action either.
+        entry["status"] = "confirmed"
+        entry["decision"] = decision
+        entry["draft_id"] = draft_id
+        self._update_history_entry(entry)
+        if message is not None:
+            self._profile.record_confirmed_decision(message, decision)
+        emit("inbox_confirm_applied", message_id=message_id, decision=decision, draft_id=draft_id)
+
+    def override_decision(self, message_id: str, new_decision: str, reason: str = "") -> None:
+        entry = self._pending.get(message_id) or self._find_history_entry(message_id)
+        if entry is None:
+            emit("inbox_error", message=f"Unknown message id: {message_id}")
+            return
+        old_decision = entry.get("decision", "")
+        message = self._gmail.get_message(message_id)
+        entry["decision"] = new_decision
+        entry["status"] = "overridden"
+        entry["override_reason"] = reason
+        self._update_history_entry(entry)
+        if message is not None:
+            self._profile.record_override(message, old_decision, new_decision)
+        emit("inbox_override_applied", message_id=message_id, old_decision=old_decision,
+             new_decision=new_decision, reason=reason)
+
+    # ── routed_history.json -- single writer (this process), main.js only reads it
+    def _append_history(self, entry: dict) -> None:
+        history = self._load_history()
+        history.append(entry)
+        self._save_history(history)
+
+    def _update_history_entry(self, entry: dict) -> None:
+        history = self._load_history()
+        for i, existing in enumerate(history):
+            if existing.get("message_id") == entry.get("message_id"):
+                history[i] = entry
+                self._save_history(history)
+                return
+        history.append(entry)
+        self._save_history(history)
+
+    def _find_history_entry(self, message_id: str) -> Optional[dict]:
+        for entry in self._load_history():
+            if entry.get("message_id") == message_id:
+                return entry
+        return None
+
+    def _load_history(self) -> list:
+        if not os.path.exists(self._history_path):
+            return []
+        try:
+            with open(self._history_path, "r", encoding="utf-8") as f:
+                return json.load(f).get("messages", [])
+        except Exception:
+            return []
+
+    def _save_history(self, history: list) -> None:
+        os.makedirs(os.path.dirname(self._history_path), exist_ok=True)
+        with open(self._history_path, "w", encoding="utf-8") as f:
+            json.dump({"messages": history}, f, indent=2)
+
+    # ── main loop ─────────────────────────────────────────────────────────
+    def run_forever(self) -> None:
+        threading.Thread(target=self._read_stdin_commands, daemon=True).start()
+        provider_kind = "real" if isinstance(self._gmail, RealGmailClient) else "mock"
+        emit("inbox_poll_started", provider=provider_kind, poll_interval_s=self._poll_interval_s)
+        self.bootstrap()
+        while not self._stop:
+            try:
+                self.poll_once()
+            except Exception as exc:
+                emit("inbox_error", message=f"Poll failed: {exc}")
+            # Sleep in short slices so "shutdown" doesn't have to wait out
+            # a full poll interval to take effect.
+            for _ in range(int(self._poll_interval_s * 10)):
+                if self._stop:
+                    break
+                time.sleep(0.1)
+        emit("inbox_stopped")
+
+    def _read_stdin_commands(self) -> None:
+        for line in sys.stdin:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                msg = json.loads(line)
+            except json.JSONDecodeError:
+                emit("inbox_error", message=f"Bad JSON: {line!r}")
+                continue
+            cmd = msg.get("cmd")
+            try:
+                if cmd == "confirm":
+                    self.confirm_suggestion(msg.get("message_id", ""), msg.get("decision", ""))
+                elif cmd == "override":
+                    self.override_decision(msg.get("message_id", ""), msg.get("new_decision", ""),
+                                            msg.get("reason", ""))
+                elif cmd == "shutdown":
+                    self._stop = True
+                    break
+                else:
+                    emit("inbox_error", message=f"Unknown command: {cmd!r}")
+            except Exception as exc:
+                # One bad command can't be allowed to kill this thread --
+                # it's the only thing still reading confirm/override
+                # commands for the rest of the process's life.
+                emit("inbox_error", message=f"Command failed: {exc}")
+
+
+def main() -> None:
+    emit("ready")
+    gmail_client = get_gmail_client()
+    profile = PatternProfile()
+    rule_layer = RuleLayer(profile)
+    provider, api_key = _pick_provider()
+    classifier = LLMClassifier(provider=provider, api_key=api_key)
+    router = InboxRouter(gmail_client, profile, rule_layer, classifier)
+    router.run_forever()
+
+
+if __name__ == "__main__":
+    main()

@@ -1,0 +1,1412 @@
+{
+  "variant": "v0_base",
+  "mapping": "C:\\Users\\paula\\AppData\\Local\\Temp\\tmpf9ijvd91\\induced_mapping.json",
+  "started": "2026-08-17T03:20:36+00:00",
+  "dry_run": false,
+  "rows": [
+    {
+      "row": 1,
+      "student_id": "2021-10001",
+      "status": "filled",
+      "reason": "",
+      "filled": {
+        "Year 1-5": "2",
+        "Grade 0-100": "85",
+        "Course": "BS Information Systems",
+        "Remarks": "Passed"
+      },
+      "verified": {
+        "Year 1-5": "2",
+        "Grade 0-100": "85",
+        "Course": "BS Information Systems",
+        "Remarks": "Passed"
+      },
+      "escalations": []
+    },
+    {
+      "row": 2,
+      "student_id": "2021-10008",
+      "status": "filled",
+      "reason": "",
+      "filled": {
+        "Year 1-5": "2",
+        "Grade 0-100": "96",
+        "Course": "BS Information Systems",
+        "Remarks": "Passed"
+      },
+      "verified": {
+        "Year 1-5": "2",
+        "Grade 0-100": "96",
+        "Course": "BS Information Systems",
+        "Remarks": "Passed"
+      },
+      "escalations": []
+    },
+    {
+      "row": 3,
+      "student_id": "2021-10015",
+      "status": "filled",
+      "reason": "",
+      "filled": {
+        "Year 1-5": "3",
+        "Grade 0-100": "95",
+        "Course": "BS Information Systems",
+        "Remarks": "Passed"
+      },
+      "verified": {
+        "Year 1-5": "3",
+        "Grade 0-100": "95",
+        "Course": "BS Information Systems",
+        "Remarks": "Passed"
+      },
+      "escalations": []
+    },
+    {
+      "row": 4,
+      "student_id": "2021-10022",
+      "status": "filled",
+      "reason": "",
+      "filled": {
+        "Year 1-5": "2",
+        "Grade 0-100": "87",
+        "Course": "BS Information Technology",
+        "Remarks": "Passed"
+      },
+      "verified": {
+        "Year 1-5": "2",
+        "Grade 0-100": "87",
+        "Course": "BS Information Technology",
+        "Remarks": "Passed"
+      },
+      "escalations": []
+    },
+    {
+      "row": 5,
+      "student_id": "2021-10029",
+      "status": "filled",
+      "reason": "",
+      "filled": {
+        "Year 1-5": "1",
+        "Grade 0-100": "72",
+        "Course": "BS Information Systems",
+        "Remarks": "Failed"
+      },
+      "verified": {
+        "Year 1-5": "1",
+        "Grade 0-100": "72",
+        "Course": "BS Information Systems",
+        "Remarks": "Failed"
+      },
+      "escalations": []
+    },
+    {
+      "row": 6,
+      "student_id": "2021-10036",
+      "status": "filled",
+      "reason": "",
+      "filled": {
+        "Year 1-5": "3",
+        "Grade 0-100": "85",
+        "Course": "BS Information Systems",
+        "Remarks": "Passed"
+      },
+      "verified": {
+        "Year 1-5": "3",
+        "Grade 0-100": "85",
+        "Course": "BS Information Systems",
+        "Remarks": "Passed"
+      },
+      "escalations": []
+    },
+    {
+      "row": 7,
+      "student_id": "2021-10043",
+      "status": "filled",
+      "reason": "",
+      "filled": {
+        "Year 1-5": "4",
+        "Grade 0-100": "82",
+        "Course": "BS Information Technology",
+        "Remarks": "Passed"
+      },
+      "verified": {
+        "Year 1-5": "4",
+        "Grade 0-100": "82",
+        "Course": "BS Information Technology",
+        "Remarks": "Passed"
+      },
+      "escalations": []
+    },
+    {
+      "row": 8,
+      "student_id": "2021-10050",
+      "status": "filled",
+      "reason": "",
+      "filled": {
+        "Year 1-5": "3",
+        "Grade 0-100": "74",
+        "Course": "BS Information Systems",
+        "Remarks": "Failed"
+      },
+      "verified": {
+        "Year 1-5": "3",
+        "Grade 0-100": "74",
+        "Course": "BS Information Systems",
+        "Remarks": "Failed"
+      },
+      "escalations": []
+    },
+    {
+      "row": 9,
+      "student_id": "2021-10057",
+      "status": "filled",
+      "reason": "",
+      "filled": {
+        "Year 1-5": "1",
+        "Grade 0-100": "90",
+        "Course": "BS Computer Science",
+        "Remarks": "Passed"
+      },
+      "verified": {
+        "Year 1-5": "1",
+        "Grade 0-100": "90",
+        "Course": "BS Computer Science",
+        "Remarks": "Passed"
+      },
+      "escalations": []
+    },
+    {
+      "row": 10,
+      "student_id": "2021-10064",
+      "status": "filled",
+      "reason": "",
+      "filled": {
+        "Year 1-5": "3",
+        "Grade 0-100": "86",
+        "Course": "BS Information Systems",
+        "Remarks": "Passed"
+      },
+      "verified": {
+        "Year 1-5": "3",
+        "Grade 0-100": "86",
+        "Course": "BS Information Systems",
+        "Remarks": "Passed"
+      },
+      "escalations": []
+    },
+    {
+      "row": 11,
+      "student_id": "2021-10071",
+      "status": "filled",
+      "reason": "",
+      "filled": {
+        "Year 1-5": "3",
+        "Grade 0-100": "80",
+        "Course": "BS Information Systems",
+        "Remarks": "Passed"
+      },
+      "verified": {
+        "Year 1-5": "3",
+        "Grade 0-100": "80",
+        "Course": "BS Information Systems",
+        "Remarks": "Passed"
+      },
+      "escalations": []
+    },
+    {
+      "row": 12,
+      "student_id": "2021-10078",
+      "status": "filled",
+      "reason": "",
+      "filled": {
+        "Year 1-5": "3",
+        "Grade 0-100": "97",
+        "Course": "BS Computer Science",
+        "Remarks": "Passed"
+      },
+      "verified": {
+        "Year 1-5": "3",
+        "Grade 0-100": "97",
+        "Course": "BS Computer Science",
+        "Remarks": "Passed"
+      },
+      "escalations": []
+    },
+    {
+      "row": 13,
+      "student_id": "2021-10085",
+      "status": "filled",
+      "reason": "",
+      "filled": {
+        "Year 1-5": "1",
+        "Grade 0-100": "72",
+        "Course": "BS Computer Science",
+        "Remarks": "Failed"
+      },
+      "verified": {
+        "Year 1-5": "1",
+        "Grade 0-100": "72",
+        "Course": "BS Computer Science",
+        "Remarks": "Failed"
+      },
+      "escalations": []
+    },
+    {
+      "row": 14,
+      "student_id": "2021-10092",
+      "status": "filled",
+      "reason": "",
+      "filled": {
+        "Year 1-5": "3",
+        "Grade 0-100": "92",
+        "Course": "BS Information Systems",
+        "Remarks": "Passed"
+      },
+      "verified": {
+        "Year 1-5": "3",
+        "Grade 0-100": "92",
+        "Course": "BS Information Systems",
+        "Remarks": "Passed"
+      },
+      "escalations": []
+    },
+    {
+      "row": 15,
+      "student_id": "2021-10099",
+      "status": "filled",
+      "reason": "",
+      "filled": {
+        "Year 1-5": "4",
+        "Grade 0-100": "73",
+        "Course": "BS Information Systems",
+        "Remarks": "Failed"
+      },
+      "verified": {
+        "Year 1-5": "4",
+        "Grade 0-100": "73",
+        "Course": "BS Information Systems",
+        "Remarks": "Failed"
+      },
+      "escalations": []
+    },
+    {
+      "row": 16,
+      "student_id": "2021-10106",
+      "status": "filled",
+      "reason": "",
+      "filled": {
+        "Year 1-5": "4",
+        "Grade 0-100": "72",
+        "Course": "BS Information Technology",
+        "Remarks": "Failed"
+      },
+      "verified": {
+        "Year 1-5": "4",
+        "Grade 0-100": "72",
+        "Course": "BS Information Technology",
+        "Remarks": "Failed"
+      },
+      "escalations": []
+    },
+    {
+      "row": 17,
+      "student_id": "2021-10113",
+      "status": "filled",
+      "reason": "",
+      "filled": {
+        "Year 1-5": "3",
+        "Grade 0-100": "94",
+        "Course": "BS Computer Science",
+        "Remarks": "Passed"
+      },
+      "verified": {
+        "Year 1-5": "3",
+        "Grade 0-100": "94",
+        "Course": "BS Computer Science",
+        "Remarks": "Passed"
+      },
+      "escalations": []
+    },
+    {
+      "row": 18,
+      "student_id": "2021-10120",
+      "status": "filled",
+      "reason": "",
+      "filled": {
+        "Year 1-5": "4",
+        "Grade 0-100": "74",
+        "Course": "BS Computer Science",
+        "Remarks": "Failed"
+      },
+      "verified": {
+        "Year 1-5": "4",
+        "Grade 0-100": "74",
+        "Course": "BS Computer Science",
+        "Remarks": "Failed"
+      },
+      "escalations": []
+    },
+    {
+      "row": 19,
+      "student_id": "2021-10127",
+      "status": "filled",
+      "reason": "",
+      "filled": {
+        "Year 1-5": "4",
+        "Grade 0-100": "85",
+        "Course": "BS Information Technology",
+        "Remarks": "Passed"
+      },
+      "verified": {
+        "Year 1-5": "4",
+        "Grade 0-100": "85",
+        "Course": "BS Information Technology",
+        "Remarks": "Passed"
+      },
+      "escalations": []
+    },
+    {
+      "row": 20,
+      "student_id": "2021-10134",
+      "status": "filled",
+      "reason": "",
+      "filled": {
+        "Year 1-5": "4",
+        "Grade 0-100": "93",
+        "Course": "BS Information Systems",
+        "Remarks": "Passed"
+      },
+      "verified": {
+        "Year 1-5": "4",
+        "Grade 0-100": "93",
+        "Course": "BS Information Systems",
+        "Remarks": "Passed"
+      },
+      "escalations": []
+    },
+    {
+      "row": 21,
+      "student_id": "2021-10141",
+      "status": "filled",
+      "reason": "",
+      "filled": {
+        "Year 1-5": "1",
+        "Grade 0-100": "92",
+        "Course": "BS Information Technology",
+        "Remarks": "Passed"
+      },
+      "verified": {
+        "Year 1-5": "1",
+        "Grade 0-100": "92",
+        "Course": "BS Information Technology",
+        "Remarks": "Passed"
+      },
+      "escalations": []
+    },
+    {
+      "row": 22,
+      "student_id": "2021-10148",
+      "status": "filled",
+      "reason": "",
+      "filled": {
+        "Year 1-5": "2",
+        "Grade 0-100": "92",
+        "Course": "BS Information Systems",
+        "Remarks": "Passed"
+      },
+      "verified": {
+        "Year 1-5": "2",
+        "Grade 0-100": "92",
+        "Course": "BS Information Systems",
+        "Remarks": "Passed"
+      },
+      "escalations": []
+    },
+    {
+      "row": 23,
+      "student_id": "2021-10155",
+      "status": "filled",
+      "reason": "",
+      "filled": {
+        "Year 1-5": "1",
+        "Grade 0-100": "88",
+        "Course": "BS Computer Science",
+        "Remarks": "Passed"
+      },
+      "verified": {
+        "Year 1-5": "1",
+        "Grade 0-100": "88",
+        "Course": "BS Computer Science",
+        "Remarks": "Passed"
+      },
+      "escalations": []
+    },
+    {
+      "row": 24,
+      "student_id": "2021-10162",
+      "status": "filled",
+      "reason": "",
+      "filled": {
+        "Year 1-5": "3",
+        "Grade 0-100": "84",
+        "Course": "BS Computer Science",
+        "Remarks": "Passed"
+      },
+      "verified": {
+        "Year 1-5": "3",
+        "Grade 0-100": "84",
+        "Course": "BS Computer Science",
+        "Remarks": "Passed"
+      },
+      "escalations": []
+    },
+    {
+      "row": 25,
+      "student_id": "2021-10169",
+      "status": "filled",
+      "reason": "",
+      "filled": {
+        "Year 1-5": "2",
+        "Grade 0-100": "75",
+        "Course": "BS Information Systems",
+        "Remarks": "Passed"
+      },
+      "verified": {
+        "Year 1-5": "2",
+        "Grade 0-100": "75",
+        "Course": "BS Information Systems",
+        "Remarks": "Passed"
+      },
+      "escalations": []
+    },
+    {
+      "row": 26,
+      "student_id": "2021-10176",
+      "status": "filled",
+      "reason": "",
+      "filled": {
+        "Year 1-5": "4",
+        "Grade 0-100": "76",
+        "Course": "BS Computer Science",
+        "Remarks": "Passed"
+      },
+      "verified": {
+        "Year 1-5": "4",
+        "Grade 0-100": "76",
+        "Course": "BS Computer Science",
+        "Remarks": "Passed"
+      },
+      "escalations": []
+    },
+    {
+      "row": 27,
+      "student_id": "2021-10183",
+      "status": "filled",
+      "reason": "",
+      "filled": {
+        "Year 1-5": "1",
+        "Grade 0-100": "74",
+        "Course": "BS Information Systems",
+        "Remarks": "Failed"
+      },
+      "verified": {
+        "Year 1-5": "1",
+        "Grade 0-100": "74",
+        "Course": "BS Information Systems",
+        "Remarks": "Failed"
+      },
+      "escalations": []
+    },
+    {
+      "row": 28,
+      "student_id": "2021-10190",
+      "status": "filled",
+      "reason": "",
+      "filled": {
+        "Year 1-5": "2",
+        "Grade 0-100": "99",
+        "Course": "BS Computer Science",
+        "Remarks": "Passed"
+      },
+      "verified": {
+        "Year 1-5": "2",
+        "Grade 0-100": "99",
+        "Course": "BS Computer Science",
+        "Remarks": "Passed"
+      },
+      "escalations": []
+    },
+    {
+      "row": 29,
+      "student_id": "2021-10197",
+      "status": "filled",
+      "reason": "",
+      "filled": {
+        "Year 1-5": "3",
+        "Grade 0-100": "84",
+        "Course": "BS Information Systems",
+        "Remarks": "Passed"
+      },
+      "verified": {
+        "Year 1-5": "3",
+        "Grade 0-100": "84",
+        "Course": "BS Information Systems",
+        "Remarks": "Passed"
+      },
+      "escalations": []
+    },
+    {
+      "row": 30,
+      "student_id": "2021-10204",
+      "status": "filled",
+      "reason": "",
+      "filled": {
+        "Year 1-5": "3",
+        "Grade 0-100": "90",
+        "Course": "BS Information Technology",
+        "Remarks": "Passed"
+      },
+      "verified": {
+        "Year 1-5": "3",
+        "Grade 0-100": "90",
+        "Course": "BS Information Technology",
+        "Remarks": "Passed"
+      },
+      "escalations": []
+    },
+    {
+      "row": 31,
+      "student_id": "2021-10211",
+      "status": "filled",
+      "reason": "",
+      "filled": {
+        "Year 1-5": "4",
+        "Grade 0-100": "88",
+        "Course": "BS Computer Science",
+        "Remarks": "Passed"
+      },
+      "verified": {
+        "Year 1-5": "4",
+        "Grade 0-100": "88",
+        "Course": "BS Computer Science",
+        "Remarks": "Passed"
+      },
+      "escalations": []
+    },
+    {
+      "row": 32,
+      "student_id": "2021-10218",
+      "status": "filled",
+      "reason": "",
+      "filled": {
+        "Year 1-5": "3",
+        "Grade 0-100": "74",
+        "Course": "BS Computer Science",
+        "Remarks": "Failed"
+      },
+      "verified": {
+        "Year 1-5": "3",
+        "Grade 0-100": "74",
+        "Course": "BS Computer Science",
+        "Remarks": "Failed"
+      },
+      "escalations": []
+    },
+    {
+      "row": 33,
+      "student_id": "2021-10225",
+      "status": "filled",
+      "reason": "",
+      "filled": {
+        "Year 1-5": "1",
+        "Grade 0-100": "73",
+        "Course": "BS Computer Science",
+        "Remarks": "Failed"
+      },
+      "verified": {
+        "Year 1-5": "1",
+        "Grade 0-100": "73",
+        "Course": "BS Computer Science",
+        "Remarks": "Failed"
+      },
+      "escalations": []
+    },
+    {
+      "row": 34,
+      "student_id": "2021-10232",
+      "status": "filled",
+      "reason": "",
+      "filled": {
+        "Year 1-5": "4",
+        "Grade 0-100": "76",
+        "Course": "BS Computer Science",
+        "Remarks": "Passed"
+      },
+      "verified": {
+        "Year 1-5": "4",
+        "Grade 0-100": "76",
+        "Course": "BS Computer Science",
+        "Remarks": "Passed"
+      },
+      "escalations": []
+    },
+    {
+      "row": 35,
+      "student_id": "2021-10239",
+      "status": "filled",
+      "reason": "",
+      "filled": {
+        "Year 1-5": "2",
+        "Grade 0-100": "84",
+        "Course": "BS Computer Science",
+        "Remarks": "Passed"
+      },
+      "verified": {
+        "Year 1-5": "2",
+        "Grade 0-100": "84",
+        "Course": "BS Computer Science",
+        "Remarks": "Passed"
+      },
+      "escalations": []
+    },
+    {
+      "row": 36,
+      "student_id": "2021-10246",
+      "status": "filled",
+      "reason": "",
+      "filled": {
+        "Year 1-5": "3",
+        "Grade 0-100": "84",
+        "Course": "BS Information Systems",
+        "Remarks": "Passed"
+      },
+      "verified": {
+        "Year 1-5": "3",
+        "Grade 0-100": "84",
+        "Course": "BS Information Systems",
+        "Remarks": "Passed"
+      },
+      "escalations": []
+    },
+    {
+      "row": 37,
+      "student_id": "2021-10253",
+      "status": "filled",
+      "reason": "",
+      "filled": {
+        "Year 1-5": "2",
+        "Grade 0-100": "89",
+        "Course": "BS Computer Science",
+        "Remarks": "Passed"
+      },
+      "verified": {
+        "Year 1-5": "2",
+        "Grade 0-100": "89",
+        "Course": "BS Computer Science",
+        "Remarks": "Passed"
+      },
+      "escalations": []
+    },
+    {
+      "row": 38,
+      "student_id": "2021-10260",
+      "status": "filled",
+      "reason": "",
+      "filled": {
+        "Year 1-5": "3",
+        "Grade 0-100": "78",
+        "Course": "BS Information Technology",
+        "Remarks": "Passed"
+      },
+      "verified": {
+        "Year 1-5": "3",
+        "Grade 0-100": "78",
+        "Course": "BS Information Technology",
+        "Remarks": "Passed"
+      },
+      "escalations": []
+    },
+    {
+      "row": 39,
+      "student_id": "2021-10267",
+      "status": "filled",
+      "reason": "",
+      "filled": {
+        "Year 1-5": "4",
+        "Grade 0-100": "90",
+        "Course": "BS Computer Science",
+        "Remarks": "Passed"
+      },
+      "verified": {
+        "Year 1-5": "4",
+        "Grade 0-100": "90",
+        "Course": "BS Computer Science",
+        "Remarks": "Passed"
+      },
+      "escalations": []
+    },
+    {
+      "row": 40,
+      "student_id": "2021-10274",
+      "status": "filled",
+      "reason": "",
+      "filled": {
+        "Year 1-5": "3",
+        "Grade 0-100": "96",
+        "Course": "BS Information Technology",
+        "Remarks": "Passed"
+      },
+      "verified": {
+        "Year 1-5": "3",
+        "Grade 0-100": "96",
+        "Course": "BS Information Technology",
+        "Remarks": "Passed"
+      },
+      "escalations": []
+    },
+    {
+      "row": 41,
+      "student_id": "2021-10281",
+      "status": "filled",
+      "reason": "",
+      "filled": {
+        "Year 1-5": "3",
+        "Grade 0-100": "86",
+        "Course": "BS Information Technology",
+        "Remarks": "Passed"
+      },
+      "verified": {
+        "Year 1-5": "3",
+        "Grade 0-100": "86",
+        "Course": "BS Information Technology",
+        "Remarks": "Passed"
+      },
+      "escalations": []
+    },
+    {
+      "row": 42,
+      "student_id": "2021-10288",
+      "status": "filled",
+      "reason": "",
+      "filled": {
+        "Year 1-5": "1",
+        "Grade 0-100": "79",
+        "Course": "BS Computer Science",
+        "Remarks": "Passed"
+      },
+      "verified": {
+        "Year 1-5": "1",
+        "Grade 0-100": "79",
+        "Course": "BS Computer Science",
+        "Remarks": "Passed"
+      },
+      "escalations": []
+    },
+    {
+      "row": 43,
+      "student_id": "2021-10295",
+      "status": "filled",
+      "reason": "",
+      "filled": {
+        "Year 1-5": "3",
+        "Grade 0-100": "80",
+        "Course": "BS Information Technology",
+        "Remarks": "Passed"
+      },
+      "verified": {
+        "Year 1-5": "3",
+        "Grade 0-100": "80",
+        "Course": "BS Information Technology",
+        "Remarks": "Passed"
+      },
+      "escalations": []
+    },
+    {
+      "row": 44,
+      "student_id": "2021-10302",
+      "status": "filled",
+      "reason": "",
+      "filled": {
+        "Year 1-5": "4",
+        "Grade 0-100": "97",
+        "Course": "BS Information Technology",
+        "Remarks": "Passed"
+      },
+      "verified": {
+        "Year 1-5": "4",
+        "Grade 0-100": "97",
+        "Course": "BS Information Technology",
+        "Remarks": "Passed"
+      },
+      "escalations": []
+    },
+    {
+      "row": 45,
+      "student_id": "2021-10309",
+      "status": "filled",
+      "reason": "",
+      "filled": {
+        "Year 1-5": "1",
+        "Grade 0-100": "96",
+        "Course": "BS Information Systems",
+        "Remarks": "Passed"
+      },
+      "verified": {
+        "Year 1-5": "1",
+        "Grade 0-100": "96",
+        "Course": "BS Information Systems",
+        "Remarks": "Passed"
+      },
+      "escalations": []
+    },
+    {
+      "row": 46,
+      "student_id": "2021-10316",
+      "status": "filled",
+      "reason": "",
+      "filled": {
+        "Year 1-5": "2",
+        "Grade 0-100": "80",
+        "Course": "BS Computer Science",
+        "Remarks": "Passed"
+      },
+      "verified": {
+        "Year 1-5": "2",
+        "Grade 0-100": "80",
+        "Course": "BS Computer Science",
+        "Remarks": "Passed"
+      },
+      "escalations": []
+    },
+    {
+      "row": 47,
+      "student_id": "2021-10323",
+      "status": "filled",
+      "reason": "",
+      "filled": {
+        "Year 1-5": "4",
+        "Grade 0-100": "92",
+        "Course": "BS Information Technology",
+        "Remarks": "Passed"
+      },
+      "verified": {
+        "Year 1-5": "4",
+        "Grade 0-100": "92",
+        "Course": "BS Information Technology",
+        "Remarks": "Passed"
+      },
+      "escalations": []
+    },
+    {
+      "row": 48,
+      "student_id": "2021-10330",
+      "status": "filled",
+      "reason": "",
+      "filled": {
+        "Year 1-5": "3",
+        "Grade 0-100": "74",
+        "Course": "BS Computer Science",
+        "Remarks": "Failed"
+      },
+      "verified": {
+        "Year 1-5": "3",
+        "Grade 0-100": "74",
+        "Course": "BS Computer Science",
+        "Remarks": "Failed"
+      },
+      "escalations": []
+    },
+    {
+      "row": 49,
+      "student_id": "2021-10337",
+      "status": "filled",
+      "reason": "",
+      "filled": {
+        "Year 1-5": "2",
+        "Grade 0-100": "94",
+        "Course": "BS Computer Science",
+        "Remarks": "Passed"
+      },
+      "verified": {
+        "Year 1-5": "2",
+        "Grade 0-100": "94",
+        "Course": "BS Computer Science",
+        "Remarks": "Passed"
+      },
+      "escalations": []
+    },
+    {
+      "row": 50,
+      "student_id": "2021-10344",
+      "status": "filled",
+      "reason": "",
+      "filled": {
+        "Year 1-5": "2",
+        "Grade 0-100": "82",
+        "Course": "BS Information Systems",
+        "Remarks": "Passed"
+      },
+      "verified": {
+        "Year 1-5": "2",
+        "Grade 0-100": "82",
+        "Course": "BS Information Systems",
+        "Remarks": "Passed"
+      },
+      "escalations": []
+    }
+  ],
+  "committed": true,
+  "commit_status": "Saved 50 rows.",
+  "portal_state": [
+    {
+      "student_id": "2021-10001",
+      "student_name": "Abad, Andrea A.",
+      "course": "BS Information Systems",
+      "year": "2",
+      "grade": "85",
+      "remarks": "Passed",
+      "recommendations": ""
+    },
+    {
+      "student_id": "2021-10008",
+      "student_name": "Aguilar, Benjamin L.",
+      "course": "BS Information Systems",
+      "year": "2",
+      "grade": "96",
+      "remarks": "Passed",
+      "recommendations": ""
+    },
+    {
+      "student_id": "2021-10015",
+      "student_name": "Alonzo, Camille W.",
+      "course": "BS Information Systems",
+      "year": "3",
+      "grade": "95",
+      "remarks": "Passed",
+      "recommendations": ""
+    },
+    {
+      "student_id": "2021-10022",
+      "student_name": "Bautista, Daniel H.",
+      "course": "BS Information Technology",
+      "year": "2",
+      "grade": "87",
+      "remarks": "Passed",
+      "recommendations": ""
+    },
+    {
+      "student_id": "2021-10029",
+      "student_name": "Bernardo, Elaine S.",
+      "course": "BS Information Systems",
+      "year": "1",
+      "grade": "72",
+      "remarks": "Failed",
+      "recommendations": ""
+    },
+    {
+      "student_id": "2021-10036",
+      "student_name": "Cabrera, Francis D.",
+      "course": "BS Information Systems",
+      "year": "3",
+      "grade": "85",
+      "remarks": "Passed",
+      "recommendations": ""
+    },
+    {
+      "student_id": "2021-10043",
+      "student_name": "Castillo, Grace O.",
+      "course": "BS Information Technology",
+      "year": "4",
+      "grade": "82",
+      "remarks": "Passed",
+      "recommendations": ""
+    },
+    {
+      "student_id": "2021-10050",
+      "student_name": "Concepcion, Hector Z.",
+      "course": "BS Information Systems",
+      "year": "3",
+      "grade": "74",
+      "remarks": "Failed",
+      "recommendations": ""
+    },
+    {
+      "student_id": "2021-10057",
+      "student_name": "Cruz, Isabel K.",
+      "course": "BS Computer Science",
+      "year": "1",
+      "grade": "90",
+      "remarks": "Passed",
+      "recommendations": ""
+    },
+    {
+      "student_id": "2021-10064",
+      "student_name": "Dacanay, Joaquin V.",
+      "course": "BS Information Systems",
+      "year": "3",
+      "grade": "86",
+      "remarks": "Passed",
+      "recommendations": ""
+    },
+    {
+      "student_id": "2021-10071",
+      "student_name": "Dela Cruz, Katrina G.",
+      "course": "BS Information Systems",
+      "year": "3",
+      "grade": "80",
+      "remarks": "Passed",
+      "recommendations": ""
+    },
+    {
+      "student_id": "2021-10078",
+      "student_name": "Domingo, Lorenzo R.",
+      "course": "BS Computer Science",
+      "year": "3",
+      "grade": "97",
+      "remarks": "Passed",
+      "recommendations": ""
+    },
+    {
+      "student_id": "2021-10085",
+      "student_name": "Escobar, Marielle C.",
+      "course": "BS Computer Science",
+      "year": "1",
+      "grade": "72",
+      "remarks": "Failed",
+      "recommendations": ""
+    },
+    {
+      "student_id": "2021-10092",
+      "student_name": "Espiritu, Nathaniel N.",
+      "course": "BS Information Systems",
+      "year": "3",
+      "grade": "92",
+      "remarks": "Passed",
+      "recommendations": ""
+    },
+    {
+      "student_id": "2021-10099",
+      "student_name": "Fernandez, Odette Y.",
+      "course": "BS Information Systems",
+      "year": "4",
+      "grade": "73",
+      "remarks": "Failed",
+      "recommendations": ""
+    },
+    {
+      "student_id": "2021-10106",
+      "student_name": "Flores, Patricia J.",
+      "course": "BS Information Technology",
+      "year": "4",
+      "grade": "72",
+      "remarks": "Failed",
+      "recommendations": ""
+    },
+    {
+      "student_id": "2021-10113",
+      "student_name": "Gabriel, Quennie U.",
+      "course": "BS Computer Science",
+      "year": "3",
+      "grade": "94",
+      "remarks": "Passed",
+      "recommendations": ""
+    },
+    {
+      "student_id": "2021-10120",
+      "student_name": "Garcia, Rafael F.",
+      "course": "BS Computer Science",
+      "year": "4",
+      "grade": "74",
+      "remarks": "Failed",
+      "recommendations": ""
+    },
+    {
+      "student_id": "2021-10127",
+      "student_name": "Gonzales, Sofia Q.",
+      "course": "BS Information Technology",
+      "year": "4",
+      "grade": "85",
+      "remarks": "Passed",
+      "recommendations": ""
+    },
+    {
+      "student_id": "2021-10134",
+      "student_name": "Hernandez, Teodoro B.",
+      "course": "BS Information Systems",
+      "year": "4",
+      "grade": "93",
+      "remarks": "Passed",
+      "recommendations": ""
+    },
+    {
+      "student_id": "2021-10141",
+      "student_name": "Ilagan, Ursula M.",
+      "course": "BS Information Technology",
+      "year": "1",
+      "grade": "92",
+      "remarks": "Passed",
+      "recommendations": ""
+    },
+    {
+      "student_id": "2021-10148",
+      "student_name": "Jimenez, Vicente X.",
+      "course": "BS Information Systems",
+      "year": "2",
+      "grade": "92",
+      "remarks": "Passed",
+      "recommendations": ""
+    },
+    {
+      "student_id": "2021-10155",
+      "student_name": "Lacsamana, Wilma I.",
+      "course": "BS Computer Science",
+      "year": "1",
+      "grade": "88",
+      "remarks": "Passed",
+      "recommendations": ""
+    },
+    {
+      "student_id": "2021-10162",
+      "student_name": "Lazaro, Xavier T.",
+      "course": "BS Computer Science",
+      "year": "3",
+      "grade": "84",
+      "remarks": "Passed",
+      "recommendations": ""
+    },
+    {
+      "student_id": "2021-10169",
+      "student_name": "Legaspi, Yvonne E.",
+      "course": "BS Information Systems",
+      "year": "2",
+      "grade": "75",
+      "remarks": "Passed",
+      "recommendations": ""
+    },
+    {
+      "student_id": "2021-10176",
+      "student_name": "Macaraeg, Zenaida P.",
+      "course": "BS Computer Science",
+      "year": "4",
+      "grade": "76",
+      "remarks": "Passed",
+      "recommendations": ""
+    },
+    {
+      "student_id": "2021-10183",
+      "student_name": "Magsino, Arnel A.",
+      "course": "BS Information Systems",
+      "year": "1",
+      "grade": "74",
+      "remarks": "Failed",
+      "recommendations": ""
+    },
+    {
+      "student_id": "2021-10190",
+      "student_name": "Manalo, Bianca L.",
+      "course": "BS Computer Science",
+      "year": "2",
+      "grade": "99",
+      "remarks": "Passed",
+      "recommendations": ""
+    },
+    {
+      "student_id": "2021-10197",
+      "student_name": "Mendoza, Carlo W.",
+      "course": "BS Information Systems",
+      "year": "3",
+      "grade": "84",
+      "remarks": "Passed",
+      "recommendations": ""
+    },
+    {
+      "student_id": "2021-10204",
+      "student_name": "Nacpil, Divina H.",
+      "course": "BS Information Technology",
+      "year": "3",
+      "grade": "90",
+      "remarks": "Passed",
+      "recommendations": ""
+    },
+    {
+      "student_id": "2021-10211",
+      "student_name": "Navarro, Emilio S.",
+      "course": "BS Computer Science",
+      "year": "4",
+      "grade": "88",
+      "remarks": "Passed",
+      "recommendations": ""
+    },
+    {
+      "student_id": "2021-10218",
+      "student_name": "Ocampo, Fatima D.",
+      "course": "BS Computer Science",
+      "year": "3",
+      "grade": "74",
+      "remarks": "Failed",
+      "recommendations": ""
+    },
+    {
+      "student_id": "2021-10225",
+      "student_name": "Olivares, Gerald O.",
+      "course": "BS Computer Science",
+      "year": "1",
+      "grade": "73",
+      "remarks": "Failed",
+      "recommendations": ""
+    },
+    {
+      "student_id": "2021-10232",
+      "student_name": "Padilla, Hazel Z.",
+      "course": "BS Computer Science",
+      "year": "4",
+      "grade": "76",
+      "remarks": "Passed",
+      "recommendations": ""
+    },
+    {
+      "student_id": "2021-10239",
+      "student_name": "Pascual, Ignacio K.",
+      "course": "BS Computer Science",
+      "year": "2",
+      "grade": "84",
+      "remarks": "Passed",
+      "recommendations": ""
+    },
+    {
+      "student_id": "2021-10246",
+      "student_name": "Quinto, Jasmine V.",
+      "course": "BS Information Systems",
+      "year": "3",
+      "grade": "84",
+      "remarks": "Passed",
+      "recommendations": ""
+    },
+    {
+      "student_id": "2021-10253",
+      "student_name": "Ramos, Kevin G.",
+      "course": "BS Computer Science",
+      "year": "2",
+      "grade": "89",
+      "remarks": "Passed",
+      "recommendations": ""
+    },
+    {
+      "student_id": "2021-10260",
+      "student_name": "Reyes, Liza R.",
+      "course": "BS Information Technology",
+      "year": "3",
+      "grade": "78",
+      "remarks": "Passed",
+      "recommendations": ""
+    },
+    {
+      "student_id": "2021-10267",
+      "student_name": "Rivera, Miguel C.",
+      "course": "BS Computer Science",
+      "year": "4",
+      "grade": "90",
+      "remarks": "Passed",
+      "recommendations": ""
+    },
+    {
+      "student_id": "2021-10274",
+      "student_name": "Salazar, Nadine N.",
+      "course": "BS Information Technology",
+      "year": "3",
+      "grade": "96",
+      "remarks": "Passed",
+      "recommendations": ""
+    },
+    {
+      "student_id": "2021-10281",
+      "student_name": "Santiago, Oscar Y.",
+      "course": "BS Information Technology",
+      "year": "3",
+      "grade": "86",
+      "remarks": "Passed",
+      "recommendations": ""
+    },
+    {
+      "student_id": "2021-10288",
+      "student_name": "Santos, Pamela J.",
+      "course": "BS Computer Science",
+      "year": "1",
+      "grade": "79",
+      "remarks": "Passed",
+      "recommendations": ""
+    },
+    {
+      "student_id": "2021-10295",
+      "student_name": "Soriano, Ramon U.",
+      "course": "BS Information Technology",
+      "year": "3",
+      "grade": "80",
+      "remarks": "Passed",
+      "recommendations": ""
+    },
+    {
+      "student_id": "2021-10302",
+      "student_name": "Tolentino, Sheila F.",
+      "course": "BS Information Technology",
+      "year": "4",
+      "grade": "97",
+      "remarks": "Passed",
+      "recommendations": ""
+    },
+    {
+      "student_id": "2021-10309",
+      "student_name": "Torres, Tomas Q.",
+      "course": "BS Information Systems",
+      "year": "1",
+      "grade": "96",
+      "remarks": "Passed",
+      "recommendations": ""
+    },
+    {
+      "student_id": "2021-10316",
+      "student_name": "Valdez, Ulysses B.",
+      "course": "BS Computer Science",
+      "year": "2",
+      "grade": "80",
+      "remarks": "Passed",
+      "recommendations": ""
+    },
+    {
+      "student_id": "2021-10323",
+      "student_name": "Velasco, Veronica M.",
+      "course": "BS Information Technology",
+      "year": "4",
+      "grade": "92",
+      "remarks": "Passed",
+      "recommendations": ""
+    },
+    {
+      "student_id": "2021-10330",
+      "student_name": "Villanueva, Warren X.",
+      "course": "BS Computer Science",
+      "year": "3",
+      "grade": "74",
+      "remarks": "Failed",
+      "recommendations": ""
+    },
+    {
+      "student_id": "2021-10337",
+      "student_name": "Ybanez, Ysabel I.",
+      "course": "BS Computer Science",
+      "year": "2",
+      "grade": "94",
+      "remarks": "Passed",
+      "recommendations": ""
+    },
+    {
+      "student_id": "2021-10344",
+      "student_name": "Zamora, Zoe T.",
+      "course": "BS Information Systems",
+      "year": "2",
+      "grade": "82",
+      "remarks": "Passed",
+      "recommendations": ""
+    }
+  ]
+}

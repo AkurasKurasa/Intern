@@ -3,21 +3,14 @@
 <head>
 <meta charset="UTF-8" />
 <title>Intern — mini</title>
+<link rel="stylesheet" href="tokens.css" />
 <style>
-  :root {
-    --orange: #F97316;
-    --orange-dark: #C2410C;
-    --green: #16A34A;
-    --green-dark: #15803D;
-    --red: #DC2626;
-    --red-dark: #B91C1C;
-  }
   * { box-sizing: border-box; }
   html, body {
     margin: 0; width: 100%; height: 100%;
     background: transparent;
     overflow: hidden;
-    font-family: "Segoe UI", -apple-system, sans-serif;
+    font-family: var(--font-ui);
   }
 
   /* column-reverse so the FIRST child (the handle) sits at the bottom,
@@ -38,24 +31,28 @@
     width: 52px; height: 52px; min-height: 52px; border-radius: 50%;
     border: none; cursor: pointer; padding: 0;
     display: flex; align-items: center; justify-content: center;
-    font-size: 17px; color: #FFFFFF; line-height: 1;
     box-shadow: 0 3px 10px rgba(0,0,0,.30);
     transition: transform .12s ease, opacity .15s ease, background .12s ease;
   }
+  .circle svg { width: 18px; height: 18px; }
   .circle:active:not(:disabled) { transform: scale(0.90); }
   .circle:disabled { opacity: .35; cursor: not-allowed; }
 
-  .handle { background: var(--orange); font-weight: 700; font-size: 15px; }
-  .handle:hover { background: var(--orange-dark); }
-  /* A soft, repeating ring pulse while a capsule is actually running --
-     the one thing worth noticing even while collapsed down to a single
-     circle with no room for a status label. */
-  .handle.running {
-    animation: pulse 1.5s ease-in-out infinite;
+  .handle {
+    background: var(--ink); color: white;
+    font-family: var(--font-mono); font-weight: 700; font-size: 15px;
   }
+  .handle:hover { background: #2A2820; }
+  /* The one indicator visible while the agent is actually running, since
+     the widget is collapsed down to a single circle with no room for a
+     status label. Deliberately no step-count text on the handle -- there
+     is no known total step count ahead of a run (see renderer.js), so a
+     fake "3/6" would misrepresent real progress; the pulse alone is the
+     honest signal. */
+  .handle.running { animation: pulse var(--motion-pulse) ease-in-out infinite; }
   @keyframes pulse {
-    0%, 100% { box-shadow: 0 3px 10px rgba(0,0,0,.30), 0 0 0 0 rgba(249,115,22,.55); }
-    50%      { box-shadow: 0 3px 10px rgba(0,0,0,.30), 0 0 0 9px rgba(249,115,22,0); }
+    0%, 100% { box-shadow: 0 3px 10px rgba(0,0,0,.30), 0 0 0 0 rgba(180,68,30,.55); }
+    50%      { box-shadow: 0 3px 10px rgba(0,0,0,.30), 0 0 0 9px rgba(180,68,30,0); }
   }
 
   /* Collapsed by default: Play/Stop are present in the DOM (so they can
@@ -71,10 +68,16 @@
     pointer-events: auto;
   }
 
-  .action-play { background: var(--green); }
-  .action-play:hover:not(:disabled) { background: var(--green-dark); }
-  .action-stop { background: var(--red); }
-  .action-stop:hover:not(:disabled) { background: var(--red-dark); }
+  /* White circles rising above the handle, per the design direction --
+     the icon colour (ink/clay) carries the meaning instead of the fill. */
+  .action-play { background: white; color: var(--ink); }
+  .action-play:hover:not(:disabled) { background: var(--sunk); }
+  .action-stop { background: white; color: var(--clay); }
+  .action-stop:hover:not(:disabled) { background: var(--clay-tint-bg); }
+
+  @media (prefers-reduced-motion: reduce) {
+    .handle.running { animation: none; }
+  }
 </style>
 </head>
 <body>
@@ -82,9 +85,13 @@
     <button class="circle handle" id="btnHandle" type="button"
             title="Play / Stop" aria-label="Expand play controls" aria-expanded="false">I</button>
     <button class="circle action action-stop" id="btnStop" type="button"
-            disabled title="Stop" aria-label="Stop the running capsule">■</button>
+            disabled title="Stop" aria-label="Stop the running capsule">
+      <svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="1.5"/></svg>
+    </button>
     <button class="circle action action-play" id="btnPlay" type="button"
-            disabled title="Play" aria-label="Play the loaded capsule">▶</button>
+            disabled title="Play" aria-label="Play the loaded capsule">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 5l12 7-12 7z"/></svg>
+    </button>
   </div>
   <script src="mini-workflow.js"></script>
 </body>
