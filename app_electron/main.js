@@ -592,6 +592,77 @@ ipcMain.handle("settings-lmstudio-load-model", async (_evt, modelKey) => {
   return { ok: true, message: result.stdout };
 });
 
+// ── Settings tab -- API keys for the non-local LLM providers, written to
+// the repo-root .env file in the exact plain KEY=value shape run_task.py's
+// own hand-rolled loader already reads (no python-dotenv anywhere in this
+// project, so this writer matches that convention rather than introducing
+// a different one). Never echoes a saved key back to the renderer -- only
+// whether one is set and a masked last-4-chars preview, so a real secret
+// is never round-tripped through IPC/devtools once saved.
+const ENV_PATH = path.join(REPO_ROOT, ".env");
+const API_KEY_ENV_NAMES = {
+  anthropic: "ANTHROPIC_API_KEY",
+  groq: "GROQ_API_KEY",
+  gemini: "GEMINI_API_KEY",
+};
+
+function readEnvFile() {
+  if (!fs.existsSync(ENV_PATH)) return {};
+  const values = {};
+  for (const line of fs.readFileSync(ENV_PATH, "utf8").split(/\r?\n/)) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("#") || !trimmed.includes("=")) continue;
+    const idx = trimmed.indexOf("=");
+    values[trimmed.slice(0, idx).trim()] = trimmed.slice(idx + 1).trim();
+  }
+  return values;
+}
+
+// Updates one key in place if the file already sets it, otherwise appends
+// it -- every other line (including ones this app knows nothing about) is
+// left exactly as it was, never a full-file overwrite from a parsed model.
+function writeEnvValue(key, value) {
+  let lines = fs.existsSync(ENV_PATH) ? fs.readFileSync(ENV_PATH, "utf8").split(/\r?\n/) : [];
+  let found = false;
+  lines = lines.map((line) => {
+    const trimmed = line.trim();
+    if (trimmed && !trimmed.startsWith("#") && trimmed.includes("=")) {
+      const idx = trimmed.indexOf("=");
+      if (trimmed.slice(0, idx).trim() === key) {
+        found = true;
+        return `${key}=${value}`;
+      }
+    }
+    return line;
+  });
+  if (!found) lines.push(`${key}=${value}`);
+  while (lines.length && lines[lines.length - 1].trim() === "") lines.pop();
+  fs.writeFileSync(ENV_PATH, lines.join("\n") + "\n");
+}
+
+ipcMain.handle("settings-get-api-key-status", (_evt, provider) => {
+  const envKey = API_KEY_ENV_NAMES[provider];
+  if (!envKey) return { ok: false, error: `Unknown provider: ${provider}` };
+  // Falls back to the live process env too -- a key set as a real OS/shell
+  // environment variable (not through this UI) should still read as "set",
+  // not falsely empty.
+  const raw = readEnvFile()[envKey] || process.env[envKey] || "";
+  return { ok: true, isSet: !!raw, masked: raw ? `••••${raw.slice(-4)}` : "" };
+});
+
+ipcMain.handle("settings-save-api-key", (_evt, provider, apiKey) => {
+  const envKey = API_KEY_ENV_NAMES[provider];
+  if (!envKey) return { ok: false, error: `Unknown provider: ${provider}` };
+  const trimmed = (apiKey || "").trim();
+  if (!trimmed) return { ok: false, error: "Enter a key first." };
+  try {
+    writeEnvValue(envKey, trimmed);
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: `Couldn't save: ${e.message}` };
+  }
+});
+
 // The mini Play/Stop widget has no capsule-picker UI of its own -- Play
 // always means "run whatever's currently loaded in the main window's
 // Play panel," tracked via capsule-set-current above.

@@ -293,7 +293,6 @@ const btnLaunchMockups = document.getElementById("btnLaunchMockups");
 const btnPlay        = document.getElementById("btnPlay");
 const btnStopCapsule = document.getElementById("btnStopCapsule");
 const btnDeploy      = document.getElementById("btnDeploy");
-const capsuleLogEl   = document.getElementById("capsuleLog");
 const ppCountdown       = document.getElementById("ppCountdown");
 const ppCountdownNumber = document.getElementById("ppCountdownNumber");
 const ppCountdownHint   = document.getElementById("ppCountdownHint");
@@ -455,13 +454,23 @@ const PLACEHOLDER_EMOJI = "🧩";
 let capsulesCache = [];      // last fetched capsule list, from capsulesAPI.list()
 let currentCapsule = null;   // the one loaded in the play panel right now
 
+// The Play panel's own "Activity" section is gone (direct request) -- its
+// messages now feed the same big-pane step-feed the Running/Finished
+// views already show, instead of a second, redundant scrolling log in
+// the narrow panel. Same shape as recordingFeedEl's log() above.
 function capsuleLog(message, level = "dim") {
   const row = document.createElement("div");
-  row.className = "log-entry";
-  const time = new Date().toLocaleTimeString();
-  row.innerHTML = `<span class="log-time">[${time}]</span> <span class="log-${level}">${escapeHtml(message)}</span>`;
-  capsuleLogEl.appendChild(row);
-  capsuleLogEl.scrollTop = capsuleLogEl.scrollHeight;
+  row.className = "step-feed-item";
+  const label = document.createElement("span");
+  label.className = `sf-label log-${level}`;
+  label.textContent = message;
+  const time = document.createElement("span");
+  time.className = "sf-time";
+  time.textContent = new Date().toLocaleTimeString();
+  row.appendChild(label);
+  row.appendChild(time);
+  stepFeedEl.appendChild(row);
+  stepFeedEl.scrollTop = stepFeedEl.scrollHeight;
 }
 
 /* Both run_task.py and components/scope2/automate.py print the same
@@ -853,6 +862,13 @@ async function loadWorkflows() {
   refreshTaskCount();
 }
 
+// Spec-sheet kicker text -- real data (the capsule's actual kind), not
+// decorative filler, mirroring how the reference's own kickers ("Data
+// Bus Width 64-bits") are real specs, not placeholder labels.
+function taskChipKicker(capsule) {
+  return capsule.kind === "script" ? "TASK · SCRIPT" : "TASK · AGENT";
+}
+
 function buildTaskChip(capsule) {
   const chip = document.createElement("button");
   chip.type = "button";
@@ -863,9 +879,11 @@ function buildTaskChip(capsule) {
   const emojiText = emojiValue || PLACEHOLDER_EMOJI;
   const emojiClass = "task-chip-emoji" + (emojiValue ? "" : " is-placeholder");
   chip.innerHTML =
-    `<span class="${emojiClass}">${emojiText}</span>` +
-    `<span class="task-chip-name">${escapeHtml(capsule.name)}</span>` +
-    `<span class="task-chip-desc">${escapeHtml(capsule.description || "")}</span>`;
+    `<span class="task-chip-kicker">${escapeHtml(taskChipKicker(capsule))}</span>` +
+    `<span class="task-chip-bottom">` +
+      `<span class="${emojiClass}">${emojiText}</span>` +
+      `<span class="task-chip-name">${escapeHtml(capsule.name)}</span>` +
+    `</span>`;
   chip.addEventListener("click", () => {
     workflowsListEl.querySelectorAll(".task-chip.capsule-selected")
       .forEach((el) => el.classList.remove("capsule-selected"));
@@ -977,20 +995,65 @@ async function loadSettingsPanel() {
 }
 
 // ── LLM provider dropdown -- LM Studio keeps its full working panel above;
-// other providers are real, known providers (agent.py already supports
-// anthropic/groq/gemini/lmstudio) but aren't configurable from this screen
-// yet -- honestly labeled as .env-only rather than faked with dead controls.
+// the other providers (agent.py already supports anthropic/groq/gemini)
+// get a real API-key field, saved to the repo's .env file -- the same
+// file run_task.py's own loader already reads, so a key saved here is
+// immediately usable by a real run, not just a UI-only preference.
 const llmProviderSelect  = document.getElementById("llmProviderSelect");
 const llmProviderLmStudio = document.getElementById("llmProviderLmStudio");
 const llmProviderOther   = document.getElementById("llmProviderOther");
+const llmApiKeyInput     = document.getElementById("llmApiKeyInput");
+const btnSaveApiKey      = document.getElementById("btnSaveApiKey");
+const llmApiKeyStatus    = document.getElementById("llmApiKeyStatus");
+
+async function refreshApiKeyStatus() {
+  const provider = llmProviderSelect.value;
+  llmApiKeyInput.value = "";
+  llmApiKeyStatus.textContent = "Checking…";
+  try {
+    const status = await window.settingsAPI.getApiKeyStatus(provider);
+    if (!status.ok) {
+      llmApiKeyStatus.textContent = status.error;
+      return;
+    }
+    llmApiKeyStatus.textContent = status.isSet
+      ? `Key saved (${status.masked}). Paste a new one to replace it.`
+      : "No key saved yet.";
+  } catch (e) {
+    llmApiKeyStatus.textContent = `Couldn't check: ${e.message || e}`;
+  }
+}
 
 function updateLlmProviderView() {
   const isLmStudio = llmProviderSelect.value === "lmstudio";
   llmProviderLmStudio.hidden = !isLmStudio;
   llmProviderOther.hidden = isLmStudio;
   if (isLmStudio) loadSettingsPanel();
+  else refreshApiKeyStatus();
 }
 llmProviderSelect.addEventListener("change", updateLlmProviderView);
+
+btnSaveApiKey.addEventListener("click", async () => {
+  const provider = llmProviderSelect.value;
+  const value = llmApiKeyInput.value;
+  btnSaveApiKey.disabled = true;
+  try {
+    const result = await window.settingsAPI.saveApiKey(provider, value);
+    if (result.ok) {
+      llmApiKeyInput.value = "";
+      await refreshApiKeyStatus();
+    } else {
+      llmApiKeyStatus.textContent = result.error;
+    }
+  } catch (e) {
+    llmApiKeyStatus.textContent = `Couldn't save: ${e.message || e}`;
+  } finally {
+    btnSaveApiKey.disabled = false;
+  }
+});
+llmApiKeyInput.addEventListener("keydown", (e) => {
+  if (e.key === "Enter") btnSaveApiKey.click();
+});
 
 btnSettingsRefresh.addEventListener("click", () => updateLlmProviderView());
 
@@ -1023,9 +1086,11 @@ btnLoadLmStudioModel.addEventListener("click", async () => {
   }
 });
 
-// ── Vision section -- perception backend preference. Real, working
-// control (persists via localStorage), but honestly scoped: run_task.py's
-// own --perception uia|vision flag exists, but nothing in the bridge/IPC
+// ── Vision section -- perception backend preference, multi-select
+// (direct request -- more than one backend can be relevant to a task at
+// once, e.g. UIA + a VLM fallback). Real, working control (persists via
+// localStorage as an array), but honestly scoped: run_task.py's own
+// --perception uia|vision flag exists, but nothing in the bridge/IPC
 // chain passes it through for a live Play run yet -- that's a real,
 // separate backend change, not part of this UI pass. Excel is included
 // as a 4th option alongside the three requested (UIA Tree/VLM/OCR)
@@ -1033,25 +1098,37 @@ btnLoadLmStudioModel.addEventListener("click", async () => {
 // (ExcelObserver, proven for Scope #2), not an invented one.
 const visionOptions = document.getElementById("visionOptions");
 const visionSavedHint = document.getElementById("visionSavedHint");
-const VISION_STORAGE_KEY = "intern.visionBackend";
+const VISION_STORAGE_KEY = "intern.visionBackends";
 const VISION_LABELS = { uia: "UIA Tree", vlm: "VLM", ocr: "OCR", excel: "Excel" };
 
+function checkedVisionValues() {
+  return Array.from(visionOptions.querySelectorAll('input[name="vision"]:checked'))
+    .map((el) => el.value);
+}
+
+function describeVisionSelection(values) {
+  if (!values.length) return "Nothing selected — no perception backend chosen.";
+  const labels = values.map((v) => VISION_LABELS[v] || v).join(", ");
+  return `Saved: ${labels} (preference only — not yet wired into a live run).`;
+}
+
 function loadVisionPreference() {
-  let saved = "uia";
+  let saved = ["uia"];
   try {
-    saved = localStorage.getItem(VISION_STORAGE_KEY) || "uia";
-  } catch (e) { /* localStorage unavailable -- fall back to the default */ }
-  const radio = visionOptions.querySelector(`input[value="${saved}"]`);
-  if (radio) radio.checked = true;
-  visionSavedHint.textContent =
-    `Saved: ${VISION_LABELS[saved] || saved} (preference only — not yet wired into a live run).`;
+    const raw = localStorage.getItem(VISION_STORAGE_KEY);
+    if (raw) saved = JSON.parse(raw);
+  } catch (e) { /* localStorage unavailable or corrupt -- fall back to the default */ }
+  visionOptions.querySelectorAll('input[name="vision"]').forEach((el) => {
+    el.checked = saved.includes(el.value);
+  });
+  visionSavedHint.textContent = describeVisionSelection(checkedVisionValues());
 }
 visionOptions.addEventListener("change", (e) => {
   if (e.target.name !== "vision") return;
+  const values = checkedVisionValues();
   try {
-    localStorage.setItem(VISION_STORAGE_KEY, e.target.value);
+    localStorage.setItem(VISION_STORAGE_KEY, JSON.stringify(values));
   } catch (err) { /* localStorage unavailable -- selection still applies visually */ }
-  visionSavedHint.textContent =
-    `Saved: ${VISION_LABELS[e.target.value] || e.target.value} (preference only — not yet wired into a live run).`;
+  visionSavedHint.textContent = describeVisionSelection(values);
 });
 loadVisionPreference();

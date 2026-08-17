@@ -2049,6 +2049,22 @@ Not a thesis objective — developer tooling. The demo recorder's interface.
 
   Verified by launching the real app after each stage, not just reading the diff. No Python changed, so the full pytest suite wasn't re-run (nothing it covers touches the renderer); syntax-checked `renderer.js` (`node --check`) and brace-balance-checked `style.css` (236/236) before and after.
 
+  **EXTENDED same session, immediate follow-up round.** Five more direct requests:
+
+  1. **A reference image corrected the "microchip" interpretation** — the first pass was just rounded pill cards, not an actual microchip/spec-sheet look (dark card, circuit-trace texture, bold model-style name, small mono spec kicker). Rebuilt `.task-chip` to match: `--ink` background (not the reference's red — this app's own color rule in `tokens.css` reserves clay/red exclusively for "the agent has control," never a decorative list card), a subtle circuit-trace texture built from layered `repeating-linear-gradient`/`radial-gradient` (no external SVG asset), a small mono uppercase kicker showing the capsule's real `kind` ("TASK · AGENT" / "TASK · SCRIPT" — real data, not filler, matching how the reference's own kickers are real specs), and the bold name. Same footprint as the first pass (~152px grid tiles) — only the surface treatment changed. Task descriptions removed per the same request.
+
+  2. **Vision section made multi-select** — radios became checkboxes; `localStorage` now stores an array (`intern.visionBackends`) instead of a single string, with a `checkedVisionValues()`/`describeVisionSelection()` pair doing the read/summarize work.
+
+  3. **Spacing increased in the narrow side panels** (Recorder/Play) — `.recorder-panel`/`.play-panel`'s own padding (16px→22px/20px) and internal gap (10px→16px) bumped; this is the *smaller* pane, distinct from the *bigger* main-area spacing already done in the first round.
+
+  4. **Play panel's own "Activity" section removed too** — same treatment as the Home page: `capsuleLog()` now writes into the same big-pane `stepFeedEl` the Running view already shows (reusing `.step-feed-item`, not a new element), rather than a second, redundant scrolling log in the narrow panel. The Copy/Open-log buttons (they read the real persisted `logs/capsule_activity.log` file, not the DOM) were kept, demoted from a labeled "Activity" section to two small utility icons. `.log`/`.log-entry`/`.log-time` and the now-unused `capsuleLogEl` removed as dead code — `.log-ok`/`.log-err`/`.log-dim` kept since they're still used as `.sf-label` modifiers.
+
+  5. **Real API-key input added, not just UI** — the "other providers" note in the LLM section became an actual field wired to `main.js`'s new `.env` reader/writer (`readEnvFile()`/`writeEnvValue()`), matching `run_task.py`'s own hand-rolled `KEY=value` loader format exactly so a key saved here is immediately usable by a real run, not a UI-only preference. `writeEnvValue()` updates a key in place if the file already sets it, otherwise appends — every other line (comments, unrelated keys) is left untouched, verified directly with a throwaway Node script before trusting it (create-fresh, then update-alongside-existing-comment-and-key, both checked byte-for-byte). Never echoes a saved key back to the renderer — only whether one is set and a masked last-4-chars preview (`settings-get-api-key-status`), so a real secret never round-trips through IPC/devtools after saving.
+
+  A mid-turn detour, not this UI work: a "the recorder is slow again" report turned out to be the same already-documented, pre-existing UIA-per-property-call latency (confirmed via `git diff --stat` that zero Python files had changed in either UI round) — not a regression from this pass. Flagged honestly as a known limitation with a real but substantial fix (UIA cache-batching) still not attempted, offered as separate follow-up work rather than silently bundled in or silently ignored.
+
+  Verified the same way as the first round: real app relaunch after each stage, `node --check` on every changed `.js` file, brace-balance check on `style.css` (237/237), plus a direct, isolated test of the new `.env` writer's actual byte output before trusting it in the app. No Python touched.
+
 ---
 
 ## Scopes & North Star

@@ -283,8 +283,8 @@ p { text-wrap: pretty; }
   background: var(--rail);
   border-left: 1px solid var(--border-strong);
   display: flex; flex-direction: column;
-  padding: 16px 16px 14px;
-  gap: 10px;
+  padding: 22px 20px 20px;
+  gap: 16px;
   overflow: hidden;
 }
 .recorder-panel[hidden], .play-panel[hidden] { display: none; }
@@ -387,7 +387,7 @@ p { text-wrap: pretty; }
 }
 .emoji-picker-tile.is-placeholder:hover { border-color: var(--text-muted); }
 
-.rp-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 2px; }
+.rp-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 4px; }
 .rp-head h2 {
   margin: 0; font-size: 11px; font-weight: 500;
   font-family: var(--font-mono); letter-spacing: .16em; text-transform: uppercase;
@@ -485,18 +485,15 @@ p { text-wrap: pretty; }
 .vision-option-name { font-size: 13px; font-weight: 600; color: var(--ink); }
 .vision-option-desc { font-size: 11.5px; color: var(--text-muted); line-height: 1.4; }
 
-.log {
-  flex: 1; min-height: 0;
-  overflow-y: auto;
-  font-family: var(--font-mono);
-  font-size: 10.5px;
-  line-height: 1.6;
-}
-.log-entry { margin-bottom: 6px; }
-.log-time { color: var(--text-faint); }
+/* Message-level color, applied to .sf-label inside a .step-feed-item --
+   both the recorder's and the Play panel's activity now flow through the
+   same big-pane step-feed, no separate narrow-pane .log container left. */
 .log-ok { color: var(--success); }
 .log-err { color: var(--error); }
 .log-dim { color: var(--text-secondary); }
+
+.pp-utility-row { display: flex; align-items: center; gap: 6px; }
+.pp-utility-label { font-size: 11px; color: var(--text-muted); }
 
 /* ── Buttons — ink is the only "primary" colour; clay is reserved for the
    recording/running state swap below, never a default button skin. ────── */
@@ -531,10 +528,18 @@ p { text-wrap: pretty; }
 
 .muted { color: var(--text-muted); font-size: 13px; line-height: 1.6; margin: 0; }
 
-/* ── Tasks list — chip grid ────────────────────────────────────────────
-   Each task is a compact, self-contained tile rather than a stacked list
-   row -- direct request ("turn them into microchips, let's try that").
-   No nested "Takes" list anymore either (separate direct request) -- a
+/* ── Tasks list — microchip grid ──────────────────────────────────────
+   Literal "microchip" reference (a semiconductor spec-sheet look: dark
+   card, faint circuit-trace texture, a small mono spec kicker, bold
+   name) -- direct correction after a first pass that was just rounded
+   pill cards, not this. Same footprint as that first pass (~152px tiles
+   in the grid) -- only the surface treatment changed, not the size.
+   Uses --ink instead of the reference's red block: this app's own color
+   rule (tokens.css) reserves clay/red exclusively for "the agent has
+   control of your mouse and keyboard" -- a task card in a list is never
+   that state, so red stays out of it here. No description line anymore
+   either (separate direct request) -- the kicker + name is the whole
+   card now. No nested "Takes" list either (from the prior pass) -- a
    chip is a leaf, not an expandable row. */
 .workflows-list { display: flex; flex-direction: column; }
 .task-chip-grid {
@@ -544,35 +549,45 @@ p { text-wrap: pretty; }
   margin-top: 6px;
 }
 .task-chip {
-  display: flex; flex-direction: column; align-items: flex-start; gap: 8px;
+  position: relative;
+  overflow: hidden;
+  display: flex; flex-direction: column; justify-content: space-between; align-items: flex-start; gap: 14px;
   text-align: left;
-  border: 1px solid var(--border-strong);
+  min-height: 148px;
+  border: 1px solid transparent;
   border-radius: var(--radius-lg);
-  background: var(--card);
-  padding: 16px;
+  padding: 14px;
   cursor: pointer;
   font: inherit;
-  color: inherit;
-  transition: border-color .12s ease, background .12s ease, transform .12s ease, box-shadow .12s ease;
+  color: white;
+  background:
+    radial-gradient(circle at 88% 18%, rgba(255,255,255,.09) 0 2.5px, transparent 3px),
+    radial-gradient(circle at 12% 82%, rgba(255,255,255,.07) 0 2.5px, transparent 3px),
+    repeating-linear-gradient(115deg, rgba(255,255,255,.055) 0 1.5px, transparent 1.5px 30px),
+    repeating-linear-gradient(25deg, rgba(255,255,255,.04) 0 1.5px, transparent 1.5px 36px),
+    var(--ink);
+  transition: transform .12s ease, box-shadow .12s ease, border-color .12s ease;
 }
-.task-chip:hover { border-color: var(--ink); transform: translateY(-1px); box-shadow: 0 4px 10px rgba(22,21,15,.06); }
+.task-chip:hover { transform: translateY(-2px); box-shadow: 0 8px 18px rgba(22,21,15,.22); }
 .task-chip:focus-visible { outline: 2px solid var(--accent-blue); outline-offset: 2px; }
-.task-chip.capsule-selected {
-  border-color: var(--accent-blue); background: var(--accent-blue-tint-bg);
+.task-chip.capsule-selected { border-color: var(--accent-blue); box-shadow: 0 0 0 3px var(--accent-blue-tint-bg); }
+.task-chip-kicker {
+  font-family: var(--font-mono); font-size: 9px; font-weight: 600;
+  letter-spacing: .1em; text-transform: uppercase;
+  color: rgba(255,255,255,.55);
 }
+.task-chip.capsule-selected .task-chip-kicker { color: var(--accent-blue-tint-border); }
+.task-chip-bottom { display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
 .task-chip-emoji {
-  font-size: 22px;
+  font-size: 19px;
   display: inline-flex; align-items: center; justify-content: center;
-  width: 42px; height: 42px; border-radius: var(--radius-sm);
-  background: var(--sunk);
+  width: 34px; height: 34px; border-radius: 7px;
+  background: rgba(255,255,255,.1);
 }
 .task-chip-emoji.is-placeholder { opacity: .5; }
-.task-chip-name { font-size: 13.5px; font-weight: 600; color: var(--ink); }
-.task-chip.capsule-selected .task-chip-name { color: var(--accent-blue); }
-.task-chip-desc {
-  font-size: 11.5px; color: var(--text-muted); line-height: 1.4;
-  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical;
-  overflow: hidden;
+.task-chip-name {
+  font-size: 15.5px; font-weight: 800; line-height: 1.15; letter-spacing: -.01em;
+  color: white;
 }
 
 /* ── Running view ─────────────────────────────────────────────────────── */

@@ -68,4 +68,6 @@ contextBridge.exposeInMainWorld("settingsAPI", {
   refreshLmStudio: () => ipcRenderer.invoke("settings-lmstudio-refresh"),
   startLmStudioServer: () => ipcRenderer.invoke("settings-lmstudio-start-server"),
   loadLmStudioModel: (modelKey) => ipcRenderer.invoke("settings-lmstudio-load-model", modelKey),
+  getApiKeyStatus: (provider) => ipcRenderer.invoke("settings-get-api-key-status", provider),
+  saveApiKey: (provider, apiKey) => ipcRenderer.invoke("settings-save-api-key", provider, apiKey),
 });

@@ -198,31 +198,36 @@
             </div>
 
             <div id="llmProviderOther" hidden>
-              <p class="settings-hint">Configured via <code>.env</code> (<code>ANTHROPIC_API_KEY</code> / <code>GROQ_API_KEY</code> / <code>GEMINI_API_KEY</code>) — not yet editable from this screen.</p>
+              <label class="field-label" for="llmApiKeyInput">API key</label>
+              <div class="settings-row">
+                <input class="field" type="password" id="llmApiKeyInput" placeholder="Paste your API key" autocomplete="off">
+                <button class="btn btn-primary btn-sm" id="btnSaveApiKey" type="button">Save</button>
+              </div>
+              <p class="settings-hint" id="llmApiKeyStatus"></p>
             </div>
           </section>
 
           <section class="settings-section">
             <h3 class="rp-log-head">Vision</h3>
-            <p class="settings-hint">How tasks perceive the screen — which perception backend a run uses. Preference only for now, not yet wired into a live run.</p>
+            <p class="settings-hint">How tasks perceive the screen — which perception backend(s) a run can use. Multi-select; preference only for now, not yet wired into a live run.</p>
             <div class="vision-options" id="visionOptions">
               <label class="vision-option">
-                <input type="radio" name="vision" value="uia" checked>
+                <input type="checkbox" name="vision" value="uia" checked>
                 <span class="vision-option-name">UIA Tree</span>
                 <span class="vision-option-desc">Reads the Windows accessibility tree directly. Free, fast, the default — works when the app exposes a clean tree.</span>
               </label>
               <label class="vision-option">
-                <input type="radio" name="vision" value="vlm">
+                <input type="checkbox" name="vision" value="vlm">
                 <span class="vision-option-name">VLM</span>
                 <span class="vision-option-desc">Screenshot sent to a vision-language model (Groq/Gemini) to read and localize elements semantically.</span>
               </label>
               <label class="vision-option">
-                <input type="radio" name="vision" value="ocr">
+                <input type="checkbox" name="vision" value="ocr">
                 <span class="vision-option-name">OCR</span>
                 <span class="vision-option-desc">Tesseract text extraction from a screenshot — a fallback when there's no accessibility tree.</span>
               </label>
               <label class="vision-option">
-                <input type="radio" name="vision" value="excel">
+                <input type="checkbox" name="vision" value="excel">
                 <span class="vision-option-name">Excel</span>
                 <span class="vision-option-desc">Reads a workbook directly via COM (ExcelObserver) — for spreadsheet-backed tasks, not screen pixels at all.</span>
               </label>
@@ -331,18 +336,19 @@
         <div class="pp-countdown-number" id="ppCountdownNumber">5</div>
       </div>
 
-      <div class="rp-log-head-row">
-        <h3 class="rp-log-head">Activity</h3>
-        <div class="rp-log-actions">
-          <button class="btn-icon" id="btnCopyLog" type="button" title="Copy the full log to the clipboard">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="9" y="9" width="11" height="11" rx="1.5"/><path d="M5 15V6a1 1 0 0 1 1-1h9"/></svg>
-          </button>
-          <button class="btn-icon" id="btnOpenLog" type="button" title="Open the full log file">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 7a1 1 0 0 1 1-1h5l2 2h9a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z"/></svg>
-          </button>
-        </div>
+      <!-- Activity itself moved to the big pane (the Running/Finished
+           views' own step-feed already show it) -- these two just read the
+           real persisted log file, kept as small utilities rather than a
+           whole section. -->
+      <div class="pp-utility-row">
+        <button class="btn-icon" id="btnCopyLog" type="button" title="Copy the full log to the clipboard">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="9" y="9" width="11" height="11" rx="1.5"/><path d="M5 15V6a1 1 0 0 1 1-1h9"/></svg>
+        </button>
+        <button class="btn-icon" id="btnOpenLog" type="button" title="Open the full log file">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 7a1 1 0 0 1 1-1h5l2 2h9a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z"/></svg>
+        </button>
+        <span class="pp-utility-label">Full log</span>
       </div>
-      <div class="log" id="capsuleLog"></div>
     </aside>
   </div>
 
