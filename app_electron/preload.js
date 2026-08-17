@@ -34,6 +34,9 @@ contextBridge.exposeInMainWorld("capsulesAPI", {
   deploy: (capsuleName, checkpointPath) =>
     ipcRenderer.invoke("capsules-deploy", capsuleName, checkpointPath),
   setEmoji: (capsuleName, emoji) => ipcRenderer.invoke("capsules-set-emoji", capsuleName, emoji),
+  create: (name, description) => ipcRenderer.invoke("capsules-create", name, description),
+  update: (name, updates) => ipcRenderer.invoke("capsules-update", name, updates),
+  delete: (name) => ipcRenderer.invoke("capsules-delete", name),
   run: (capsuleName) => ipcRenderer.invoke("capsule-run", capsuleName),
   stop: () => ipcRenderer.invoke("capsule-stop"),
   openLog: () => ipcRenderer.invoke("capsule-open-log"),

@@ -611,6 +611,21 @@ async function loadCapsuleIntoSlot(capsule) {
   setCapsuleRunning(false);
 }
 
+// Resets the Play panel back to its empty default -- used when the task
+// currently loaded there gets deleted out from under it, so Play never
+// keeps pointing at a task that no longer exists.
+function clearPlaySlot() {
+  currentCapsule = null;
+  ppSlotHint.hidden = false;
+  ppCapsule.hidden = true;
+  ppSlot.classList.remove("filled");
+  ppCheckpointGroup.hidden = true;
+  ppTestGroup.hidden = true;
+  workflowsListEl.querySelectorAll(".task-chip.capsule-selected")
+    .forEach((el) => el.classList.remove("capsule-selected"));
+  setCapsuleRunning(false);
+}
+
 ppCheckpoint.addEventListener("change", () => {
   btnDeploy.hidden = !currentCapsule || ppCheckpoint.value === currentCapsule.model_path;
 });
@@ -806,22 +821,28 @@ btnOpenLog.addEventListener("click", async () => {
   }
 });
 
-/* ── Recorder panel's "Save to" dropdown -- populated from existing
-   workflow groups instead of free-typed text. ─────────────────────────── */
+/* ── Recorder panel's "Save to" dropdown -- lists real tasks (capsules),
+   not a raw scan of data/demos/. Direct correction: "edit Save to to the
+   specific workflows not some random data/demos/x" -- a folder that
+   doesn't belong to any actual task is exactly what this used to allow.
+   Script-kind tasks (e.g. Scope #2) don't record via the Recorder at all,
+   so they're excluded here the same way findCapsuleForGroup() already
+   excludes them elsewhere. ─────────────────────────────────────────────── */
 async function populateOutDirOptions() {
-  let groups = [];
+  let capsules = [];
   try {
-    groups = await window.workflowsAPI.list();
+    capsules = await window.capsulesAPI.list();
   } catch (e) {
     return;
   }
-  if (!groups.length) return;
+  const recordable = capsules.filter((c) => c.kind !== "script");
+  if (!recordable.length) return;
   const current = outDirInput.value;
   outDirInput.innerHTML = "";
-  groups.forEach((g) => {
+  recordable.forEach((c) => {
     const opt = document.createElement("option");
-    opt.value = `data/demos/${g.name}`;
-    opt.textContent = `data/demos/${g.name}`;
+    opt.value = `data/demos/${c.name}`;
+    opt.textContent = `data/demos/${c.name}`;
     outDirInput.appendChild(opt);
   });
   if (Array.from(outDirInput.options).some((o) => o.value === current)) {
@@ -883,13 +904,20 @@ function buildTaskChip(capsule) {
     `<span class="task-chip-bottom">` +
       `<span class="${emojiClass}">${emojiText}</span>` +
       `<span class="task-chip-name">${escapeHtml(capsule.name)}</span>` +
-    `</span>`;
+    `</span>` +
+    `<button type="button" class="task-chip-edit" title="Edit task">` +
+      `<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>` +
+    `</button>`;
   chip.addEventListener("click", () => {
     workflowsListEl.querySelectorAll(".task-chip.capsule-selected")
       .forEach((el) => el.classList.remove("capsule-selected"));
     chip.classList.add("capsule-selected");
     loadCapsuleIntoSlot(capsule);
     flashPlaySlot();
+  });
+  chip.querySelector(".task-chip-edit").addEventListener("click", (e) => {
+    e.stopPropagation();
+    openTaskEditModal(capsule);
   });
   return chip;
 }
@@ -900,12 +928,135 @@ function escapeHtml(s) {
   }[c]));
 }
 
+/* ── Task edit panel (Update + Delete) -- opened from each chip's small
+   pencil button. A centered modal rather than an anchored popover: it
+   needs several fields at once (description, emoji, triggers) which
+   wouldn't fit cleanly next to a ~150px chip without risking overflow
+   near screen edges. Renaming is deliberately not offered here -- a
+   task's name ties together its registry entry, its data/demos/<name>
+   folder, and (once trained) its model path, so a rename would mean
+   moving files, a separate, harder feature not asked for. ───────────── */
+let openTaskEditEl = null;
+
+function closeTaskEditModal() {
+  if (!openTaskEditEl) return;
+  openTaskEditEl.remove();
+  openTaskEditEl = null;
+  document.removeEventListener("keydown", handleTaskEditEscape, true);
+}
+function handleTaskEditEscape(e) {
+  if (e.key === "Escape") closeTaskEditModal();
+}
+
+function openTaskEditModal(capsule) {
+  closeTaskEditModal();
+  const isAgent = capsule.kind !== "script";
+
+  const backdrop = document.createElement("div");
+  backdrop.className = "task-edit-backdrop";
+  const panel = document.createElement("div");
+  panel.className = "task-edit-panel";
+  panel.innerHTML =
+    `<h3 class="task-edit-title">Edit task</h3>` +
+    `<p class="task-edit-name">${escapeHtml(capsule.name)}</p>` +
+    `<label class="field-label" for="teDescription">Description</label>` +
+    `<textarea class="field" id="teDescription" rows="3">${escapeHtml(capsule.description || "")}</textarea>` +
+    `<label class="field-label">Emoji</label>` +
+    `<div class="task-edit-emoji-grid" id="teEmojiGrid"></div>` +
+    (isAgent
+      ? `<label class="field-label" for="teKeywords">Trigger keywords (comma-separated)</label>` +
+        `<input class="field" id="teKeywords" type="text" value="${escapeHtml((capsule.trigger_keywords || []).join(", "))}" />` +
+        `<label class="field-label" for="teApps">Trigger apps (comma-separated)</label>` +
+        `<input class="field" id="teApps" type="text" value="${escapeHtml((capsule.trigger_apps || []).join(", "))}" />`
+      : `<p class="settings-hint">Trigger keywords/apps aren't used by a script-kind task — it's never auto-routed, only run directly from Play.</p>`) +
+    `<div class="task-edit-actions">` +
+      `<button class="btn btn-danger btn-sm" id="teDelete" type="button">Delete task</button>` +
+      `<span class="task-edit-spacer"></span>` +
+      `<button class="btn btn-ghost btn-sm" id="teCancel" type="button">Cancel</button>` +
+      `<button class="btn btn-primary btn-sm" id="teSave" type="button">Save</button>` +
+    `</div>`;
+  backdrop.appendChild(panel);
+  document.body.appendChild(backdrop);
+  openTaskEditEl = backdrop;
+
+  let selectedEmoji = capsule.emoji || "";
+  const grid = panel.querySelector("#teEmojiGrid");
+  const renderEmojiGrid = () => {
+    grid.innerHTML = "";
+    const makeTile = (value, isClear) => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      const selected = isClear ? selectedEmoji === "" : selectedEmoji === value;
+      btn.className = "emoji-picker-tile" + (isClear ? " is-placeholder" : "") + (selected ? " is-selected" : "");
+      btn.textContent = isClear ? PLACEHOLDER_EMOJI : value;
+      btn.title = isClear ? "Clear (use placeholder)" : value;
+      btn.addEventListener("click", () => { selectedEmoji = isClear ? "" : value; renderEmojiGrid(); });
+      return btn;
+    };
+    grid.appendChild(makeTile(PLACEHOLDER_EMOJI, true));
+    EMOJI_CHOICES.forEach((em) => grid.appendChild(makeTile(em, false)));
+  };
+  renderEmojiGrid();
+
+  panel.querySelector("#teCancel").addEventListener("click", closeTaskEditModal);
+  backdrop.addEventListener("mousedown", (e) => { if (e.target === backdrop) closeTaskEditModal(); });
+  document.addEventListener("keydown", handleTaskEditEscape, true);
+
+  panel.querySelector("#teSave").addEventListener("click", async () => {
+    const updates = {
+      description: panel.querySelector("#teDescription").value,
+      emoji: selectedEmoji,
+    };
+    if (isAgent) {
+      updates.trigger_keywords = panel.querySelector("#teKeywords").value
+        .split(",").map((s) => s.trim()).filter(Boolean);
+      updates.trigger_apps = panel.querySelector("#teApps").value
+        .split(",").map((s) => s.trim()).filter(Boolean);
+    }
+    try {
+      const updated = await window.capsulesAPI.update(capsule.name, updates);
+      if (currentCapsule && currentCapsule.name === updated.name) {
+        currentCapsule = updated;
+        applyCapsuleEmojiDisplay(ppCapsuleEmoji, updated.emoji);
+      }
+      closeTaskEditModal();
+      await loadWorkflows();
+      await populateOutDirOptions();
+    } catch (e) {
+      capsuleLog(`Couldn't save task: ${e.message || e}`, "err");
+    }
+  });
+
+  // Registry-entry only, confirmed directly -- recorded sessions and any
+  // trained checkpoint stay on disk. window.confirm() (not a custom
+  // in-app step) since Electron's renderer is a real Chromium context and
+  // this is a one-off, infrequent action, not worth a bespoke dialog.
+  panel.querySelector("#teDelete").addEventListener("click", async () => {
+    const ok = window.confirm(
+      `Delete task '${capsule.name}'?\n\nThis only removes it from the task list. ` +
+      `Any recorded sessions in data/demos/${capsule.name} and any trained checkpoint stay on disk.`
+    );
+    if (!ok) return;
+    try {
+      await window.capsulesAPI.delete(capsule.name);
+      if (currentCapsule && currentCapsule.name === capsule.name) clearPlaySlot();
+      closeTaskEditModal();
+      await loadWorkflows();
+      await populateOutDirOptions();
+    } catch (e) {
+      capsuleLog(`Couldn't delete task: ${e.message || e}`, "err");
+    }
+  });
+}
+
 btnRefreshWorkflows.addEventListener("click", () => { loadWorkflows(); populateOutDirOptions(); });
 
-/* ── Create workflow — just reserves an empty data/demos/<name>/ folder.
-   No capsule/model gets registered here; there's nothing trained for a
-   brand-new workflow yet. It shows up immediately in this list (as an
-   empty group) and in the Recorder's Save-to dropdown. ─────────────────── */
+/* ── Create task — registers a real capsule entry (so it shows up as a
+   chip immediately) AND reserves its matching data/demos/<name>/ recording
+   folder in one step, via capsulesAPI.create(). Previously this only made
+   the folder (workflowsAPI.create()) with no capsule to go with it -- a
+   "workflow" that never actually became a task. Description/emoji/trigger
+   fields are filled in afterward through each chip's own edit panel. ──── */
 const btnCreateWorkflow = document.getElementById("btnCreateWorkflow");
 const wfCreateForm   = document.getElementById("wfCreateForm");
 const wfCreateName   = document.getElementById("wfCreateName");
@@ -925,12 +1076,12 @@ wfCreateSubmit.addEventListener("click", async () => {
   const name = wfCreateName.value.trim();
   if (!name) return;
   try {
-    await window.workflowsAPI.create(name);
+    await window.capsulesAPI.create(name, "");
     wfCreateForm.hidden = true;
     await loadWorkflows();
     await populateOutDirOptions();
   } catch (e) {
-    capsuleLog(`Couldn't create workflow: ${e.message || e}`, "err");
+    capsuleLog(`Couldn't create task: ${e.message || e}`, "err");
   }
 });
 

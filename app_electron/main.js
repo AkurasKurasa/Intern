@@ -404,6 +404,70 @@ function deployCheckpoint(capsuleName, checkpointPath) {
   return capsule;
 }
 
+// ── Task CRUD (Tasks page) -- a "task" IS a capsule registry entry. Create
+// also reserves the matching data/demos/<name> recording folder in the
+// same step, so the Recorder's Save-to dropdown (which now lists real
+// capsules, not a raw folder scan -- see populateOutDirOptions() in the
+// renderer) always points at something that actually shows up as a task.
+function createTask(name, description) {
+  const trimmed = (name || "").trim();
+  if (!trimmed) throw new Error("Task name can't be empty.");
+  if (!/^[A-Za-z0-9 _-]+$/.test(trimmed)) {
+    throw new Error("Use only letters, numbers, spaces, - and _.");
+  }
+  const safe = trimmed.replace(/\s+/g, "_");
+  const registry = readRegistry();
+  registry.capsules = registry.capsules || [];
+  if (registry.capsules.some((c) => c.name === safe)) {
+    throw new Error(`A task named '${safe}' already exists.`);
+  }
+  const dir = path.join(DEMOS_ROOT, safe);
+  if (fs.existsSync(dir)) throw new Error(`'${safe}' already exists.`);
+  fs.mkdirSync(dir, { recursive: true });
+
+  const capsule = {
+    name: safe,
+    description: (description || "").trim(),
+    model_path: "",
+    trigger_keywords: [],
+    trigger_apps: [],
+    trace_dir: "",
+    created: new Date().toISOString(),
+    emoji: "",
+  };
+  registry.capsules.push(capsule);
+  fs.writeFileSync(REGISTRY_PATH, JSON.stringify(registry, null, 2));
+  return capsule;
+}
+
+// Whitelisted patch -- only fields a person should hand-edit from the
+// Tasks page. model_path/kind/entrypoint/args/cwd stay off limits here;
+// those come from training/registration, not this edit panel.
+function updateCapsule(name, updates) {
+  const registry = readRegistry();
+  const capsule = (registry.capsules || []).find((c) => c.name === name);
+  if (!capsule) throw new Error(`Task not found: ${name}`);
+  if (typeof updates.description === "string") capsule.description = updates.description.trim();
+  if (typeof updates.emoji === "string") capsule.emoji = updates.emoji.trim();
+  if (Array.isArray(updates.trigger_keywords)) capsule.trigger_keywords = updates.trigger_keywords;
+  if (Array.isArray(updates.trigger_apps)) capsule.trigger_apps = updates.trigger_apps;
+  fs.writeFileSync(REGISTRY_PATH, JSON.stringify(registry, null, 2));
+  return capsule;
+}
+
+// Registry-entry only, a direct decision: data/demos/<name> recordings
+// and any trained .pt checkpoint are left on disk untouched. Deleting a
+// task from the list must never be able to destroy recorded work or a
+// trained model as a side effect.
+function deleteCapsule(name) {
+  const registry = readRegistry();
+  const before = (registry.capsules || []).length;
+  registry.capsules = (registry.capsules || []).filter((c) => c.name !== name);
+  if (registry.capsules.length === before) throw new Error(`Task not found: ${name}`);
+  fs.writeFileSync(REGISTRY_PATH, JSON.stringify(registry, null, 2));
+  return { ok: true };
+}
+
 // "" clears back to the placeholder -- capsule.py's WorkflowCapsule.emoji
 // field defaults to "" too, so an empty string round-trips cleanly either
 // direction (this app's JSON edit vs. a real Python-side registration).
@@ -466,6 +530,9 @@ ipcMain.handle("capsules-deploy", (_evt, capsuleName, checkpointPath) =>
   deployCheckpoint(capsuleName, checkpointPath));
 ipcMain.handle("capsules-set-emoji", (_evt, capsuleName, emoji) =>
   setCapsuleEmoji(capsuleName, emoji));
+ipcMain.handle("capsules-create", (_evt, name, description) => createTask(name, description));
+ipcMain.handle("capsules-update", (_evt, name, updates) => updateCapsule(name, updates));
+ipcMain.handle("capsules-delete", (_evt, name) => deleteCapsule(name));
 ipcMain.handle("capsule-run", (_evt, capsuleName) => {
   queueOrSend({ cmd: "run_capsule", capsule_name: capsuleName });
 });

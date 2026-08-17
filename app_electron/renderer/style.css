@@ -386,6 +386,46 @@ p { text-wrap: pretty; }
   grid-column: 1 / -1; width: auto; justify-self: stretch;
 }
 .emoji-picker-tile.is-placeholder:hover { border-color: var(--text-muted); }
+.emoji-picker-tile.is-selected { border-color: var(--accent-blue); background: var(--accent-blue-tint-bg); }
+
+/* ── Task edit modal -- Update/Delete for a task (Tasks page CRUD). A
+   centered overlay rather than a chip-anchored popover: it holds several
+   fields (description/emoji/triggers) that wouldn't fit next to a small
+   ~150px chip without risking overflow near an edge. ────────────────────── */
+.task-chip-edit {
+  position: absolute; top: 10px; right: 10px;
+  width: 24px; height: 24px; border-radius: 6px;
+  border: none; background: rgba(255,255,255,.12); color: rgba(255,255,255,.75);
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; padding: 0;
+  transition: background .1s ease, color .1s ease;
+}
+.task-chip-edit:hover { background: rgba(255,255,255,.22); color: white; }
+
+.task-edit-backdrop {
+  position: fixed; inset: 0; z-index: 300;
+  background: rgba(22,21,15,.35);
+  display: flex; align-items: center; justify-content: center;
+}
+.task-edit-panel {
+  width: min(420px, 90vw);
+  max-height: 85vh; overflow-y: auto;
+  background: var(--card); border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg); padding: 20px;
+  box-shadow: 0 20px 48px rgba(22,21,15,.28);
+  display: flex; flex-direction: column; gap: 10px;
+}
+.task-edit-title { margin: 0; font-size: 15px; font-weight: 700; color: var(--ink); }
+.task-edit-name {
+  margin: -6px 0 4px; font-family: var(--font-mono); font-size: 12px;
+  color: var(--text-muted);
+}
+.task-edit-panel textarea.field { resize: vertical; font-family: var(--font-ui); }
+.task-edit-emoji-grid {
+  display: grid; grid-template-columns: repeat(8, 28px); gap: 4px;
+}
+.task-edit-actions { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+.task-edit-spacer { flex: 1; }
 
 .rp-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 4px; }
 .rp-head h2 {
@@ -556,15 +596,15 @@ p { text-wrap: pretty; }
   gap: 14px;
   margin-top: 6px;
 }
-/* Actual chip SILHOUETTE, not just a dark rounded card -- a body rect
-   plus 12 small "pin" rects along all four edges, applied as a mask so
-   the whole element (background texture included) is clipped into that
-   shape. Direct correction: "I meant I want it shaped like a microchip,
-   you added a background and called it finished." aspect-ratio:1 keeps
-   it square so the pin pattern isn't stretched off-proportion. */
-.task-chip-mask {
-  --chip-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect x='12' y='12' width='76' height='76' rx='8' fill='%23fff'/%3E%3Crect x='1' y='20' width='13' height='6' fill='%23fff'/%3E%3Crect x='1' y='47' width='13' height='6' fill='%23fff'/%3E%3Crect x='1' y='74' width='13' height='6' fill='%23fff'/%3E%3Crect x='86' y='20' width='13' height='6' fill='%23fff'/%3E%3Crect x='86' y='47' width='13' height='6' fill='%23fff'/%3E%3Crect x='86' y='74' width='13' height='6' fill='%23fff'/%3E%3Crect x='20' y='1' width='6' height='13' fill='%23fff'/%3E%3Crect x='47' y='1' width='6' height='13' fill='%23fff'/%3E%3Crect x='74' y='1' width='6' height='13' fill='%23fff'/%3E%3Crect x='20' y='86' width='6' height='13' fill='%23fff'/%3E%3Crect x='47' y='86' width='6' height='13' fill='%23fff'/%3E%3Crect x='74' y='86' width='6' height='13' fill='%23fff'/%3E%3C/svg%3E");
-}
+/* Actual chip SILHOUETTE, not a plain rounded card -- a rounded rectangle
+   with one corner cut off diagonally (a chamfer), matching the reference
+   "spec sheet" card image directly: "Look at the white shape, I want it
+   just like that." Cut on the bottom-right, opposite the kicker/name text
+   (both left-aligned), so the cut never overlaps real content. Built as a
+   single SVG path applied as a mask so the whole element -- background
+   texture included -- is clipped into that outline, not just colored
+   inside a normal box. aspect-ratio:1 keeps the mask's proportions correct
+   at any grid width. */
 .task-chip {
   position: relative;
   overflow: hidden;
@@ -572,20 +612,15 @@ p { text-wrap: pretty; }
   text-align: left;
   aspect-ratio: 1;
   border: none;
-  padding: 27px 23px;
+  padding: 18px 18px 20px;
   cursor: pointer;
   font: inherit;
   color: white;
-  background:
-    radial-gradient(circle at 88% 18%, rgba(255,255,255,.09) 0 2.5px, transparent 3px),
-    radial-gradient(circle at 12% 82%, rgba(255,255,255,.07) 0 2.5px, transparent 3px),
-    repeating-linear-gradient(115deg, rgba(255,255,255,.055) 0 1.5px, transparent 1.5px 30px),
-    repeating-linear-gradient(25deg, rgba(255,255,255,.04) 0 1.5px, transparent 1.5px 36px),
-    var(--ink);
-  -webkit-mask-image: var(--chip-mask);
+  background: var(--ink);
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpath d='M9,0 L91,0 A9,9 0 0 1 100,9 L100,86 L86,100 L9,100 A9,9 0 0 1 0,91 L0,9 A9,9 0 0 1 9,0 Z' fill='%23fff'/%3E%3C/svg%3E");
   -webkit-mask-size: 100% 100%;
   -webkit-mask-repeat: no-repeat;
-  mask-image: var(--chip-mask);
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpath d='M9,0 L91,0 A9,9 0 0 1 100,9 L100,86 L86,100 L9,100 A9,9 0 0 1 0,91 L0,9 A9,9 0 0 1 9,0 Z' fill='%23fff'/%3E%3C/svg%3E");
   mask-size: 100% 100%;
   mask-repeat: no-repeat;
   transition: transform .12s ease, filter .12s ease;
@@ -596,12 +631,7 @@ p { text-wrap: pretty; }
    border/box-shadow -- those paint outside the masked silhouette and
    would draw as a rectangle around it instead of hugging the chip shape. */
 .task-chip.capsule-selected {
-  background:
-    radial-gradient(circle at 88% 18%, rgba(255,255,255,.12) 0 2.5px, transparent 3px),
-    radial-gradient(circle at 12% 82%, rgba(255,255,255,.09) 0 2.5px, transparent 3px),
-    repeating-linear-gradient(115deg, rgba(255,255,255,.07) 0 1.5px, transparent 1.5px 30px),
-    repeating-linear-gradient(25deg, rgba(255,255,255,.05) 0 1.5px, transparent 1.5px 36px),
-    var(--accent-blue);
+  background: var(--accent-blue);
 }
 .task-chip-kicker {
   font-family: var(--font-mono); font-size: 9px; font-weight: 600;
