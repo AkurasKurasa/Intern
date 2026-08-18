@@ -84,7 +84,10 @@ const pendingCommands = [];
 const MINI_WIDTH = 92;
 const MINI_MARGIN = 20;
 const MINI_RECORD_HEIGHT = 320;     // 4 circles + two-line frames/sessions pill
-const MINI_WORKFLOW_HEIGHT = 300;   // 4 circles + one-line step/name pill
+// Was 300 (one-line pill); bumped to 320 when the pill became two lines
+// (task name + model/step, 2026-08-19) -- same real content math as
+// MINI_RECORD_HEIGHT now that both pills are the same shape.
+const MINI_WORKFLOW_HEIGHT = 320;   // 4 circles + two-line task/model pill
 
 // Which main-window section was last active ("home" = Recorder,
 // "workflows" = Workflows) -- decides which mini overlay minimizing
@@ -362,10 +365,24 @@ ipcMain.handle("switch-mini-widget", () => switchMiniWidget());
 // recorder-event broadcast the widget listens to directly.
 function pushMiniWorkflowState() {
   if (!miniWorkflowWindow || miniWorkflowWindow.isDestroyed()) return;
+  // Direct request: "what Workflow were using, and what model." The
+  // deployed model_path (what actually runs on Play, not just whatever
+  // the main window's Checkpoint dropdown happens to have selected but
+  // not yet deployed) already lives in the registry entry -- readRegistry()
+  // is a plain, cheap disk read (same precedent as listCapsules()
+  // elsewhere), no bridge round-trip needed just to look this up.
+  // Script-kind capsules (e.g. Scope #2) carry no model_path at all --
+  // modelName stays null for those, and the widget shows nothing for
+  // that line rather than a misleading blank/empty string.
+  const capsule = listCapsules().find((c) => c.name === currentCapsuleName);
+  const modelName = capsule && capsule.model_path
+    ? path.basename(capsule.model_path)
+    : null;
   miniWorkflowWindow.webContents.send("mini-workflow-state", {
     hasCapsule: !!currentCapsuleName,
     isRunning: capsuleIsRunning,
     capsuleName: currentCapsuleName,
+    modelName,
   });
 }
 

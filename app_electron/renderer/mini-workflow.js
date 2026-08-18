@@ -4,11 +4,14 @@ const btnSwitch = document.getElementById("btnSwitchWidget");
 const btnPlay   = document.getElementById("btnPlay");
 const btnStop   = document.getElementById("btnStop");
 const infoPill  = document.getElementById("infoPill");
+const infoTask  = document.getElementById("infoTask");
+const infoModel = document.getElementById("infoModel");
 
 let expanded    = false;
 let hasCapsule  = false;
 let isRunning   = false;
 let capsuleName = null;
+let modelName   = null;
 let lastStep    = null;   // reset on start/done/stop -- "Step N" while running
 
 function setExpanded(next) {
@@ -26,15 +29,25 @@ function refreshButtons() {
 // Only ever shown while expanded (see the .info-pill CSS) -- the collapsed
 // circle stays exactly as minimal as it's always been, matching the
 // existing "the pulse alone is the honest signal" decision above it.
-// Running always wins over the idle capsule-name line, since it's the
-// more useful thing to know once a run is actually in progress.
+// Direct request: "what Workflow were using, and what model" -- two
+// explicit lines, same shape as the Record Overlay sibling's frames/
+// sessions pill, rather than one line that can only show one thing at a
+// time. Line 1 is always the task name (stable, whether idle or
+// running). Line 2 is the model/checkpoint while idle, but switches to
+// the live step count once running -- that's the more useful thing to
+// know once a run is actually in progress, same reasoning this function
+// already used before this change.
 function refreshInfoPill() {
+  if (!hasCapsule) {
+    infoPill.hidden = true;
+    return;
+  }
+  infoPill.hidden = false;
+  infoTask.textContent = capsuleName || "Untitled task";
   if (isRunning) {
-    infoPill.textContent = lastStep != null ? `Step ${lastStep}` : "Starting…";
-  } else if (hasCapsule && capsuleName) {
-    infoPill.textContent = capsuleName;
+    infoModel.textContent = lastStep != null ? `Step ${lastStep}` : "Starting…";
   } else {
-    infoPill.textContent = "";
+    infoModel.textContent = modelName || "No model";
   }
 }
 
@@ -99,6 +112,7 @@ window.recorderAPI.onMiniWorkflowState((state) => {
   hasCapsule = !!state.hasCapsule;
   isRunning = !!state.isRunning;
   capsuleName = state.capsuleName || null;
+  modelName = state.modelName || null;
   refreshButtons();
   refreshInfoPill();
 });
