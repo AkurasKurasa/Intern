@@ -291,6 +291,7 @@ function pushMiniWorkflowState() {
   miniWorkflowWindow.webContents.send("mini-workflow-state", {
     hasCapsule: !!currentCapsuleName,
     isRunning: capsuleIsRunning,
+    capsuleName: currentCapsuleName,
   });
 }
 

@@ -37,6 +37,16 @@
   .circle svg { width: 18px; height: 18px; }
   .circle:active:not(:disabled) { transform: scale(0.90); }
   .circle:disabled { opacity: .35; cursor: not-allowed; }
+  /* .circle:disabled (a class + a pseudo-class) and .action below (one
+     class) tie in specificity's class-count column -- whichever rule
+     happens to come LATER in this file wins the tie, which meant the
+     "stay fully invisible while collapsed" rule kept losing to the
+     "disabled" rule real-world (confirmed live: computed opacity came
+     back 0.35, not 0, on Play/Stop even fully collapsed). Fixed the same
+     way canvas[hidden] was fixed in treetask/index.html this session --
+     matching the buttons' real compound class list (circle + action +
+     action-play/-stop) so the "stay hidden" rule wins outright, not by
+     source-order luck. */
 
   .handle {
     background: var(--ink); color: white;
@@ -59,13 +69,25 @@
      still receive their disabled state updates while hidden) but scaled
      to nothing and non-interactive. Expanding is purely a class toggle
      on the container, animated via transform/opacity on each circle. */
-  .action {
+  .circle.action.action-play,
+  .circle.action.action-stop {
     opacity: 0; transform: scale(0.4);
     pointer-events: none;
   }
-  .stack.expanded .action {
+  .stack.expanded .circle.action.action-play,
+  .stack.expanded .circle.action.action-stop {
     opacity: 1; transform: scale(1);
     pointer-events: auto;
+  }
+  /* Found while verifying the fix above: that same specificity bump also
+     started overpowering the ordinary .circle:disabled dimming (0.35)
+     once expanded, so a disabled Play circle looked identically bright
+     to an enabled one while running -- confirmed live (computed opacity
+     came back 1, not .35). One more explicit, higher-specificity rule
+     for exactly that combination, rather than a coincidence of ordering. */
+  .stack.expanded .circle.action.action-play:disabled,
+  .stack.expanded .circle.action.action-stop:disabled {
+    opacity: .35;
   }
 
   /* White circles rising above the handle, per the design direction --
@@ -74,6 +96,29 @@
   .action-play:hover:not(:disabled) { background: var(--sunk); }
   .action-stop { background: white; color: var(--clay); }
   .action-stop:hover:not(:disabled) { background: var(--clay-tint-bg); }
+
+  /* Model info -- direct request (uiux_action_overlay_redesign): "add
+     real model information... step count, active/inactive state,
+     whatever else is useful to see at a glance." Only ever shown
+     expanded, same reasoning as the handle's own comment above: the
+     collapsed circle stays exactly as minimal as it already was, no
+     text crammed onto a 52px dot. No new colour role -- plain ink text
+     on a light pill, matching this file's "clay is reserved for
+     agent-in-control" rule (tokens.css). Not a .circle, so it never
+     collides with the :disabled specificity issue fixed above. */
+  .info-pill {
+    opacity: 0; transform: scale(0.4); pointer-events: none;
+    transition: transform .12s ease, opacity .15s ease;
+    max-width: 84px; padding: 5px 9px; border-radius: 999px;
+    background: white; color: var(--text-secondary);
+    font-family: var(--font-mono); font-size: 10px; font-weight: 600;
+    text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    box-shadow: 0 3px 10px rgba(0,0,0,.30);
+  }
+  .stack.expanded .info-pill {
+    opacity: 1; transform: scale(1);
+  }
+  .info-pill:empty { display: none; }
 
   @media (prefers-reduced-motion: reduce) {
     .handle.running { animation: none; }
@@ -92,6 +137,7 @@
             disabled title="Play" aria-label="Play the loaded capsule">
       <svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 5l12 7-12 7z"/></svg>
     </button>
+    <div class="info-pill" id="infoPill" aria-live="polite"></div>
   </div>
   <script src="mini-workflow.js"></script>
 </body>
