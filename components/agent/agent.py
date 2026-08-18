@@ -4154,10 +4154,18 @@ class LLMAgent:
                             logger.info("[OPT2] pointer invalid — Tab fallback")
 
             elif self._llm_client and t_conf < _HIGH_CONF:
-                llm_action = self._ask_llm(state)
+                # Experimental (branch experiment/reasoning-ladder): reuse the
+                # Transformer's own confidence, already computed above for
+                # free, to pick a slower/more careful LLM call only on the
+                # steps where the Transformer itself is unsure (_MED_CONF was
+                # defined but never read before this). Everything else about
+                # this branch is unchanged.
+                _deep_reason = t_conf < _MED_CONF
+                llm_action = self._ask_llm(state, deep=_deep_reason)
                 action_type = llm_action.get("action_type", "wait")
                 reason = llm_action.get("reason", "")
-                logger.info("[LLM:%s] action=%-8s", self.provider, action_type)
+                logger.info("[LLM:%s]%s action=%-8s", self.provider,
+                            " DEEP" if _deep_reason else "", action_type)
 
                 if action_type == "done":
                     logger.info("LLM: task complete.")
@@ -8145,7 +8153,7 @@ class LLMAgent:
             expected = self._lookup_field(field_name, section=section)
         return expected
 
-    def _ask_llm(self, state: Dict[str, Any]) -> Dict[str, Any]:
+    def _ask_llm(self, state: Dict[str, Any], deep: bool = False) -> Dict[str, Any]:
         # Prefer _cached_record (Win32 Notepad read, fully parsed) over visual_cache
         # (which is empty when VLM pre-scan is disabled). This prevents the LLM from
         # reading a truncated UIA text blob and hallucinating field values.
@@ -8244,7 +8252,23 @@ class LLMAgent:
         if filled_fields:
             filled_summary = "\nAlready filled (DO NOT retype these):\n" + "\n".join(filled_fields[:20])
 
+        # Experimental (branch experiment/reasoning-ladder): the Transformer's
+        # own per-step confidence already tells us, for free, when IT is
+        # unsure about this screen -- no separate analysis needed. Only on
+        # those low-confidence steps does the caller pass deep=True, which
+        # adds one instruction asking the LLM to take real care. Every other
+        # step (the common case) leaves deep=False, and the prompt below must
+        # come out byte-identical to what this function already sent before
+        # this parameter existed.
+        deep_banner = (
+            "⚠ LOW CONFIDENCE: the click-position model is unsure about this "
+            "screen. Take extra care — read the screen text closely, look for "
+            "anything unfamiliar, and double-check before deciding.\n\n"
+            if deep else ""
+        )
+
         user_msg = (
+            f"{deep_banner}"
             f"{focused_banner}"
             f"Task goal: {self.goal}\n\n"
             f"Current screen:\n{screen_text}"
@@ -8264,6 +8288,7 @@ class LLMAgent:
             keep_chars = max(2000, _MAX_USER_CHARS - overhead)
             screen_text = screen_text[:keep_chars]
             user_msg = (
+                f"{deep_banner}"
                 f"{focused_banner}"
                 f"Task goal: {self.goal}\n\n"
                 f"Current screen:\n{screen_text}"
