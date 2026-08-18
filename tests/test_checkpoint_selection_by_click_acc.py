@@ -89,6 +89,10 @@ def test_checkpoint_selection_uses_click_acc_alone(tmp_path):
             data_dir=str(tmp_path), epochs=2, batch_size=4, hist_len=4,
             val_split=0.3, save_path=str(save_path), d_model=8, nhead=2,
             num_layers=1, dim_feedforward=16, verbose=False,
+            # Isolated so this test's fake 4-example fixture never lands in the
+            # real training log (see test_train_log_path_isolation.py) -- this
+            # is the exact test that polluted it with 27 identical rows before.
+            log_path=str(tmp_path / "training_log.jsonl"),
         )
 
     ckpt = torch.load(str(save_path), map_location="cpu", weights_only=False)

@@ -1549,6 +1549,7 @@ def train(
     device_str: str = "auto",
     verbose: bool = True,
     action_space: str = "legacy",              # "legacy" | "semantic" — see TrajectoryDataset docstring
+    log_path: Optional[str] = None,            # override the per-run metrics log path (default: real repo log). Tests must pass their own path — see test_train_log_path_isolation.py.
 ) -> TransformerAgentNetwork:
     """
     Train TransformerAgentNetwork via Behavioral Cloning.
@@ -1764,8 +1765,11 @@ def train(
         # the wrong place when it wasn't. Found 2026-08-12 running an A/B into
         # tasks/form_filling/experiments/*.pt: logged to tasks/data/output/
         # instead of data/output/.
-        _repo_root = Path(__file__).resolve().parents[3]
-        _log_path = _repo_root / "data" / "output" / "transformer_training_log.jsonl"
+        if log_path:
+            _log_path = Path(log_path)
+        else:
+            _repo_root = Path(__file__).resolve().parents[3]
+            _log_path = _repo_root / "data" / "output" / "transformer_training_log.jsonl"
         _log_path.parent.mkdir(parents=True, exist_ok=True)
         _n_train = len(train_loader.dataset)
         _row = {
