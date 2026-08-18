@@ -33,6 +33,7 @@
     display: flex; align-items: center; justify-content: center;
     box-shadow: 0 3px 10px rgba(0,0,0,.30);
     transition: transform .12s ease, opacity .15s ease, background .12s ease;
+    flex: none;   /* never let flexbox silently squeeze a circle to fit */
   }
   .circle svg { width: 18px; height: 18px; }
   .circle:active:not(:disabled) { transform: scale(0.90); }
@@ -114,6 +115,7 @@
     font-family: var(--font-mono); font-size: 10px; font-weight: 600;
     text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     box-shadow: 0 3px 10px rgba(0,0,0,.30);
+    flex: none;   /* same real bug as .circle above -- found live, not assumed */
   }
   .stack.expanded .info-pill {
     opacity: 1; transform: scale(1);

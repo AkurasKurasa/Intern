@@ -88,6 +88,12 @@ let activeSection = "home";
 // through the main renderer for every click.
 let currentCapsuleName = null;
 let capsuleIsRunning = false;
+// Mirrors the recorder's own "started"/"saved"/"error" events, same
+// purpose as capsuleIsRunning above but for the Recorder-tab mini widget:
+// lets a freshly (re)opened mini.html know immediately whether a
+// recording is already in progress, instead of only finding out on the
+// next live event.
+let recorderIsRecording = false;
 
 function startBridge() {
   const pythonExe = resolvePython();
@@ -141,6 +147,10 @@ function broadcast(channel, payload) {
   if (payload && (payload.event === "capsule_started")) capsuleIsRunning = true;
   if (payload && (payload.event === "capsule_done" || payload.event === "capsule_stopped")) {
     capsuleIsRunning = false;
+  }
+  if (payload && payload.event === "started") recorderIsRecording = true;
+  if (payload && (payload.event === "saved" || payload.event === "error")) {
+    recorderIsRecording = false;
   }
 }
 
@@ -199,11 +209,19 @@ function createWindow() {
   });
 }
 
+// Redesigned 2026-08-18 (uiux_record_overlay_redesign) to match the
+// Workflows-tab sibling's transparent floating-circle shape exactly --
+// same transparent/hasShadow/frame config, same 92px width. Height (270,
+// taller than the sibling's 250) accounts for this widget's two-line
+// "N frames / N sessions" pill vs. the sibling's one-line label -- sized
+// with headroom on purpose, having just found live that the sibling's
+// first attempt at 216 silently squeezed its own info pill to fit
+// instead of actually showing it at full size.
 function createMiniWindow() {
   miniWindow = new BrowserWindow({
     title: "Intern — mini",
-    width: 240,
-    height: 168,
+    width: 92,
+    height: 270,
     resizable: false,
     minimizable: false,
     maximizable: false,
@@ -211,7 +229,9 @@ function createMiniWindow() {
     alwaysOnTop: true,
     skipTaskbar: true,
     frame: false,
-    backgroundColor: "#F7F5F0",
+    transparent: true,
+    hasShadow: false,
+    backgroundColor: "#00000000",
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
@@ -221,7 +241,16 @@ function createMiniWindow() {
   miniWindow.loadFile(path.join(__dirname, "renderer", "mini.html"));
 
   const { width: sw, height: sh } = require("electron").screen.getPrimaryDisplay().workAreaSize;
-  miniWindow.setPosition(sw - 260, sh - 188);
+  miniWindow.setPosition(sw - 112, sh - 290);
+
+  // A recording may already be in progress from before this widget ever
+  // opened -- same real gap the Workflows-tab sibling's own review caught
+  // and fixed for its capsule state, applied here too rather than left
+  // as a fresh instance of the identical gap. Reuses the existing
+  // recorder-event wire format/channel, no new IPC needed.
+  miniWindow.webContents.once("did-finish-load", () => {
+    if (recorderIsRecording) miniWindow.webContents.send("recorder-event", { event: "started" });
+  });
 
   miniWindow.on("closed", () => { miniWindow = null; });
 }
@@ -249,7 +278,14 @@ function createMiniWorkflowWindow() {
   miniWorkflowWindow = new BrowserWindow({
     title: "Intern — mini",
     width: 92,
-    height: 216,
+    // 216 was sized for exactly 3 circles + gaps; adding the info-pill
+    // (uiux_action_overlay_redesign) needs real extra room -- found live
+    // that 216 wasn't enough: flexbox silently squeezed the pill down to
+    // ~10px tall instead of its real ~24px to fit the too-short window,
+    // never actually clipped by CSS overflow so nothing looked "broken" in
+    // a bounding-box check alone, only visible by comparing against the
+    // pill's natural size. 250 gives headroom + padding + all 4 items.
+    height: 250,
     resizable: false,
     minimizable: false,
     maximizable: false,
@@ -269,7 +305,9 @@ function createMiniWorkflowWindow() {
   miniWorkflowWindow.loadFile(path.join(__dirname, "renderer", "mini-workflow.html"));
 
   const { width: sw, height: sh } = require("electron").screen.getPrimaryDisplay().workAreaSize;
-  miniWorkflowWindow.setPosition(sw - 112, sh - 236);
+  // -270 keeps the same 20px bottom margin as before (height 250 + 20),
+  // matching the -112 = width(92) + 20px right margin already established.
+  miniWorkflowWindow.setPosition(sw - 112, sh - 270);
 
   // Push whatever state already exists (a capsule may already be loaded
   // and/or running from before this widget was ever created) so it opens
