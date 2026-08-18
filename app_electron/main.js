@@ -73,6 +73,19 @@ let bridge = null;
 let bridgeReady = false;
 const pendingCommands = [];
 
+// Shared sizing for both mini widgets -- both anchor to the exact same
+// screen corner (sw-MINI_MARGIN, sh-MINI_MARGIN), each just at its own
+// height. Centralized here after two real bugs (both widgets' info-pills
+// getting silently squeezed by flexbox, twice) came from the window
+// height and its matching setPosition() math being hand-duplicated in
+// separate places and drifting out of sync -- one set of numbers used
+// everywhere (createMiniWindow, createMiniWorkflowWindow,
+// switchMiniWidget) instead.
+const MINI_WIDTH = 92;
+const MINI_MARGIN = 20;
+const MINI_RECORD_HEIGHT = 320;     // 4 circles + two-line frames/sessions pill
+const MINI_WORKFLOW_HEIGHT = 300;   // 4 circles + one-line step/name pill
+
 // Which main-window section was last active ("home" = Recorder,
 // "workflows" = Workflows) -- decides which mini overlay minimizing
 // shows. Updated by the renderer via setActiveSection() every time the
@@ -211,17 +224,17 @@ function createWindow() {
 
 // Redesigned 2026-08-18 (uiux_record_overlay_redesign) to match the
 // Workflows-tab sibling's transparent floating-circle shape exactly --
-// same transparent/hasShadow/frame config, same 92px width. Height (270,
-// taller than the sibling's 250) accounts for this widget's two-line
-// "N frames / N sessions" pill vs. the sibling's one-line label -- sized
-// with headroom on purpose, having just found live that the sibling's
-// first attempt at 216 silently squeezed its own info pill to fit
-// instead of actually showing it at full size.
+// same transparent/hasShadow/frame config, same 92px width. Height
+// computed upfront this time (learned live from the sibling's own
+// squeeze bug, not rediscovered a third time): padding(24) + 4 circles
+// (handle/switch/stop/record, 52px each = 208) + 3 gaps (12px = 36) +
+// the two-line frames/sessions pill (~40) = 308, rounded up to 320 for
+// headroom.
 function createMiniWindow() {
   miniWindow = new BrowserWindow({
     title: "Intern — mini",
-    width: 92,
-    height: 270,
+    width: MINI_WIDTH,
+    height: MINI_RECORD_HEIGHT,
     resizable: false,
     minimizable: false,
     maximizable: false,
@@ -241,7 +254,7 @@ function createMiniWindow() {
   miniWindow.loadFile(path.join(__dirname, "renderer", "mini.html"));
 
   const { width: sw, height: sh } = require("electron").screen.getPrimaryDisplay().workAreaSize;
-  miniWindow.setPosition(sw - 112, sh - 290);
+  miniWindow.setPosition(sw - MINI_WIDTH - MINI_MARGIN, sh - MINI_RECORD_HEIGHT - MINI_MARGIN);
 
   // A recording may already be in progress from before this widget ever
   // opened -- same real gap the Workflows-tab sibling's own review caught
@@ -277,15 +290,8 @@ function createMiniWindow() {
 function createMiniWorkflowWindow() {
   miniWorkflowWindow = new BrowserWindow({
     title: "Intern — mini",
-    width: 92,
-    // 216 was sized for exactly 3 circles + gaps; adding the info-pill
-    // (uiux_action_overlay_redesign) needs real extra room -- found live
-    // that 216 wasn't enough: flexbox silently squeezed the pill down to
-    // ~10px tall instead of its real ~24px to fit the too-short window,
-    // never actually clipped by CSS overflow so nothing looked "broken" in
-    // a bounding-box check alone, only visible by comparing against the
-    // pill's natural size. 250 gives headroom + padding + all 4 items.
-    height: 250,
+    width: MINI_WIDTH,
+    height: MINI_WORKFLOW_HEIGHT,
     resizable: false,
     minimizable: false,
     maximizable: false,
@@ -305,9 +311,7 @@ function createMiniWorkflowWindow() {
   miniWorkflowWindow.loadFile(path.join(__dirname, "renderer", "mini-workflow.html"));
 
   const { width: sw, height: sh } = require("electron").screen.getPrimaryDisplay().workAreaSize;
-  // -270 keeps the same 20px bottom margin as before (height 250 + 20),
-  // matching the -112 = width(92) + 20px right margin already established.
-  miniWorkflowWindow.setPosition(sw - 112, sh - 270);
+  miniWorkflowWindow.setPosition(sw - MINI_WIDTH - MINI_MARGIN, sh - MINI_WORKFLOW_HEIGHT - MINI_MARGIN);
 
   // Push whatever state already exists (a capsule may already be loaded
   // and/or running from before this widget was ever created) so it opens
@@ -317,6 +321,38 @@ function createMiniWorkflowWindow() {
 
   miniWorkflowWindow.on("closed", () => { miniWorkflowWindow = null; });
 }
+
+// Direct request: "Find a way to navigate between the two widgets (Record
+// and Workflow)". Before this, which widget showed was decided ONCE, by
+// activeSection, at the moment you minimized -- no way to see the other
+// one without restoring the main window, switching tabs, and minimizing
+// again. This lets either mini widget hand off to its sibling directly.
+//
+// Deliberately does NOT copy one window's live position onto the other --
+// the two windows are different heights (270 vs 250) with content packed
+// toward the TOP of each (confirmed live while verifying the info-pill
+// sizing fix above), so a naive position copy would visually shift the
+// handle circle by however much the heights differ. Both windows are
+// already independently anchored to the exact same screen corner
+// (sw-112,sh-290 / sw-112,sh-270 both resolve to the same sw-20,sh-20
+// bottom-right point) by their own creation functions -- reusing each
+// one's own real formula here keeps that anchor exact, rather than
+// re-deriving it with a fragile offset.
+function switchMiniWidget() {
+  const { width: sw, height: sh } = require("electron").screen.getPrimaryDisplay().workAreaSize;
+  if (miniWindow && !miniWindow.isDestroyed() && miniWindow.isVisible()) {
+    miniWindow.hide();
+    if (!miniWorkflowWindow || miniWorkflowWindow.isDestroyed()) createMiniWorkflowWindow();
+    miniWorkflowWindow.setPosition(sw - MINI_WIDTH - MINI_MARGIN, sh - MINI_WORKFLOW_HEIGHT - MINI_MARGIN);
+    miniWorkflowWindow.show();
+  } else if (miniWorkflowWindow && !miniWorkflowWindow.isDestroyed() && miniWorkflowWindow.isVisible()) {
+    miniWorkflowWindow.hide();
+    if (!miniWindow || miniWindow.isDestroyed()) createMiniWindow();
+    miniWindow.setPosition(sw - MINI_WIDTH - MINI_MARGIN, sh - MINI_RECORD_HEIGHT - MINI_MARGIN);
+    miniWindow.show();
+  }
+}
+ipcMain.handle("switch-mini-widget", () => switchMiniWidget());
 
 // Re-sends the widget's non-running state (which capsule is loaded) --
 // called on creation AND every time capsule-set-current changes, since

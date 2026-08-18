@@ -71,12 +71,14 @@
      to nothing and non-interactive. Expanding is purely a class toggle
      on the container, animated via transform/opacity on each circle. */
   .circle.action.action-play,
-  .circle.action.action-stop {
+  .circle.action.action-stop,
+  .circle.action.action-switch {
     opacity: 0; transform: scale(0.4);
     pointer-events: none;
   }
   .stack.expanded .circle.action.action-play,
-  .stack.expanded .circle.action.action-stop {
+  .stack.expanded .circle.action.action-stop,
+  .stack.expanded .circle.action.action-switch {
     opacity: 1; transform: scale(1);
     pointer-events: auto;
   }
@@ -97,24 +99,30 @@
   .action-play:hover:not(:disabled) { background: var(--sunk); }
   .action-stop { background: white; color: var(--clay); }
   .action-stop:hover:not(:disabled) { background: var(--clay-tint-bg); }
+  /* Switch-to-other-widget -- direct request: "Find a way to navigate
+     between the two widgets (Record and Workflow)." Neutral ink (not
+     clay -- this isn't a stop/danger action), same treatment as Play. */
+  .action-switch { background: white; color: var(--ink); }
+  .action-switch:hover { background: var(--sunk); }
 
   /* Model info -- direct request (uiux_action_overlay_redesign): "add
      real model information... step count, active/inactive state,
      whatever else is useful to see at a glance." Only ever shown
      expanded, same reasoning as the handle's own comment above: the
      collapsed circle stays exactly as minimal as it already was, no
-     text crammed onto a 52px dot. No new colour role -- plain ink text
-     on a light pill, matching this file's "clay is reserved for
-     agent-in-control" rule (tokens.css). Not a .circle, so it never
-     collides with the :disabled specificity issue fixed above. */
+     text crammed onto a 52px dot. Recoloured 2026-08-18, direct request
+     to match the Record Overlay sibling's black-transparent + white text
+     pill exactly (was a white pill) -- one shared look between the two
+     widgets, not two different answers to the same design question.
+     Not a .circle, so it never collides with the :disabled specificity
+     issue fixed above. */
   .info-pill {
     opacity: 0; transform: scale(0.4); pointer-events: none;
     transition: transform .12s ease, opacity .15s ease;
-    max-width: 84px; padding: 5px 9px; border-radius: 999px;
-    background: white; color: var(--text-secondary);
+    max-width: 84px; padding: 6px 9px; border-radius: 12px;
+    background: rgba(20,19,15,.72); color: white;
     font-family: var(--font-mono); font-size: 10px; font-weight: 600;
     text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-    box-shadow: 0 3px 10px rgba(0,0,0,.30);
     flex: none;   /* same real bug as .circle above -- found live, not assumed */
   }
   .stack.expanded .info-pill {
@@ -131,6 +139,10 @@
   <div class="stack" id="stack">
     <button class="circle handle" id="btnHandle" type="button"
             title="Play / Stop" aria-label="Expand play controls" aria-expanded="false">I</button>
+    <button class="circle action action-switch" id="btnSwitchWidget" type="button"
+            title="Switch to Recorder" aria-label="Switch to the Recorder widget">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h13M13 8l-3-3M13 8l-3 3M20 16H7M7 16l3-3M7 16l3 3"/></svg>
+    </button>
     <button class="circle action action-stop" id="btnStop" type="button"
             disabled title="Stop" aria-label="Stop the running capsule">
       <svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="1.5"/></svg>

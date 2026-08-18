@@ -1,5 +1,6 @@
 const stack     = document.getElementById("stack");
 const btnHandle = document.getElementById("btnHandle");
+const btnSwitch = document.getElementById("btnSwitchWidget");
 const btnPlay   = document.getElementById("btnPlay");
 const btnStop   = document.getElementById("btnStop");
 const infoPill  = document.getElementById("infoPill");
@@ -44,6 +45,7 @@ function refreshInfoPill() {
 const STEP_LINE_RE = /Step (\d+)\/\d+\s+\((\d+) elements\)/;
 
 btnHandle.addEventListener("click", () => setExpanded(!expanded));
+btnSwitch.addEventListener("click", () => window.recorderAPI.switchMiniWidget());
 
 btnPlay.addEventListener("click", () => {
   if (btnPlay.disabled) return;

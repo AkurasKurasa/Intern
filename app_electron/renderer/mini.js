@@ -1,5 +1,6 @@
 const stack       = document.getElementById("stack");
 const btnHandle   = document.getElementById("btnHandle");
+const btnSwitch   = document.getElementById("btnSwitchWidget");
 const btnStart    = document.getElementById("btnStart");
 const btnStop     = document.getElementById("btnStop");
 const infoFrames  = document.getElementById("infoFrames");
@@ -34,6 +35,7 @@ function refreshInfoPill() {
 refreshInfoPill();
 
 btnHandle.addEventListener("click", () => setExpanded(!expanded));
+btnSwitch.addEventListener("click", () => window.recorderAPI.switchMiniWidget());
 
 btnStart.addEventListener("click", () => {
   if (btnStart.disabled) return;

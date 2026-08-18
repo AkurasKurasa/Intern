@@ -21,6 +21,11 @@ contextBridge.exposeInMainWorld("recorderAPI", {
   onMiniWorkflowState: (callback) => {
     ipcRenderer.on("mini-workflow-state", (_evt, state) => callback(state));
   },
+  // Direct request: a way to switch between the two mini widgets without
+  // restoring the main window. Called from whichever widget is currently
+  // open; main.js figures out which one that is and hands off to the
+  // other (see switchMiniWidget() there).
+  switchMiniWidget: () => ipcRenderer.invoke("switch-mini-widget"),
 });
 
 contextBridge.exposeInMainWorld("workflowsAPI", {

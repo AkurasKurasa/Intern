@@ -67,12 +67,14 @@
      outright, never a source-order coincidence. See that file's own
      comment for the live-confirmed bug this avoids repeating. */
   .circle.action.action-record,
-  .circle.action.action-stop {
+  .circle.action.action-stop,
+  .circle.action.action-switch {
     opacity: 0; transform: scale(0.4);
     pointer-events: none;
   }
   .stack.expanded .circle.action.action-record,
-  .stack.expanded .circle.action.action-stop {
+  .stack.expanded .circle.action.action-stop,
+  .stack.expanded .circle.action.action-switch {
     opacity: 1; transform: scale(1);
     pointer-events: auto;
   }
@@ -85,6 +87,11 @@
   .action-record:hover:not(:disabled) { background: var(--sunk); }
   .action-stop { background: white; color: var(--clay); }
   .action-stop:hover:not(:disabled) { background: var(--clay-tint-bg); }
+  /* Switch-to-other-widget -- direct request: "Find a way to navigate
+     between the two widgets (Record and Workflow)." Same neutral
+     treatment as the Workflows-tab sibling's own switch button. */
+  .action-switch { background: white; color: var(--ink); }
+  .action-switch:hover { background: var(--sunk); }
 
   /* Model info -- direct request: "x frames / x session", black
      transparent background, white text. Two explicit lines rather than
@@ -115,6 +122,10 @@
   <div class="stack" id="stack">
     <button class="circle handle" id="btnHandle" type="button"
             title="Record / Stop" aria-label="Expand record controls" aria-expanded="false">I</button>
+    <button class="circle action action-switch" id="btnSwitchWidget" type="button"
+            title="Switch to Workflows" aria-label="Switch to the Workflows widget">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h13M13 8l-3-3M13 8l-3 3M20 16H7M7 16l3-3M7 16l3 3"/></svg>
+    </button>
     <button class="circle action action-stop" id="btnStop" type="button"
             disabled title="Stop" aria-label="Stop recording">
       <svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="1.5"/></svg>
