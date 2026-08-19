@@ -3738,7 +3738,29 @@ class LLMAgent:
                                 continue
                             logger.info("[OPT2] CLICK on empty combobox %r → treat as FILL", _cb_label[:30])
                             _cb_sec = self._detect_section(state, _cbox)
-                            _cb_val = self._lookup_field(_cb_label, section=_cb_sec)
+                            # Last known gap, direct request ("let's try
+                            # that"): this branch used to always source its
+                            # value from a plain self._lookup_field() call --
+                            # no escalation, no confidence awareness -- fully
+                            # bypassing _ask_llm() (and deep) regardless of
+                            # how unsure the Transformer was about the click
+                            # (found live: 'Policy Type' at conf=0.37 still
+                            # resolved here, deep-reasoning code never
+                            # reached). Only the VALUE SOURCE changes now on
+                            # low confidence/an active struggle streak -- the
+                            # click/dropdown-open/mark-attempted/leave-blank/
+                            # repeat-guard mechanics below are untouched,
+                            # each has its own hard-won fix history.
+                            _cb_defer = t_conf < _MED_CONF or _lowconf_fallback_streak > 0 or _reclick_streak > 0
+                            if _cb_defer and self._llm_client:
+                                _cb_llm_action = self._ask_llm(state, deep=True)
+                                _cb_val = (_cb_llm_action.get("text", "")
+                                           if _cb_llm_action.get("action_type") in ("type", "keyboard")
+                                           else "")
+                                if not _cb_val:
+                                    _cb_val = self._lookup_field(_cb_label, section=_cb_sec)
+                            else:
+                                _cb_val = self._lookup_field(_cb_label, section=_cb_sec)
                             # ONE click opens the dropdown; select inline + continue.
                             # (Don't route to the type-handler — its own open-click would
                             #  TOGGLE the dropdown shut → no options → Escape loop.)

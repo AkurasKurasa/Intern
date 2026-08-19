@@ -188,3 +188,27 @@ class TestDeepReasoningReachesConfirmedBlankFields:
 
         assert result == {"action_type": "type", "text": "PAI-2026-00441", "_fast_path": "lookup"}
         agent._llm_client.chat.completions.create.assert_not_called()
+
+
+class TestComboboxClickFillDefersLowConfidenceToTheLLM:
+    """The last known gap, direct request ('let's try that'): OPT2's own
+    empty-combobox click-to-fill shortcut (found live -- 'Policy Type' at
+    conf=0.37) resolves the VALUE via a plain self._lookup_field() call
+    with no escalation and no confidence awareness at all, fully
+    bypassing _ask_llm() (and therefore deep) regardless of how confident
+    the Transformer was about the click. Surgical fix: only the VALUE
+    SOURCE changes when confidence/streak state says this step deserves
+    care -- the click, dropdown-open, mark-attempted, leave-blank, and
+    repeat-guard fingerprinting mechanics around it (each with real,
+    hard-won fix history of its own) stay completely untouched."""
+
+    def test_combobox_fill_source_references_ask_llm_deep_when_low_confidence(self):
+        anchor = "logger.info(\"[OPT2] CLICK on empty combobox %r"
+        idx = _AGENT_SOURCE.index(anchor)
+        window = _AGENT_SOURCE[idx:idx + 1600]
+        assert "_ask_llm" in window, "must consult the LLM instead of only the plain lookup"
+        assert "deep=True" in window, "must ask the LLM to reason carefully, not a normal call"
+        assert "_MED_CONF" in window or "_lowconf_fallback_streak" in window or "_reclick_streak" in window, (
+            "must gate the deferral on the same confidence/streak signal Option C already uses, "
+            "not defer on every combobox fill"
+        )
