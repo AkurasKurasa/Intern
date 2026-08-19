@@ -98,9 +98,26 @@ class TestCallSiteRoutesOnTransformerConfidence:
     def test_llm_branch_computes_deep_from_med_conf_and_passes_it_through(self):
         anchor = "elif self._llm_client and t_conf < _HIGH_CONF:"
         idx = _AGENT_SOURCE.index(anchor)
-        window = _AGENT_SOURCE[idx:idx + 700]
+        window = _AGENT_SOURCE[idx:idx + 1700]
         assert "_MED_CONF" in window, "call site must reference the existing _MED_CONF threshold"
         assert "deep=" in window, "call site must pass deep= through to _ask_llm"
+
+    def test_llm_branch_also_considers_existing_streak_state(self):
+        """Option C, direct request: a single step's raw t_conf isn't the
+        only trigger -- real log evidence showed the general LLM branch is
+        rarely reached at all (OPT2's own specialized handlers resolve
+        most low-confidence clicks directly, never reaching this branch).
+        For the steps that DO reach here, deep reasoning should also fire
+        when the agent has already been struggling on nearby steps
+        (_lowconf_fallback_streak / _reclick_streak, both pre-existing
+        escalation counters), not just on this exact step's isolated
+        number -- reusing existing state instead of adding a new signal."""
+        anchor = "elif self._llm_client and t_conf < _HIGH_CONF:"
+        idx = _AGENT_SOURCE.index(anchor)
+        window = _AGENT_SOURCE[idx:idx + 1700]
+        assert "_lowconf_fallback_streak" in window or "_reclick_streak" in window, (
+            "call site must also consider existing streak state, not just this step's raw t_conf"
+        )
 
     def test_med_conf_constant_is_unchanged_at_0_50(self):
         # Confirms this change reuses the existing threshold rather than

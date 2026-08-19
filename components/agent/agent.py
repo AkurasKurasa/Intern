@@ -4160,7 +4160,25 @@ class LLMAgent:
                 # steps where the Transformer itself is unsure (_MED_CONF was
                 # defined but never read before this). Everything else about
                 # this branch is unchanged.
-                _deep_reason = t_conf < _MED_CONF
+                #
+                # Option C, added after real live-run evidence: this exact
+                # step's raw t_conf isn't the only signal worth trusting --
+                # a live run showed the general LLM branch is reached rarely
+                # (OPT2's own specialized handlers, e.g. the empty-combobox
+                # click-to-fill branch, resolve most low-confidence clicks
+                # directly and never reach here at all). For the steps that
+                # DO make it here, also go deep if the agent has already
+                # been struggling on nearby steps -- _lowconf_fallback_streak
+                # / _reclick_streak are pre-existing escalation counters
+                # (already used elsewhere to trigger Navigation Protocol /
+                # reclick redirects), reused here rather than adding a new
+                # signal. A live-observed streak is more meaningful than one
+                # isolated confidence number.
+                _deep_reason = (
+                    t_conf < _MED_CONF
+                    or _lowconf_fallback_streak > 0
+                    or _reclick_streak > 0
+                )
                 llm_action = self._ask_llm(state, deep=_deep_reason)
                 action_type = llm_action.get("action_type", "wait")
                 reason = llm_action.get("reason", "")
