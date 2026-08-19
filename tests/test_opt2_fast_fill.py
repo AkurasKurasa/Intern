@@ -431,7 +431,7 @@ class TestBatchFastFill:
 
     def _batch_window(self):
         idx = _SOURCE.index("OPT2 BATCH FAST-FILL")
-        return _SOURCE[idx:idx + 17000]
+        return _SOURCE[idx:idx + 19000]
 
     def test_batch_block_exists_before_the_single_field_block(self):
         batch_idx = _SOURCE.index("OPT2 BATCH FAST-FILL")
@@ -565,7 +565,7 @@ class TestBatchFastFillConfirmedBlankSkip:
 
     def _batch_window(self):
         idx = _SOURCE.index("OPT2 BATCH FAST-FILL")
-        return _SOURCE[idx:idx + 17000]
+        return _SOURCE[idx:idx + 19000]
 
     def test_editcontrol_and_comboboxcontrol_both_use_the_escalation_helper(self):
         window = self._batch_window()
@@ -635,7 +635,7 @@ class TestConfirmedBlankGetsOneDeepLLMCheckFirst:
 
     def _batch_window(self):
         idx = _SOURCE.index("OPT2 BATCH FAST-FILL")
-        return _SOURCE[idx:idx + 17000]
+        return _SOURCE[idx:idx + 19000]
 
     def test_both_editcontrol_and_comboboxcontrol_branches_get_the_check(self):
         window = self._batch_window()
@@ -692,7 +692,7 @@ class TestBatchFastFillControlResolutionFailureIsVisible:
 
     def _batch_window(self):
         idx = _SOURCE.index("OPT2 BATCH FAST-FILL")
-        return _SOURCE[idx:idx + 17000]
+        return _SOURCE[idx:idx + 19000]
 
     def test_control_resolution_failure_is_logged_at_a_visible_level_in_both_branches(self):
         window = self._batch_window()
@@ -739,7 +739,7 @@ class TestBatchFastFillPassesSectionForDisambiguation:
 
     def _batch_window(self):
         idx = _SOURCE.index("OPT2 BATCH FAST-FILL")
-        return _SOURCE[idx:idx + 17000]
+        return _SOURCE[idx:idx + 19000]
 
     def test_both_branches_pass_the_already_computed_section(self):
         window = self._batch_window()
@@ -759,3 +759,59 @@ class TestBatchFastFillPassesSectionForDisambiguation:
         assert len(sec_positions) == 2 and len(ctrl_positions) == 2
         for sec_pos, ctrl_pos in zip(sec_positions, ctrl_positions):
             assert sec_pos < ctrl_pos, "_bf_sec must be computed before it's used to resolve the control"
+
+
+class TestBatchFastFillFieldScanDiagnostic:
+    """Read-only diagnostic, direct request ("Add it, sure" -- after three
+    fix attempts for the Driver 2 gap, one real-but-unrelated, one that
+    made things worse and was reverted). Rather than guess a fourth
+    behavioral fix, this logs exactly what the batch loop sees for every
+    repeated-label field (any label shared by 2+ elements currently in
+    state, e.g. 'First Name' across the Policyholder tab and both driver
+    sections) right when it's computed -- label, type, visible flag,
+    current value, bbox, and whether it actually made it onto the fill
+    target list. Pure logging: no new mouse/keyboard action, no change to
+    what gets filled or how, one plain logger.info() call per matching
+    field. This answers the open question directly on the next live run:
+    is Driver 2's First Name missing from state['elements'] entirely, or
+    present but excluded for some other, still-unknown reason."""
+
+    def _batch_window(self):
+        idx = _SOURCE.index("OPT2 BATCH FAST-FILL")
+        return _SOURCE[idx:idx + 19000]
+
+    def test_scan_runs_right_after_targets_are_computed(self):
+        window = self._batch_window()
+        targets_idx = window.index(
+            "_bf_targets = self._navproto.find_all_visible_empty_targets(")
+        scan_idx = window.index("[FIELD-SCAN]")
+        loop_idx = window.index("for _bf_el in _bf_targets:")
+        assert targets_idx < scan_idx < loop_idx, \
+            "the scan must run after targets are known and before the fill loop starts"
+
+    def test_scan_is_pure_logging_no_new_actions(self):
+        """Must not introduce any executor call, click, or keyboard action --
+        this is a read-only report, nothing else changes."""
+        window = self._batch_window()
+        scan_idx = window.index("[FIELD-SCAN]")
+        loop_idx = window.index("for _bf_el in _bf_targets:")
+        section = window[scan_idx - 400:loop_idx]
+        assert "self._executor.execute(" not in section
+        assert "pyautogui" not in section
+
+    def test_scan_only_logs_fields_whose_label_is_genuinely_repeated(self):
+        """Not every field, or every step becomes noisy -- only labels
+        shared by 2+ elements currently on screen (the actual ambiguous
+        case) are worth reporting."""
+        window = self._batch_window()
+        idx = window.index("[FIELD-SCAN]")
+        section = window[idx - 500:idx + 100]
+        assert "> 1" in section
+
+    def test_scan_reports_visibility_value_and_whether_it_became_a_target(self):
+        window = self._batch_window()
+        idx = window.index("[FIELD-SCAN]")
+        section = window[idx:idx + 500]
+        assert "visible" in section
+        assert "value" in section
+        assert "is_target" in section
