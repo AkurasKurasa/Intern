@@ -2452,33 +2452,6 @@ class LLMAgent:
                 _bf_targets = self._navproto.find_all_visible_empty_targets(
                     state, _nav_vb, attempted_keys=self._attempted_keys,
                     attempt_key_fn=self._attempt_key)
-                # Read-only diagnostic, direct request ("Add it, sure" --
-                # after three fix attempts for the Driver 2 gap, one real
-                # but unrelated, one that made things worse and got
-                # reverted). Rather than guess a fourth behavioral change,
-                # report exactly what's seen for every genuinely-repeated
-                # label (e.g. "First Name" shared by the Policyholder tab
-                # and both driver sections) right when targets are
-                # computed -- no new mouse/keyboard action, nothing about
-                # what gets filled changes, one plain log line per matching
-                # field. Answers directly on the next live run: is Driver
-                # 2's First Name missing from state['elements'] entirely,
-                # or present but excluded for some other reason.
-                _fs_target_ids = {id(e) for e in _bf_targets}
-                _fs_label_counts: Dict[str, int] = {}
-                for _fs_e in state.get("elements", []):
-                    _fs_lbl = (_fs_e.get("label") or _fs_e.get("text") or "").strip()
-                    if _fs_lbl:
-                        _fs_label_counts[_fs_lbl] = _fs_label_counts.get(_fs_lbl, 0) + 1
-                for _fs_e in state.get("elements", []):
-                    _fs_lbl = (_fs_e.get("label") or _fs_e.get("text") or "").strip()
-                    if _fs_lbl and _fs_label_counts.get(_fs_lbl, 0) > 1:
-                        logger.info(
-                            "[FIELD-SCAN] label=%r type=%s visible=%s value=%r bbox=%s is_target=%s",
-                            _fs_lbl, _fs_e.get("type"), _fs_e.get("visible", True),
-                            (_fs_e.get("value") or "")[:20], _fs_e.get("bbox"),
-                            id(_fs_e) in _fs_target_ids)
-
                 _bf_filled = 0
                 if _bf_targets:
                     self._ensure_foreground(state)
