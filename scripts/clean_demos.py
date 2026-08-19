@@ -71,10 +71,19 @@ def main():
         os.makedirs(out, exist_ok=True)
         oi = 0
         prev_lbl = None
-        for f in files:
+        for i, f in enumerate(files):
             t = json.load(open(f, encoding="utf-8"))
             st = t.get("state", {})
-            ns = t.get("next_state", {})
+            # Sessions recorded before ~May 2026 carry a literal `next_state`
+            # field. Newer ones don't (removed as redundant — it's just the
+            # next step's own `state`) — so derive it the same way instead of
+            # silently defaulting to {}, which made every click unresolvable.
+            if "next_state" in t:
+                ns = t.get("next_state", {})
+            elif i + 1 < len(files):
+                ns = json.load(open(files[i + 1], encoding="utf-8")).get("state", {})
+            else:
+                ns = st   # last step in the session — no next file to read
             m = t.get("mouse", {}).get("actions", [])
             k = t.get("keyboard", {}).get("actions", [])
 
