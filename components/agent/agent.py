@@ -2512,8 +2512,23 @@ class LLMAgent:
                                 _bf_ctrl.SetFocus()
                                 _bf_hwnd = _bf_ctrl.NativeWindowHandle
                             except Exception as _bf_exc:
-                                logger.debug("Batch fast-fill focus/handle resolution failed for %r — %s",
-                                             _bf_label, _bf_exc)
+                                logger.warning("Batch fast-fill focus/handle resolution failed for %r — %s",
+                                               _bf_label, _bf_exc)
+                        else:
+                            # Real live bug, direct report ("There's still a
+                            # problem with Driver 2 and Driver 3, please
+                            # change"): a real, known value (_bf_val) was
+                            # ready to write but no on-screen UIA control
+                            # could be matched for it -- previously this fell
+                            # straight to `continue` below with NO log at any
+                            # visible level, silently dropping a real value.
+                            # Not yet root-caused (needs to see this line
+                            # fire on a real run to know why resolution
+                            # failed) -- this makes the failure visible
+                            # instead of guessing at a behavioral fix.
+                            logger.warning("Batch fast-fill: no UIA control resolved for %r "
+                                           "(value %r was ready to write) — skipping, field stays empty",
+                                           _bf_label, _bf_val[:40])
                         if not _bf_hwnd:
                             continue
                         logger.info("[OPT2] batch fast-fill '%s' → %r (no transformer, no LLM, no click)",
@@ -2568,8 +2583,23 @@ class LLMAgent:
                                 _bf_ctrl.SetFocus()
                                 _bf_hwnd = _bf_ctrl.NativeWindowHandle
                             except Exception as _bf_exc:
-                                logger.debug("Batch fast-fill focus/handle resolution failed for %r — %s",
-                                             _bf_label, _bf_exc)
+                                logger.warning("Batch fast-fill focus/handle resolution failed for %r — %s",
+                                               _bf_label, _bf_exc)
+                        else:
+                            # Real live bug, direct report ("There's still a
+                            # problem with Driver 2 and Driver 3, please
+                            # change"): a real, known value (_bf_val) was
+                            # ready to write but no on-screen UIA control
+                            # could be matched for it -- previously this fell
+                            # straight to `continue` below with NO log at any
+                            # visible level, silently dropping a real value.
+                            # Not yet root-caused (needs to see this line
+                            # fire on a real run to know why resolution
+                            # failed) -- this makes the failure visible
+                            # instead of guessing at a behavioral fix.
+                            logger.warning("Batch fast-fill: no UIA control resolved for %r "
+                                           "(value %r was ready to write) — skipping, field stays empty",
+                                           _bf_label, _bf_val[:40])
                         if not _bf_hwnd:
                             continue
                         _bf_cb_result = self._executor.execute({

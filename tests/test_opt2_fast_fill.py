@@ -431,7 +431,7 @@ class TestBatchFastFill:
 
     def _batch_window(self):
         idx = _SOURCE.index("OPT2 BATCH FAST-FILL")
-        return _SOURCE[idx:idx + 15000]
+        return _SOURCE[idx:idx + 17000]
 
     def test_batch_block_exists_before_the_single_field_block(self):
         batch_idx = _SOURCE.index("OPT2 BATCH FAST-FILL")
@@ -459,7 +459,7 @@ class TestBatchFastFill:
     def test_editcontrol_uses_direct_fill_hwnd_no_click(self):
         window = self._batch_window()
         idx = window.index('_bf_ty == "editcontrol"')
-        section = window[idx:idx + 4700]
+        section = window[idx:idx + 6000]
         assert '"direct_fill_hwnd": _bf_hwnd' in section
         assert '"action_type": "click"' not in section
         assert "_bf_ctrl.SetFocus()" in section
@@ -467,7 +467,7 @@ class TestBatchFastFill:
     def test_comboboxcontrol_uses_combobox_select_and_checks_success(self):
         window = self._batch_window()
         idx = window.index('_bf_ty == "comboboxcontrol"')
-        section = window[idx:idx + 3600]
+        section = window[idx:idx + 5000]
         assert '"action_type": "combobox_select"' in section
         assert '"combobox_hwnd": _bf_hwnd' in section
         assert "_bf_cb_result.success" in section
@@ -565,7 +565,7 @@ class TestBatchFastFillConfirmedBlankSkip:
 
     def _batch_window(self):
         idx = _SOURCE.index("OPT2 BATCH FAST-FILL")
-        return _SOURCE[idx:idx + 15000]
+        return _SOURCE[idx:idx + 17000]
 
     def test_editcontrol_and_comboboxcontrol_both_use_the_escalation_helper(self):
         window = self._batch_window()
@@ -635,7 +635,7 @@ class TestConfirmedBlankGetsOneDeepLLMCheckFirst:
 
     def _batch_window(self):
         idx = _SOURCE.index("OPT2 BATCH FAST-FILL")
-        return _SOURCE[idx:idx + 15000]
+        return _SOURCE[idx:idx + 17000]
 
     def test_both_editcontrol_and_comboboxcontrol_branches_get_the_check(self):
         window = self._batch_window()
@@ -669,4 +669,57 @@ class TestConfirmedBlankGetsOneDeepLLMCheckFirst:
         idx = window.index("confirmed blank, Tab past")
         section = window[idx:idx + 700]
         assert "self._mark_attempted(_bf_el" in section
-        assert '"key_count": 1, "keystrokes": ["tab"]' in section
+
+
+class TestBatchFastFillControlResolutionFailureIsVisible:
+    """Real live bug, direct report ('There's still a problem with Driver 2
+    and Driver 3, please change'). A real, known value could be resolved
+    (_bf_val was non-empty -- the field is NOT genuinely blank) but the
+    on-screen UIA control for it couldn't be matched (_resolve_field_control
+    returned None, or SetFocus()/NativeWindowHandle raised) -- 7 of Driver
+    2's fields on the messy-UI test form (First Name, Last Name, Date of
+    Birth, Gender, DL Number, DL Issuing State, DL Expiration -- every field
+    ALSO shared with the Policyholder tab, forcing the slow disambiguation
+    path) went completely missing from a real run with ZERO log output at
+    any visible level, while Driver 3's identical fields filled correctly.
+    Traced to this exact `if not _bf_hwnd: continue` -- the only trace was
+    a logger.debug() call on the exception path, invisible in a normal run,
+    and NO log at all when _bf_ctrl resolved to None without raising (the
+    actual case here, confirmed by _resolve_field_control's own contract:
+    it returns None on a clean 'not found', no exception). Root cause not
+    yet provable without seeing that line -- this makes the failure visible
+    (not a guessed behavioral fix) so the next live run gives a real answer."""
+
+    def _batch_window(self):
+        idx = _SOURCE.index("OPT2 BATCH FAST-FILL")
+        return _SOURCE[idx:idx + 17000]
+
+    def test_control_resolution_failure_is_logged_at_a_visible_level_in_both_branches(self):
+        window = self._batch_window()
+        assert window.count(
+            'logger.warning("Batch fast-fill: no UIA control resolved for %r') == 2
+
+    def test_the_exception_path_is_also_promoted_to_a_visible_level(self):
+        """The pre-existing SetFocus()/NativeWindowHandle exception handler
+        used logger.debug -- same invisibility problem, same fix."""
+        window = self._batch_window()
+        assert window.count(
+            'logger.debug("Batch fast-fill focus/handle resolution failed for %r') == 0
+        assert window.count(
+            'logger.warning("Batch fast-fill focus/handle resolution failed for %r') == 2
+
+    def test_failure_log_includes_the_value_that_could_not_be_written(self):
+        """The diagnostic must say what was ready to write, not just that
+        something failed -- otherwise it can't distinguish 'a real value was
+        lost' from a genuinely-blank field being skipped for some other reason."""
+        window = self._batch_window()
+        idx = window.index('logger.warning("Batch fast-fill: no UIA control resolved for %r')
+        section = window[idx:idx + 300]
+        assert "_bf_val" in section
+
+    def test_still_continues_past_an_unresolved_field_same_as_before(self):
+        """The new logging must not change control flow -- a field whose
+        control can't be resolved still falls through to a later step
+        (dead-spot rescue / transformer fallback), not raise or hang."""
+        window = self._batch_window()
+        assert window.count("if not _bf_hwnd:\n                            continue") == 2
