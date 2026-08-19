@@ -1134,6 +1134,17 @@ class LLMAgent:
         # forever. See _reassert_form_window() for the actual break condition.
         self._reassert_foreign_hwnd: Optional[int] = None
         self._reassert_foreign_streak: int         = 0
+        # Real live incident: the streak-breaker above only ever stopped
+        # ONE action (SetForegroundWindow) once it detected the user
+        # reaching for Stop -- the main step loop kept moving the mouse
+        # and typing on the form regardless, still physically fighting the
+        # user for the OS mouse cursor even with window focus correctly
+        # left alone. capsule_activity.log confirmed zero stop_capsule
+        # calls ever reached the backend despite this exact backoff firing
+        # three times in the run. Set True by _reassert_form_window() when
+        # it backs off, False once the form is foreground again -- the
+        # main loop checks this to actually pause taking real actions.
+        self._user_reaching_for_stop: bool          = False
         self._visual_cache: Dict[str, str]  = visual_cache or {}   # Gemini pre-scan data
         self._visual_reader: Optional[Any]  = visual_reader        # VisualDataReader instance
         self._source_window: str            = source_window        # Notepad/source window title
@@ -1497,6 +1508,21 @@ class LLMAgent:
             # stray click last step can't leave us observing/acting on a drifted
             # window. Lock is captured on the first observe (form is in front at GO).
             self._reassert_form_window()
+            # Real live incident: _reassert_form_window() correctly detects
+            # and logs "the user reaching for Stop" (backing off from
+            # re-stealing foreground), but this loop used to keep observing
+            # and acting regardless -- still physically moving the mouse and
+            # typing on the form, still fighting the user for the OS cursor,
+            # even though window focus was correctly left alone. Confirmed
+            # live: capsule_activity.log showed zero stop_capsule calls ever
+            # reached the backend despite this exact backoff firing three
+            # times in one run. Skip taking any real action this step so a
+            # manual Stop click actually gets an uncontested moment to land
+            # -- re-checked every step until the user either succeeds
+            # (process exits) or returns focus to the form on their own.
+            if self._user_reaching_for_stop:
+                time.sleep(0.3)
+                continue
             state      = self._observe()
             _t_observed = time.time()
             observe_time_sec = _t_observed - _step_t0
@@ -3753,7 +3779,24 @@ class LLMAgent:
                             # each has its own hard-won fix history.
                             _cb_defer = t_conf < _MED_CONF or _lowconf_fallback_streak > 0 or _reclick_streak > 0
                             if _cb_defer and self._llm_client:
-                                _cb_llm_action = self._ask_llm(state, deep=True)
+                                # Real bug found live: _cbox is matched by the
+                                # Transformer's click COORDINATES, independent
+                                # of state["focused_element_id"] -- the click
+                                # on _cbox hasn't happened yet, so the OS can
+                                # (and did) still report a completely
+                                # different field as focused. _ask_llm()
+                                # derives "the focused field" only from
+                                # state["focused_element_id"], so passing
+                                # state through unmodified asked about the
+                                # WRONG field ('E-Signature Obtained' instead
+                                # of 'Policy Type'), and the wrong value got
+                                # used ('YES (check)', not even a valid
+                                # option). Override on a COPY -- never mutate
+                                # the real state dict other code in this same
+                                # step still reads afterward.
+                                _cb_state_for_llm = dict(state)
+                                _cb_state_for_llm["focused_element_id"] = _cbox.get("element_id")
+                                _cb_llm_action = self._ask_llm(_cb_state_for_llm, deep=True)
                                 _cb_val = (_cb_llm_action.get("text", "")
                                            if _cb_llm_action.get("action_type") in ("type", "keyboard")
                                            else "")
@@ -6097,6 +6140,7 @@ class LLMAgent:
             if fg == self._locked_hwnd:
                 self._reassert_foreign_hwnd   = None
                 self._reassert_foreign_streak = 0
+                self._user_reaching_for_stop  = False
                 return
             if not win32gui.IsWindow(self._locked_hwnd):
                 return
@@ -6115,6 +6159,7 @@ class LLMAgent:
                 self._reassert_foreign_hwnd   = fg
                 self._reassert_foreign_streak = 1
             if self._reassert_foreign_streak >= 2:
+                self._user_reaching_for_stop = True
                 # DIAGNOSTIC, added 2026-08-10: direct live report, "clicked
                 # the form, literally nothing happened" -- the bare hwnd
                 # number this warning used to log is useless after the fact

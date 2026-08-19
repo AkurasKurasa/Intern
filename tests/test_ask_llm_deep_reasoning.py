@@ -205,10 +205,33 @@ class TestComboboxClickFillDefersLowConfidenceToTheLLM:
     def test_combobox_fill_source_references_ask_llm_deep_when_low_confidence(self):
         anchor = "logger.info(\"[OPT2] CLICK on empty combobox %r"
         idx = _AGENT_SOURCE.index(anchor)
-        window = _AGENT_SOURCE[idx:idx + 1600]
+        window = _AGENT_SOURCE[idx:idx + 2900]
         assert "_ask_llm" in window, "must consult the LLM instead of only the plain lookup"
         assert "deep=True" in window, "must ask the LLM to reason carefully, not a normal call"
         assert "_MED_CONF" in window or "_lowconf_fallback_streak" in window or "_reclick_streak" in window, (
             "must gate the deferral on the same confidence/streak signal Option C already uses, "
             "not defer on every combobox fill"
         )
+
+    def test_combobox_fill_overrides_focused_element_id_to_the_combobox_itself(self):
+        """Real bug found live, direct report ("Policy Type" got filled
+        with a completely different field's value, 'YES (check)', which
+        wasn't even a valid option): _cbox is found by matching the
+        Transformer's click COORDINATES against elements, independent of
+        state["focused_element_id"] -- the OS-reported focus can (and did)
+        point at a different field entirely at the moment this branch
+        runs, since the click on _cbox hasn't happened yet. _ask_llm()
+        derives "the focused field" purely from state["focused_element_id"],
+        so calling it with the original state asks about the wrong field.
+        The deferred call must override focused_element_id to _cbox's own
+        element_id before calling _ask_llm, not pass state through as-is."""
+        anchor = "logger.info(\"[OPT2] CLICK on empty combobox %r"
+        idx = _AGENT_SOURCE.index(anchor)
+        window = _AGENT_SOURCE[idx:idx + 2900]
+        assert "_cbox.get(\"element_id\")" in window or "_cbox.get('element_id')" in window, (
+            "must override focused_element_id to _cbox's own id before calling _ask_llm, "
+            "not let it fall back to whatever state already reports as focused"
+        )
+        # The override must happen on a COPY, never mutate the real state
+        # dict other code in this same step still reads afterward.
+        assert "dict(state)" in window, "must build a copy of state, not mutate the shared state dict in place"

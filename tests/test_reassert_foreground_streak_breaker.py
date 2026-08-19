@@ -26,6 +26,9 @@ from unittest.mock import MagicMock
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "components"))
 from agent.agent import LLMAgent
 
+_AGENT_PY = Path(__file__).resolve().parent.parent / "components" / "agent" / "agent.py"
+_AGENT_SOURCE = _AGENT_PY.read_text(encoding="utf-8")
+
 
 def _make_agent():
     agent = LLMAgent(goal="test goal", dry_run=True, max_steps=1)
@@ -203,3 +206,61 @@ class TestBackoffDiagnosticLogging:
         agent._reassert_form_window()  # must not raise, must still back off
 
         assert fake_win32gui.SetForegroundWindow.call_count == 1
+
+
+class TestUserReachingForStopFlag:
+    """New finding, direct live report: "the Stop button... never actually
+    reached the backend... the agent's own log shows it clearly saw the
+    user trying [to reach it]." Backing off from re-stealing foreground
+    only ever stopped ONE action (SetForegroundWindow) -- the main
+    per-step loop (agent.py's run(), not this method) kept moving the
+    mouse/typing on the form the whole time regardless, still physically
+    fighting the user for the OS mouse cursor even though window focus
+    correctly stayed on Electron. This flag is the signal the main loop
+    needs in order to actually pause taking real actions while the user
+    is reaching for Stop -- not just stop re-stealing window focus."""
+
+    def test_flag_starts_false(self):
+        agent = _make_agent()
+        assert agent._user_reaching_for_stop is False
+
+    def test_flag_set_true_once_backing_off(self, monkeypatch):
+        _install_fake_win32(monkeypatch, foreground_hwnd=222)
+        agent = _make_agent()
+
+        agent._reassert_form_window()  # 1st occurrence -- reclaimed, not backing off yet
+        assert agent._user_reaching_for_stop is False
+        agent._reassert_form_window()  # 2nd occurrence -- backs off
+
+        assert agent._user_reaching_for_stop is True
+
+    def test_flag_resets_false_once_form_regains_focus(self, monkeypatch):
+        agent = _make_agent()
+        _install_fake_win32(monkeypatch, foreground_hwnd=222)
+        agent._reassert_form_window()
+        agent._reassert_form_window()
+        assert agent._user_reaching_for_stop is True
+
+        _install_fake_win32(monkeypatch, foreground_hwnd=111)  # form is foreground again
+        agent._reassert_form_window()
+
+        assert agent._user_reaching_for_stop is False
+
+    def test_main_loop_pauses_real_actions_while_the_flag_is_set(self):
+        """The flag alone does nothing unless the main step loop actually
+        checks it. Source-level regression test, same pattern used
+        throughout tests/test_ask_llm_deep_reasoning.py -- the real loop
+        is one giant method, too costly to drive end-to-end just to check
+        this. Confirms the check sits directly after _reassert_form_window()
+        and before self._observe(), so a step where the user is reaching
+        for Stop never even gets as far as predicting or acting."""
+        anchor = "self._reassert_form_window()"
+        idx = _AGENT_SOURCE.index(anchor)
+        window = _AGENT_SOURCE[idx:idx + 1300]
+        assert "self._user_reaching_for_stop" in window, (
+            "the main loop must check the flag right after calling _reassert_form_window()"
+        )
+        assert "continue" in window, "must skip the rest of this step's action-taking, not just log"
+        observe_idx = window.index("self._observe()")
+        flag_idx = window.index("self._user_reaching_for_stop")
+        assert flag_idx < observe_idx, "the flag check must come BEFORE observing/acting, not after"
