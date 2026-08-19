@@ -5,102 +5,140 @@
 <title>Intern — mini</title>
 <link rel="stylesheet" href="tokens.css" />
 <style>
+  /* Redesign, direct request (uiux_record_overlay_redesign): "turn it
+     into a circle and expandable to either Record or Stop... add some
+     information there... black transparent bg and white text... the
+     information being 'x frames / x session'." Rebuilt on the exact
+     proven pattern from the Workflows-tab sibling (mini-workflow.html) --
+     same transparent floating-action-button shape, same collapse
+     mechanics, same real specificity-safe CSS (that widget's ghost-
+     outline bug fixed first, so it's never repeated here) -- rather than
+     a second, slightly-different implementation of the same idea. Picked
+     the black-transparent-pill + white-text option over plain floating
+     text: a pill with its own background stays legible over any desktop
+     wallpaper, floating text alone would not. */
   * { box-sizing: border-box; }
   html, body {
-    margin: 0; height: 100%;
-    background: var(--app-bg);
-    border: 1px solid var(--border-strong);
-    border-radius: var(--radius-lg);
+    margin: 0; width: 100%; height: 100%;
+    background: transparent;
     overflow: hidden;
     font-family: var(--font-ui);
-    color: var(--ink);
   }
-  .mini {
-    display: flex; flex-direction: column;
-    height: 100%; padding: 10px 12px;
-    gap: 8px;
-  }
-  .mini-head {
-    display: flex; align-items: center; justify-content: space-between;
-    -webkit-app-region: drag;
-    cursor: default;
-  }
-  .mini-head .brand {
-    display: flex; align-items: center; gap: 6px;
-    font-family: var(--font-mono); font-size: 11px; font-weight: 500; letter-spacing: .1em;
-  }
-  .mini-mark {
-    width: 16px; height: 16px; border-radius: 5px;
-    background: var(--ink); color: white;
-    display: flex; align-items: center; justify-content: center;
-    font-family: var(--font-mono); font-weight: 700; font-size: 10px;
-  }
-  .restore-btn {
+
+  .stack {
+    display: flex; flex-direction: column-reverse;
+    align-items: center; justify-content: flex-end;
+    gap: 12px;
+    width: 100%; height: 100%;
+    padding: 12px 0;
     -webkit-app-region: no-drag;
-    width: 20px; height: 20px; border-radius: 6px;
-    border: none; background: transparent; color: var(--text-muted);
+  }
+
+  .circle {
+    width: 52px; height: 52px; min-height: 52px; border-radius: 50%;
+    border: none; cursor: pointer; padding: 0;
     display: flex; align-items: center; justify-content: center;
-    cursor: pointer;
+    box-shadow: 0 3px 10px rgba(0,0,0,.30);
+    transition: transform .12s ease, opacity .15s ease, background .12s ease;
+    flex: none;
   }
-  .restore-btn:hover { background: var(--card); color: var(--ink); }
-  .restore-btn svg { width: 12px; height: 12px; }
+  .circle svg { width: 18px; height: 18px; }
+  .circle:active:not(:disabled) { transform: scale(0.90); }
+  .circle:disabled { opacity: .35; cursor: not-allowed; }
 
-  .mini-status {
-    display: flex; align-items: center; gap: 7px;
-    background: var(--card); border: 1px solid var(--border-strong);
-    border-radius: var(--radius-sm); padding: 6px 10px;
-    font-size: 12px; font-weight: 600;
+  .handle {
+    background: var(--ink); color: white;
+    font-family: var(--font-mono); font-weight: 700; font-size: 15px;
   }
-  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--text-muted); flex: none; }
-  /* Same signal as the main window's recorder dot: clay while capturing a
-     take, since that take is what will later drive the agent. */
-  .dot.recording { background: var(--clay); box-shadow: 0 0 6px rgba(180,68,30,.5); animation: blip 1s ease-in-out infinite; }
-  .dot.error { background: var(--error); }
-  @keyframes blip { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
-
-  .mini-frames { font-family: var(--font-mono); font-size: 11px; color: var(--text-muted); }
-  .mini-frames b { color: var(--ink); }
-
-  .mini-btn-row { display: flex; gap: 8px; margin-top: auto; }
-  .btn {
-    flex: 1; border: 1px solid transparent; border-radius: var(--radius-sm);
-    padding: 7px 10px; font-family: var(--font-ui); font-size: 12px; font-weight: 600; cursor: pointer;
-    display: inline-flex; align-items: center; justify-content: center; gap: 5px;
+  .handle:hover { background: #2A2820; }
+  /* Same signal as the main window's recorder dot (mini-status .dot):
+     clay while capturing a take, since that take is what will later
+     drive the agent -- an existing, deliberate precedent in this exact
+     file, not a new use of the reserved colour. */
+  .handle.recording { animation: pulse var(--motion-pulse) ease-in-out infinite; }
+  @keyframes pulse {
+    0%, 100% { box-shadow: 0 3px 10px rgba(0,0,0,.30), 0 0 0 0 rgba(180,68,30,.55); }
+    50%      { box-shadow: 0 3px 10px rgba(0,0,0,.30), 0 0 0 9px rgba(180,68,30,0); }
   }
-  .btn svg { width: 11px; height: 11px; }
-  .btn:disabled { opacity: .4; cursor: not-allowed; }
-  .btn-primary { background: var(--ink); color: white; }
-  .btn-danger { background: var(--card); color: var(--error); border-color: var(--error); }
+
+  /* Collapsed by default -- matching mini-workflow.html's already-fixed
+     pattern exactly: real compound class list (circle + action +
+     action-record/-stop) so the "stay hidden" rule wins on specificity
+     outright, never a source-order coincidence. See that file's own
+     comment for the live-confirmed bug this avoids repeating. */
+  .circle.action.action-record,
+  .circle.action.action-stop,
+  .circle.action.action-switch {
+    opacity: 0; transform: scale(0.4);
+    pointer-events: none;
+  }
+  .stack.expanded .circle.action.action-record,
+  .stack.expanded .circle.action.action-stop,
+  .stack.expanded .circle.action.action-switch {
+    opacity: 1; transform: scale(1);
+    pointer-events: auto;
+  }
+  .stack.expanded .circle.action.action-record:disabled,
+  .stack.expanded .circle.action.action-stop:disabled {
+    opacity: .35;
+  }
+
+  .action-record { background: white; color: var(--ink); }
+  .action-record:hover:not(:disabled) { background: var(--sunk); }
+  .action-stop { background: white; color: var(--clay); }
+  .action-stop:hover:not(:disabled) { background: var(--clay-tint-bg); }
+  /* Switch-to-other-widget -- direct request: "Find a way to navigate
+     between the two widgets (Record and Workflow)." Same neutral
+     treatment as the Workflows-tab sibling's own switch button. */
+  .action-switch { background: white; color: var(--ink); }
+  .action-switch:hover { background: var(--sunk); }
+
+  /* Model info -- direct request: "x frames / x session", black
+     transparent background, white text. Two explicit lines rather than
+     one truncated line (mini-workflow.html's single-line pill is fine
+     for a name that's OK to truncate; frame/session counts are the
+     whole point of this pill and must never get cut off). Only shown
+     expanded, matching the sibling widget's own "collapsed stays
+     minimal" decision. */
+  .info-pill {
+    opacity: 0; transform: scale(0.4); pointer-events: none;
+    transition: transform .12s ease, opacity .15s ease;
+    flex: none;
+    width: 92px; padding: 6px 8px; border-radius: 12px;
+    background: rgba(20,19,15,.72); color: white;
+    font-family: var(--font-mono); font-size: 10px; font-weight: 600;
+    line-height: 1.4; text-align: center;
+  }
+  .stack.expanded .info-pill {
+    opacity: 1; transform: scale(1);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .handle.recording { animation: none; }
+  }
 </style>
 </head>
 <body>
-  <div class="mini">
-    <div class="mini-head">
-      <div class="brand"><span class="mini-mark">I</span>RECORDING</div>
-      <button class="restore-btn" id="btnRestore" title="Restore window" aria-label="Restore window">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="5" width="14" height="14" rx="2"/></svg>
-      </button>
-    </div>
-
-    <div class="mini-status">
-      <i class="dot" id="statusDot"></i>
-      <span id="statStatus">Idle</span>
-    </div>
-
-    <div class="mini-frames"><b id="statFrames">0</b> frames</div>
-
-    <div class="mini-btn-row">
-      <button class="btn btn-primary" id="btnStart">
-        <svg viewBox="0 0 24 24" width="11" height="11" fill="currentColor"><circle cx="12" cy="12" r="7"/></svg>
-        Start
-      </button>
-      <button class="btn btn-danger" id="btnStop" disabled>
-        <svg viewBox="0 0 24 24" width="11" height="11" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="1.5"/></svg>
-        Stop
-      </button>
+  <div class="stack" id="stack">
+    <button class="circle handle" id="btnHandle" type="button"
+            title="Record / Stop" aria-label="Expand record controls" aria-expanded="false">I</button>
+    <button class="circle action action-switch" id="btnSwitchWidget" type="button"
+            title="Switch to Workflows" aria-label="Switch to the Workflows widget">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h13M13 8l-3-3M13 8l-3 3M20 16H7M7 16l3-3M7 16l3 3"/></svg>
+    </button>
+    <button class="circle action action-stop" id="btnStop" type="button"
+            disabled title="Stop" aria-label="Stop recording">
+      <svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="1.5"/></svg>
+    </button>
+    <button class="circle action action-record" id="btnStart" type="button"
+            title="Record" aria-label="Start recording">
+      <svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="7"/></svg>
+    </button>
+    <div class="info-pill" id="infoPill" aria-live="polite">
+      <div id="infoFrames">0 frames</div>
+      <div id="infoSessions">0 sessions</div>
     </div>
   </div>
-
   <script src="mini.js"></script>
 </body>
 </html>

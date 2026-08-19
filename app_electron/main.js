@@ -73,6 +73,22 @@ let bridge = null;
 let bridgeReady = false;
 const pendingCommands = [];
 
+// Shared sizing for both mini widgets -- both anchor to the exact same
+// screen corner (sw-MINI_MARGIN, sh-MINI_MARGIN), each just at its own
+// height. Centralized here after two real bugs (both widgets' info-pills
+// getting silently squeezed by flexbox, twice) came from the window
+// height and its matching setPosition() math being hand-duplicated in
+// separate places and drifting out of sync -- one set of numbers used
+// everywhere (createMiniWindow, createMiniWorkflowWindow,
+// switchMiniWidget) instead.
+const MINI_WIDTH = 92;
+const MINI_MARGIN = 20;
+const MINI_RECORD_HEIGHT = 320;     // 4 circles + two-line frames/sessions pill
+// Was 300 (one-line pill); bumped to 320 when the pill became two lines
+// (task name + model/step, 2026-08-19) -- same real content math as
+// MINI_RECORD_HEIGHT now that both pills are the same shape.
+const MINI_WORKFLOW_HEIGHT = 320;   // 4 circles + two-line task/model pill
+
 // Which main-window section was last active ("home" = Recorder,
 // "workflows" = Workflows) -- decides which mini overlay minimizing
 // shows. Updated by the renderer via setActiveSection() every time the
@@ -88,6 +104,12 @@ let activeSection = "home";
 // through the main renderer for every click.
 let currentCapsuleName = null;
 let capsuleIsRunning = false;
+// Mirrors the recorder's own "started"/"saved"/"error" events, same
+// purpose as capsuleIsRunning above but for the Recorder-tab mini widget:
+// lets a freshly (re)opened mini.html know immediately whether a
+// recording is already in progress, instead of only finding out on the
+// next live event.
+let recorderIsRecording = false;
 
 function startBridge() {
   const pythonExe = resolvePython();
@@ -142,6 +164,10 @@ function broadcast(channel, payload) {
   if (payload && (payload.event === "capsule_done" || payload.event === "capsule_stopped")) {
     capsuleIsRunning = false;
   }
+  if (payload && payload.event === "started") recorderIsRecording = true;
+  if (payload && (payload.event === "saved" || payload.event === "error")) {
+    recorderIsRecording = false;
+  }
 }
 
 function sendCommand(cmd) {
@@ -185,11 +211,22 @@ function createWindow() {
   // which section was showing: Recorder -> the Start/Stop status card
   // (unchanged); Workflows -> the round Play/Stop widget.
   mainWindow.on("minimize", () => {
+    // Direct request: smooth switching between the two mini widgets.
+    // Found live: switchMiniWidget() created whichever widget hadn't been
+    // needed yet from scratch -- a brand-new BrowserWindow means spinning
+    // up a whole Chromium renderer process and loading/parsing the HTML,
+    // CSS, and fonts, which measured as a real multi-second gap where the
+    // (transparent) window shows nothing at all. Both widgets are cheap
+    // and small -- pre-creating both here, hidden, the first time the
+    // user ever minimizes means every later switchMiniWidget() call is
+    // just hide()/show() on already-loaded windows, no creation cost.
+    if (!miniWindow || miniWindow.isDestroyed()) createMiniWindow();
+    if (!miniWorkflowWindow || miniWorkflowWindow.isDestroyed()) createMiniWorkflowWindow();
     if (activeSection === "workflows") {
-      if (!miniWorkflowWindow || miniWorkflowWindow.isDestroyed()) createMiniWorkflowWindow();
+      miniWindow.hide();
       miniWorkflowWindow.show();
     } else {
-      if (!miniWindow || miniWindow.isDestroyed()) createMiniWindow();
+      miniWorkflowWindow.hide();
       miniWindow.show();
     }
   });
@@ -199,11 +236,19 @@ function createWindow() {
   });
 }
 
+// Redesigned 2026-08-18 (uiux_record_overlay_redesign) to match the
+// Workflows-tab sibling's transparent floating-circle shape exactly --
+// same transparent/hasShadow/frame config, same 92px width. Height
+// computed upfront this time (learned live from the sibling's own
+// squeeze bug, not rediscovered a third time): padding(24) + 4 circles
+// (handle/switch/stop/record, 52px each = 208) + 3 gaps (12px = 36) +
+// the two-line frames/sessions pill (~40) = 308, rounded up to 320 for
+// headroom.
 function createMiniWindow() {
   miniWindow = new BrowserWindow({
     title: "Intern — mini",
-    width: 240,
-    height: 168,
+    width: MINI_WIDTH,
+    height: MINI_RECORD_HEIGHT,
     resizable: false,
     minimizable: false,
     maximizable: false,
@@ -211,7 +256,15 @@ function createMiniWindow() {
     alwaysOnTop: true,
     skipTaskbar: true,
     frame: false,
-    backgroundColor: "#F7F5F0",
+    transparent: true,
+    hasShadow: false,
+    backgroundColor: "#00000000",
+    // Created eagerly now (see mainWindow's "minimize" handler) even when
+    // this isn't the widget the user is about to see -- show:false keeps
+    // the default "auto-show once ready-to-show" behavior from flashing
+    // it onscreen before the minimize handler's own explicit hide()/
+    // show() calls decide which widget is actually visible.
+    show: false,
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
@@ -221,7 +274,16 @@ function createMiniWindow() {
   miniWindow.loadFile(path.join(__dirname, "renderer", "mini.html"));
 
   const { width: sw, height: sh } = require("electron").screen.getPrimaryDisplay().workAreaSize;
-  miniWindow.setPosition(sw - 260, sh - 188);
+  miniWindow.setPosition(sw - MINI_WIDTH - MINI_MARGIN, sh - MINI_RECORD_HEIGHT - MINI_MARGIN);
+
+  // A recording may already be in progress from before this widget ever
+  // opened -- same real gap the Workflows-tab sibling's own review caught
+  // and fixed for its capsule state, applied here too rather than left
+  // as a fresh instance of the identical gap. Reuses the existing
+  // recorder-event wire format/channel, no new IPC needed.
+  miniWindow.webContents.once("did-finish-load", () => {
+    if (recorderIsRecording) miniWindow.webContents.send("recorder-event", { event: "started" });
+  });
 
   miniWindow.on("closed", () => { miniWindow = null; });
 }
@@ -248,8 +310,8 @@ function createMiniWindow() {
 function createMiniWorkflowWindow() {
   miniWorkflowWindow = new BrowserWindow({
     title: "Intern — mini",
-    width: 92,
-    height: 216,
+    width: MINI_WIDTH,
+    height: MINI_WORKFLOW_HEIGHT,
     resizable: false,
     minimizable: false,
     maximizable: false,
@@ -260,6 +322,10 @@ function createMiniWorkflowWindow() {
     transparent: true,
     hasShadow: false,
     backgroundColor: "#00000000",
+    // Same reasoning as the Record sibling's show:false above -- this
+    // widget is now also created eagerly on first minimize, before we
+    // necessarily know it's the one to display.
+    show: false,
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
@@ -269,7 +335,7 @@ function createMiniWorkflowWindow() {
   miniWorkflowWindow.loadFile(path.join(__dirname, "renderer", "mini-workflow.html"));
 
   const { width: sw, height: sh } = require("electron").screen.getPrimaryDisplay().workAreaSize;
-  miniWorkflowWindow.setPosition(sw - 112, sh - 236);
+  miniWorkflowWindow.setPosition(sw - MINI_WIDTH - MINI_MARGIN, sh - MINI_WORKFLOW_HEIGHT - MINI_MARGIN);
 
   // Push whatever state already exists (a capsule may already be loaded
   // and/or running from before this widget was ever created) so it opens
@@ -280,6 +346,38 @@ function createMiniWorkflowWindow() {
   miniWorkflowWindow.on("closed", () => { miniWorkflowWindow = null; });
 }
 
+// Direct request: "Find a way to navigate between the two widgets (Record
+// and Workflow)". Before this, which widget showed was decided ONCE, by
+// activeSection, at the moment you minimized -- no way to see the other
+// one without restoring the main window, switching tabs, and minimizing
+// again. This lets either mini widget hand off to its sibling directly.
+//
+// Deliberately does NOT copy one window's live position onto the other --
+// the two windows are different heights (270 vs 250) with content packed
+// toward the TOP of each (confirmed live while verifying the info-pill
+// sizing fix above), so a naive position copy would visually shift the
+// handle circle by however much the heights differ. Both windows are
+// already independently anchored to the exact same screen corner
+// (sw-112,sh-290 / sw-112,sh-270 both resolve to the same sw-20,sh-20
+// bottom-right point) by their own creation functions -- reusing each
+// one's own real formula here keeps that anchor exact, rather than
+// re-deriving it with a fragile offset.
+function switchMiniWidget() {
+  const { width: sw, height: sh } = require("electron").screen.getPrimaryDisplay().workAreaSize;
+  if (miniWindow && !miniWindow.isDestroyed() && miniWindow.isVisible()) {
+    miniWindow.hide();
+    if (!miniWorkflowWindow || miniWorkflowWindow.isDestroyed()) createMiniWorkflowWindow();
+    miniWorkflowWindow.setPosition(sw - MINI_WIDTH - MINI_MARGIN, sh - MINI_WORKFLOW_HEIGHT - MINI_MARGIN);
+    miniWorkflowWindow.show();
+  } else if (miniWorkflowWindow && !miniWorkflowWindow.isDestroyed() && miniWorkflowWindow.isVisible()) {
+    miniWorkflowWindow.hide();
+    if (!miniWindow || miniWindow.isDestroyed()) createMiniWindow();
+    miniWindow.setPosition(sw - MINI_WIDTH - MINI_MARGIN, sh - MINI_RECORD_HEIGHT - MINI_MARGIN);
+    miniWindow.show();
+  }
+}
+ipcMain.handle("switch-mini-widget", () => switchMiniWidget());
+
 // Re-sends the widget's non-running state (which capsule is loaded) --
 // called on creation AND every time capsule-set-current changes, since
 // the widget can stay open (minimized, just hidden) across the user
@@ -288,9 +386,24 @@ function createMiniWorkflowWindow() {
 // recorder-event broadcast the widget listens to directly.
 function pushMiniWorkflowState() {
   if (!miniWorkflowWindow || miniWorkflowWindow.isDestroyed()) return;
+  // Direct request: "what Workflow were using, and what model." The
+  // deployed model_path (what actually runs on Play, not just whatever
+  // the main window's Checkpoint dropdown happens to have selected but
+  // not yet deployed) already lives in the registry entry -- readRegistry()
+  // is a plain, cheap disk read (same precedent as listCapsules()
+  // elsewhere), no bridge round-trip needed just to look this up.
+  // Script-kind capsules (e.g. Scope #2) carry no model_path at all --
+  // modelName stays null for those, and the widget shows nothing for
+  // that line rather than a misleading blank/empty string.
+  const capsule = listCapsules().find((c) => c.name === currentCapsuleName);
+  const modelName = capsule && capsule.model_path
+    ? path.basename(capsule.model_path)
+    : null;
   miniWorkflowWindow.webContents.send("mini-workflow-state", {
     hasCapsule: !!currentCapsuleName,
     isRunning: capsuleIsRunning,
+    capsuleName: currentCapsuleName,
+    modelName,
   });
 }
 

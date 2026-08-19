@@ -33,10 +33,21 @@
     display: flex; align-items: center; justify-content: center;
     box-shadow: 0 3px 10px rgba(0,0,0,.30);
     transition: transform .12s ease, opacity .15s ease, background .12s ease;
+    flex: none;   /* never let flexbox silently squeeze a circle to fit */
   }
   .circle svg { width: 18px; height: 18px; }
   .circle:active:not(:disabled) { transform: scale(0.90); }
   .circle:disabled { opacity: .35; cursor: not-allowed; }
+  /* .circle:disabled (a class + a pseudo-class) and .action below (one
+     class) tie in specificity's class-count column -- whichever rule
+     happens to come LATER in this file wins the tie, which meant the
+     "stay fully invisible while collapsed" rule kept losing to the
+     "disabled" rule real-world (confirmed live: computed opacity came
+     back 0.35, not 0, on Play/Stop even fully collapsed). Fixed the same
+     way canvas[hidden] was fixed in treetask/index.html this session --
+     matching the buttons' real compound class list (circle + action +
+     action-play/-stop) so the "stay hidden" rule wins outright, not by
+     source-order luck. */
 
   .handle {
     background: var(--ink); color: white;
@@ -59,13 +70,27 @@
      still receive their disabled state updates while hidden) but scaled
      to nothing and non-interactive. Expanding is purely a class toggle
      on the container, animated via transform/opacity on each circle. */
-  .action {
+  .circle.action.action-play,
+  .circle.action.action-stop,
+  .circle.action.action-switch {
     opacity: 0; transform: scale(0.4);
     pointer-events: none;
   }
-  .stack.expanded .action {
+  .stack.expanded .circle.action.action-play,
+  .stack.expanded .circle.action.action-stop,
+  .stack.expanded .circle.action.action-switch {
     opacity: 1; transform: scale(1);
     pointer-events: auto;
+  }
+  /* Found while verifying the fix above: that same specificity bump also
+     started overpowering the ordinary .circle:disabled dimming (0.35)
+     once expanded, so a disabled Play circle looked identically bright
+     to an enabled one while running -- confirmed live (computed opacity
+     came back 1, not .35). One more explicit, higher-specificity rule
+     for exactly that combination, rather than a coincidence of ordering. */
+  .stack.expanded .circle.action.action-play:disabled,
+  .stack.expanded .circle.action.action-stop:disabled {
+    opacity: .35;
   }
 
   /* White circles rising above the handle, per the design direction --
@@ -74,6 +99,51 @@
   .action-play:hover:not(:disabled) { background: var(--sunk); }
   .action-stop { background: white; color: var(--clay); }
   .action-stop:hover:not(:disabled) { background: var(--clay-tint-bg); }
+  /* Switch-to-other-widget -- direct request: "Find a way to navigate
+     between the two widgets (Record and Workflow)." Neutral ink (not
+     clay -- this isn't a stop/danger action), same treatment as Play. */
+  .action-switch { background: white; color: var(--ink); }
+  .action-switch:hover { background: var(--sunk); }
+
+  /* Model info -- direct request (uiux_action_overlay_redesign): "add
+     real model information... step count, active/inactive state,
+     whatever else is useful to see at a glance." Only ever shown
+     expanded, same reasoning as the handle's own comment above: the
+     collapsed circle stays exactly as minimal as it already was, no
+     text crammed onto a 52px dot. Recoloured 2026-08-18 to match the
+     Record Overlay sibling's black-transparent + white text pill exactly
+     (was a white pill) -- one shared look between the two widgets.
+     Restructured to two explicit lines 2026-08-19, direct request
+     ("what Workflow were using, and what model") -- task name always on
+     top, model/checkpoint or live step count on the bottom line, same
+     two-line shape as the Record sibling's frames/sessions pill rather
+     than a single truncated line. Visibility now driven by the
+     `hidden` attribute set in JS (see mini-workflow.js) instead of
+     `:empty`, since the pill always has two real child elements now
+     even when there's nothing to show. Not a .circle, so it never
+     collides with the :disabled specificity issue fixed above. */
+  .info-pill {
+    opacity: 0; transform: scale(0.4); pointer-events: none;
+    transition: transform .12s ease, opacity .15s ease;
+    flex: none;   /* same real bug as .circle above -- found live, not assumed */
+    width: 92px; padding: 6px 8px; border-radius: 12px;
+    background: rgba(20,19,15,.72); color: white;
+    font-family: var(--font-mono); font-size: 10px; font-weight: 600;
+    line-height: 1.4; text-align: center;
+  }
+  /* Task names (unlike the Record sibling's fixed "N frames" format) can
+     be any length -- found live, not assumed: an unclamped 2nd line let
+     "Sheet-to-Portal Matcher" wrap to 3 lines, ballooning the pill to
+     68px and pushing it above the top of the window (measured top: -4,
+     genuinely clipped, not just visually cramped). Each line now clamps
+     to a single truncated row instead of wrapping, same nowrap+ellipsis
+     treatment this pill already used before it became two lines. */
+  .info-pill > div {
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .stack.expanded .info-pill {
+    opacity: 1; transform: scale(1);
+  }
 
   @media (prefers-reduced-motion: reduce) {
     .handle.running { animation: none; }
@@ -84,6 +154,10 @@
   <div class="stack" id="stack">
     <button class="circle handle" id="btnHandle" type="button"
             title="Play / Stop" aria-label="Expand play controls" aria-expanded="false">I</button>
+    <button class="circle action action-switch" id="btnSwitchWidget" type="button"
+            title="Switch to Recorder" aria-label="Switch to the Recorder widget">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h13M13 8l-3-3M13 8l-3 3M20 16H7M7 16l3-3M7 16l3 3"/></svg>
+    </button>
     <button class="circle action action-stop" id="btnStop" type="button"
             disabled title="Stop" aria-label="Stop the running capsule">
       <svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="1.5"/></svg>
@@ -92,6 +166,10 @@
             disabled title="Play" aria-label="Play the loaded capsule">
       <svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 5l12 7-12 7z"/></svg>
     </button>
+    <div class="info-pill" id="infoPill" aria-live="polite" hidden>
+      <div id="infoTask">No task</div>
+      <div id="infoModel"></div>
+    </div>
   </div>
   <script src="mini-workflow.js"></script>
 </body>

@@ -1,41 +1,83 @@
-const statusDot  = document.getElementById("statusDot");
-const statStatus = document.getElementById("statStatus");
-const statFrames = document.getElementById("statFrames");
-const btnStart   = document.getElementById("btnStart");
-const btnStop    = document.getElementById("btnStop");
-const btnRestore = document.getElementById("btnRestore");
+const stack       = document.getElementById("stack");
+const btnHandle   = document.getElementById("btnHandle");
+const btnSwitch   = document.getElementById("btnSwitchWidget");
+const btnStart    = document.getElementById("btnStart");
+const btnStop     = document.getElementById("btnStop");
+const infoFrames  = document.getElementById("infoFrames");
+const infoSessions= document.getElementById("infoSessions");
 
-function setRecording(isRecording) {
-  btnStart.disabled = isRecording;
-  btnStop.disabled = !isRecording;
-  statusDot.className = "dot" + (isRecording ? " recording" : "");
-  statStatus.textContent = isRecording ? "Recording" : "Idle";
+let expanded    = false;
+let isRecording = false;
+let frames      = 0;
+let sessions    = 0;   // matches renderer.js's own "count of saves seen by
+                        // this window since it loaded" convention exactly --
+                        // not read from disk, resets per window like the
+                        // main window's own counter already does.
+
+function setExpanded(next) {
+  expanded = next;
+  stack.classList.toggle("expanded", expanded);
+  btnHandle.setAttribute("aria-expanded", String(expanded));
 }
 
+function refreshButtons() {
+  btnStart.disabled = isRecording;
+  btnStop.disabled = !isRecording;
+  btnHandle.classList.toggle("recording", isRecording);
+}
+
+// Only ever shown while expanded, matching the Workflows-tab sibling's
+// "collapsed stays minimal" rule.
+function refreshInfoPill() {
+  infoFrames.textContent = `${frames} frame${frames === 1 ? "" : "s"}`;
+  infoSessions.textContent = `${sessions} session${sessions === 1 ? "" : "s"}`;
+}
+refreshInfoPill();
+
+btnHandle.addEventListener("click", () => setExpanded(!expanded));
+btnSwitch.addEventListener("click", () => window.recorderAPI.switchMiniWidget());
+
 btnStart.addEventListener("click", () => {
+  if (btnStart.disabled) return;
   window.recorderAPI.start(null);
-  statFrames.textContent = "0";
+  frames = 0;
+  refreshInfoPill();
 });
-btnStop.addEventListener("click", () => window.recorderAPI.stop());
-btnRestore.addEventListener("click", () => window.recorderAPI.restoreMain());
+btnStop.addEventListener("click", () => {
+  if (btnStop.disabled) return;
+  window.recorderAPI.stop();
+});
+
+// Collapses "when you press outside" -- same real signal as the
+// Workflows-tab sibling: the window losing OS focus.
+window.addEventListener("blur", () => setExpanded(false));
 
 window.recorderAPI.onEvent((event) => {
   switch (event.event) {
     case "started":
-      setRecording(true);
+      isRecording = true;
+      frames = 0;
+      refreshButtons();
+      refreshInfoPill();
       break;
     case "frame_count":
-      statFrames.textContent = String(event.value);
+      frames = event.value;
+      refreshInfoPill();
       break;
     case "saved":
-      setRecording(false);
-      statFrames.textContent = String(event.steps);
+      isRecording = false;
+      sessions += 1;
+      frames = event.steps;
+      refreshButtons();
+      refreshInfoPill();
       break;
     case "error":
-      setRecording(false);
-      statusDot.classList.add("error");
+      isRecording = false;
+      refreshButtons();
       break;
     default:
       break;
   }
 });
+
+refreshButtons();
