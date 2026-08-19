@@ -9,11 +9,17 @@ the parse+lookup logic IS pure and is what's pinned here.
 import os
 import pytest
 
-from data_sources.notepad_source import _parse_records, NotepadDataSource
+from data_sources.notepad_source import (
+    _parse_records, _find_field_line, _record_body_and_line_offset, NotepadDataSource,
+)
 
 _INTAKE = os.path.join(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
     "data_entry_tasks", "data_entry_intake.txt",
+)
+_FOREIGN_TEST_INTAKE = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+    "data_entry_tasks", "data_entry_intake_FOREIGN_TEST.txt",
 )
 
 
@@ -75,3 +81,53 @@ def test_get_all_returns_copy(source):
     snap = source.get_all()
     snap["injected"] = "x"
     assert "injected" not in source.get_all()           # must be a copy
+
+
+# ── record-scoped search (real bug found live) ───────────────────────────────
+# _peek_notepad's raw-text search used to run over the ENTIRE multi-record
+# file with no record-boundary awareness at all. Real live incident: record
+# 1's intake used "Policy Reference #" instead of "Policy Number" (a real,
+# legitimate relabeling), so the whole-file search skipped straight past
+# record 1 and matched record 2's "Policy Number" line instead -- silently
+# filling a DIFFERENT customer's policy number into record 1's form, with no
+# error logged anywhere. _record_body_and_line_offset() scopes any field
+# search to just the requested record's own text.
+
+def test_record_body_and_offset_scopes_search_to_the_right_record():
+    with open(_FOREIGN_TEST_INTAKE, encoding="utf-8") as f:
+        raw_text = f.read()
+    body, offset = _record_body_and_line_offset(raw_text, 2)
+    assert body is not None
+    hit = _find_field_line(body.splitlines(), "Policy Number")
+    assert hit is not None
+    assert hit[1] == "PAI-2026-00442"
+    # The offset must convert back to the REAL absolute line in the full file.
+    all_lines = raw_text.splitlines()
+    absolute_line = all_lines[offset + hit[0]]
+    assert "Policy Number" in absolute_line
+    assert "PAI-2026-00442" in absolute_line
+
+
+def test_mislabeled_field_is_not_found_via_a_different_records_data():
+    """The exact live bug: record 1 genuinely has no 'Policy Number' key
+    (only the relabeled 'Policy Reference #') -- scoped correctly to record
+    1's own text, searching for 'Policy Number' must find NOTHING, not
+    silently succeed against record 2's line."""
+    with open(_FOREIGN_TEST_INTAKE, encoding="utf-8") as f:
+        raw_text = f.read()
+    body, offset = _record_body_and_line_offset(raw_text, 1)
+    assert body is not None
+    hit = _find_field_line(body.splitlines(), "Policy Number")
+    assert hit is None, "must not cross into a different record's data"
+
+    # The relabeled key IS genuinely present in record 1's own text, though.
+    hit_relabeled = _find_field_line(body.splitlines(), "Policy Reference #")
+    assert hit_relabeled is not None
+    assert hit_relabeled[1] == "PAI-2026-00441"
+
+
+def test_record_body_and_offset_returns_none_for_a_record_that_does_not_exist():
+    with open(_FOREIGN_TEST_INTAKE, encoding="utf-8") as f:
+        raw_text = f.read()
+    body, offset = _record_body_and_line_offset(raw_text, 999)
+    assert body is None

@@ -73,6 +73,33 @@ def _find_field_line(lines, field_name: str) -> Optional[Tuple[int, str]]:
 _DEFAULT_RECORD_RE = r"={3,}[\s\S]*?RECORD\s+(\d+)\s+OF\s+\d+[\s\S]*?={3,}"
 
 
+def _record_body_and_line_offset(
+    raw_text: str, record_num: int, record_re: str = _DEFAULT_RECORD_RE,
+) -> Tuple[Optional[str], int]:
+    """Return (this record's own text, its starting line number in the full
+    file) for record_num, or (None, 0) if that record isn't found.
+
+    Real bug found live: _peek_notepad used to search the ENTIRE multi-record
+    file for a field, with no idea which record it was actually supposed to
+    be reading. A relabeled field in the current record (no match) let that
+    whole-file search fall through to the next matching line anywhere in the
+    file -- silently returning a DIFFERENT record's value (e.g. a different
+    customer's policy number) with no error. Any field search that needs to
+    stay within one record should scope to the body this returns, not the
+    raw file text directly. Reuses the exact same split _parse_records
+    already does, so the two can never disagree about where a record starts.
+    """
+    parts = re.split(record_re, raw_text)
+    i = 1
+    while i + 1 < len(parts):
+        if int(parts[i]) == record_num:
+            body = parts[i + 1]
+            offset = raw_text[:raw_text.index(body)].count("\n")
+            return body, offset
+        i += 2
+    return None, 0
+
+
 def _parse_records(raw_text: str, record_re: str = _DEFAULT_RECORD_RE) -> dict:
     """
     Parse a multi-record intake text into {record_num: {field: value}}.

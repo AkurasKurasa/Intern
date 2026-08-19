@@ -459,7 +459,7 @@ class TestBatchFastFill:
     def test_editcontrol_uses_direct_fill_hwnd_no_click(self):
         window = self._batch_window()
         idx = window.index('_bf_ty == "editcontrol"')
-        section = window[idx:idx + 3400]
+        section = window[idx:idx + 4700]
         assert '"direct_fill_hwnd": _bf_hwnd' in section
         assert '"action_type": "click"' not in section
         assert "_bf_ctrl.SetFocus()" in section
@@ -467,7 +467,7 @@ class TestBatchFastFill:
     def test_comboboxcontrol_uses_combobox_select_and_checks_success(self):
         window = self._batch_window()
         idx = window.index('_bf_ty == "comboboxcontrol"')
-        section = window[idx:idx + 2400]
+        section = window[idx:idx + 3600]
         assert '"action_type": "combobox_select"' in section
         assert '"combobox_hwnd": _bf_hwnd' in section
         assert "_bf_cb_result.success" in section
@@ -617,3 +617,56 @@ class TestBatchFastFillConfirmedBlankSkip:
         idx = window.index("confirmed blank, Tab past")
         section = window[idx - 200:idx + 400]
         assert not re.search(r'_bf_label\s*==\s*[\'"]', section)
+
+
+class TestConfirmedBlankGetsOneDeepLLMCheckFirst:
+    """Real live bug + fix, direct report ('Check most recent logs. I don't
+    think reasoning was activated again.' -> 'how the hell do we get
+    reasoning to fire' -> 'let's try it'). 'Lookup found nothing' and
+    'genuinely blank' aren't the same thing -- the FOREIGN_TEST intake has
+    a real, legitimate relabeling ('Policy Reference #' instead of 'Policy
+    Number'), a real answer under different wording that plain text
+    matching can never bridge but real judgment can. Before committing a
+    field as blank, give the LLM exactly one careful look (deep=True, the
+    same mechanism already proven for the OPT2 combobox case) -- if the
+    LLM also finds nothing, commit blank exactly as before, same
+    leave_blank_keys/mark_attempted/Tab-only guarantee, never re-paid on
+    a later visit to the same field."""
+
+    def _batch_window(self):
+        idx = _SOURCE.index("OPT2 BATCH FAST-FILL")
+        return _SOURCE[idx:idx + 15000]
+
+    def test_both_editcontrol_and_comboboxcontrol_branches_get_the_check(self):
+        window = self._batch_window()
+        # "deep=True" also appears in explanatory comments, so count the
+        # actual call sites, not the bare substring.
+        assert window.count("self._ask_llm(_bf_state_for_llm, deep=True)") == 2
+        assert window.count("self._ask_llm(") == 2
+
+    def test_llm_check_happens_before_committing_blank_in_both_branches(self):
+        window = self._batch_window()
+        blank_positions = [m.start() for m in re.finditer("confirmed blank, Tab past", window)]
+        llm_positions = [m.start() for m in re.finditer(r"self\._ask_llm\(", window)]
+        assert len(blank_positions) == 2 and len(llm_positions) == 2
+        for llm_pos, blank_pos in zip(llm_positions, blank_positions):
+            assert llm_pos < blank_pos, "must check the LLM BEFORE giving up, not after"
+
+    def test_llm_check_overrides_focused_element_id_to_the_real_field(self):
+        """Same real bug class already fixed once for the OPT2 combobox
+        deferral: _ask_llm() derives 'the focused field' only from
+        state['focused_element_id'], which can point at a different
+        element than the one batch fast-fill is actually resolving."""
+        window = self._batch_window()
+        assert window.count("_bf_el.get(\"element_id\")") == 2 or window.count("_bf_el.get('element_id')") == 2
+        assert window.count("dict(state)") == 2
+
+    def test_confirmed_blank_bookkeeping_is_unchanged_after_the_llm_also_finds_nothing(self):
+        """The existing performance guarantee (a field confirmed blank is
+        never re-escalated on a later visit) must be untouched."""
+        window = self._batch_window()
+        assert window.count("self._leave_blank_keys.add(_bf_key)") == 2
+        idx = window.index("confirmed blank, Tab past")
+        section = window[idx:idx + 700]
+        assert "self._mark_attempted(_bf_el" in section
+        assert '"key_count": 1, "keystrokes": ["tab"]' in section

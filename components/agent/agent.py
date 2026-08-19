@@ -2477,6 +2477,25 @@ class LLMAgent:
                         # was already paying for the SAME field -- this
                         # just skips the transformer call in front of it.
                         _bf_val = self._resolve_field_value_with_escalation(state, _bf_label, section=_bf_sec)
+                        if not _bf_val and self._llm_client:
+                            # Real live bug + fix: "lookup found nothing"
+                            # and "genuinely blank" aren't the same thing --
+                            # a relabeled field ('Policy Reference #'
+                            # instead of 'Policy Number') has a real answer
+                            # under different wording plain text matching
+                            # can never bridge but real judgment can. One
+                            # careful LLM look before committing blank,
+                            # same deep=True mechanism already proven for
+                            # the OPT2 combobox deferral -- and the same
+                            # focused_element_id override that fix needed
+                            # too, since _ask_llm() derives "the focused
+                            # field" only from state, which may not
+                            # actually point at _bf_el yet.
+                            _bf_state_for_llm = dict(state)
+                            _bf_state_for_llm["focused_element_id"] = _bf_el.get("element_id")
+                            _bf_llm_action = self._ask_llm(_bf_state_for_llm, deep=True)
+                            if _bf_llm_action.get("action_type") in ("type", "keyboard"):
+                                _bf_val = _bf_llm_action.get("text", "")
                         if not _bf_val:
                             logger.info("[OPT2] batch fast-fill '%s' → confirmed blank, Tab past "
                                         "(no transformer, no LLM, no click)", _bf_label)
@@ -2514,6 +2533,25 @@ class LLMAgent:
                             continue
                         _bf_sec = self._detect_section(state, _bf_el)
                         _bf_val = self._resolve_field_value_with_escalation(state, _bf_label, section=_bf_sec)
+                        if not _bf_val and self._llm_client:
+                            # Real live bug + fix: "lookup found nothing"
+                            # and "genuinely blank" aren't the same thing --
+                            # a relabeled field ('Policy Reference #'
+                            # instead of 'Policy Number') has a real answer
+                            # under different wording plain text matching
+                            # can never bridge but real judgment can. One
+                            # careful LLM look before committing blank,
+                            # same deep=True mechanism already proven for
+                            # the OPT2 combobox deferral -- and the same
+                            # focused_element_id override that fix needed
+                            # too, since _ask_llm() derives "the focused
+                            # field" only from state, which may not
+                            # actually point at _bf_el yet.
+                            _bf_state_for_llm = dict(state)
+                            _bf_state_for_llm["focused_element_id"] = _bf_el.get("element_id")
+                            _bf_llm_action = self._ask_llm(_bf_state_for_llm, deep=True)
+                            if _bf_llm_action.get("action_type") in ("type", "keyboard"):
+                                _bf_val = _bf_llm_action.get("text", "")
                         if not _bf_val:
                             logger.info("[OPT2] batch fast-fill '%s' → confirmed blank, Tab past "
                                         "(no transformer, no LLM, no click)", _bf_label)
@@ -5954,8 +5992,24 @@ class LLMAgent:
                 return
 
             lines = raw_text.splitlines()
-            from data_sources.notepad_source import _find_field_line
-            hit = _find_field_line(lines, field_name)
+            from data_sources.notepad_source import _find_field_line, _record_body_and_line_offset
+            # Real bug found live: searching the WHOLE multi-record file let
+            # a relabeled field in the CURRENT record (no match there) fall
+            # through to the next matching line anywhere in the file --
+            # silently returning a DIFFERENT record's value (e.g. a
+            # different customer's policy number) with no error. Scope the
+            # search to the current record's own text first. Falls back to
+            # the whole file only when record-scoping doesn't apply at all
+            # (e.g. a single-record source with no "RECORD N OF M" headers,
+            # where _record_body_and_line_offset returns (None, 0)), so
+            # nothing regresses for non-multi-record data sources.
+            _record_body, _line_offset = _record_body_and_line_offset(raw_text, self._record_num)
+            if _record_body is not None:
+                hit = _find_field_line(_record_body.splitlines(), field_name)
+                if hit:
+                    hit = (hit[0] + _line_offset, hit[1])
+            else:
+                hit = _find_field_line(lines, field_name)
             target_line = hit[0] if hit else 0
             fl = field_name.lower()
 
