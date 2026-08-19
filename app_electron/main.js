@@ -211,11 +211,22 @@ function createWindow() {
   // which section was showing: Recorder -> the Start/Stop status card
   // (unchanged); Workflows -> the round Play/Stop widget.
   mainWindow.on("minimize", () => {
+    // Direct request: smooth switching between the two mini widgets.
+    // Found live: switchMiniWidget() created whichever widget hadn't been
+    // needed yet from scratch -- a brand-new BrowserWindow means spinning
+    // up a whole Chromium renderer process and loading/parsing the HTML,
+    // CSS, and fonts, which measured as a real multi-second gap where the
+    // (transparent) window shows nothing at all. Both widgets are cheap
+    // and small -- pre-creating both here, hidden, the first time the
+    // user ever minimizes means every later switchMiniWidget() call is
+    // just hide()/show() on already-loaded windows, no creation cost.
+    if (!miniWindow || miniWindow.isDestroyed()) createMiniWindow();
+    if (!miniWorkflowWindow || miniWorkflowWindow.isDestroyed()) createMiniWorkflowWindow();
     if (activeSection === "workflows") {
-      if (!miniWorkflowWindow || miniWorkflowWindow.isDestroyed()) createMiniWorkflowWindow();
+      miniWindow.hide();
       miniWorkflowWindow.show();
     } else {
-      if (!miniWindow || miniWindow.isDestroyed()) createMiniWindow();
+      miniWorkflowWindow.hide();
       miniWindow.show();
     }
   });
@@ -248,6 +259,12 @@ function createMiniWindow() {
     transparent: true,
     hasShadow: false,
     backgroundColor: "#00000000",
+    // Created eagerly now (see mainWindow's "minimize" handler) even when
+    // this isn't the widget the user is about to see -- show:false keeps
+    // the default "auto-show once ready-to-show" behavior from flashing
+    // it onscreen before the minimize handler's own explicit hide()/
+    // show() calls decide which widget is actually visible.
+    show: false,
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
@@ -305,6 +322,10 @@ function createMiniWorkflowWindow() {
     transparent: true,
     hasShadow: false,
     backgroundColor: "#00000000",
+    // Same reasoning as the Record sibling's show:false above -- this
+    // widget is now also created eagerly on first minimize, before we
+    // necessarily know it's the one to display.
+    show: false,
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,

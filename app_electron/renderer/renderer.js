@@ -430,17 +430,24 @@ btnRunAgain.addEventListener("click", () => {
 });
 
 // ── Home hero / Tasks header live counts ─────────────────────────────────
-// A "task" is anything the user can think of as one job Intern knows:
-// every registered capsule, plus any recorded data/demos/ group that
-// doesn't have a capsule yet (recorded but not yet trained/registered).
+// Direct report: "the count of the workflow in the Workflow tab isn't
+// the same of the actual workflow." Real, reproducible cause -- this
+// used to count every registered capsule PLUS any recorded data/demos/
+// group with no matching capsule yet (e.g. a real "eight_Tabs" folder on
+// disk with no registry entry), but loadWorkflows()'s chip grid below
+// only ever renders capsulesCache -- registered capsules, never those
+// unregistered groups. The header could say "3 TASKS" while only 2 chips
+// were ever on screen to count. Fixed by counting exactly what's
+// rendered, not a broader definition the grid never actually showed --
+// if surfacing unregistered recordings turns out to matter, that's a
+// real, separate feature (showing them as their own chips), not a
+// silent number that doesn't match anything visible.
 async function computeTaskCount() {
-  let groups = [];
-  let capsules = [];
-  try { groups = await window.workflowsAPI.list(); } catch (e) { /* counted as 0 */ }
-  try { capsules = await window.capsulesAPI.list(); } catch (e) { /* counted as 0 */ }
-  const capsuleNames = new Set(capsules.map((c) => c.name));
-  const groupOnly = groups.filter((g) => !capsuleNames.has(g.name)).length;
-  return capsules.length + groupOnly;
+  try {
+    return (await window.capsulesAPI.list()).length;
+  } catch (e) {
+    return 0;
+  }
 }
 async function refreshTaskCount() {
   const n = await computeTaskCount();
@@ -1094,23 +1101,8 @@ const lmStudioModelSelect     = document.getElementById("lmStudioModelSelect");
 const btnLoadLmStudioModel    = document.getElementById("btnLoadLmStudioModel");
 const lmStudioLoadedLabel     = document.getElementById("lmStudioLoadedLabel");
 
-async function loadSettingsPanel() {
-  lmStudioServerLabel.textContent = "Checking…";
+function renderLmStudioStatus(status) {
   lmStudioServerDot.className = "dot";
-  lmStudioModelSelect.disabled = true;
-  lmStudioModelSelect.innerHTML = "<option>Loading…</option>";
-  btnLoadLmStudioModel.disabled = true;
-
-  let status;
-  try {
-    status = await window.settingsAPI.refreshLmStudio();
-  } catch (e) {
-    lmStudioServerLabel.textContent = `Couldn't reach LM Studio: ${e.message || e}`;
-    lmStudioServerDot.classList.add("error");
-    lmStudioModelSelect.innerHTML = "<option>—</option>";
-    return;
-  }
-
   lmStudioServerDot.classList.add(status.serverRunning ? "ok" : "error");
   lmStudioServerLabel.textContent = status.serverRunning
     ? "Server running"
@@ -1145,6 +1137,51 @@ async function loadSettingsPanel() {
     : "No model loaded";
 }
 
+// Real lag traced to a real cause, direct report ("There is a lag from
+// the Settings as it loads, I don't want that"): every navigation to the
+// Settings tab -- not just an explicit Refresh click -- called
+// window.settingsAPI.refreshLmStudio(), which shells out to LM Studio's
+// own CLI (execFile with up to a 15s timeout, see runLmsCli() in
+// main.js) to check the server and list models. Simply clicking the
+// Settings nav button paid that cost every single time, whether or not
+// anything had changed since the last check.
+//
+// Fixed by caching the last real status and rendering it INSTANTLY (no
+// await, no lag) on plain navigation; a fresh CLI round-trip only
+// happens on the very first check this session, or when the user
+// explicitly asks for one (Refresh button, Start server, Load model --
+// all pass forceRefresh=true since those actions genuinely need fresh
+// state). The status shown is never fabricated -- it's always either a
+// real previous result or a real fresh one, just not re-fetched on
+// every idle tab switch.
+let lastLmStudioStatus = null;
+
+async function loadSettingsPanel(forceRefresh = false) {
+  if (!forceRefresh && lastLmStudioStatus) {
+    renderLmStudioStatus(lastLmStudioStatus);
+    return;
+  }
+
+  lmStudioServerLabel.textContent = "Checking…";
+  lmStudioServerDot.className = "dot";
+  lmStudioModelSelect.disabled = true;
+  lmStudioModelSelect.innerHTML = "<option>Loading…</option>";
+  btnLoadLmStudioModel.disabled = true;
+
+  let status;
+  try {
+    status = await window.settingsAPI.refreshLmStudio();
+  } catch (e) {
+    lmStudioServerLabel.textContent = `Couldn't reach LM Studio: ${e.message || e}`;
+    lmStudioServerDot.classList.add("error");
+    lmStudioModelSelect.innerHTML = "<option>—</option>";
+    return;
+  }
+
+  lastLmStudioStatus = status;
+  renderLmStudioStatus(status);
+}
+
 // ── LLM provider dropdown -- LM Studio keeps its full working panel above;
 // the other providers (agent.py already supports anthropic/groq/gemini)
 // get a real API-key field, saved to the repo's .env file -- the same
@@ -1175,14 +1212,14 @@ async function refreshApiKeyStatus() {
   }
 }
 
-function updateLlmProviderView() {
+function updateLlmProviderView(forceRefresh = false) {
   const isLmStudio = llmProviderSelect.value === "lmstudio";
   llmProviderLmStudio.hidden = !isLmStudio;
   llmProviderOther.hidden = isLmStudio;
-  if (isLmStudio) loadSettingsPanel();
+  if (isLmStudio) loadSettingsPanel(forceRefresh);
   else refreshApiKeyStatus();
 }
-llmProviderSelect.addEventListener("change", updateLlmProviderView);
+llmProviderSelect.addEventListener("change", () => updateLlmProviderView());
 
 btnSaveApiKey.addEventListener("click", async () => {
   const provider = llmProviderSelect.value;
@@ -1206,7 +1243,7 @@ llmApiKeyInput.addEventListener("keydown", (e) => {
   if (e.key === "Enter") btnSaveApiKey.click();
 });
 
-btnSettingsRefresh.addEventListener("click", () => updateLlmProviderView());
+btnSettingsRefresh.addEventListener("click", () => updateLlmProviderView(true));
 
 btnStartLmStudioServer.addEventListener("click", async () => {
   btnStartLmStudioServer.disabled = true;
@@ -1218,7 +1255,7 @@ btnStartLmStudioServer.addEventListener("click", async () => {
     lmStudioServerLabel.textContent = `Couldn't start server: ${e.message || e}`;
   } finally {
     btnStartLmStudioServer.disabled = false;
-    loadSettingsPanel();
+    loadSettingsPanel(true);
   }
 });
 
@@ -1233,7 +1270,7 @@ btnLoadLmStudioModel.addEventListener("click", async () => {
   } catch (e) {
     lmStudioLoadedLabel.textContent = `Couldn't load model: ${e.message || e}`;
   } finally {
-    loadSettingsPanel();
+    loadSettingsPanel(true);
   }
 });
 
