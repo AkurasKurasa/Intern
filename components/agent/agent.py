@@ -2505,7 +2505,7 @@ class LLMAgent:
                                                     "key_count": 1, "keystrokes": ["tab"]})
                             _bf_filled += 1
                             continue
-                        _bf_ctrl = self._resolve_field_control(state, _bf_label, _bf_el.get("bbox"))
+                        _bf_ctrl = self._resolve_field_control(state, _bf_label, _bf_el.get("bbox"), section=_bf_sec)
                         _bf_hwnd = None
                         if _bf_ctrl is not None:
                             try:
@@ -2576,7 +2576,7 @@ class LLMAgent:
                                                     "key_count": 1, "keystrokes": ["tab"]})
                             _bf_filled += 1
                             continue
-                        _bf_ctrl = self._resolve_field_control(state, _bf_label, _bf_el.get("bbox"))
+                        _bf_ctrl = self._resolve_field_control(state, _bf_label, _bf_el.get("bbox"), section=_bf_sec)
                         _bf_hwnd = None
                         if _bf_ctrl is not None:
                             try:
@@ -6622,6 +6622,35 @@ class LLMAgent:
         except Exception:
             pass
 
+    def _sorted_section_panes(self, state: Dict[str, Any]) -> List[Tuple[float, str]]:
+        """Every section_* pane currently in state, sorted top-to-bottom, each
+        paired with its own formatted section name (e.g. (400, 'Driver 2')) --
+        '' when the pane's label doesn't match the scope's section pattern.
+        Shared by _detect_section and _section_bounds so both read the exact
+        same geometry from one place, never two independently-written scans
+        that could silently drift apart. Empty list when the scope has no
+        sections (section_pattern is None)."""
+        import re as _re
+        _pat = getattr(self._scope, "section_pattern", None)
+        if not _pat:
+            return []
+        _prefix = getattr(self._scope, "section_prefix", "section_")
+        panes = sorted(
+            [e for e in state.get("elements", [])
+             if e.get("type") == "panecontrol"
+             and e.get("window_role") != "background"
+             and e.get("bbox")
+             and (e.get("label") or e.get("text") or "").startswith(_prefix)],
+            key=lambda e: e["bbox"][1]
+        )
+        out = []
+        for pane in panes:
+            raw = pane.get("label") or pane.get("text") or ""
+            m = _re.match(_pat, raw.lower())
+            name = self._scope.section_format(*m.groups()) if m else ""
+            out.append((pane["bbox"][1], name))
+        return out
+
     def _detect_section(self, state: Dict[str, Any], focused_el: Dict) -> str:
         """
         Return the repeated-section name (e.g. 'Driver 2') the focused element
@@ -6633,38 +6662,39 @@ class LLMAgent:
         ScopeConfig — so a non-sectioned app (default scope, pattern=None) gets
         '' for free, and no app-specific names live here.
         """
-        import re as _re
-        _pat = getattr(self._scope, "section_pattern", None)
-        if not _pat:                         # scope has no sections → no-op
-            return ""
         if not focused_el or not focused_el.get("bbox"):
             return ""
-        _prefix = getattr(self._scope, "section_prefix", "section_")
         fx1, fy1, fx2, fy2 = focused_el["bbox"]
         fy_center = (fy1 + fy2) / 2
 
-        section_panes = sorted(
-            [e for e in state.get("elements", [])
-             if e.get("type") == "panecontrol"
-             and e.get("window_role") != "background"
-             and e.get("bbox")
-             and (e.get("label") or e.get("text") or "").startswith(_prefix)],
-            key=lambda e: e["bbox"][1]
-        )
-
-        current_label = ""
-        for pane in section_panes:
-            if pane["bbox"][1] <= fy_center:
-                current_label = pane.get("label") or pane.get("text") or ""
+        current = ""
+        for top, name in self._sorted_section_panes(state):
+            if top <= fy_center:
+                current = name
             else:
                 break
+        return current
 
-        if not current_label:
-            return ""
-        m = _re.match(_pat, current_label.lower())
-        if m:
-            return self._scope.section_format(*m.groups())
-        return ""
+    def _section_bounds(self, state: Dict[str, Any], section: str) -> Optional[Tuple[float, float]]:
+        """(top, bottom) y-range owned by a named section (e.g. 'Driver 2'),
+        or None if that section isn't currently on screen / the scope has no
+        sections. Real live bug, direct report ("Driver 2 returns empty...
+        also add a way to distinguish similar bare label names"): repeated
+        labels (e.g. 'First Name' shared by the Policyholder tab AND Driver 2
+        AND Driver 3) were disambiguated by raw nearest-distance alone in
+        _find_uia_control_by_name — a signal that batch fast-fill's own
+        no-re-observe-between-fields design can throw off once a bbox
+        snapshot goes stale partway through a batch. This gives a stronger,
+        geometry-based signal instead: which section's own on-screen pane a
+        candidate control genuinely falls inside. Reuses
+        _sorted_section_panes so it can never disagree with _detect_section
+        about where a section starts."""
+        panes = self._sorted_section_panes(state)
+        for i, (top, name) in enumerate(panes):
+            if name == section:
+                bottom = panes[i + 1][0] if i + 1 < len(panes) else float("inf")
+                return (top, bottom)
+        return None
 
     def _lookup_field(self, field_name: str, section: str = "") -> str:
         """
@@ -6936,7 +6966,7 @@ class LLMAgent:
             logger.debug("UIA SetFocus on %r failed — %s", label, exc)
             return False
 
-    def _find_uia_control_by_name(self, label: str, expected_bbox=None):
+    def _find_uia_control_by_name(self, label: str, expected_bbox=None, section_bounds=None):
         """
         Shared lookup used by _focus_element_via_uia and
         _scroll_into_view_via_uia -- finds a live UIA control by its
@@ -6979,6 +7009,23 @@ class LLMAgent:
         instead of blindly trusting tree order. `expected_bbox` is optional
         and defaults to the old first-match behavior when omitted, so any
         future caller without a specific position in hand still works.
+
+        `section_bounds` (optional, a (top, bottom) y-range from
+        _section_bounds) adds a STRONGER disambiguation signal on top of
+        raw distance: real live bug, direct report ("Driver 2 returns
+        empty... also add a way to distinguish similar bare label names").
+        Plain nearest-distance can be thrown off by a stale expected_bbox --
+        batch fast-fill deliberately reuses one observe() across many
+        fields with no re-check in between, so a coordinate captured before
+        several fields were already typed into can drift from where the
+        real control sits by the time this runs. Among the candidates that
+        genuinely fall inside the given section's own on-screen range,
+        picks the nearest by distance as before; only candidates OUTSIDE
+        that range are excluded from consideration. If none fall inside it
+        (section detection unavailable, stale, or simply wrong for this
+        call), falls back to the plain nearest-distance-overall behavior
+        rather than failing -- this can only ever narrow the choice toward
+        the right section, never make resolution worse than before.
         """
         try:
             import uiautomation as _uia
@@ -6997,17 +7044,24 @@ class LLMAgent:
                 _ecx = (expected_bbox[0] + expected_bbox[2]) / 2
                 _ecy = (expected_bbox[1] + expected_bbox[3]) / 2
                 _best, _best_dist = None, None
+                _sect_best, _sect_best_dist = None, None
                 for _idx in range(1, 11):  # generous cap; real forms never repeat a label 10x
                     _c = _finder(searchDepth=25, Name=label, foundIndex=_idx)
                     if not _c.Exists(maxSearchSeconds=0.3):
                         break
                     try:
                         _r = _c.BoundingRectangle
-                        _dist = ((_r.left + _r.right) / 2 - _ecx) ** 2 + ((_r.top + _r.bottom) / 2 - _ecy) ** 2
+                        _cy = (_r.top + _r.bottom) / 2
+                        _dist = ((_r.left + _r.right) / 2 - _ecx) ** 2 + (_cy - _ecy) ** 2
                     except Exception:
                         continue
                     if _best_dist is None or _dist < _best_dist:
                         _best, _best_dist = _c, _dist
+                    if section_bounds is not None and section_bounds[0] <= _cy < section_bounds[1]:
+                        if _sect_best_dist is None or _dist < _sect_best_dist:
+                            _sect_best, _sect_best_dist = _c, _dist
+                if section_bounds is not None and _sect_best is not None:
+                    return _sect_best
                 if _best is not None:
                     return _best
             return None
@@ -7015,7 +7069,7 @@ class LLMAgent:
             logger.debug("UIA control lookup for %r failed — %s", label, exc)
             return None
 
-    def _resolve_field_control(self, state: Dict[str, Any], label: str, bbox):
+    def _resolve_field_control(self, state: Dict[str, Any], label: str, bbox, section: str = ""):
         """Resolves a live UIA control for a field via
         _find_uia_control_by_name -- but only pays for that function's
         expensive position-based disambiguation search (a foundIndex=1..10
@@ -7050,6 +7104,15 @@ class LLMAgent:
         elements already in hand, not a new UIA call) decides whether the
         slow path is even needed. Never slower than before, only faster
         for the common case.
+
+        `section` (optional, e.g. "Driver 2" -- the caller's own already-
+        computed _detect_section result, reused here at zero extra cost)
+        adds section-aware disambiguation on top of raw distance. Real live
+        bug, direct report ("Driver 2 returns empty... also add a way to
+        distinguish similar bare label names") -- see _section_bounds and
+        _find_uia_control_by_name's own docstrings for the full mechanism.
+        Only looked up when the label is already known to be ambiguous;
+        never adds cost to the common (unique-label) case.
         """
         if not label:
             return None
@@ -7061,6 +7124,9 @@ class LLMAgent:
         _point_ctrl = self._resolve_control_via_point(bbox, label)
         if _point_ctrl is not None:
             return _point_ctrl
+        if _dup > 1 and section:
+            _bounds = self._section_bounds(state, section)
+            return self._find_uia_control_by_name(label, expected_bbox=bbox, section_bounds=_bounds)
         return self._find_uia_control_by_name(label, expected_bbox=bbox if _dup > 1 else None)
 
     # Native window classes _resolve_control_via_point trusts as a real,

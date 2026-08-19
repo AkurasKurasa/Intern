@@ -368,3 +368,78 @@ class TestFindUiaControlByNameDisambiguatesRepeatedLabels:
         assert result is True
         driver3_first_name.SetFocus.assert_called_once()
         driver1_first_name.SetFocus.assert_not_called()
+
+
+class TestFindUiaControlByNameSectionBounds:
+    """Regression test for _find_uia_control_by_name's `section_bounds`
+    parameter. Real live bug, direct report ("Driver 2 returns empty...
+    also add a way to distinguish similar bare label names"): plain
+    nearest-distance disambiguation (expected_bbox alone) can be thrown off
+    by a stale/drifted bbox snapshot -- batch fast-fill deliberately reuses
+    one observe() across many fields with no re-check in between, so a
+    coordinate captured before several fields were already typed into can
+    drift from where the control actually sits by the time this runs.
+    section_bounds gives a stronger signal: which repeated section's own
+    on-screen pane a candidate control genuinely falls inside (from
+    _section_bounds, sharing _detect_section's own geometry) -- preferred
+    over raw distance when both disagree, not a replacement for it."""
+
+    def test_prefers_the_candidate_inside_the_given_section_bounds_over_raw_distance(self):
+        from agent.agent import LLMAgent
+
+        # Driver 2's real control sits at y=400-430 (inside bounds), but a
+        # drifted expected_bbox (y=380) is numerically CLOSER to a stale
+        # ghost position than to Driver 2's real one -- distance alone
+        # would pick the wrong candidate; section_bounds must not.
+        driver1_first_name = _FakeControl(exists=True, bbox=(1449, 100, 1600, 130))
+        driver2_first_name = _FakeControl(exists=True, bbox=(1449, 400, 1600, 430))
+        driver3_first_name = _FakeControl(exists=True, bbox=(1449, 700, 1600, 730))
+        root = _FakeRoot(edit=[driver1_first_name, driver2_first_name, driver3_first_name])
+        _install_fake_uia_modules(root)
+
+        fake_self = _fake_self()
+
+        ctrl = LLMAgent._find_uia_control_by_name(
+            fake_self, "First Name",
+            expected_bbox=[1449, 200, 1600, 230],   # numerically closer to Driver 1
+            section_bounds=(350, 650))               # but Driver 2 owns this range
+
+        assert ctrl is driver2_first_name
+
+    def test_falls_back_to_raw_distance_when_no_candidate_is_inside_the_bounds(self):
+        """section_bounds must never make resolution WORSE than before --
+        if nothing genuinely falls inside the given range (section
+        detection unavailable, stale, or simply wrong), the old
+        nearest-distance behavior must still apply, not a hard failure."""
+        from agent.agent import LLMAgent
+
+        driver1_first_name = _FakeControl(exists=True, bbox=(1449, 100, 1600, 130))
+        driver3_first_name = _FakeControl(exists=True, bbox=(1449, 700, 1600, 730))
+        root = _FakeRoot(edit=[driver1_first_name, driver3_first_name])
+        _install_fake_uia_modules(root)
+
+        fake_self = _fake_self()
+
+        ctrl = LLMAgent._find_uia_control_by_name(
+            fake_self, "First Name",
+            expected_bbox=[1449, 705, 1600, 735],
+            section_bounds=(350, 650))   # no real candidate falls in here
+
+        assert ctrl is driver3_first_name   # nearest-distance fallback still wins
+
+    def test_none_section_bounds_is_completely_unaffected(self):
+        """The default (no section_bounds given) must be byte-identical to
+        the pre-existing nearest-distance-only behavior."""
+        from agent.agent import LLMAgent
+
+        driver1_first_name = _FakeControl(exists=True, bbox=(1449, 100, 1600, 130))
+        driver2_first_name = _FakeControl(exists=True, bbox=(1449, 400, 1600, 430))
+        root = _FakeRoot(edit=[driver1_first_name, driver2_first_name])
+        _install_fake_uia_modules(root)
+
+        fake_self = _fake_self()
+
+        ctrl = LLMAgent._find_uia_control_by_name(
+            fake_self, "First Name", expected_bbox=[1449, 400, 1600, 430])
+
+        assert ctrl is driver2_first_name

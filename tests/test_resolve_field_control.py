@@ -149,3 +149,64 @@ def test_real_resolve_control_via_point_is_tried_not_reimplemented():
     from agent.agent import LLMAgent as _LLMAgent
     src = inspect.getsource(_LLMAgent._resolve_field_control)
     assert "self._resolve_control_via_point(" in src
+
+
+class TestResolveFieldControlSectionAwareDisambiguation:
+    """Real live bug, direct report ("Driver 2 returns empty... also add a
+    way to distinguish similar bare label names"). A repeated label like
+    'First Name' (shared by the Policyholder tab AND Driver 2 AND Driver 3)
+    needs a stronger disambiguation signal than raw nearest-distance alone
+    -- section_bounds (from _section_bounds, sharing _detect_section's own
+    geometry) tells the UIA search which repeated section's own pane a
+    candidate control genuinely belongs to."""
+
+    def test_ambiguous_label_with_a_section_computes_and_passes_section_bounds(self):
+        agent = _make_agent()
+        agent._find_uia_control_by_name = MagicMock(return_value="the_correct_one")
+        agent._section_bounds = MagicMock(return_value=(350, 650))
+        state = {"elements": [
+            _field("First Name", bbox=(100, 100, 300, 130)),
+            _field("First Name", bbox=(100, 400, 300, 430)),
+            _field("First Name", bbox=(100, 700, 300, 730)),
+        ]}
+
+        result = agent._resolve_field_control(
+            state, "First Name", (100, 400, 300, 430), section="Driver 2")
+
+        assert result == "the_correct_one"
+        agent._section_bounds.assert_called_once_with(state, "Driver 2")
+        agent._find_uia_control_by_name.assert_called_once_with(
+            "First Name", expected_bbox=(100, 400, 300, 430), section_bounds=(350, 650))
+
+    def test_no_section_given_does_not_call_section_bounds_at_all(self):
+        """Backward compatible -- every existing caller that doesn't pass
+        section must be completely unaffected, not even the extra lookup."""
+        agent = _make_agent()
+        agent._find_uia_control_by_name = MagicMock(return_value="the_correct_one")
+        agent._section_bounds = MagicMock(return_value=(350, 650))
+        state = {"elements": [
+            _field("First Name", bbox=(100, 100, 300, 130)),
+            _field("First Name", bbox=(100, 400, 300, 430)),
+        ]}
+
+        agent._resolve_field_control(state, "First Name", (100, 400, 300, 430))
+
+        agent._section_bounds.assert_not_called()
+        agent._find_uia_control_by_name.assert_called_once_with(
+            "First Name", expected_bbox=(100, 400, 300, 430))
+
+    def test_unique_label_ignores_section_even_when_given(self):
+        """A unique label takes the fast path (expected_bbox=None) same as
+        before -- section-awareness only matters once a label is already
+        known to be ambiguous, never adds cost to the common case."""
+        agent = _make_agent()
+        agent._find_uia_control_by_name = MagicMock(return_value="ctrl")
+        agent._section_bounds = MagicMock(return_value=(350, 650))
+        state = {"elements": [_field("Policy Number")]}
+
+        agent._resolve_field_control(
+            state, "Policy Number", (100, 100, 300, 130), section="Driver 2")
+
+        agent._section_bounds.assert_not_called()
+        agent._find_uia_control_by_name.assert_called_once_with(
+            "Policy Number", expected_bbox=None)

@@ -483,7 +483,7 @@ class TestBatchFastFill:
         comboboxcontrol branches must route through it, not call
         _find_uia_control_by_name directly."""
         window = self._batch_window()
-        assert window.count("self._resolve_field_control(state, _bf_label, _bf_el.get(\"bbox\"))") == 2
+        assert window.count("self._resolve_field_control(state, _bf_label, _bf_el.get(\"bbox\"), section=_bf_sec)") == 2
         assert "self._find_uia_control_by_name(" not in window
 
     def test_checkbox_reuses_the_extracted_lookup_helper_not_auto_check(self):
@@ -723,3 +723,39 @@ class TestBatchFastFillControlResolutionFailureIsVisible:
         (dead-spot rescue / transformer fallback), not raise or hang."""
         window = self._batch_window()
         assert window.count("if not _bf_hwnd:\n                            continue") == 2
+
+
+class TestBatchFastFillPassesSectionForDisambiguation:
+    """Real live bug, direct report ("Driver 2 returns empty... also add a
+    way to distinguish similar bare label names"). Both batch branches
+    already computed _bf_sec (via _detect_section) for the VALUE lookup --
+    but never passed it to _resolve_field_control, so the UIA-level control
+    search had no way to tell Driver 2's 'First Name' apart from Driver 3's
+    or the Policyholder's own, other than raw on-screen distance (which a
+    stale bbox, from batch fast-fill's own no-re-observe-between-fields
+    design, can throw off). Threading the already-computed section through
+    reuses real on-screen geometry (_section_bounds) as a stronger signal,
+    at zero extra cost -- _bf_sec was already being computed either way."""
+
+    def _batch_window(self):
+        idx = _SOURCE.index("OPT2 BATCH FAST-FILL")
+        return _SOURCE[idx:idx + 17000]
+
+    def test_both_branches_pass_the_already_computed_section(self):
+        window = self._batch_window()
+        assert window.count(
+            'self._resolve_field_control(state, _bf_label, _bf_el.get("bbox"), section=_bf_sec)') == 2
+
+    def test_bf_sec_is_computed_before_it_is_used_for_control_resolution(self):
+        """_bf_sec must be assigned before EITHER of its two uses in each
+        branch (value lookup, then later control resolution) -- ordering
+        only, not proximity, since real code (the deep=True LLM check, the
+        confirmed-blank block) legitimately sits between them."""
+        window = self._batch_window()
+        sec_positions = [m.start() for m in re.finditer(
+            r'_bf_sec = self\._detect_section\(state, _bf_el\)', window)]
+        ctrl_positions = [m.start() for m in re.finditer(
+            r'self\._resolve_field_control\(state, _bf_label, _bf_el\.get\("bbox"\), section=_bf_sec\)', window)]
+        assert len(sec_positions) == 2 and len(ctrl_positions) == 2
+        for sec_pos, ctrl_pos in zip(sec_positions, ctrl_positions):
+            assert sec_pos < ctrl_pos, "_bf_sec must be computed before it's used to resolve the control"
