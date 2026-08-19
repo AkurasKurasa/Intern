@@ -286,6 +286,22 @@ const ppCapsule      = document.getElementById("ppCapsule");
 const ppCapsuleEmoji = document.getElementById("ppCapsuleEmoji");
 const ppCapsuleName  = document.getElementById("ppCapsuleName");
 const ppCapsuleMeta  = document.getElementById("ppCapsuleMeta");
+const ppDetails         = document.getElementById("ppDetails");
+const ppDetailView      = document.getElementById("ppDetailView");
+const ppDetailDesc      = document.getElementById("ppDetailDesc");
+const ppDetailStats     = document.getElementById("ppDetailStats");
+const ppDetailTags      = document.getElementById("ppDetailTags");
+const ppDetailEdit      = document.getElementById("ppDetailEdit");
+const ppDetailClose     = document.getElementById("ppDetailClose");
+const ppDetailEditForm  = document.getElementById("ppDetailEditForm");
+const ppDetailDescInput = document.getElementById("ppDetailDescInput");
+const ppDetailEmojiGrid = document.getElementById("ppDetailEmojiGrid");
+const ppDetailTriggerFields = document.getElementById("ppDetailTriggerFields");
+const ppDetailKeywords  = document.getElementById("ppDetailKeywords");
+const ppDetailApps      = document.getElementById("ppDetailApps");
+const ppDetailDelete    = document.getElementById("ppDetailDelete");
+const ppDetailCancel    = document.getElementById("ppDetailCancel");
+const ppDetailSave      = document.getElementById("ppDetailSave");
 const ppCheckpointGroup = document.getElementById("ppCheckpointGroup");
 const ppCheckpoint   = document.getElementById("ppCheckpoint");
 const ppTestGroup    = document.getElementById("ppTestGroup");
@@ -560,6 +576,11 @@ function setCapsuleRunning(isRunning) {
 /* Loads a capsule into the play panel for real -- called once the fly
    animation (below) lands, or immediately if animation is skipped. */
 async function loadCapsuleIntoSlot(capsule) {
+  // Details are capsule-specific -- closing here means loading a
+  // DIFFERENT task never leaves stale details open for the wrong
+  // capsule. openTaskDetails() (called right after this by the info
+  // button's own handler) just reopens fresh, so this doesn't fight it.
+  closeTaskDetails();
   currentCapsule = capsule;
   ppSlotHint.hidden = true;
   ppCapsule.hidden = false;
@@ -622,6 +643,7 @@ async function loadCapsuleIntoSlot(capsule) {
 // currently loaded there gets deleted out from under it, so Play never
 // keeps pointing at a task that no longer exists.
 function clearPlaySlot() {
+  closeTaskDetails();
   currentCapsule = null;
   ppSlotHint.hidden = false;
   ppCapsule.hidden = true;
@@ -897,6 +919,17 @@ function taskChipKicker(capsule) {
   return capsule.kind === "script" ? "TASK · SCRIPT" : "TASK · AGENT";
 }
 
+// Shared by the chip body click and the info button below -- both need
+// "make this the selected/loaded task," the info button just also opens
+// details on top of that instead of stopping there.
+function selectTaskChip(chip, capsule) {
+  workflowsListEl.querySelectorAll(".task-chip.capsule-selected")
+    .forEach((el) => el.classList.remove("capsule-selected"));
+  chip.classList.add("capsule-selected");
+  loadCapsuleIntoSlot(capsule);
+  flashPlaySlot();
+}
+
 function buildTaskChip(capsule) {
   const chip = document.createElement("button");
   chip.type = "button";
@@ -912,19 +945,19 @@ function buildTaskChip(capsule) {
       `<span class="${emojiClass}">${emojiText}</span>` +
       `<span class="task-chip-name">${escapeHtml(capsule.name)}</span>` +
     `</span>` +
-    `<button type="button" class="task-chip-edit" title="Edit task">` +
-      `<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>` +
+    // Repurposed 2026-08-19 (direct request) from "open a centered edit
+    // modal" to "open task details in the Play panel" -- pencil swapped
+    // for an info glyph to match what it now does first (show info,
+    // Edit is one click further in), same button so there's one obvious
+    // place to find task details, not two competing entry points.
+    `<button type="button" class="task-chip-edit" title="Task details">` +
+      `<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 11v5.5"/><circle cx="12" cy="8" r="0.5" fill="currentColor" stroke-width="1.2"/></svg>` +
     `</button>`;
-  chip.addEventListener("click", () => {
-    workflowsListEl.querySelectorAll(".task-chip.capsule-selected")
-      .forEach((el) => el.classList.remove("capsule-selected"));
-    chip.classList.add("capsule-selected");
-    loadCapsuleIntoSlot(capsule);
-    flashPlaySlot();
-  });
+  chip.addEventListener("click", () => selectTaskChip(chip, capsule));
   chip.querySelector(".task-chip-edit").addEventListener("click", (e) => {
     e.stopPropagation();
-    openTaskEditModal(capsule);
+    selectTaskChip(chip, capsule);
+    openTaskDetails(capsule);
   });
   return chip;
 }
@@ -935,126 +968,148 @@ function escapeHtml(s) {
   }[c]));
 }
 
-/* ── Task edit panel (Update + Delete) -- opened from each chip's small
-   pencil button. A centered modal rather than an anchored popover: it
-   needs several fields at once (description, emoji, triggers) which
-   wouldn't fit cleanly next to a ~150px chip without risking overflow
-   near screen edges. Renaming is deliberately not offered here -- a
-   task's name ties together its registry entry, its data/demos/<name>
-   folder, and (once trained) its model path, so a rename would mean
-   moving files, a separate, harder feature not asked for. ───────────── */
-let openTaskEditEl = null;
+/* ── Task details (view + Update/Delete) -- moved 2026-08-19 (direct
+   request) from a centered modal into the Play panel itself, opened via
+   a chip's small info button. Renaming is deliberately not offered here
+   -- a task's name ties together its registry entry, its
+   data/demos/<name> folder, and (once trained) its model path, so a
+   rename would mean moving files, a separate, harder feature not asked
+   for. ─────────────────────────────────────────────────────────────── */
+let detailsCapsule = null;   // which capsule ppDetails is currently showing
 
-function closeTaskEditModal() {
-  if (!openTaskEditEl) return;
-  openTaskEditEl.remove();
-  openTaskEditEl = null;
-  document.removeEventListener("keydown", handleTaskEditEscape, true);
-}
-function handleTaskEditEscape(e) {
-  if (e.key === "Escape") closeTaskEditModal();
+function closeTaskDetails() {
+  ppDetails.hidden = true;
+  detailsCapsule = null;
 }
 
-function openTaskEditModal(capsule) {
-  closeTaskEditModal();
-  const isAgent = capsule.kind !== "script";
+async function openTaskDetails(capsule) {
+  detailsCapsule = capsule;
+  ppDetails.hidden = false;
+  ppDetailEditForm.hidden = true;
+  ppDetailView.hidden = false;
+  await renderTaskDetailsView(capsule);
+}
 
-  const backdrop = document.createElement("div");
-  backdrop.className = "task-edit-backdrop";
-  const panel = document.createElement("div");
-  panel.className = "task-edit-panel";
-  panel.innerHTML =
-    `<h3 class="task-edit-title">Edit task</h3>` +
-    `<p class="task-edit-name">${escapeHtml(capsule.name)}</p>` +
-    `<label class="field-label" for="teDescription">Description</label>` +
-    `<textarea class="field" id="teDescription" rows="3">${escapeHtml(capsule.description || "")}</textarea>` +
-    `<label class="field-label">Emoji</label>` +
-    `<div class="task-edit-emoji-grid" id="teEmojiGrid"></div>` +
-    (isAgent
-      ? `<label class="field-label" for="teKeywords">Trigger keywords (comma-separated)</label>` +
-        `<input class="field" id="teKeywords" type="text" value="${escapeHtml((capsule.trigger_keywords || []).join(", "))}" />` +
-        `<label class="field-label" for="teApps">Trigger apps (comma-separated)</label>` +
-        `<input class="field" id="teApps" type="text" value="${escapeHtml((capsule.trigger_apps || []).join(", "))}" />`
-      : `<p class="settings-hint">Trigger keywords/apps aren't used by a script-kind task — it's never auto-routed, only run directly from Play.</p>`) +
-    `<div class="task-edit-actions">` +
-      `<button class="btn btn-danger btn-sm" id="teDelete" type="button">Delete task</button>` +
-      `<span class="task-edit-spacer"></span>` +
-      `<button class="btn btn-ghost btn-sm" id="teCancel" type="button">Cancel</button>` +
-      `<button class="btn btn-primary btn-sm" id="teSave" type="button">Save</button>` +
-    `</div>`;
-  backdrop.appendChild(panel);
-  document.body.appendChild(backdrop);
-  openTaskEditEl = backdrop;
+// Real stats (session count, frame count, last-recorded date) pulled
+// from the same data/demos/ scan the Recorder tab's own session counter
+// already reads -- workflowsAPI.list() -- not a fabricated number.
+async function renderTaskDetailsView(capsule) {
+  ppDetailDesc.textContent = capsule.description || "No description yet.";
 
-  let selectedEmoji = capsule.emoji || "";
-  const grid = panel.querySelector("#teEmojiGrid");
-  const renderEmojiGrid = () => {
-    grid.innerHTML = "";
-    const makeTile = (value, isClear) => {
-      const btn = document.createElement("button");
-      btn.type = "button";
-      const selected = isClear ? selectedEmoji === "" : selectedEmoji === value;
-      btn.className = "emoji-picker-tile" + (isClear ? " is-placeholder" : "") + (selected ? " is-selected" : "");
-      btn.textContent = isClear ? PLACEHOLDER_EMOJI : value;
-      btn.title = isClear ? "Clear (use placeholder)" : value;
-      btn.addEventListener("click", () => { selectedEmoji = isClear ? "" : value; renderEmojiGrid(); });
-      return btn;
-    };
-    grid.appendChild(makeTile(PLACEHOLDER_EMOJI, true));
-    EMOJI_CHOICES.forEach((em) => grid.appendChild(makeTile(em, false)));
+  let groups = [];
+  try { groups = await window.workflowsAPI.list(); } catch (e) { /* stats just won't show */ }
+  const group = groups.find((g) => g.name === capsule.name);
+  ppDetailStats.textContent = group
+    ? `${group.sessionCount} session${group.sessionCount === 1 ? "" : "s"} · ` +
+      `${group.totalSteps} frame${group.totalSteps === 1 ? "" : "s"} · ` +
+      `recorded ${new Date(group.mtime).toLocaleDateString()}`
+    : "No recordings yet.";
+
+  ppDetailTags.innerHTML = "";
+  if (capsule.kind !== "script") {
+    const tags = [...(capsule.trigger_keywords || []), ...(capsule.trigger_apps || [])];
+    if (tags.length) {
+      tags.forEach((t) => {
+        const el = document.createElement("span");
+        el.className = "pp-detail-tag";
+        el.textContent = t;
+        ppDetailTags.appendChild(el);
+      });
+    }
+  }
+}
+
+let detailSelectedEmoji = "";
+function renderDetailEmojiGrid() {
+  ppDetailEmojiGrid.innerHTML = "";
+  const makeTile = (value, isClear) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    const selected = isClear ? detailSelectedEmoji === "" : detailSelectedEmoji === value;
+    btn.className = "emoji-picker-tile" + (isClear ? " is-placeholder" : "") + (selected ? " is-selected" : "");
+    btn.textContent = isClear ? PLACEHOLDER_EMOJI : value;
+    btn.title = isClear ? "Clear (use placeholder)" : value;
+    btn.addEventListener("click", () => { detailSelectedEmoji = isClear ? "" : value; renderDetailEmojiGrid(); });
+    return btn;
   };
-  renderEmojiGrid();
-
-  panel.querySelector("#teCancel").addEventListener("click", closeTaskEditModal);
-  backdrop.addEventListener("mousedown", (e) => { if (e.target === backdrop) closeTaskEditModal(); });
-  document.addEventListener("keydown", handleTaskEditEscape, true);
-
-  panel.querySelector("#teSave").addEventListener("click", async () => {
-    const updates = {
-      description: panel.querySelector("#teDescription").value,
-      emoji: selectedEmoji,
-    };
-    if (isAgent) {
-      updates.trigger_keywords = panel.querySelector("#teKeywords").value
-        .split(",").map((s) => s.trim()).filter(Boolean);
-      updates.trigger_apps = panel.querySelector("#teApps").value
-        .split(",").map((s) => s.trim()).filter(Boolean);
-    }
-    try {
-      const updated = await window.capsulesAPI.update(capsule.name, updates);
-      if (currentCapsule && currentCapsule.name === updated.name) {
-        currentCapsule = updated;
-        applyCapsuleEmojiDisplay(ppCapsuleEmoji, updated.emoji);
-      }
-      closeTaskEditModal();
-      await loadWorkflows();
-      await populateOutDirOptions();
-    } catch (e) {
-      capsuleLog(`Couldn't save task: ${e.message || e}`, "err");
-    }
-  });
-
-  // Registry-entry only, confirmed directly -- recorded sessions and any
-  // trained checkpoint stay on disk. window.confirm() (not a custom
-  // in-app step) since Electron's renderer is a real Chromium context and
-  // this is a one-off, infrequent action, not worth a bespoke dialog.
-  panel.querySelector("#teDelete").addEventListener("click", async () => {
-    const ok = window.confirm(
-      `Delete task '${capsule.name}'?\n\nThis only removes it from the task list. ` +
-      `Any recorded sessions in data/demos/${capsule.name} and any trained checkpoint stay on disk.`
-    );
-    if (!ok) return;
-    try {
-      await window.capsulesAPI.delete(capsule.name);
-      if (currentCapsule && currentCapsule.name === capsule.name) clearPlaySlot();
-      closeTaskEditModal();
-      await loadWorkflows();
-      await populateOutDirOptions();
-    } catch (e) {
-      capsuleLog(`Couldn't delete task: ${e.message || e}`, "err");
-    }
-  });
+  ppDetailEmojiGrid.appendChild(makeTile(PLACEHOLDER_EMOJI, true));
+  EMOJI_CHOICES.forEach((em) => ppDetailEmojiGrid.appendChild(makeTile(em, false)));
 }
+
+ppDetailEdit.addEventListener("click", () => {
+  const capsule = detailsCapsule;
+  if (!capsule) return;
+  const isAgent = capsule.kind !== "script";
+  ppDetailDescInput.value = capsule.description || "";
+  detailSelectedEmoji = capsule.emoji || "";
+  renderDetailEmojiGrid();
+  ppDetailTriggerFields.hidden = !isAgent;
+  if (isAgent) {
+    ppDetailKeywords.value = (capsule.trigger_keywords || []).join(", ");
+    ppDetailApps.value = (capsule.trigger_apps || []).join(", ");
+  }
+  ppDetailView.hidden = true;
+  ppDetailEditForm.hidden = false;
+});
+
+ppDetailCancel.addEventListener("click", () => {
+  ppDetailEditForm.hidden = true;
+  ppDetailView.hidden = false;
+});
+
+ppDetailClose.addEventListener("click", closeTaskDetails);
+
+ppDetailSave.addEventListener("click", async () => {
+  const capsule = detailsCapsule;
+  if (!capsule) return;
+  const isAgent = capsule.kind !== "script";
+  const updates = {
+    description: ppDetailDescInput.value,
+    emoji: detailSelectedEmoji,
+  };
+  if (isAgent) {
+    updates.trigger_keywords = ppDetailKeywords.value.split(",").map((s) => s.trim()).filter(Boolean);
+    updates.trigger_apps = ppDetailApps.value.split(",").map((s) => s.trim()).filter(Boolean);
+  }
+  try {
+    const updated = await window.capsulesAPI.update(capsule.name, updates);
+    detailsCapsule = updated;
+    if (currentCapsule && currentCapsule.name === updated.name) {
+      currentCapsule = updated;
+      applyCapsuleEmojiDisplay(ppCapsuleEmoji, updated.emoji);
+    }
+    ppDetailEditForm.hidden = true;
+    ppDetailView.hidden = false;
+    await renderTaskDetailsView(updated);
+    await loadWorkflows();
+    await populateOutDirOptions();
+  } catch (e) {
+    capsuleLog(`Couldn't save task: ${e.message || e}`, "err");
+  }
+});
+
+// Registry-entry only, confirmed directly -- recorded sessions and any
+// trained checkpoint stay on disk. window.confirm() (not a custom
+// in-app step) since Electron's renderer is a real Chromium context and
+// this is a one-off, infrequent action, not worth a bespoke dialog.
+ppDetailDelete.addEventListener("click", async () => {
+  const capsule = detailsCapsule;
+  if (!capsule) return;
+  const ok = window.confirm(
+    `Delete task '${capsule.name}'?\n\nThis only removes it from the task list. ` +
+    `Any recorded sessions in data/demos/${capsule.name} and any trained checkpoint stay on disk.`
+  );
+  if (!ok) return;
+  try {
+    await window.capsulesAPI.delete(capsule.name);
+    if (currentCapsule && currentCapsule.name === capsule.name) clearPlaySlot();
+    closeTaskDetails();
+    await loadWorkflows();
+    await populateOutDirOptions();
+  } catch (e) {
+    capsuleLog(`Couldn't delete task: ${e.message || e}`, "err");
+  }
+});
 
 btnRefreshWorkflows.addEventListener("click", () => { loadWorkflows(); populateOutDirOptions(); });
 

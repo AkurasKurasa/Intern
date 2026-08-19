@@ -292,6 +292,42 @@
         </div>
       </div>
 
+      <!-- Task details -- opened via a chip's small info button (moved off
+           the old centered edit modal, direct request). View mode shows
+           the full description, real session/frame/recorded-date stats,
+           and trigger tags; Edit switches the same block to the same
+           fields the old modal had (description/emoji/triggers/delete). -->
+      <div class="pp-details" id="ppDetails" hidden>
+        <div id="ppDetailView">
+          <p class="pp-detail-desc" id="ppDetailDesc"></p>
+          <p class="pp-detail-stats" id="ppDetailStats"></p>
+          <div class="pp-detail-tags" id="ppDetailTags"></div>
+          <div class="task-edit-actions">
+            <button class="btn btn-ghost btn-sm" id="ppDetailEdit" type="button">Edit</button>
+            <span class="task-edit-spacer"></span>
+            <button class="btn btn-ghost btn-sm" id="ppDetailClose" type="button">Close</button>
+          </div>
+        </div>
+        <div id="ppDetailEditForm" hidden>
+          <label class="field-label" for="ppDetailDescInput">Description</label>
+          <textarea class="field" id="ppDetailDescInput" rows="3"></textarea>
+          <label class="field-label">Emoji</label>
+          <div class="task-edit-emoji-grid" id="ppDetailEmojiGrid"></div>
+          <div id="ppDetailTriggerFields">
+            <label class="field-label" for="ppDetailKeywords">Trigger keywords (comma-separated)</label>
+            <input class="field" id="ppDetailKeywords" type="text" />
+            <label class="field-label" for="ppDetailApps">Trigger apps (comma-separated)</label>
+            <input class="field" id="ppDetailApps" type="text" />
+          </div>
+          <div class="task-edit-actions">
+            <button class="btn btn-danger btn-sm" id="ppDetailDelete" type="button">Delete task</button>
+            <span class="task-edit-spacer"></span>
+            <button class="btn btn-ghost btn-sm" id="ppDetailCancel" type="button">Cancel</button>
+            <button class="btn btn-primary btn-sm" id="ppDetailSave" type="button">Save</button>
+          </div>
+        </div>
+      </div>
+
       <div id="ppCheckpointGroup">
         <label class="field-label" for="ppCheckpoint">Checkpoint</label>
         <select class="field" id="ppCheckpoint" disabled></select>
