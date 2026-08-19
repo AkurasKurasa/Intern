@@ -8186,33 +8186,6 @@ class LLMAgent:
             self._advance_blacklist_pos.add(_round_click_pos([(_lx1 + _lx2) / 2, (_ly1 + _ly2) / 2]))
         self._executor.execute({"action_type": "click", "click_position": [cx, cy]})
         self._current_tab_idx = next_idx
-        # Real live bug, direct reports across two rounds ("Driver 2 returns
-        # empty... also add a way to distinguish similar bare label names",
-        # then, after that fix, "Driver 2 was still not filled"). Traced
-        # with real log evidence: Driver 2's own topmost fields (the first
-        # ones declared for that section) never even became batch-fill
-        # targets -- no fill, no confirmed-blank, no control-resolution
-        # warning either, while Driver 2's LOWER fields and all of Driver
-        # 3's (further down the page) filled correctly. No scroll event
-        # occurred anywhere during that tab visit. Root cause: a normal tab
-        # switch never reset scroll position -- a long tab (e.g. Coverage)
-        # scrolled deep down before this click could leave the newly-active
-        # tab's view starting mid-page instead of its own top, silently
-        # scrolling its topmost fields out of the initial viewport.
-        # Navigation Protocol's own scroll-reveal only ever scrolls DOWN to
-        # find more, never up to check what was already skipped above, so
-        # they were never revisited. _scroll_form_to_top already existed
-        # with exactly this guarantee ("always starts from the first
-        # visible field") but was only ever wired into this function's rare
-        # "no tabs found at all" fallback below -- never this, the ordinary
-        # path that runs on every tab switch. Re-observes first: `state`
-        # here is from BEFORE the click, so its elements belong to the tab
-        # being LEFT -- _scroll_form_to_top computes a click point from
-        # whatever elements it's given, and a stale state could target the
-        # old tab's now-hidden controls instead of the new tab's own.
-        time.sleep(0.3)
-        _new_tab_state = self._observe()
-        self._scroll_form_to_top(_new_tab_state)
         return True
 
     def _merge(
