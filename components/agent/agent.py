@@ -8240,7 +8240,17 @@ class LLMAgent:
                 # tracked as the fix for execution_llm_value_errors) — if three
                 # independent lookup attempts agree there's no data, there's
                 # nothing for the LLM to add by being asked a fourth time.
-                if _fn != "?":
+                # Option C follow-up, direct request ("Find a way to make
+                # it fire"): a confirmed-blank field is genuinely the case
+                # deep reasoning exists for -- three lookup attempts found
+                # nothing, unlike the truthy fast path above (a real,
+                # confident answer, never worth reasoning about regardless
+                # of deep). Only skip THIS shortcut when deep=True; the
+                # hallucination risk this shortcut was built to avoid was
+                # from asking on EVERY visit to a blank field, not from one
+                # careful attempt on a step already flagged as struggling
+                # (deep=True is rare by design after Option C).
+                if _fn != "?" and not deep:
                     logger.info("LLM call skipped — direct lookup confirms %r has no record value "
                                 "(leave blank)", _fn)
                     return {"action_type": "type", "text": "", "_fast_path": "lookup_blank"}

@@ -124,3 +124,67 @@ class TestCallSiteRoutesOnTransformerConfidence:
         # inventing a new one -- _MED_CONF already existed, unused, before
         # this branch.
         assert "_MED_CONF    = 0.50" in _AGENT_SOURCE
+
+
+def _state_with_focused_field(label: str) -> dict:
+    return {
+        "focused_element_id": "e1",
+        "elements": [
+            {"element_id": "e1", "type": "editcontrol", "label": label, "text": label, "value": ""},
+        ],
+    }
+
+
+class TestDeepReasoningReachesConfirmedBlankFields:
+    """Live-run finding, direct request ('Find a way to make it fire'):
+    _ask_llm()'s own 'confirmed blank' fast path (three independent lookup
+    attempts all agreeing a field has no value) returns BEFORE deep is
+    ever read -- for any field with a real label (nearly every real
+    field), this fires ahead of the deep-reasoning code entirely,
+    regardless of confidence or streak state. That fast path exists for a
+    real reason (asking the LLM repeatedly about a blank field used to
+    make it hallucinate), so deep=True skips ONLY that one shortcut, not
+    the 'value found' shortcut above it -- a confidently-known value still
+    never needs reasoning, deep or not."""
+
+    def test_deep_true_skips_the_confirmed_blank_shortcut_and_asks_the_llm(self):
+        agent = _make_agent()
+        agent._lookup_field = MagicMock(return_value="")   # every attempt comes back empty
+        agent._refresh_record_cache = MagicMock()
+        agent._peek_notepad = MagicMock()
+        captured = {}
+        agent._call_openai_compat = lambda user_msg: captured.setdefault("user_msg", user_msg) or {"action_type": "wait"}
+
+        result = agent._ask_llm(_state_with_focused_field("Account Type"), deep=True)
+
+        assert result != {"action_type": "type", "text": "", "_fast_path": "lookup_blank"}
+        assert "user_msg" in captured, "deep=True must reach the real LLM call, not the blank fast path"
+        assert "LOW CONFIDENCE" in captured["user_msg"]
+
+    def test_deep_false_still_uses_the_confirmed_blank_shortcut_unchanged(self):
+        """The safety guarantee: this exact scenario (the one that caused
+        the original hallucination bug) must be byte-for-byte unaffected
+        when deep is left at its default False."""
+        agent = _make_agent()
+        agent._lookup_field = MagicMock(return_value="")
+        agent._refresh_record_cache = MagicMock()
+        agent._peek_notepad = MagicMock()
+        agent._llm_client = MagicMock()   # would fail this test if actually called
+
+        result = agent._ask_llm(_state_with_focused_field("Account Type"))
+
+        assert result == {"action_type": "type", "text": "", "_fast_path": "lookup_blank"}
+        agent._llm_client.chat.completions.create.assert_not_called()
+
+    def test_deep_true_does_not_affect_the_confident_value_shortcut(self):
+        """The other fast path (a value WAS found) stays untouched by deep
+        -- a confidently-known value never needs reasoning, regardless of
+        how the agent got here."""
+        agent = _make_agent()
+        agent._lookup_field = MagicMock(return_value="PAI-2026-00441")
+        agent._llm_client = MagicMock()
+
+        result = agent._ask_llm(_state_with_focused_field("Policy Number"), deep=True)
+
+        assert result == {"action_type": "type", "text": "PAI-2026-00441", "_fast_path": "lookup"}
+        agent._llm_client.chat.completions.create.assert_not_called()
