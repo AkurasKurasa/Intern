@@ -2477,33 +2477,6 @@ class LLMAgent:
                 _bf_targets = self._navproto.find_all_visible_empty_targets(
                     state, _nav_vb, attempted_keys=self._attempted_keys,
                     attempt_key_fn=_bf_attempt_key_fn)
-                # Narrow, read-only diagnostic, direct request ("just find
-                # a way") after five straight fix attempts for the Driver
-                # 2 gap failed -- including the safe, UIA-only scroll-reset
-                # (attempt five), which produced zero "Scroll-form: UIA
-                # SetScrollPercent reset" lines on the next live run,
-                # meaning either it never fired or scroll position was
-                # never the real cause. Rather than guess a sixth time,
-                # report exactly what's seen for ONLY the 7 specific field
-                # labels already confirmed missing (Driver 2's own First
-                # Name, Last Name, Date of Birth, Gender, DL Number, DL
-                # Issuing State, DL Expiration) -- NOT the earlier "any
-                # repeated label" diagnostic reverted for logging 2,417
-                # lines in one run by also matching unrelated noise. Fixed
-                # to this 7-label set, this can only ever log a handful of
-                # lines per tab visit -- no new action, pure reporting.
-                _DFS_LABELS = {"first name", "last name", "date of birth", "gender",
-                               "dl number", "dl issuing state", "dl expiration"}
-                _dfs_target_ids = {id(e) for e in _bf_targets}
-                for _dfs_e in state.get("elements", []):
-                    _dfs_lbl = (_dfs_e.get("label") or _dfs_e.get("text") or "").strip().lower()
-                    if _dfs_lbl in _DFS_LABELS:
-                        logger.info(
-                            "[DRIVER-FIELD-SCAN] label=%r type=%s visible=%s value=%r bbox=%s is_target=%s",
-                            _dfs_lbl, _dfs_e.get("type"), _dfs_e.get("visible", True),
-                            (_dfs_e.get("value") or "")[:20], _dfs_e.get("bbox"),
-                            id(_dfs_e) in _dfs_target_ids)
-
                 _bf_filled = 0
                 if _bf_targets:
                     self._ensure_foreground(state)
@@ -4531,7 +4504,7 @@ class LLMAgent:
                         # LLM typed a truthy value (e.g. "YES (check)") into a checkbox — check it
                         _chk_text = prediction.get("text", "").lower().strip()
                         _should_chk = _chk_text not in ("", "no", "false", "0", "unchecked")
-                        if _should_chk and _flabel not in self._checked_fields:
+                        if _should_chk and _flabel_full not in self._checked_fields:
                             _chk_bbox = _fel.get("bbox")
                             if _chk_bbox:
                                 try:
@@ -4557,7 +4530,7 @@ class LLMAgent:
                                         self._mark_attempted(_fel, elements=state.get("elements", []))
                                 except Exception as _cbe:
                                     logger.warning("Checkbox BM_SETCHECK failed: %s", _cbe)
-                        elif not _should_chk and _flabel not in self._checked_fields:
+                        elif not _should_chk and _flabel_full not in self._checked_fields:
                             # Symmetric with the check-branch above -- was
                             # entirely missing until 2026-08-12, found live:
                             # 'Renewal Policy' was already checked (a form-
@@ -4578,6 +4551,26 @@ class LLMAgent:
                             # starts a record in the right state -- actively
                             # drive it to the target state either direction,
                             # same as a human would.
+                            #
+                            # Real live bug, found 2026-08-20, direct report
+                            # ("it halted at Drivers and it's not moving"):
+                            # this branch never added itself to
+                            # self._checked_fields, unlike the should-check
+                            # branch above -- so the SAME "leave unchecked"
+                            # checkbox got re-offered as a redirect target
+                            # and re-processed forever, every single time,
+                            # an infinite loop that only became reachable
+                            # once Driver 2's own fields started filling
+                            # correctly for the first time (see
+                            # learning_reasoning_ladder_experiment). Also
+                            # fixed the same membership check on both
+                            # branches to use _flabel_full (section-
+                            # qualified) consistently -- it was comparing
+                            # against the bare _flabel while the should-
+                            # check branch's own bookkeeping stored the
+                            # full, section-qualified label, a mismatch
+                            # that alone would have kept this broken even
+                            # with the add() call present.
                             _chk_bbox = _fel.get("bbox")
                             if _chk_bbox:
                                 try:
@@ -4591,6 +4584,7 @@ class LLMAgent:
                                             _wau.SendMessage(_hw, BM_SETCHECK, 0, 0)  # BST_UNCHECKED
                                             logger.info("Checkbox %r unchecked via BM_SETCHECK "
                                                         "(type intercept, target=NO).", _flabel_full)
+                                        self._checked_fields.add(_flabel_full)
                                         self._filled_this_tab.add(_flabel_full)
                                         _real_progress_this_step = True
                                         # Same belt-and-suspenders reasoning as the

@@ -848,65 +848,16 @@ class TestBatchFastFillRejectsLeaveBlankPhrasesFromTheLlm:
         assert "confirmed blank, Tab past" in section
 
 
-class TestBatchFastFillDriverFieldScanDiagnostic:
-    """Narrow, read-only diagnostic, direct request ("just find a way")
-    after five straight fix attempts for the Driver 2 gap failed --
-    including the safe, UIA-only scroll-reset (attempt five), which
-    produced zero "Scroll-form: UIA SetScrollPercent reset" log lines on
-    the next live run, meaning either it never fired or scroll position
-    was never the real cause. Rather than guess a sixth time, this reports
-    exactly what the batch loop sees for ONLY the 7 specific field labels
-    already confirmed missing (First Name, Last Name, Date of Birth,
-    Gender, DL Number, DL Issuing State, DL Expiration) -- NOT the earlier
-    "any repeated label" diagnostic that got reverted for logging 2,417
-    lines in one run by also matching unrelated noise (Notepad's own menu
-    items). Scoped to a fixed 7-label set, this can only ever log a
-    handful of lines per tab visit -- the volume problem that sank the
-    prior diagnostic structurally cannot recur here."""
-
-    def _batch_window(self):
-        idx = _SOURCE.index("OPT2 BATCH FAST-FILL")
-        return _SOURCE[idx:idx + 21500]
-
-    def test_scan_checks_exactly_the_seven_known_missing_labels(self):
-        window = self._batch_window()
-        idx = window.index("_DFS_LABELS = {")
-        section = window[idx:idx + 300]
-        for label in ("first name", "last name", "date of birth", "gender",
-                      "dl number", "dl issuing state", "dl expiration"):
-            assert f'"{label}"' in section
-
-    def test_scan_runs_right_after_targets_are_computed(self):
-        window = self._batch_window()
-        targets_idx = window.index(
-            "_bf_targets = self._navproto.find_all_visible_empty_targets(")
-        scan_idx = window.index("[DRIVER-FIELD-SCAN]")
-        loop_idx = window.index("for _bf_el in _bf_targets:")
-        assert targets_idx < scan_idx < loop_idx
-
-    def test_scan_is_pure_logging_no_new_actions(self):
-        window = self._batch_window()
-        scan_idx = window.index("[DRIVER-FIELD-SCAN]")
-        loop_idx = window.index("for _bf_el in _bf_targets:")
-        section = window[scan_idx - 600:loop_idx]
-        assert "self._executor.execute(" not in section
-        assert "pyautogui" not in section
-
-    def test_scan_reports_visibility_value_and_whether_it_became_a_target(self):
-        window = self._batch_window()
-        idx = window.index("[DRIVER-FIELD-SCAN]")
-        section = window[idx:idx + 500]
-        assert "visible" in section
-        assert "value" in section
-        assert "is_target" in section
-
-
 class TestBatchFastFillUsesSectionAwareAttemptKeys:
-    """Real root cause, finally proven by [DRIVER-FIELD-SCAN]'s real live
-    output: Driver 2's fields were genuinely visible and empty, yet
-    consistently is_target=False -- meaning _attempted_keys already
-    contained their computed key despite never having been touched. Cause:
-    UIA duplicates every repeated-section label across multiple elements
+    """Real root cause, found via a narrow, temporary read-only diagnostic
+    (since removed once its job was done, live-confirmed and then flagged
+    directly -- "why do we have a hard-coded task-specific protocol for
+    the DRIVER itself... we can't have that" -- as exactly the kind of
+    form-specific hardcode this project doesn't allow): Driver 2's fields
+    were genuinely visible and empty, yet consistently is_target=False --
+    meaning _attempted_keys already contained their computed key despite
+    never having been touched. Cause: UIA duplicates every repeated-
+    section label across multiple elements
     (a decorative textcontrol alongside the real editcontrol/comboboxcontrol),
     and across three sections sharing a label (Policyholder + Driver 2 +
     Driver 3), rank-based disambiguation (element-list position) is fragile
