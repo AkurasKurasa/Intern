@@ -759,3 +759,54 @@ class TestBatchFastFillPassesSectionForDisambiguation:
         assert len(sec_positions) == 2 and len(ctrl_positions) == 2
         for sec_pos, ctrl_pos in zip(sec_positions, ctrl_positions):
             assert sec_pos < ctrl_pos, "_bf_sec must be computed before it's used to resolve the control"
+
+
+class TestBatchFastFillRejectsLeaveBlankPhrasesFromTheLlm:
+    """Real live bug, direct report ("Third Party Information was falsely
+    filled... not fill things where they're not supposed to be filled").
+    Confirmed in a real run: a genuinely-blank field ("Third Party Name,"
+    no third party involved) got the literal text "leave blank" typed
+    into it -- the deep=True LLM check (added to give a real answer
+    before committing a field blank) answered in English instead of
+    truly returning nothing, and that English answer was accepted as a
+    real value to write.
+
+    _is_leave_blank_prediction already exists in this file for exactly
+    this failure mode (a genuine keyboard-action LLM prediction whose
+    text means "leave this blank" -- '', 'none', 'n/a', or anything
+    starting with 'leave blank') and is already proven at another call
+    site (_merge()'s own click-vs-keyboard override guard). Reusing it
+    here, not reimplementing a second copy that could drift out of sync.
+
+    Deliberately scoped: this closes the LITERAL-PHRASE case only. A
+    separate, harder case (the LLM inventing a plausible-looking but
+    wrong VALUE, e.g. filling 'Third Party Name' with the policyholder's
+    own name) is a different problem this does not claim to solve."""
+
+    def _batch_window(self):
+        idx = _SOURCE.index("OPT2 BATCH FAST-FILL")
+        return _SOURCE[idx:idx + 19000]
+
+    def test_both_branches_reject_a_leave_blank_prediction_before_accepting_it(self):
+        window = self._batch_window()
+        assert window.count(
+            "and not _is_leave_blank_prediction(_bf_llm_action)") == 2
+
+    def test_the_reject_check_is_combined_with_the_existing_action_type_check(self):
+        """Must not replace the action_type gate, only tighten it -- a
+        click-type llm_action (no meaningful text) must still be ignored
+        exactly as before."""
+        window = self._batch_window()
+        for m in re.finditer(r'and not _is_leave_blank_prediction\(_bf_llm_action\)', window):
+            before = window[max(0, m.start() - 200):m.start()]
+            assert '_bf_llm_action.get("action_type") in ("type", "keyboard")' in before
+
+    def test_rejecting_falls_through_to_the_existing_confirmed_blank_path(self):
+        """A rejected leave-blank prediction must leave _bf_val empty, so
+        the field still gets committed blank via the same existing
+        bookkeeping (leave_blank_keys/mark_attempted/Tab-only) -- not a
+        new, separate blank-handling path."""
+        window = self._batch_window()
+        idx = window.index("and not _is_leave_blank_prediction(_bf_llm_action)")
+        section = window[idx:idx + 500]
+        assert "confirmed blank, Tab past" in section

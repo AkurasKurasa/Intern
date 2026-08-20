@@ -2494,7 +2494,8 @@ class LLMAgent:
                             _bf_state_for_llm = dict(state)
                             _bf_state_for_llm["focused_element_id"] = _bf_el.get("element_id")
                             _bf_llm_action = self._ask_llm(_bf_state_for_llm, deep=True)
-                            if _bf_llm_action.get("action_type") in ("type", "keyboard"):
+                            if (_bf_llm_action.get("action_type") in ("type", "keyboard")
+                                    and not _is_leave_blank_prediction(_bf_llm_action)):
                                 _bf_val = _bf_llm_action.get("text", "")
                         if not _bf_val:
                             logger.info("[OPT2] batch fast-fill '%s' → confirmed blank, Tab past "
@@ -2565,7 +2566,8 @@ class LLMAgent:
                             _bf_state_for_llm = dict(state)
                             _bf_state_for_llm["focused_element_id"] = _bf_el.get("element_id")
                             _bf_llm_action = self._ask_llm(_bf_state_for_llm, deep=True)
-                            if _bf_llm_action.get("action_type") in ("type", "keyboard"):
+                            if (_bf_llm_action.get("action_type") in ("type", "keyboard")
+                                    and not _is_leave_blank_prediction(_bf_llm_action)):
                                 _bf_val = _bf_llm_action.get("text", "")
                         if not _bf_val:
                             logger.info("[OPT2] batch fast-fill '%s' → confirmed blank, Tab past "
@@ -7435,6 +7437,57 @@ class LLMAgent:
             logger.info("[SCROLL-PERCENT-DIAG] SetScrollPercent route failed — %s — falling back.", exc)
             return False
 
+    def _scroll_form_to_top_uia_percent(self, state: Dict[str, Any]) -> bool:
+        """
+        Jump the scrollable pane directly to its own top (vertical scroll
+        0%) via ScrollPattern.SetScrollPercent() -- ONE native UIA call, no
+        mouse click, no keyboard hotkey, no simulated scroll-wheel events.
+
+        Safe replacement for _scroll_form_to_top's pyautogui-based
+        click+Ctrl+Home+wheel-scroll approach. Real live bug, two rounds:
+        (1) a normal tab switch never reset scroll position, so a long tab
+        scrolled deep down could leave the newly-active tab starting mid-
+        page, silently scrolling its topmost fields out of the initial
+        viewport (Driver 2's own fields, direct report "Driver 2 was still
+        not filled"). (2) Wiring the EXISTING _scroll_form_to_top into the
+        ordinary tab-click path fixed the theory but broke something else,
+        direct report ("it got slower... so many wrong things got
+        filled"): that function's real mouse click (to give the panel
+        keyboard focus) could land in the wrong control, and its scroll-
+        wheel events could catch a combobox and change its selected value
+        -- both safe risks for a rare, near-never-hit fallback (its only
+        prior use), not for something run on every ordinary tab switch.
+
+        Reuses the exact same ScrollPattern mechanism already proven live
+        for _scroll_form_down_uia_percent, just targeting 0% instead of a
+        computed downward position -- no pixel math needed at all for
+        "go to the top."
+
+        Returns True if already at the top or the jump was issued, False
+        if the pane doesn't expose the needed properties (caller should
+        treat this as "couldn't reset, proceed anyway" -- never a hard
+        failure, matching every other scroll route in this file).
+        """
+        _panel = self._find_scrollable_pane_uia(state)
+        if _panel is None:
+            return False
+        try:
+            import uiautomation as _uia
+            _sp = _panel.GetScrollPattern()
+            if _sp is None or not _sp.VerticallyScrollable:
+                return False
+            _cur_percent = _sp.VerticalScrollPercent
+            if _cur_percent is None or _cur_percent <= 0:
+                return True   # already at the top, nothing to do
+            _sp.SetScrollPercent(_uia.ScrollPattern.NoScrollValue, 0.0)
+            logger.info(
+                "Scroll-form: UIA SetScrollPercent reset pane %r to top (was %.1f%%).",
+                getattr(_panel, "Name", "?"), _cur_percent)
+            return True
+        except Exception as exc:
+            logger.debug("[SCROLL-TO-TOP-DIAG] SetScrollPercent-to-top failed — %s", exc)
+            return False
+
     def _scroll_form_down(self, state: Dict[str, Any]) -> bool:
         """
         Scroll the active form window down to reveal fields hidden below the
@@ -8186,6 +8239,26 @@ class LLMAgent:
             self._advance_blacklist_pos.add(_round_click_pos([(_lx1 + _lx2) / 2, (_ly1 + _ly2) / 2]))
         self._executor.execute({"action_type": "click", "click_position": [cx, cy]})
         self._current_tab_idx = next_idx
+        # Real live bug, three rounds. (1) Direct report ("Driver 2 was
+        # still not filled") traced to a normal tab switch never resetting
+        # scroll position -- a long tab (Coverage) scrolled deep down
+        # before this click could leave the newly-active Drivers tab
+        # starting mid-page, silently scrolling Driver 2's topmost fields
+        # out of the initial viewport. (2) Fixed with the existing
+        # _scroll_form_to_top -- but that does a REAL physical mouse
+        # click, Ctrl+Home, and scroll-wheel events, safe as a rare
+        # fallback but not for every ordinary tab switch: direct report
+        # ("it got slower... so many wrong things got filled") after a
+        # stray click/scroll landed somewhere it shouldn't. Reverted.
+        # (3) Fixed again with _scroll_form_to_top_uia_percent -- ONE
+        # native UIA ScrollPattern call, no mouse, no keyboard, no wheel
+        # simulation, reusing the exact mechanism already proven live for
+        # the downward-scroll case. Re-observes first: `state` here is
+        # from BEFORE the click, so its elements belong to the tab being
+        # LEFT -- the scroll-reset's own anchor search needs a field name
+        # that actually exists on the NEW tab to find the right pane.
+        _new_tab_state = self._observe()
+        self._scroll_form_to_top_uia_percent(_new_tab_state)
         return True
 
     def _merge(
