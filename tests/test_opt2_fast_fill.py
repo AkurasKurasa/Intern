@@ -431,7 +431,7 @@ class TestBatchFastFill:
 
     def _batch_window(self):
         idx = _SOURCE.index("OPT2 BATCH FAST-FILL")
-        return _SOURCE[idx:idx + 17000]
+        return _SOURCE[idx:idx + 20000]
 
     def test_batch_block_exists_before_the_single_field_block(self):
         batch_idx = _SOURCE.index("OPT2 BATCH FAST-FILL")
@@ -565,7 +565,7 @@ class TestBatchFastFillConfirmedBlankSkip:
 
     def _batch_window(self):
         idx = _SOURCE.index("OPT2 BATCH FAST-FILL")
-        return _SOURCE[idx:idx + 17000]
+        return _SOURCE[idx:idx + 20000]
 
     def test_editcontrol_and_comboboxcontrol_both_use_the_escalation_helper(self):
         window = self._batch_window()
@@ -635,7 +635,7 @@ class TestConfirmedBlankGetsOneDeepLLMCheckFirst:
 
     def _batch_window(self):
         idx = _SOURCE.index("OPT2 BATCH FAST-FILL")
-        return _SOURCE[idx:idx + 17000]
+        return _SOURCE[idx:idx + 20000]
 
     def test_both_editcontrol_and_comboboxcontrol_branches_get_the_check(self):
         window = self._batch_window()
@@ -692,7 +692,7 @@ class TestBatchFastFillControlResolutionFailureIsVisible:
 
     def _batch_window(self):
         idx = _SOURCE.index("OPT2 BATCH FAST-FILL")
-        return _SOURCE[idx:idx + 17000]
+        return _SOURCE[idx:idx + 20000]
 
     def test_control_resolution_failure_is_logged_at_a_visible_level_in_both_branches(self):
         window = self._batch_window()
@@ -739,7 +739,7 @@ class TestBatchFastFillPassesSectionForDisambiguation:
 
     def _batch_window(self):
         idx = _SOURCE.index("OPT2 BATCH FAST-FILL")
-        return _SOURCE[idx:idx + 17000]
+        return _SOURCE[idx:idx + 20000]
 
     def test_both_branches_pass_the_already_computed_section(self):
         window = self._batch_window()
@@ -785,7 +785,7 @@ class TestBatchFastFillRejectsLeaveBlankPhrasesFromTheLlm:
 
     def _batch_window(self):
         idx = _SOURCE.index("OPT2 BATCH FAST-FILL")
-        return _SOURCE[idx:idx + 19000]
+        return _SOURCE[idx:idx + 20000]
 
     def test_both_branches_reject_a_leave_blank_prediction_before_accepting_it(self):
         window = self._batch_window()
@@ -810,3 +810,56 @@ class TestBatchFastFillRejectsLeaveBlankPhrasesFromTheLlm:
         idx = window.index("and not _is_leave_blank_prediction(_bf_llm_action)")
         section = window[idx:idx + 500]
         assert "confirmed blank, Tab past" in section
+
+
+class TestBatchFastFillDriverFieldScanDiagnostic:
+    """Narrow, read-only diagnostic, direct request ("just find a way")
+    after five straight fix attempts for the Driver 2 gap failed --
+    including the safe, UIA-only scroll-reset (attempt five), which
+    produced zero "Scroll-form: UIA SetScrollPercent reset" log lines on
+    the next live run, meaning either it never fired or scroll position
+    was never the real cause. Rather than guess a sixth time, this reports
+    exactly what the batch loop sees for ONLY the 7 specific field labels
+    already confirmed missing (First Name, Last Name, Date of Birth,
+    Gender, DL Number, DL Issuing State, DL Expiration) -- NOT the earlier
+    "any repeated label" diagnostic that got reverted for logging 2,417
+    lines in one run by also matching unrelated noise (Notepad's own menu
+    items). Scoped to a fixed 7-label set, this can only ever log a
+    handful of lines per tab visit -- the volume problem that sank the
+    prior diagnostic structurally cannot recur here."""
+
+    def _batch_window(self):
+        idx = _SOURCE.index("OPT2 BATCH FAST-FILL")
+        return _SOURCE[idx:idx + 20000]
+
+    def test_scan_checks_exactly_the_seven_known_missing_labels(self):
+        window = self._batch_window()
+        idx = window.index("_DFS_LABELS = {")
+        section = window[idx:idx + 300]
+        for label in ("first name", "last name", "date of birth", "gender",
+                      "dl number", "dl issuing state", "dl expiration"):
+            assert f'"{label}"' in section
+
+    def test_scan_runs_right_after_targets_are_computed(self):
+        window = self._batch_window()
+        targets_idx = window.index(
+            "_bf_targets = self._navproto.find_all_visible_empty_targets(")
+        scan_idx = window.index("[DRIVER-FIELD-SCAN]")
+        loop_idx = window.index("for _bf_el in _bf_targets:")
+        assert targets_idx < scan_idx < loop_idx
+
+    def test_scan_is_pure_logging_no_new_actions(self):
+        window = self._batch_window()
+        scan_idx = window.index("[DRIVER-FIELD-SCAN]")
+        loop_idx = window.index("for _bf_el in _bf_targets:")
+        section = window[scan_idx - 600:loop_idx]
+        assert "self._executor.execute(" not in section
+        assert "pyautogui" not in section
+
+    def test_scan_reports_visibility_value_and_whether_it_became_a_target(self):
+        window = self._batch_window()
+        idx = window.index("[DRIVER-FIELD-SCAN]")
+        section = window[idx:idx + 500]
+        assert "visible" in section
+        assert "value" in section
+        assert "is_target" in section

@@ -2452,6 +2452,33 @@ class LLMAgent:
                 _bf_targets = self._navproto.find_all_visible_empty_targets(
                     state, _nav_vb, attempted_keys=self._attempted_keys,
                     attempt_key_fn=self._attempt_key)
+                # Narrow, read-only diagnostic, direct request ("just find
+                # a way") after five straight fix attempts for the Driver
+                # 2 gap failed -- including the safe, UIA-only scroll-reset
+                # (attempt five), which produced zero "Scroll-form: UIA
+                # SetScrollPercent reset" lines on the next live run,
+                # meaning either it never fired or scroll position was
+                # never the real cause. Rather than guess a sixth time,
+                # report exactly what's seen for ONLY the 7 specific field
+                # labels already confirmed missing (Driver 2's own First
+                # Name, Last Name, Date of Birth, Gender, DL Number, DL
+                # Issuing State, DL Expiration) -- NOT the earlier "any
+                # repeated label" diagnostic reverted for logging 2,417
+                # lines in one run by also matching unrelated noise. Fixed
+                # to this 7-label set, this can only ever log a handful of
+                # lines per tab visit -- no new action, pure reporting.
+                _DFS_LABELS = {"first name", "last name", "date of birth", "gender",
+                               "dl number", "dl issuing state", "dl expiration"}
+                _dfs_target_ids = {id(e) for e in _bf_targets}
+                for _dfs_e in state.get("elements", []):
+                    _dfs_lbl = (_dfs_e.get("label") or _dfs_e.get("text") or "").strip().lower()
+                    if _dfs_lbl in _DFS_LABELS:
+                        logger.info(
+                            "[DRIVER-FIELD-SCAN] label=%r type=%s visible=%s value=%r bbox=%s is_target=%s",
+                            _dfs_lbl, _dfs_e.get("type"), _dfs_e.get("visible", True),
+                            (_dfs_e.get("value") or "")[:20], _dfs_e.get("bbox"),
+                            id(_dfs_e) in _dfs_target_ids)
+
                 _bf_filled = 0
                 if _bf_targets:
                     self._ensure_foreground(state)
