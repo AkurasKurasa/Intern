@@ -4504,7 +4504,7 @@ class LLMAgent:
                         # LLM typed a truthy value (e.g. "YES (check)") into a checkbox — check it
                         _chk_text = prediction.get("text", "").lower().strip()
                         _should_chk = _chk_text not in ("", "no", "false", "0", "unchecked")
-                        if _should_chk and _flabel_full not in self._checked_fields:
+                        if _should_chk and _flabel not in self._checked_fields:
                             _chk_bbox = _fel.get("bbox")
                             if _chk_bbox:
                                 try:
@@ -4515,7 +4515,7 @@ class LLMAgent:
                                     if _hw:
                                         _wac.SendMessage(_hw, 0x00F1, 1, 0)  # BM_SETCHECK, BST_CHECKED
                                         logger.info("Checkbox %r checked via BM_SETCHECK (type intercept).", _flabel_full)
-                                        self._checked_fields.add(_flabel_full)
+                                        self._checked_fields.add(_flabel)
                                         self._filled_this_tab.add(_flabel_full)
                                         _real_progress_this_step = True
                                         # Belt-and-suspenders alongside the
@@ -4530,7 +4530,7 @@ class LLMAgent:
                                         self._mark_attempted(_fel, elements=state.get("elements", []))
                                 except Exception as _cbe:
                                     logger.warning("Checkbox BM_SETCHECK failed: %s", _cbe)
-                        elif not _should_chk and _flabel_full not in self._checked_fields:
+                        elif not _should_chk and _flabel not in self._checked_fields:
                             # Symmetric with the check-branch above -- was
                             # entirely missing until 2026-08-12, found live:
                             # 'Renewal Policy' was already checked (a form-
@@ -4562,15 +4562,33 @@ class LLMAgent:
                             # an infinite loop that only became reachable
                             # once Driver 2's own fields started filling
                             # correctly for the first time (see
-                            # learning_reasoning_ladder_experiment). Also
-                            # fixed the same membership check on both
-                            # branches to use _flabel_full (section-
-                            # qualified) consistently -- it was comparing
-                            # against the bare _flabel while the should-
-                            # check branch's own bookkeeping stored the
-                            # full, section-qualified label, a mismatch
-                            # that alone would have kept this broken even
-                            # with the add() call present.
+                            # learning_reasoning_ladder_experiment).
+                            #
+                            # First fix attempt (same night) also switched
+                            # BOTH branches' key from the bare _flabel to
+                            # the section-qualified _flabel_full, reasoning
+                            # (wrongly) that a bare/full mismatch was a
+                            # second bug -- direct report right after:
+                            # "it did not advance to the History tab...
+                            # I don't know what you did but its not good."
+                            # Root cause of THAT regression: every OTHER
+                            # self._checked_fields site in this file (batch
+                            # fast-fill's own checkbox branch, the single-
+                            # field OPT2 checkbox fast-fill) stores and
+                            # checks the BARE label -- correct for THIS
+                            # form, whose checkbox labels already bake the
+                            # driver number in ("Driver 2 — SR-22
+                            # Required" is the control's own raw label, not
+                            # something this code adds). Switching this one
+                            # path to the section-qualified key broke
+                            # cross-path recognition: batch fast-fill
+                            # stored the bare key, this path then checked
+                            # the qualified one, so a field batch fast-fill
+                            # had ALREADY correctly handled looked
+                            # unhandled here again. Reverted back to the
+                            # bare _flabel, matching every other site in
+                            # the file -- the missing add() call (the
+                            # actual, real fix) stays.
                             _chk_bbox = _fel.get("bbox")
                             if _chk_bbox:
                                 try:
@@ -4584,7 +4602,7 @@ class LLMAgent:
                                             _wau.SendMessage(_hw, BM_SETCHECK, 0, 0)  # BST_UNCHECKED
                                             logger.info("Checkbox %r unchecked via BM_SETCHECK "
                                                         "(type intercept, target=NO).", _flabel_full)
-                                        self._checked_fields.add(_flabel_full)
+                                        self._checked_fields.add(_flabel)
                                         self._filled_this_tab.add(_flabel_full)
                                         _real_progress_this_step = True
                                         # Same belt-and-suspenders reasoning as the

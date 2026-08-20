@@ -22,15 +22,25 @@ a way that reliably excludes it going forward), the exact same "leave
 unchecked" logic runs again, forever, since self._checked_fields never
 remembers it.
 
-A second, related inconsistency: the "already handled" check on both
-branches compares the BARE label (`_flabel`, from the focused element's
-own accessible Name) against self._checked_fields, but the "should check"
-branch's own bookkeeping adds the SECTION-QUALIFIED label (`_flabel_full`,
-via _detect_section) instead -- a key-format mismatch that, independent
-of the missing add(), means the "already handled" check can never
-correctly recognize a bare-vs-full mismatched entry either. Fixed by
-using `_flabel_full` consistently for the check AND the add, in BOTH
-branches.
+FIRST FIX ATTEMPT (same night) also switched both branches' key from the
+bare `_flabel` to the section-qualified `_flabel_full`, reasoning
+(wrongly) that a bare/full mismatch was a second bug. Direct report right
+after: "it did not advance to the History tab... I don't know what you
+did but its not good." Root cause of THAT regression: every OTHER
+self._checked_fields site in this file (batch fast-fill's own checkbox
+branch, the single-field OPT2 checkbox fast-fill) stores and checks the
+BARE label -- correct for this form, whose checkbox labels already bake
+the driver number in ("Driver 2 -- SR-22 Required" is the control's own
+raw label, not something this code adds). Switching only this one path
+to the section-qualified key broke cross-path recognition: batch fast-
+fill stored the bare key, this path then checked the qualified one, so a
+field batch fast-fill had ALREADY correctly handled looked unhandled here
+again -- the exact same infinite-loop symptom, just reached through a
+different door (dead-spot rescue re-focusing an already-handled field).
+
+Reverted back to the bare `_flabel`, matching every other
+self._checked_fields site in the file. The missing add() call in the
+"leave unchecked" branch -- the actual, real fix -- stays.
 """
 import re
 import sys
@@ -44,7 +54,7 @@ _SOURCE = _AGENT_PY.read_text(encoding="utf-8")
 
 def _checkbox_intercept_window():
     idx = _SOURCE.index('if _fel.get("type") == "checkboxcontrol":')
-    return _SOURCE[idx:idx + 7000]
+    return _SOURCE[idx:idx + 8500]
 
 
 class TestCheckboxLeaveUncheckedBranchMarksItselfHandled:
@@ -55,7 +65,7 @@ class TestCheckboxLeaveUncheckedBranchMarksItselfHandled:
         should_chk_idx = window.index("if _should_chk and")
         not_should_chk_idx = window.index("elif not _should_chk and")
         section = window[should_chk_idx:not_should_chk_idx]
-        assert "self._checked_fields.add(_flabel_full)" in section
+        assert "self._checked_fields.add(_flabel)" in section
 
     def test_leave_unchecked_branch_also_adds_to_checked_fields(self):
         """The actual fix -- the branch that decides a checkbox should
@@ -67,17 +77,23 @@ class TestCheckboxLeaveUncheckedBranchMarksItselfHandled:
         # top-level statement (`else:` for the non-checkbox case)
         else_idx = window.index("\n                    else:\n", not_should_chk_idx)
         section = window[not_should_chk_idx:else_idx]
-        assert "self._checked_fields.add(_flabel_full)" in section
+        assert "self._checked_fields.add(_flabel)" in section
 
-    def test_both_branches_check_membership_using_the_same_key_they_store(self):
-        """Real second bug: the membership check used _flabel (bare) while
-        the store used _flabel_full (section-qualified) -- a mismatch that
-        alone would make self._checked_fields never actually recognize a
-        previously-handled field, regardless of the missing add() fix
-        above. Both the check and the store must use the same key."""
+    def test_both_branches_use_the_bare_label_matching_every_other_site(self):
+        """The corrected understanding, after a same-night regression and
+        revert: self._checked_fields is a cross-path shared set (batch
+        fast-fill's own checkbox branch, single-field OPT2 checkbox fast-
+        fill, and this type-intercept path all read/write it) -- every
+        OTHER site uses the bare label, so this path must too, or a field
+        one path already handled looks unhandled to another. Both branches
+        here must check AND store the SAME bare `_flabel` -- not the
+        section-qualified `_flabel_full` (that was the exact regression:
+        "it did not advance to the History tab... its not good")."""
         window = _checkbox_intercept_window()
-        assert window.count("_flabel_full not in self._checked_fields") == 2
-        assert "_flabel not in self._checked_fields" not in window
+        assert window.count("_flabel not in self._checked_fields") == 2
+        assert "_flabel_full not in self._checked_fields" not in window
+        assert window.count("self._checked_fields.add(_flabel)") == 2
+        assert "self._checked_fields.add(_flabel_full)" not in window
 
     def test_fix_does_not_touch_the_should_check_branchs_own_behavior(self):
         """No regression -- the should-check branch's actual checking
