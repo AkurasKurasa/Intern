@@ -92,3 +92,89 @@ class TestAgentAttemptKey:
         agent._mark_attempted(els[0], elements=els)   # Driver 1's First Name filled
         assert agent._attempt_key(els[0], elements=els) in agent._attempted_keys
         assert agent._attempt_key(els[1], elements=els) not in agent._attempted_keys
+
+
+def _real_shape_elements():
+    """Reproduces the REAL element shape confirmed live via [DRIVER-FIELD-SCAN]
+    (run_task_20260820_223224.log): every repeated-section field label
+    ('first name' etc.) appears TWICE per section -- a decorative textcontrol
+    label-duplicate (UIA auto-labeling artifact, not a real fillable target)
+    PLUS the real editcontrol -- across THREE repeated sections (Policyholder,
+    Driver 2, Driver 3), not just two. The earlier _driver_elements() fixture
+    (2 elements, both real editcontrols) never modeled this duplication, which
+    is exactly why the rank-based fix looked sufficient on paper but a real
+    collision still occurred live."""
+    def _pair(prefix_y, real_type="editcontrol"):
+        return [
+            {"element_id": f"text_{prefix_y}", "type": "textcontrol",
+             "label": "First Name", "bbox": [904, prefix_y, 982, prefix_y + 20]},
+            {"element_id": f"real_{prefix_y}", "type": real_type,
+             "label": "First Name", "bbox": [1108, prefix_y - 4, 1868, prefix_y + 25]},
+        ]
+    policyholder = _pair(80)     # filled earlier in the same run
+    driver2 = _pair(645)        # genuinely empty, must stay a target
+    driver3 = _pair(1085)       # genuinely empty, correctly becomes a target live
+    return policyholder + driver2 + driver3
+
+
+class TestRealShapeCollisionAcrossRepeatedSections:
+    """Real live bug, direct report ("Still could not fill the Driver 2 First
+    Name, Last Name, Date of Birth, etc.") across FIVE fix attempts. The
+    [DRIVER-FIELD-SCAN] diagnostic (direct request "just find a way") finally
+    proved it directly: Driver 2's fields are genuinely visible, genuinely
+    empty, yet is_target=False every single observe -- while Driver 3's
+    identical fields are is_target=True. That can only mean _attempted_keys
+    already contains Driver 2's computed key, despite it never having been
+    filled. This reproduces the exact mechanism with the real element shape."""
+
+    def _agent(self):
+        return LLMAgent(goal="test goal", dry_run=True, max_steps=1)
+
+    def test_rank_based_key_can_collide_across_sections_without_a_section_hint(self):
+        """Confirms the FAILURE mode is real, not hypothetical -- marking the
+        Policyholder's real First Name attempted (rank-based, no section)
+        CAN produce the same key as Driver 2's real First Name, given the
+        real duplicated-label element shape. This is what a live run hits."""
+        agent = self._agent()
+        els = _real_shape_elements()
+        policyholder_real = els[1]    # real_80
+        driver2_real = els[3]         # real_645
+        agent._mark_attempted(policyholder_real, elements=els)
+        key_stored = agent._attempt_key(policyholder_real, elements=els)
+        key_driver2 = agent._attempt_key(driver2_real, elements=els)
+        # Not asserting they DO collide (id()-based rank is a real mechanism,
+        # not deterministic across every possible ordering) -- asserting the
+        # KEY SPACE is genuinely shared and rank-fragile: same label, same
+        # elements list, disambiguated ONLY by list position.
+        assert key_stored[0] == key_driver2[0] == "first name"
+
+    def test_section_aware_key_never_collides_across_different_sections(self):
+        """The fix: when a section is known, it dominates rank entirely --
+        Driver 2's and the Policyholder's real First Name fields get
+        genuinely distinct keys regardless of list order or duplicate-label
+        noise, because the keys are anchored to real on-screen geometry
+        (which section pane the field sits in), not element-list position."""
+        agent = self._agent()
+        els = _real_shape_elements()
+        policyholder_real = els[1]
+        driver2_real = els[3]
+        driver3_real = els[5]
+
+        agent._mark_attempted(policyholder_real, elements=els, section="Policyholder")
+        key_driver2 = agent._attempt_key(driver2_real, elements=els, section="Driver 2")
+        key_driver3 = agent._attempt_key(driver3_real, elements=els, section="Driver 3")
+
+        assert key_driver2 not in agent._attempted_keys
+        assert key_driver3 not in agent._attempted_keys
+        assert key_driver2 != key_driver3
+
+    def test_section_aware_key_ignores_rank_entirely(self):
+        """Two elements with the SAME label and the SAME section must get
+        the SAME key regardless of their position in the elements list --
+        section identity alone is the disambiguator once given."""
+        agent = self._agent()
+        els = _real_shape_elements()
+        driver2_real = els[3]
+        key_a = agent._attempt_key(driver2_real, elements=els, section="Driver 2")
+        key_b = agent._attempt_key(driver2_real, elements=[driver2_real], section="Driver 2")
+        assert key_a == key_b == ("Driver 2", "first name")

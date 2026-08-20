@@ -2449,9 +2449,34 @@ class LLMAgent:
             # batch fast-fill had never run. filled_count starts at 0 and
             # only a nonzero count short-circuits the rest of this step.
             if self._no_autohandlers:
+                # Real live bug, direct report ("Still could not fill the
+                # Driver 2 First Name, Last Name, Date of Birth, etc."),
+                # finally root-caused via the narrow driver-field-scan
+                # diagnostic below: Driver 2's fields were genuinely visible
+                # and empty, yet consistently excluded from this exact
+                # target list -- meaning self._attempted_keys already held
+                # their computed key despite never having been touched.
+                # Cause: UIA duplicates every repeated-section label across
+                # multiple elements (a decorative textcontrol alongside the
+                # real editcontrol/comboboxcontrol), so with three sections
+                # sharing a label (Policyholder + Driver 2 + Driver 3),
+                # plain rank-among-same-labeled-elements is fragile enough
+                # that marking the Policyholder's real field attempted can
+                # compute the SAME key as Driver 2's real field. Section-
+                # aware keys (see _attempt_key's own docstring) sidestep
+                # this: a field genuinely in a different section can never
+                # collide, since section identity dominates rank whenever
+                # it's known. This closure computes it per-candidate so the
+                # EXCLUSION filter itself (not just the later per-field key
+                # below) is section-aware -- otherwise a field could be
+                # silently dropped from the target list before ever
+                # reaching that later check.
+                def _bf_attempt_key_fn(e, els):
+                    return self._attempt_key(e, elements=els, section=self._detect_section(state, e))
+
                 _bf_targets = self._navproto.find_all_visible_empty_targets(
                     state, _nav_vb, attempted_keys=self._attempted_keys,
-                    attempt_key_fn=self._attempt_key)
+                    attempt_key_fn=_bf_attempt_key_fn)
                 # Narrow, read-only diagnostic, direct request ("just find
                 # a way") after five straight fix attempts for the Driver
                 # 2 gap failed -- including the safe, UIA-only scroll-reset
@@ -2487,12 +2512,16 @@ class LLMAgent:
                     _bf_label = (_bf_el.get("label") or _bf_el.get("text") or "").strip()
                     if not _bf_label:
                         continue
-                    _bf_key = self._attempt_key(_bf_el, elements=state.get("elements", []))
+                    # Computed before _bf_key so the key itself can be
+                    # section-aware from the start (see _attempt_key's
+                    # docstring) -- reused below for value lookup and
+                    # control resolution too, no extra _detect_section cost.
+                    _bf_sec = self._detect_section(state, _bf_el)
+                    _bf_key = self._attempt_key(_bf_el, elements=state.get("elements", []), section=_bf_sec)
                     if _bf_ty == "editcontrol":
                         if (_bf_key in self._leave_blank_keys
                                 or _bf_key in self._typed_keys):
                             continue
-                        _bf_sec = self._detect_section(state, _bf_el)
                         # Three-attempt escalation (plain lookup, cache
                         # refresh + retry, Notepad peek + retry) -- the
                         # exact same trust bar _ask_llm's own blank fast
@@ -2528,7 +2557,7 @@ class LLMAgent:
                             logger.info("[OPT2] batch fast-fill '%s' → confirmed blank, Tab past "
                                         "(no transformer, no LLM, no click)", _bf_label)
                             self._leave_blank_keys.add(_bf_key)
-                            self._mark_attempted(_bf_el, elements=state.get("elements", []))
+                            self._mark_attempted(_bf_el, elements=state.get("elements", []), section=_bf_sec)
                             self._executor.execute({"action_type": "keyboard",
                                                     "key_count": 1, "keystrokes": ["tab"]})
                             _bf_filled += 1
@@ -2566,7 +2595,7 @@ class LLMAgent:
                             "key_count": len(_bf_val), "keystrokes": list(_bf_val),
                             "direct_fill_hwnd": _bf_hwnd,
                         })
-                        self._mark_attempted(_bf_el, elements=state.get("elements", []))
+                        self._mark_attempted(_bf_el, elements=state.get("elements", []), section=_bf_sec)
                         self._executor.execute({"action_type": "keyboard",
                                                 "key_count": 1, "keystrokes": ["tab"]})
                         _bf_filled += 1
@@ -2574,7 +2603,6 @@ class LLMAgent:
                         if (_bf_key in self._leave_blank_keys
                                 or _bf_key in self._typed_keys):
                             continue
-                        _bf_sec = self._detect_section(state, _bf_el)
                         _bf_val = self._resolve_field_value_with_escalation(state, _bf_label, section=_bf_sec)
                         if not _bf_val and self._llm_client:
                             # Real live bug + fix: "lookup found nothing"
@@ -2600,7 +2628,7 @@ class LLMAgent:
                             logger.info("[OPT2] batch fast-fill '%s' → confirmed blank, Tab past "
                                         "(no transformer, no LLM, no click)", _bf_label)
                             self._leave_blank_keys.add(_bf_key)
-                            self._mark_attempted(_bf_el, elements=state.get("elements", []))
+                            self._mark_attempted(_bf_el, elements=state.get("elements", []), section=_bf_sec)
                             self._executor.execute({"action_type": "keyboard",
                                                     "key_count": 1, "keystrokes": ["tab"]})
                             _bf_filled += 1
@@ -2639,7 +2667,7 @@ class LLMAgent:
                             continue   # no matching option — leave for the click-based fallback
                         logger.info("[OPT2] batch fast-fill '%s' → %r (no transformer, no LLM, no click)",
                                     _bf_label, _bf_val[:40])
-                        self._mark_attempted(_bf_el, elements=state.get("elements", []))
+                        self._mark_attempted(_bf_el, elements=state.get("elements", []), section=_bf_sec)
                         self._executor.execute({"action_type": "keyboard",
                                                 "key_count": 1, "keystrokes": ["tab"]})
                         _bf_filled += 1
@@ -2672,7 +2700,7 @@ class LLMAgent:
                             logger.info("[OPT2] batch fast-fill checkbox '%s' → leave unchecked "
                                         "(no transformer, no LLM, no click)", _bf_label)
                         self._checked_fields.add(_bf_label)
-                        self._mark_attempted(_bf_el, elements=state.get("elements", []))
+                        self._mark_attempted(_bf_el, elements=state.get("elements", []), section=_bf_sec)
                         self._executor.execute({"action_type": "keyboard",
                                                 "key_count": 1, "keystrokes": ["tab"]})
                         _bf_filled += 1
@@ -2708,13 +2736,20 @@ class LLMAgent:
                                 if e.get("element_id") == _ff_fid), None)
                 _ff_ty  = (_ff_fel.get("type") or "").lower() if _ff_fel else ""
                 _ff_val = (_ff_fel.get("value") or "").strip() if _ff_fel else ""
-                _ff_key = (self._attempt_key(_ff_fel, elements=state.get("elements", []))
+                # Computed before _ff_key, same reasoning as the batch
+                # path's _bf_sec (see its own comment): section-aware keys
+                # avoid the real, confirmed collision where UIA's duplicate
+                # label elements (a decorative textcontrol alongside the
+                # real editcontrol/comboboxcontrol) made plain rank-based
+                # disambiguation fragile across repeated sections sharing a
+                # label (Policyholder + Driver 2 + Driver 3).
+                _ff_sec = self._detect_section(state, _ff_fel) if _ff_fel else ""
+                _ff_key = (self._attempt_key(_ff_fel, elements=state.get("elements", []), section=_ff_sec)
                            if _ff_fel else None)
                 if (_ff_fel and _ff_ty in ("editcontrol", "comboboxcontrol") and not _ff_val
                         and _ff_key not in self._leave_blank_keys
                         and _ff_key not in self._typed_keys):
                     _ff_label = (_ff_fel.get("label") or _ff_fel.get("text") or "").strip()
-                    _ff_sec   = self._detect_section(state, _ff_fel)
                     _ff_val_known = self._lookup_field(_ff_label, section=_ff_sec) if _ff_label else ""
                     if _ff_label and _ff_val_known:
                         _ff_ctrl = self._resolve_field_control(state, _ff_label, _ff_fel.get("bbox"))
@@ -2735,7 +2770,7 @@ class LLMAgent:
                                 "key_count": len(_ff_val_known), "keystrokes": list(_ff_val_known),
                                 "direct_fill_hwnd": _ff_hwnd,
                             })
-                            self._mark_attempted(_ff_fel, elements=state.get("elements", []))
+                            self._mark_attempted(_ff_fel, elements=state.get("elements", []), section=_ff_sec)
                             self._executor.execute({"action_type": "keyboard",
                                                     "key_count": 1, "keystrokes": ["tab"]})
                             # Tightened 2026-08-14, direct request ahead of a
@@ -2758,7 +2793,7 @@ class LLMAgent:
                             if _ff_cb_result.success:
                                 logger.info("[OPT2] fast-fill '%s' → %r (no transformer, no LLM, no click)",
                                             _ff_label, _ff_val_known[:40])
-                                self._mark_attempted(_ff_fel, elements=state.get("elements", []))
+                                self._mark_attempted(_ff_fel, elements=state.get("elements", []), section=_ff_sec)
                                 self._executor.execute({"action_type": "keyboard",
                                                         "key_count": 1, "keystrokes": ["tab"]})
                                 self._adaptive_settle_wait(self.step_delay * 0.2)
@@ -2803,7 +2838,7 @@ class LLMAgent:
                                     logger.info("[OPT2] fast-fill checkbox '%s' → checked "
                                                 "(no transformer, no LLM, no click)", _chk_label)
                                     self._checked_fields.add(_chk_label)
-                                    self._mark_attempted(_ff_fel, elements=state.get("elements", []))
+                                    self._mark_attempted(_ff_fel, elements=state.get("elements", []), section=_ff_sec)
                                     self._executor.execute({"action_type": "keyboard",
                                                             "key_count": 1, "keystrokes": ["tab"]})
                                     self._adaptive_settle_wait(self.step_delay * 0.2)
@@ -2820,7 +2855,7 @@ class LLMAgent:
                             logger.info("[OPT2] fast-fill checkbox '%s' → leave unchecked "
                                         "(no transformer, no LLM, no click)", _chk_label)
                             self._checked_fields.add(_chk_label)
-                            self._mark_attempted(_ff_fel, elements=state.get("elements", []))
+                            self._mark_attempted(_ff_fel, elements=state.get("elements", []), section=_ff_sec)
                             self._executor.execute({"action_type": "keyboard",
                                                     "key_count": 1, "keystrokes": ["tab"]})
                             self._adaptive_settle_wait(self.step_delay * 0.2)
@@ -8876,7 +8911,7 @@ class LLMAgent:
         out["elements"] = slim
         return out
 
-    def _attempt_key(self, elem: Dict[str, Any], elements: Optional[list] = None):
+    def _attempt_key(self, elem: Dict[str, Any], elements: Optional[list] = None, section: str = ""):
         """Match transformer._attempt_key exactly (label-primary, scroll-stable,
         disambiguated by rank among same-labeled elements when `elements` — the
         full elements list from elem's own state — is given). Repeated-section
@@ -8884,11 +8919,34 @@ class LLMAgent:
         the same label; without disambiguation, filling Driver 1's First Name
         silently marked Driver 2's identically-labeled, still-empty First Name
         as already-attempted too. See transformer._attempt_key for the full
-        rationale — keep both copies in sync."""
+        rationale — keep both copies in sync.
+
+        `section` (e.g. "Driver 2", from _detect_section — a stable signal
+        based on real on-screen geometry, not list order) takes priority over
+        rank when given. Real live bug, direct report ("Still could not fill
+        the Driver 2 First Name, Last Name, Date of Birth, etc.") across five
+        fix attempts, finally proven with the narrow [DRIVER-FIELD-SCAN]
+        diagnostic: Driver 2's fields were genuinely visible and empty, yet
+        consistently is_target=False. Root cause: UIA duplicates every
+        repeated-section label across MULTIPLE elements per field (a
+        decorative textcontrol label-duplicate alongside the real
+        editcontrol/comboboxcontrol), so with three repeated sections sharing
+        a label (Policyholder + Driver 2 + Driver 3), rank position among all
+        of them is fragile enough that marking the Policyholder's real field
+        attempted could compute the SAME key as Driver 2's real field —
+        entirely different fields, silently sharing one bookkeeping slot.
+        Section-based disambiguation sidesteps list position and duplicate-
+        label noise entirely: two fields in genuinely different sections can
+        never collide, and rank only kicks in when no section is known (the
+        overwhelming majority of fields, on non-sectioned tabs), so this adds
+        a stronger signal on top of the existing one rather than replacing it
+        everywhere."""
         lbl = (elem.get("label") or elem.get("text") or "").strip().lower()
         if not lbl:
             b = elem.get("bbox") or [0, 0, 0, 0]
             return ("@", round((b[0] + b[2]) / 2 / 20) * 20, round((b[1] + b[3]) / 2 / 20) * 20)
+        if section:
+            return (section, lbl)
         if elements:
             same_label_ids = [id(e) for e in elements
                                if (e.get("label") or e.get("text") or "").strip().lower() == lbl]
@@ -8899,10 +8957,11 @@ class LLMAgent:
                     pass
         return lbl
 
-    def _mark_attempted(self, elem: Dict[str, Any], elements: Optional[list] = None) -> None:
+    def _mark_attempted(self, elem: Dict[str, Any], elements: Optional[list] = None,
+                         section: str = "") -> None:
         """Record that a field has been acted on this session (attempted feature)."""
         if isinstance(elem, dict):
-            self._attempted_keys.add(self._attempt_key(elem, elements=elements))
+            self._attempted_keys.add(self._attempt_key(elem, elements=elements, section=section))
 
     def _elem_at(self, state: Dict[str, Any], pos) -> Optional[Dict[str, Any]]:
         """Element whose bbox contains pos (nearest center on ties)."""

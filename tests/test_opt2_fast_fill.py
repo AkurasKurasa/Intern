@@ -155,7 +155,7 @@ class TestSourceWiresRealMechanisms:
 
     def _fast_fill_window(self):
         idx = _SOURCE.index("OPT2 FAST-FILL")
-        return _SOURCE[idx:idx + 13500]
+        return _SOURCE[idx:idx + 15000]
 
     def test_gated_on_no_autohandlers(self):
         window = self._fast_fill_window()
@@ -262,6 +262,38 @@ class TestSourceWiresRealMechanisms:
         assert window.count("self._adaptive_settle_wait(self.step_delay * 0.2)") == 5
 
 
+class TestSingleFieldFastFillUsesSectionAwareAttemptKeys:
+    """Same real root cause as the batch path (see
+    TestBatchFastFillUsesSectionAwareAttemptKeys), applied to the single-
+    field OPT2 fast-fill block -- both paths must use the SAME section-aware
+    key scheme, or a field marked attempted by one path could go unrecognized
+    by the other, reintroducing the exact class of bug being fixed."""
+
+    def _fast_fill_window(self):
+        idx = _SOURCE.index("OPT2 FAST-FILL")
+        return _SOURCE[idx:idx + 15000]
+
+    def test_ff_sec_is_computed_before_ff_key_not_after(self):
+        window = self._fast_fill_window()
+        sec_idx = window.index("_ff_sec")
+        key_idx = window.index("_ff_key = (self._attempt_key(")
+        assert sec_idx < key_idx, "_ff_sec must be available before _ff_key uses it"
+
+    def test_ff_key_is_computed_with_the_section(self):
+        window = self._fast_fill_window()
+        idx = window.index("_ff_key = (self._attempt_key(")
+        section = window[idx:idx + 150]
+        assert "section=_ff_sec" in section
+
+    def test_every_mark_attempted_for_ff_fel_passes_the_section(self):
+        window = self._fast_fill_window()
+        calls = re.findall(r'self\._mark_attempted\(_ff_fel, elements=state\.get\("elements", \[\]\)(.*?)\)',
+                            window)
+        assert len(calls) >= 4, "expected all 4 single-field mark_attempted call sites"
+        for call_tail in calls:
+            assert "section=_ff_sec" in call_tail
+
+
 class TestDeadSpotRescue:
     """Tests for the OPT2 dead-spot rescue -- added 2026-08-14 from real
     log evidence (a live run showed Tab periodically landing on a
@@ -272,7 +304,7 @@ class TestDeadSpotRescue:
 
     def _fast_fill_window(self):
         idx = _SOURCE.index("OPT2 FAST-FILL")
-        return _SOURCE[idx:idx + 13500]
+        return _SOURCE[idx:idx + 15000]
 
     def test_rescue_block_exists_and_is_gated_correctly(self):
         window = self._fast_fill_window()
@@ -369,7 +401,7 @@ class TestCheckboxFastFill:
 
     def _fast_fill_window(self):
         idx = _SOURCE.index("OPT2 FAST-FILL")
-        return _SOURCE[idx:idx + 13500]
+        return _SOURCE[idx:idx + 15000]
 
     def test_gated_on_checked_fields_not_typed_keys(self):
         """Checkboxes don't reliably expose .value (see
@@ -431,7 +463,7 @@ class TestBatchFastFill:
 
     def _batch_window(self):
         idx = _SOURCE.index("OPT2 BATCH FAST-FILL")
-        return _SOURCE[idx:idx + 20000]
+        return _SOURCE[idx:idx + 21500]
 
     def test_batch_block_exists_before_the_single_field_block(self):
         batch_idx = _SOURCE.index("OPT2 BATCH FAST-FILL")
@@ -444,11 +476,16 @@ class TestBatchFastFill:
 
     def test_uses_the_real_find_all_visible_empty_targets(self):
         """Must reuse the shared eligibility rule (navigation_protocol.py),
-        not a second, parallel scan that could silently drift from it."""
+        not a second, parallel scan that could silently drift from it.
+        attempt_key_fn is a small section-aware closure (see
+        TestBatchFastFillUsesSectionAwareAttemptKeys) rather than
+        self._attempt_key passed directly -- it must still call the real
+        self._attempt_key internally, not reimplement its own logic."""
         window = self._batch_window()
         assert "self._navproto.find_all_visible_empty_targets(" in window
         assert "attempted_keys=self._attempted_keys" in window
-        assert "attempt_key_fn=self._attempt_key" in window
+        assert "attempt_key_fn=_bf_attempt_key_fn" in window
+        assert "self._attempt_key(e, elements=els, section=" in window
 
     def test_handles_all_three_known_fillable_types(self):
         window = self._batch_window()
@@ -565,7 +602,7 @@ class TestBatchFastFillConfirmedBlankSkip:
 
     def _batch_window(self):
         idx = _SOURCE.index("OPT2 BATCH FAST-FILL")
-        return _SOURCE[idx:idx + 20000]
+        return _SOURCE[idx:idx + 21500]
 
     def test_editcontrol_and_comboboxcontrol_both_use_the_escalation_helper(self):
         window = self._batch_window()
@@ -635,7 +672,7 @@ class TestConfirmedBlankGetsOneDeepLLMCheckFirst:
 
     def _batch_window(self):
         idx = _SOURCE.index("OPT2 BATCH FAST-FILL")
-        return _SOURCE[idx:idx + 20000]
+        return _SOURCE[idx:idx + 21500]
 
     def test_both_editcontrol_and_comboboxcontrol_branches_get_the_check(self):
         window = self._batch_window()
@@ -692,7 +729,7 @@ class TestBatchFastFillControlResolutionFailureIsVisible:
 
     def _batch_window(self):
         idx = _SOURCE.index("OPT2 BATCH FAST-FILL")
-        return _SOURCE[idx:idx + 20000]
+        return _SOURCE[idx:idx + 21500]
 
     def test_control_resolution_failure_is_logged_at_a_visible_level_in_both_branches(self):
         window = self._batch_window()
@@ -739,7 +776,7 @@ class TestBatchFastFillPassesSectionForDisambiguation:
 
     def _batch_window(self):
         idx = _SOURCE.index("OPT2 BATCH FAST-FILL")
-        return _SOURCE[idx:idx + 20000]
+        return _SOURCE[idx:idx + 21500]
 
     def test_both_branches_pass_the_already_computed_section(self):
         window = self._batch_window()
@@ -747,17 +784,16 @@ class TestBatchFastFillPassesSectionForDisambiguation:
             'self._resolve_field_control(state, _bf_label, _bf_el.get("bbox"), section=_bf_sec)') == 2
 
     def test_bf_sec_is_computed_before_it_is_used_for_control_resolution(self):
-        """_bf_sec must be assigned before EITHER of its two uses in each
-        branch (value lookup, then later control resolution) -- ordering
-        only, not proximity, since real code (the deep=True LLM check, the
-        confirmed-blank block) legitimately sits between them."""
+        """_bf_sec is now computed ONCE per field, shared by both branches
+        (moved up during the section-aware-attempt-key fix, see
+        TestBatchFastFillUsesSectionAwareAttemptKeys) -- must still be
+        assigned before EITHER branch's control-resolution call uses it."""
         window = self._batch_window()
-        sec_positions = [m.start() for m in re.finditer(
-            r'_bf_sec = self\._detect_section\(state, _bf_el\)', window)]
+        sec_pos = window.index('_bf_sec = self._detect_section(state, _bf_el)')
         ctrl_positions = [m.start() for m in re.finditer(
             r'self\._resolve_field_control\(state, _bf_label, _bf_el\.get\("bbox"\), section=_bf_sec\)', window)]
-        assert len(sec_positions) == 2 and len(ctrl_positions) == 2
-        for sec_pos, ctrl_pos in zip(sec_positions, ctrl_positions):
+        assert len(ctrl_positions) == 2
+        for ctrl_pos in ctrl_positions:
             assert sec_pos < ctrl_pos, "_bf_sec must be computed before it's used to resolve the control"
 
 
@@ -785,7 +821,7 @@ class TestBatchFastFillRejectsLeaveBlankPhrasesFromTheLlm:
 
     def _batch_window(self):
         idx = _SOURCE.index("OPT2 BATCH FAST-FILL")
-        return _SOURCE[idx:idx + 20000]
+        return _SOURCE[idx:idx + 21500]
 
     def test_both_branches_reject_a_leave_blank_prediction_before_accepting_it(self):
         window = self._batch_window()
@@ -830,7 +866,7 @@ class TestBatchFastFillDriverFieldScanDiagnostic:
 
     def _batch_window(self):
         idx = _SOURCE.index("OPT2 BATCH FAST-FILL")
-        return _SOURCE[idx:idx + 20000]
+        return _SOURCE[idx:idx + 21500]
 
     def test_scan_checks_exactly_the_seven_known_missing_labels(self):
         window = self._batch_window()
@@ -863,3 +899,58 @@ class TestBatchFastFillDriverFieldScanDiagnostic:
         assert "visible" in section
         assert "value" in section
         assert "is_target" in section
+
+
+class TestBatchFastFillUsesSectionAwareAttemptKeys:
+    """Real root cause, finally proven by [DRIVER-FIELD-SCAN]'s real live
+    output: Driver 2's fields were genuinely visible and empty, yet
+    consistently is_target=False -- meaning _attempted_keys already
+    contained their computed key despite never having been touched. Cause:
+    UIA duplicates every repeated-section label across multiple elements
+    (a decorative textcontrol alongside the real editcontrol/comboboxcontrol),
+    and across three sections sharing a label (Policyholder + Driver 2 +
+    Driver 3), rank-based disambiguation (element-list position) is fragile
+    enough to collide. Fix: _attempt_key/_mark_attempted now accept an
+    optional `section` (see test_attempt_key_disambiguation.py) that
+    dominates rank when given -- this wires it through both the batch
+    loop's own key computation AND the exclusion filter passed into
+    find_all_visible_empty_targets, so a field belonging to a genuinely
+    different section can never collide with Driver 2's key again."""
+
+    def _batch_window(self):
+        idx = _SOURCE.index("OPT2 BATCH FAST-FILL")
+        return _SOURCE[idx:idx + 21500]
+
+    def test_bf_sec_is_computed_before_bf_key_not_after(self):
+        """_bf_sec must be available BEFORE _bf_key is computed, so the key
+        itself can be section-aware from the start -- not computed with an
+        empty section and never corrected."""
+        window = self._batch_window()
+        sec_idx = window.index("_bf_sec = self._detect_section(state, _bf_el)")
+        key_idx = window.index("_bf_key = self._attempt_key(")
+        assert sec_idx < key_idx
+
+    def test_bf_key_is_computed_with_the_section(self):
+        window = self._batch_window()
+        assert 'section=_bf_sec' in window[
+            window.index("_bf_key = self._attempt_key("):
+            window.index("_bf_key = self._attempt_key(") + 150]
+
+    def test_every_mark_attempted_for_bf_el_passes_the_section(self):
+        window = self._batch_window()
+        calls = re.findall(r'self\._mark_attempted\(_bf_el, elements=state\.get\("elements", \[\]\)(.*?)\)',
+                            window)
+        assert len(calls) >= 5, "expected all 5 batch-fill mark_attempted call sites"
+        for call_tail in calls:
+            assert "section=_bf_sec" in call_tail
+
+    def test_target_exclusion_filter_is_section_aware_too(self):
+        """find_all_visible_empty_targets's own attempt_key_fn (the filter
+        deciding which fields even become candidates) must ALSO be section-
+        aware -- otherwise a field could be silently excluded from the
+        target list before ever reaching _bf_key's own section-aware check."""
+        window = self._batch_window()
+        idx = window.index("_bf_targets = self._navproto.find_all_visible_empty_targets(")
+        section = window[max(0, idx - 400):idx + 300]
+        assert "_detect_section(state, e)" in section or "_detect_section(state, " in section
+        assert "attempt_key_fn=" in section
