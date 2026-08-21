@@ -35,6 +35,10 @@ for _p in (_ROOT, _COMP_DIR):
     if _p not in sys.path:
         sys.path.insert(0, _p)
 
+sys.path.insert(0, os.path.join(_ROOT, "scripts"))
+from eval_metrics import evaluate_run  # noqa: E402
+from shared.run_recorder import record_run_result  # noqa: E402
+
 _env_path = os.path.join(_ROOT, ".env")
 if os.path.exists(_env_path):
     with open(_env_path) as _f:
@@ -100,6 +104,38 @@ if hasattr(_signal, "SIGBREAK"):
     def _handle_ctrl_break(signum, frame):
         raise KeyboardInterrupt
     _signal.signal(_signal.SIGBREAK, _handle_ctrl_break)
+
+
+def _safe_evaluate_run(**kwargs):
+    """Wraps eval_metrics.evaluate_run() so a crash inside metric
+    computation can't silently skip the persistence step after it --
+    the previous version called evaluate_run() unguarded directly inside
+    run_task.py's finally: block."""
+    try:
+        return evaluate_run(**kwargs)
+    except Exception:
+        logger.error("evaluate_run() crashed -- this run's metrics are lost:", exc_info=True)
+        return {
+            "task_completion_rate": 0.0,
+            "action_prediction_accuracy": 0.0,
+            "execution_success_rate": 0.0,
+            "summary": "evaluate_run() crashed -- see log for traceback",
+        }
+
+
+def _persist_scope1_metrics(metrics: dict, goal: str, provider: str) -> None:
+    """Persists one Scope #1 run's metrics through the shared recorder
+    (components/shared/run_recorder.py), replacing the old inline
+    open()/write() block that silently swallowed failures at
+    logger.debug()."""
+    record_run_result(
+        scope="scope1",
+        row={
+            "goal": goal,
+            "provider": provider,
+            **{k: v for k, v in metrics.items() if k != "summary"},
+        },
+    )
 
 
 def print_countdown(seconds: int = 5, sleep_fn=None, print_fn=None) -> None:
@@ -376,29 +412,15 @@ if __name__ == "__main__":
                        "asked to make.", agent._ablation_transformer_calls_skipped)
 
         # ── Evaluation metrics (always runs, even on early stop or crash) ──────
-        sys.path.insert(0, os.path.join(_ROOT, "scripts"))
-        from eval_metrics import evaluate_run
-        _metrics = evaluate_run(
-            results, goal=GOAL, heuristic_steps=getattr(agent, "_heuristic_steps", []),
+        _metrics = _safe_evaluate_run(
+            results=results, goal=GOAL, heuristic_steps=getattr(agent, "_heuristic_steps", []),
             run_duration_sec=getattr(agent, "_run_duration_sec", None),
             time_to_first_action_sec=getattr(agent, "_time_to_first_action_sec", None),
             manual_interventions=getattr(agent, "_manual_interventions", 0),
         )
 
-        # ── Persist metrics to JSONL for trend tracking ───────────────────────
-        try:
-            import datetime as _dt
-            _metrics_path = os.path.join(_ROOT, "data", "output", "run_metrics.jsonl")
-            _metrics_row  = {
-                "timestamp": _dt.datetime.now().isoformat(),
-                "goal":      GOAL,
-                "provider":  PROVIDER,
-                **{k: v for k, v in _metrics.items() if k != "summary"},
-            }
-            with open(_metrics_path, "a", encoding="utf-8") as _mf:
-                _mf.write(json.dumps(_metrics_row) + "\n")
-        except Exception as _me:
-            logger.debug("Metrics persist failed: %s", _me)
+        # ── Persist metrics to the shared trend log (both scopes' runs) ───────
+        _persist_scope1_metrics(_metrics, goal=GOAL, provider=PROVIDER)
 
         # ── BC fidelity score vs gold standard ───────────────────────────────
         try:
