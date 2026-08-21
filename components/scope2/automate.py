@@ -33,6 +33,8 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parent
 sys.path.insert(0, str(REPO))
+sys.path.insert(0, str(REPO.parent))
+from shared.run_recorder import record_run_result  # noqa: E402
 
 from executor.runner import run as run_executor  # noqa: E402
 from executor.scanner import KIND_INPUT, scan_variants  # noqa: E402
@@ -90,6 +92,26 @@ def print_countdown(seconds: int = 5) -> None:
         _flush_safe_print(f"COUNTDOWN {i}")
         time.sleep(1)
     _flush_safe_print("COUNTDOWN_END")
+
+
+def _persist_scope2_metrics(filled, failed, commit_status, mapping, rules, variant: str) -> None:
+    """Persists one Scope #2 run's summary through the shared recorder
+    (components/shared/run_recorder.py) -- Scope #2 previously had no
+    trend log at all, only the per-run JSON file written below. Takes
+    filled/failed pre-computed by the caller rather than recomputing them,
+    since main() already needs the same two lists for its own print()."""
+    record_run_result(
+        scope="scope2",
+        row={
+            "variant": variant,
+            "rows_filled": len(filled),
+            "rows_failed": len(failed),
+            "commit_status": commit_status,
+            "columns_mapped": len(mapping.auto),
+            "columns_abstained": len(mapping.abstained),
+            "fields_filled_by_rule": len(rules),
+        },
+    )
 
 
 def main():
@@ -228,6 +250,7 @@ def main():
     if not log_path.is_absolute():
         log_path = REPO / log_path
     log.write(log_path)
+    _persist_scope2_metrics(filled, failed, log.commit_status, mapping, rules, variant=args.variant)
 
     banner(6, "Result")
     print(f"  columns mapped        {len(mapping.auto)}")
