@@ -34,13 +34,13 @@ def record_run_result(scope: str, row: Mapping[str, Any], path: Optional[Path] =
     """Append one row to the shared trend log. Never raises -- recording a
     run's result must never fail the run it's recording. Returns True on
     success, False on failure."""
-    target = Path(path) if path is not None else DEFAULT_PATH
-    full_row = {
-        "scope": scope,
-        "timestamp": datetime.now(timezone.utc).isoformat(),
-        **row,
-    }
     try:
+        target = Path(path) if path is not None else DEFAULT_PATH
+        full_row = {
+            "scope": scope,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            **row,
+        }
         target.parent.mkdir(parents=True, exist_ok=True)
         with open(target, "a", encoding="utf-8") as f:
             f.write(json.dumps(full_row) + "\n")
@@ -48,6 +48,6 @@ def record_run_result(scope: str, row: Mapping[str, Any], path: Optional[Path] =
     except Exception:
         logger.error(
             "record_run_result: failed to persist a %r run's result to %s",
-            scope, target, exc_info=True,
+            scope, path if path is not None else DEFAULT_PATH, exc_info=True,
         )
         return False

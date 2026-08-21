@@ -59,6 +59,12 @@ def test_record_run_result_logs_at_error_not_debug_on_failure(tmp_path, monkeypa
     assert any(r.levelno == logging.ERROR for r in caplog.records)
 
 
+def test_record_run_result_never_raises_on_invalid_row(tmp_path):
+    target = tmp_path / "run_metrics.jsonl"
+    ok = record_run_result("scope1", row=None, path=target)
+    assert ok is False  # invalid row (not a mapping) must not raise, must return False
+
+
 def test_default_path_is_the_shared_run_metrics_jsonl():
     assert DEFAULT_PATH.name == "run_metrics.jsonl"
     assert DEFAULT_PATH.parent.name == "output"
