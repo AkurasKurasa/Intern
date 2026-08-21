@@ -2673,7 +2673,29 @@ class LLMAgent:
                             logger.info("[OPT2] batch fast-fill checkbox '%s' → leave unchecked "
                                         "(no transformer, no LLM, no click)", _bf_label)
                         self._checked_fields.add(_bf_label)
-                        self._mark_attempted(_bf_el, elements=state.get("elements", []), section=_bf_sec)
+                        # Real live bug, direct report ("Did not navigate
+                        # away from Drivers tab goddamnit"): checkbox
+                        # labels on this form are ALREADY globally unique
+                        # (the form itself bakes the driver number in --
+                        # "Driver 2 -- SR-22 Required" is the control's own
+                        # raw label, not something agent-side code adds),
+                        # so they never needed section-qualification the
+                        # way bare labels like "First Name" do. Passing
+                        # section=_bf_sec here (inherited from the earlier
+                        # Driver-2 fix's broad replace_all across all 5
+                        # batch mark_attempted calls) broke _cb_next's own
+                        # redirect-target search a few hundred lines below
+                        # (~L4634): that search excludes already-attempted
+                        # elements via a PLAIN, non-section-aware
+                        # self._attempt_key call, matching every OTHER
+                        # checkbox-tracking site in the file. A checkbox
+                        # whose _attempted_keys entry was section-qualified
+                        # here never matched there, so it kept getting
+                        # re-offered as a redirect target forever, even
+                        # though self._checked_fields (its own, separate,
+                        # correctly bare-keyed set, unaffected by this)
+                        # already knew it was handled. No section here.
+                        self._mark_attempted(_bf_el, elements=state.get("elements", []))
                         self._executor.execute({"action_type": "keyboard",
                                                 "key_count": 1, "keystrokes": ["tab"]})
                         _bf_filled += 1

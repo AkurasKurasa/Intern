@@ -887,13 +887,47 @@ class TestBatchFastFillUsesSectionAwareAttemptKeys:
             window.index("_bf_key = self._attempt_key("):
             window.index("_bf_key = self._attempt_key(") + 150]
 
-    def test_every_mark_attempted_for_bf_el_passes_the_section(self):
+    def test_editcontrol_and_combobox_mark_attempted_calls_pass_the_section(self):
+        """The 4 editcontrol/comboboxcontrol mark_attempted calls (2 each,
+        confirmed-blank + real-fill) need section-awareness -- their labels
+        genuinely repeat across sections (First Name, DL Number, ...) with
+        no other disambiguating signal."""
         window = self._batch_window()
+        editcontrol_idx = window.index('_bf_ty == "editcontrol"')
+        checkbox_idx = window.index('_bf_ty in ("checkboxcontrol", "checkbox")')
+        section = window[editcontrol_idx:checkbox_idx]
         calls = re.findall(r'self\._mark_attempted\(_bf_el, elements=state\.get\("elements", \[\]\)(.*?)\)',
-                            window)
-        assert len(calls) >= 5, "expected all 5 batch-fill mark_attempted call sites"
+                            section)
+        assert len(calls) == 4, "expected all 4 editcontrol+comboboxcontrol mark_attempted call sites"
         for call_tail in calls:
             assert "section=_bf_sec" in call_tail
+
+    def test_checkbox_mark_attempted_call_does_not_pass_the_section(self):
+        """Real live bug, direct report ("Did not navigate away from
+        Drivers tab goddamnit") -- traced to this exact call. Checkbox
+        labels on this form are ALREADY globally unique (the form itself
+        bakes the driver number in, e.g. "Driver 2 -- SR-22 Required" is
+        the control's own raw label) -- they never needed section-
+        qualification the way bare labels like "First Name" do. Applying
+        it anyway broke _cb_next's own redirect-target search a few
+        hundred lines below (components/agent/agent.py, ~L4634): that
+        search excludes already-attempted elements via a PLAIN,
+        non-section-aware self._attempt_key call (matching every OTHER
+        checkbox-tracking site in the file, which all use the bare
+        label) -- so a checkbox whose _attempted_keys entry was section-
+        qualified here never matched there, and kept getting re-offered
+        as a redirect target forever, regardless of _checked_fields
+        already (correctly) marking it handled by its own bare key.
+        _checked_fields.add(_bf_label) -- the bare key -- is untouched
+        and correct; only the separate _attempted_keys bookkeeping via
+        _mark_attempted needed this revert."""
+        window = self._batch_window()
+        checkbox_idx = window.index('_bf_ty in ("checkboxcontrol", "checkbox")')
+        section = window[checkbox_idx:checkbox_idx + 4000]
+        calls = re.findall(r'self\._mark_attempted\(_bf_el, elements=state\.get\("elements", \[\]\)(.*?)\)',
+                            section)
+        assert len(calls) == 1, "expected exactly 1 checkbox mark_attempted call site"
+        assert "section=_bf_sec" not in calls[0]
 
     def test_target_exclusion_filter_is_section_aware_too(self):
         """find_all_visible_empty_targets's own attempt_key_fn (the filter
