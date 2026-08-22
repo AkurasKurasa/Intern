@@ -160,6 +160,7 @@ General rules:
 # Canonical record parser + default data source live in data_sources.notepad_source.
 # This re-export keeps existing call sites working.
 from data_sources.notepad_source import _parse_records, NotepadDataSource  # noqa: F401
+from shared.confidence_gate import should_escalate
 
 
 def _state_to_text(state: Dict[str, Any], record_num: int = 1, visual_cache: Optional[Dict[str, str]] = None, filled_labels: Optional[set] = None) -> str:
@@ -3904,7 +3905,11 @@ class LLMAgent:
                             # click/dropdown-open/mark-attempted/leave-blank/
                             # repeat-guard mechanics below are untouched,
                             # each has its own hard-won fix history.
-                            _cb_defer = t_conf < _MED_CONF or _lowconf_fallback_streak > 0 or _reclick_streak > 0
+                            _cb_defer = should_escalate(
+                                t_conf < _MED_CONF,
+                                _lowconf_fallback_streak > 0,
+                                _reclick_streak > 0,
+                            )
                             if _cb_defer and self._llm_client:
                                 # Real bug found live: _cbox is matched by the
                                 # Transformer's click COORDINATES, independent
@@ -4366,10 +4371,10 @@ class LLMAgent:
                 # reclick redirects), reused here rather than adding a new
                 # signal. A live-observed streak is more meaningful than one
                 # isolated confidence number.
-                _deep_reason = (
-                    t_conf < _MED_CONF
-                    or _lowconf_fallback_streak > 0
-                    or _reclick_streak > 0
+                _deep_reason = should_escalate(
+                    t_conf < _MED_CONF,
+                    _lowconf_fallback_streak > 0,
+                    _reclick_streak > 0,
                 )
                 llm_action = self._ask_llm(state, deep=_deep_reason)
                 action_type = llm_action.get("action_type", "wait")
