@@ -33,9 +33,21 @@ def _load_jsonl(path):
     return rows
 
 
+def _filter_scope1(rows):
+    """data/output/run_metrics.jsonl is a SHARED trend log written by both
+    Scope #1 (run_task.py) and Scope #2 (components/scope2/automate.py),
+    tagged with a "scope" key. This script only understands Scope #1's row
+    shape (provider, transformer_dependency, task_completion_rate, ...) --
+    a Scope #2 row would render as a bogus/garbled Scope #1 run below.
+    70 pre-existing legacy rows predate the "scope" key entirely and are
+    treated as "scope1" (that's what they always were)."""
+    return [r for r in rows if r.get("scope", "scope1") == "scope1"]
+
+
 def main():
     train_log = _load_jsonl(os.path.join(_ROOT, "data", "output", "transformer_training_log.jsonl"))
     run_log   = _load_jsonl(os.path.join(_ROOT, "data", "output", "run_metrics.jsonl"))
+    run_log   = _filter_scope1(run_log)
 
     # ── Training progress ─────────────────────────────────────────────────────
     print("\n" + "=" * 72)

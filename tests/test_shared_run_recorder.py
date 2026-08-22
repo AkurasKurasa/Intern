@@ -2,8 +2,6 @@
 import json
 import logging
 
-import pytest
-
 from shared.run_recorder import DEFAULT_PATH, record_run_result
 
 

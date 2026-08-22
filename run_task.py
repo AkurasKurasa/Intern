@@ -24,18 +24,16 @@ try:
 except Exception:
     pass
 
-import json
 import logging
 import sys
 import time
 
 _ROOT     = os.path.dirname(os.path.abspath(__file__))
 _COMP_DIR = os.path.join(_ROOT, "components")
-for _p in (_ROOT, _COMP_DIR):
+for _p in (_ROOT, _COMP_DIR, os.path.join(_ROOT, "scripts")):
     if _p not in sys.path:
         sys.path.insert(0, _p)
 
-sys.path.insert(0, os.path.join(_ROOT, "scripts"))
 from eval_metrics import evaluate_run  # noqa: E402
 from shared.run_recorder import record_run_result  # noqa: E402
 
@@ -120,6 +118,11 @@ def _safe_evaluate_run(**kwargs):
             "action_prediction_accuracy": 0.0,
             "execution_success_rate": 0.0,
             "summary": "evaluate_run() crashed -- see log for traceback",
+            # _persist_scope1_metrics strips only "summary" before persisting,
+            # so "summary" alone can't survive into the trend log to mark this
+            # as fake data -- this key is NOT filtered out, so it does. Its
+            # absence on a real evaluate_run() result means "metrics were fine".
+            "metrics_ok": False,
         }
 
 

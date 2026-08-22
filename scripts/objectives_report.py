@@ -74,13 +74,24 @@ def _row(num: str, name: str, target: str, actual: str, passed: bool | None) -> 
     return f"  {num:<4} {name:<52} target {target:<10} actual {actual:<12} [{flag}]"
 
 
+def _filter_scope1(rows: list[dict]) -> list[dict]:
+    """data/output/run_metrics.jsonl is a SHARED trend log written by both
+    Scope #1 (run_task.py) and Scope #2 (components/scope2/automate.py),
+    tagged with a "scope" key. Must be filtered to Scope #1 rows BEFORE
+    slicing to the last --recent N, or a Scope #2 row can silently eat a
+    slot meant for a Scope #1 run and get averaged in with keys it doesn't
+    have. 70 pre-existing legacy rows predate the "scope" key entirely and
+    are treated as "scope1" (that's what they always were)."""
+    return [r for r in rows if r.get("scope", "scope1") == "scope1"]
+
+
 def main() -> None:
     import argparse
     ap = argparse.ArgumentParser(description="Unified objectives dashboard (objective 10).")
     ap.add_argument("--recent", type=int, default=5, help="Average the last N run_metrics entries (default 5).")
     args = ap.parse_args()
 
-    run_metrics   = _load_jsonl(OUT / "run_metrics.jsonl")[-args.recent:]
+    run_metrics   = _filter_scope1(_load_jsonl(OUT / "run_metrics.jsonl"))[-args.recent:]
     bc_progress   = _load_jsonl(OUT / "bc_progress.jsonl")
     training_log  = _load_jsonl(OUT / "transformer_training_log.jsonl")
     perception    = _load_jsonl(OUT / "perception_eval_log.jsonl")

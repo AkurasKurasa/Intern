@@ -7,8 +7,6 @@ entirely if it raised.
 """
 import logging
 
-import pytest
-
 import run_task
 
 
@@ -48,3 +46,26 @@ def test_safe_evaluate_run_falls_back_and_logs_on_crash(monkeypatch, caplog):
     assert result["action_prediction_accuracy"] == 0.0
     assert result["execution_success_rate"] == 0.0
     assert any(r.levelno == logging.ERROR for r in caplog.records)
+
+
+def test_safe_evaluate_run_fallback_marks_metrics_ok_false_on_crash(monkeypatch):
+    # _persist_scope1_metrics strips only "summary" before persisting, so
+    # "summary" alone can't survive into the trend log to mark a crashed
+    # run as fake data -- "metrics_ok": False must be present instead,
+    # since that key is NOT filtered out and so does survive into the
+    # persisted row.
+    def _boom(*a, **kw):
+        raise ValueError("bad step shape")
+
+    monkeypatch.setattr(run_task, "evaluate_run", _boom)
+    result = run_task._safe_evaluate_run(results=[{"a": 1}], goal="g")
+    assert result["metrics_ok"] is False
+
+
+def test_safe_evaluate_run_success_result_has_no_metrics_ok_key(monkeypatch):
+    # Symmetry/documentation: real eval_metrics.evaluate_run() never sets
+    # "metrics_ok" itself, so its absence in a persisted row should be
+    # read as "metrics were fine" -- only the crash fallback sets it.
+    monkeypatch.setattr(run_task, "evaluate_run", lambda *a, **kw: {"task_completion_rate": 0.5})
+    result = run_task._safe_evaluate_run(results=[{"a": 1}], goal="g")
+    assert "metrics_ok" not in result
