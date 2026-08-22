@@ -19,7 +19,7 @@ import numpy as np
 
 REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO))
-sys.path.insert(0, str(REPO.parent))
+sys.path.append(str(REPO.parent))
 from shared.confidence_gate import should_escalate  # noqa: E402
 
 # 3.9's starting thresholds. Tau is tuned on a validation set and the
