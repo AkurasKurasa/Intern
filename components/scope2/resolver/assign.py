@@ -19,6 +19,8 @@ import numpy as np
 
 REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO))
+sys.path.insert(0, str(REPO.parent))
+from shared.confidence_gate import should_escalate  # noqa: E402
 
 # 3.9's starting thresholds. Tau is tuned on a validation set and the
 # precision/recall tradeoff reported; delta is the clarity requirement.
@@ -164,7 +166,7 @@ def resolve(columns, fields, matrix, derived_labels=(), tau=TAU, delta=DELTA):
 
         score = float(scores[ci][fj])
         margin = float(column_margins[ci])
-        status = STATUS_AUTO if (score >= tau and margin >= delta) else STATUS_ABSTAIN
+        status = STATUS_ABSTAIN if should_escalate(score < tau, margin < delta) else STATUS_AUTO
 
         mapping.assignments.append(Assignment(
             source_header=columns[ci].header,
