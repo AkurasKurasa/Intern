@@ -304,7 +304,6 @@ class InboxRouter:
             "avg_confidence": avg_confidence,
         }
         try:
-            os.makedirs(os.path.dirname(target), exist_ok=True)
             with open(target, "a", encoding="utf-8") as f:
                 f.write(json.dumps(row) + "\n")
         except Exception as _me:
