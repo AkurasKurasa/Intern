@@ -273,3 +273,143 @@ class TestInboxRouterPollOnce:
         assert history[0]["decision"] == "leave_alone"
         assert history[0]["status"] == "overridden"
         assert router._profile.pattern_for("stranger@x.com").ignore_count >= 1
+
+
+class TestInboxRouterSessionMetrics:
+    """
+    Scope #3 previously had no trend-log recording at all -- only the
+    per-message routed_history.json. This follows Scope #1's OWN
+    architecture as it exists on master (run_task.py's finally: block: a
+    local metrics computation + a plain inline try/except JSONL append to
+    data/output/run_metrics.jsonl), not the shared components/shared/
+    recorder from the (unmerged) unification branch -- deliberately no
+    dependency on that branch.
+
+    Scope #1 records once per run (a bounded unit of work); Scope #3 is a
+    forever-polling daemon with no such natural end, so it records once per
+    session, on shutdown, accumulating counters across the whole session's
+    lifetime.
+    """
+
+    def _build(self, tmp_path, inbox=None, sent=None, capsules=None):
+        _write_fixture(tmp_path / "data", inbox=inbox or [], sent=sent or [])
+        client = MockGmailClient(data_dir=str(tmp_path / "data"))
+        profile = PatternProfile(path=str(tmp_path / "data" / "profile.json"))
+        registry_path = tmp_path / "registry.json"
+        registry_path.write_text(json.dumps({"capsules": capsules or []}), encoding="utf-8")
+        rules = RuleLayer(profile, registry_path=str(registry_path))
+        classifier = LLMClassifier(provider="none")
+        history_path = str(tmp_path / "data" / "routed_history.json")
+        return InboxRouter(client, profile, rules, classifier, history_path=history_path)
+
+    def test_record_session_metrics_writes_a_row_tagged_scope3(self, tmp_path):
+        router = self._build(tmp_path, inbox=[_msg("i1", "stranger@x.com", "unrelated")])
+        router.poll_once()
+        metrics_path = tmp_path / "run_metrics.jsonl"
+        router._record_session_metrics(path=str(metrics_path))
+
+        lines = metrics_path.read_text(encoding="utf-8").splitlines()
+        assert len(lines) == 1
+        row = json.loads(lines[0])
+        assert row["scope"] == "scope3"
+        assert "timestamp" in row
+        assert row["messages_routed"] == 1
+
+    def test_record_session_metrics_counts_by_decision_type(self, tmp_path):
+        router = self._build(
+            tmp_path,
+            inbox=[_msg("i1", "broker@x.com", "insurance intake form"),
+                   _msg("i2", "stranger@x.com", "unrelated")],
+            capsules=[{"name": "form_filling", "description": "", "model_path": "x.pt",
+                       "trigger_keywords": ["insurance", "intake"], "trigger_apps": []}],
+        )
+        router.poll_once()
+        metrics_path = tmp_path / "run_metrics.jsonl"
+        router._record_session_metrics(path=str(metrics_path))
+
+        row = json.loads(metrics_path.read_text(encoding="utf-8").splitlines()[0])
+        assert row["decisions"]["route_scope1"] == 1
+        assert row["decisions"]["flag"] == 1
+
+    def test_record_session_metrics_counts_rule_vs_llm_layer(self, tmp_path):
+        router = self._build(
+            tmp_path,
+            inbox=[_msg("i1", "broker@x.com", "insurance intake form"),
+                   _msg("i2", "stranger@x.com", "unrelated")],
+            capsules=[{"name": "form_filling", "description": "", "model_path": "x.pt",
+                       "trigger_keywords": ["insurance", "intake"], "trigger_apps": []}],
+        )
+        router.poll_once()  # i1 -> rule (keyword match), i2 -> llm (falls through, no LLM configured -> flag)
+        metrics_path = tmp_path / "run_metrics.jsonl"
+        router._record_session_metrics(path=str(metrics_path))
+
+        row = json.loads(metrics_path.read_text(encoding="utf-8").splitlines()[0])
+        assert row["layer"]["rule"] == 1
+        assert row["layer"]["llm"] == 1
+
+    def test_record_session_metrics_counts_confirmed_and_overridden(self, tmp_path):
+        router = self._build(tmp_path, inbox=[_msg("i1", "stranger@x.com", "unrelated")])
+        router.poll_once()
+        router.override_decision("i1", "leave_alone", reason="not relevant")
+        router.confirm_suggestion("i1", "leave_alone")
+
+        metrics_path = tmp_path / "run_metrics.jsonl"
+        router._record_session_metrics(path=str(metrics_path))
+        row = json.loads(metrics_path.read_text(encoding="utf-8").splitlines()[0])
+        assert row["confirmed"] == 1
+        assert row["overridden"] == 1
+
+    def test_record_session_metrics_computes_avg_confidence(self, tmp_path):
+        router = self._build(tmp_path, inbox=[_msg("i1", "stranger@x.com", "unrelated")])
+        routed = router.poll_once()
+        expected_avg = routed[0]["confidence"]
+
+        metrics_path = tmp_path / "run_metrics.jsonl"
+        router._record_session_metrics(path=str(metrics_path))
+        row = json.loads(metrics_path.read_text(encoding="utf-8").splitlines()[0])
+        assert row["avg_confidence"] == expected_avg
+
+    def test_record_session_metrics_zero_messages_still_writes_a_row(self, tmp_path):
+        router = self._build(tmp_path, inbox=[])
+        router.poll_once()
+        metrics_path = tmp_path / "run_metrics.jsonl"
+        router._record_session_metrics(path=str(metrics_path))
+
+        row = json.loads(metrics_path.read_text(encoding="utf-8").splitlines()[0])
+        assert row["messages_routed"] == 0
+        assert row["avg_confidence"] is None
+
+    def test_record_session_metrics_never_raises_on_write_failure(self, tmp_path, monkeypatch):
+        router = self._build(tmp_path, inbox=[_msg("i1", "stranger@x.com", "unrelated")])
+        router.poll_once()
+
+        def _boom(*a, **kw):
+            raise OSError("disk is on fire")
+
+        monkeypatch.setattr("builtins.open", _boom)
+        # Must not raise -- matches Scope #1's own contract that recording
+        # a run's result must never fail the run itself.
+        router._record_session_metrics(path=str(tmp_path / "run_metrics.jsonl"))
+
+    def test_record_session_metrics_default_path_is_the_shared_run_metrics_jsonl(self):
+        import router as router_module
+        assert router_module._SESSION_METRICS_PATH.replace("\\", "/").endswith(
+            "data/output/run_metrics.jsonl"
+        )
+
+    def test_run_forever_records_session_metrics_on_shutdown(self, tmp_path, monkeypatch):
+        router = self._build(tmp_path, inbox=[])
+        router._stop = True  # loop body never executes; falls straight through to shutdown
+        calls = []
+        monkeypatch.setattr(router, "_record_session_metrics", lambda **kw: calls.append(kw))
+        # The real stdin-reading background thread is irrelevant to what
+        # this test verifies (the shutdown-path wiring), and it crashes
+        # under pytest's captured stdin (OSError: reading from stdin while
+        # output is captured) -- a real, unrelated pytest/thread quirk, not
+        # a router bug. Stub the thread out so it never actually starts.
+        monkeypatch.setattr(
+            "router.threading.Thread",
+            lambda *a, **kw: type("_NoopThread", (), {"start": lambda self: None})(),
+        )
+        router.run_forever()
+        assert len(calls) == 1

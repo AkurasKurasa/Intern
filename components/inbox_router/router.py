@@ -71,6 +71,15 @@ HISTORY_PATH = os.path.join(_THIS_DIR, "data", "routed_history.json")
 SENT_LOOKBACK_DAYS = 90
 DEFAULT_POLL_INTERVAL_S = 30.0
 
+# Follows Scope #1's OWN architecture as it exists on master (run_task.py's
+# finally: block -- a local metrics computation + a plain inline try/except
+# JSONL append), not the shared components/shared/ recorder from the
+# (unmerged) unification branch -- deliberately no dependency on that
+# branch. Scope #1 records once per run; Scope #3 is a forever-polling
+# daemon with no such natural end, so it accumulates counters across the
+# whole session and records once, on shutdown.
+_SESSION_METRICS_PATH = os.path.join(_ROOT, "data", "output", "run_metrics.jsonl")
+
 
 def emit(event: str, **fields) -> None:
     # write() then a separately-guarded flush() -- same reasoning as
@@ -114,6 +123,16 @@ class InboxRouter:
         # _find_history_entry() below is still the fallback for a command
         # referencing a message routed in an earlier process lifetime.
         self._pending: dict[str, dict] = {}
+
+        # ── session metrics accumulators (one row written on shutdown) ──
+        self._session_start_ts = time.time()
+        self._routed_count = 0
+        self._decision_counts: dict[str, int] = {}
+        self._layer_counts = {"rule": 0, "llm": 0}
+        self._confirmed_count = 0
+        self._overridden_count = 0
+        self._confidence_sum = 0.0
+        self._confidence_count = 0
 
     def bootstrap(self) -> None:
         """The "learned passively, no manual labeling" step -- runs once at
@@ -170,6 +189,14 @@ class InboxRouter:
         }
         self._pending[message.id] = entry
         self._append_history(entry)
+
+        self._routed_count += 1
+        self._decision_counts[decision] = self._decision_counts.get(decision, 0) + 1
+        self._layer_counts[layer] = self._layer_counts.get(layer, 0) + 1
+        if isinstance(confidence, (int, float)):
+            self._confidence_sum += confidence
+            self._confidence_count += 1
+
         return entry
 
     # ── confirm / override -- the only place create_draft() is ever called ──
@@ -197,6 +224,7 @@ class InboxRouter:
         self._update_history_entry(entry)
         if message is not None:
             self._profile.record_confirmed_decision(message, decision)
+        self._confirmed_count += 1
         emit("inbox_confirm_applied", message_id=message_id, decision=decision, draft_id=draft_id)
 
     def override_decision(self, message_id: str, new_decision: str, reason: str = "") -> None:
@@ -212,6 +240,7 @@ class InboxRouter:
         self._update_history_entry(entry)
         if message is not None:
             self._profile.record_override(message, old_decision, new_decision)
+        self._overridden_count += 1
         emit("inbox_override_applied", message_id=message_id, old_decision=old_decision,
              new_decision=new_decision, reason=reason)
 
@@ -251,6 +280,36 @@ class InboxRouter:
         with open(self._history_path, "w", encoding="utf-8") as f:
             json.dump({"messages": history}, f, indent=2)
 
+    # ── session metrics -- one row per session, written on shutdown ────────
+    def _record_session_metrics(self, path: str = None) -> None:
+        """Persists this session's accumulated counters as one JSONL row,
+        following Scope #1's OWN architecture on master (run_task.py's
+        finally: block) rather than importing the shared recorder from the
+        unification branch. Never raises -- recording a session's metrics
+        must never crash the shutdown path."""
+        target = path if path is not None else _SESSION_METRICS_PATH
+        avg_confidence = (
+            self._confidence_sum / self._confidence_count
+            if self._confidence_count else None
+        )
+        row = {
+            "scope": "scope3",
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "session_duration_sec": time.time() - self._session_start_ts,
+            "messages_routed": self._routed_count,
+            "decisions": dict(self._decision_counts),
+            "layer": dict(self._layer_counts),
+            "confirmed": self._confirmed_count,
+            "overridden": self._overridden_count,
+            "avg_confidence": avg_confidence,
+        }
+        try:
+            os.makedirs(os.path.dirname(target), exist_ok=True)
+            with open(target, "a", encoding="utf-8") as f:
+                f.write(json.dumps(row) + "\n")
+        except Exception as _me:
+            emit("inbox_log", line=f"Session metrics persist failed: {_me}", level="err")
+
     # ── main loop ─────────────────────────────────────────────────────────
     def run_forever(self) -> None:
         threading.Thread(target=self._read_stdin_commands, daemon=True).start()
@@ -268,6 +327,7 @@ class InboxRouter:
                 if self._stop:
                     break
                 time.sleep(0.1)
+        self._record_session_metrics()
         emit("inbox_stopped")
 
     def _read_stdin_commands(self) -> None:
