@@ -9,7 +9,10 @@
       "snippet": "Attached is the completed intake form for the new car insurance application...",
       "body_text": "Hi,\n\nAttached is the completed intake form for the new car insurance application (Delgado, James). Please process this data entry as soon as you can.\n\nThanks,\nJordan",
       "received_at": "2026-08-16T09:12:00-07:00",
-      "labels": ["INBOX", "UNREAD"]
+      "labels": [
+        "INBOX",
+        "UNREAD"
+      ]
     },
     {
       "id": "mock-002",
@@ -20,7 +23,10 @@
       "snippet": "The final grade spreadsheet for Section 4B is attached and ready...",
       "body_text": "Hello,\n\nThe final grade spreadsheet for Section 4B is attached and ready to be matched and uploaded to the student portal. Let me know once it's posted.\n\nBest,\nRegistrar Office",
       "received_at": "2026-08-16T10:05:00-07:00",
-      "labels": ["INBOX", "UNREAD"]
+      "labels": [
+        "INBOX",
+        "UNREAD"
+      ]
     },
     {
       "id": "mock-003",
@@ -31,7 +37,10 @@
       "snippet": "Do you have a minute to confirm the line item on page 2?",
       "body_text": "Hi,\n\nDo you have a minute to confirm the line item on page 2 of the March invoice? Want to make sure it's booked correctly before we close the month.\n\nThanks,\nPriya",
       "received_at": "2026-08-16T11:30:00-07:00",
-      "labels": ["INBOX", "UNREAD"]
+      "labels": [
+        "INBOX",
+        "UNREAD"
+      ]
     },
     {
       "id": "mock-004",
@@ -42,7 +51,10 @@
       "snippet": "Our platform will be unavailable for scheduled maintenance...",
       "body_text": "This is an automated notice. Our platform will be unavailable for scheduled maintenance on Aug 20, 11pm-1am PT.",
       "received_at": "2026-08-16T08:00:00-07:00",
-      "labels": ["INBOX", "UNREAD"]
+      "labels": [
+        "INBOX",
+        "UNREAD"
+      ]
     },
     {
       "id": "mock-005",
@@ -53,7 +65,10 @@
       "snippet": "This letter serves as formal notice concerning account #48213...",
       "body_text": "This letter serves as formal notice concerning account #48213. Please review the attached documents and respond within 10 business days.",
       "received_at": "2026-08-16T07:45:00-07:00",
-      "labels": ["INBOX", "UNREAD"]
+      "labels": [
+        "INBOX",
+        "UNREAD"
+      ]
     },
     {
       "id": "mock-006",
@@ -64,7 +79,80 @@
       "snippet": "Your weekly roundup of insurance technology news...",
       "body_text": "Your weekly roundup of insurance technology news is here. Top story: AI adoption trends in 2026.",
       "received_at": "2026-08-16T06:00:00-07:00",
-      "labels": ["INBOX", "UNREAD"]
+      "labels": [
+        "INBOX",
+        "UNREAD"
+      ]
+    },
+    {
+      "id": "mock-101",
+      "thread_id": "thread-101",
+      "sender": "Priya Raman <priya.raman@vendorco.com>",
+      "sender_email": "priya.raman@vendorco.com",
+      "subject": "Invoice question - February",
+      "snippet": "Can you confirm this line item before we close the month?",
+      "body_text": "Hi,\n\nCan you confirm this line item before we close the month?\n\nThanks,\nPriya",
+      "received_at": "2026-07-10T11:00:00-07:00",
+      "labels": [
+        "INBOX"
+      ],
+      "to": ""
+    },
+    {
+      "id": "mock-102",
+      "thread_id": "thread-102",
+      "sender": "Priya Raman <priya.raman@vendorco.com>",
+      "sender_email": "priya.raman@vendorco.com",
+      "subject": "Contract renewal terms",
+      "snippet": "Attached are the renewal terms for your review.",
+      "body_text": "Hi,\n\nAttached are the renewal terms for your review. Let me know if these work.\n\nPriya",
+      "received_at": "2026-07-21T15:30:00-07:00",
+      "labels": [
+        "INBOX"
+      ],
+      "to": ""
+    },
+    {
+      "id": "mock-103",
+      "thread_id": "thread-103",
+      "sender": "Priya Raman <priya.raman@vendorco.com>",
+      "sender_email": "priya.raman@vendorco.com",
+      "subject": "January invoice line items",
+      "snippet": "One of the line items looks off, can you take a look?",
+      "body_text": "Hi,\n\nOne of the January line items looks off, can you take a look?\n\nPriya",
+      "received_at": "2026-08-01T10:15:00-07:00",
+      "labels": [
+        "INBOX"
+      ],
+      "to": ""
+    },
+    {
+      "id": "mock-104",
+      "thread_id": "thread-104",
+      "sender": "IT Alerts <it-alerts@thirdpartyvendor.com>",
+      "sender_email": "it-alerts@thirdpartyvendor.com",
+      "subject": "Scheduled maintenance window - Aug 6",
+      "snippet": "Our platform will be unavailable for scheduled maintenance.",
+      "body_text": "This is an automated notice. Our platform will be unavailable for scheduled maintenance on Aug 6, 11pm-1am PT.",
+      "received_at": "2026-08-06T07:00:00-07:00",
+      "labels": [
+        "INBOX"
+      ],
+      "to": ""
+    },
+    {
+      "id": "mock-105",
+      "thread_id": "thread-105",
+      "sender": "IT Alerts <it-alerts@thirdpartyvendor.com>",
+      "sender_email": "it-alerts@thirdpartyvendor.com",
+      "subject": "Scheduled maintenance window - Jul 23",
+      "snippet": "Our platform will be unavailable for scheduled maintenance.",
+      "body_text": "This is an automated notice. Our platform will be unavailable for scheduled maintenance on Jul 23, 11pm-1am PT.",
+      "received_at": "2026-07-23T07:00:00-07:00",
+      "labels": [
+        "INBOX"
+      ],
+      "to": ""
     }
   ],
   "sent": [
@@ -77,7 +165,9 @@
       "snippet": "Confirmed, that line item is correct.",
       "body_text": "Confirmed, that line item is correct. Go ahead and close the month.\n",
       "received_at": "2026-07-10T14:20:00-07:00",
-      "labels": ["SENT"],
+      "labels": [
+        "SENT"
+      ],
       "to": "priya.raman@vendorco.com"
     },
     {
@@ -89,7 +179,9 @@
       "snippet": "Thanks Priya, terms look good.",
       "body_text": "Thanks Priya, terms look good on our end.\n",
       "received_at": "2026-07-22T09:05:00-07:00",
-      "labels": ["SENT"],
+      "labels": [
+        "SENT"
+      ],
       "to": "priya.raman@vendorco.com"
     },
     {
@@ -101,7 +193,9 @@
       "snippet": "Got it, replying with the correction.",
       "body_text": "Got it, replying with the correction below.\n",
       "received_at": "2026-08-01T16:40:00-07:00",
-      "labels": ["SENT"],
+      "labels": [
+        "SENT"
+      ],
       "to": "priya.raman@vendorco.com"
     },
     {
@@ -113,7 +207,9 @@
       "snippet": "FYI, heads up for Aug 6.",
       "body_text": "FYI, heads up for the Aug 6 maintenance window.\n\n---------- Forwarded message ----------\nFrom: IT Alerts <it-alerts@thirdpartyvendor.com>",
       "received_at": "2026-08-06T08:15:00-07:00",
-      "labels": ["SENT"],
+      "labels": [
+        "SENT"
+      ],
       "to": "ops-team@example.com"
     },
     {
@@ -125,7 +221,9 @@
       "snippet": "Forwarding for visibility.",
       "body_text": "Forwarding for visibility.\n\n---------- Forwarded message ----------\nFrom: IT Alerts <it-alerts@thirdpartyvendor.com>",
       "received_at": "2026-07-23T08:10:00-07:00",
-      "labels": ["SENT"],
+      "labels": [
+        "SENT"
+      ],
       "to": "ops-team@example.com"
     }
   ]
