@@ -1,3 +1,4 @@
+import json
 import os
 import sys
 
@@ -49,6 +50,49 @@ class TestBuildDataset:
         assert x.shape == (n, trainer.DIMS)
         assert y.shape == (n,)
         assert set(centroids.keys()) == {"reply", "leave_alone", "forward"}
+
+    def test_registry_path_affects_rule_hit_scope1_feature(self, tmp_path):
+        from inbox_features import FEATURE_NAMES
+        from pattern_profile import PatternProfile
+        from routing_rules import RuleLayer
+
+        # Seed examples
+        path = str(tmp_path / "examples.jsonl")
+        _seed_examples(path)
+        examples = rec.load_examples(path)
+
+        # Create a registry with a capsule that matches m1's subject ("status update")
+        registry_path = str(tmp_path / "registry.json")
+        registry = {
+            "capsules": [
+                {
+                    "name": "status_monitor",
+                    "trigger_keywords": ["status"],
+                    "trigger_apps": [],
+                    "kind": "agent",
+                    "model_path": ""
+                }
+            ]
+        }
+        with open(registry_path, "w") as f:
+            json.dump(registry, f)
+
+        # Build dataset with the registry
+        profile = PatternProfile(path=str(tmp_path / "profile.json"))
+        rules = RuleLayer(profile, registry_path=registry_path)
+        x, y, centroids = trainer.build_dataset(examples, profile, rules)
+
+        # Find the feature index for rule_hit_scope1
+        rule_hit_scope1_idx = FEATURE_NAMES.index("rule_hit_scope1")
+
+        # m1 (index 0) has subject "status update" -- should match the "status" keyword
+        assert x[0, rule_hit_scope1_idx].item() == 1.0, \
+            "Example m1 (status update) should have rule_hit_scope1=1.0"
+
+        # m2, m3, m4, m5, m6 don't have "status" in subject/body -- should be 0.0
+        for i in [1, 2, 3, 4, 5]:
+            assert x[i, rule_hit_scope1_idx].item() == 0.0, \
+                f"Example at index {i} should have rule_hit_scope1=0.0"
 
 
 class TestTrain:
