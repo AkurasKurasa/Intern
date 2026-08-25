@@ -879,7 +879,7 @@ git commit -m "Add Scope #3 Sent-folder bootstrap (bootstrap_from_sent.py)"
 
 **Interfaces:**
 - Consumes: `decision_recorder.{DEFAULT_EXAMPLES_PATH, load_examples}` (Task 3), `inbox_features.{DECISIONS_ORDER, DIMS, compute_centroids, extract}` (Task 1), `inbox_model.{InboxDecisionNet, save}` (Task 2), `gmail_client.EmailMessage`, `pattern_profile.PatternProfile`, `routing_rules.RuleLayer`.
-- Produces: `TooFewExamplesError` (exception), `MIN_EXAMPLES: int`, `build_dataset(examples, profile, rule_layer) -> (Tensor, Tensor, dict)`, `train(examples_path, save_path, epochs, lr, val_split) -> dict`. `train()` is imported by Task 6's tests to build a real checkpoint fixture.
+- Produces: `TooFewExamplesError` (exception), `MIN_EXAMPLES: int`, `build_dataset(examples, profile, rule_layer) -> (Tensor, Tensor, dict)`, `train(examples_path, save_path, epochs, lr, val_split, profile_path=None, registry_path=None) -> dict`. `train()` is imported by Task 6's tests to build a real checkpoint fixture; `profile_path`/`registry_path` exist specifically so that fixture can use the same isolated registry/profile paths Task 6's `InboxAgent` fixture uses at inference time.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -950,7 +950,9 @@ class TestTrain:
         path = str(tmp_path / "examples.jsonl")
         _seed_examples(path)
         save_path = str(tmp_path / "model.pt")
-        result = trainer.train(path, save_path, epochs=20, lr=1e-2, val_split=0.15)
+        result = trainer.train(path, save_path, epochs=20, lr=1e-2, val_split=0.15,
+                                profile_path=str(tmp_path / "profile.json"),
+                                registry_path=str(tmp_path / "registry.json"))
         assert os.path.exists(save_path)
         assert 0.0 <= result["train_acc"] <= 1.0
         assert result["num_examples"] == 6
@@ -1040,15 +1042,26 @@ def _accuracy(model: InboxDecisionNet, x: torch.Tensor, y: torch.Tensor):
     return float((preds == y).float().mean())
 
 
-def train(examples_path: str, save_path: str, epochs: int, lr: float, val_split: float) -> dict:
+def train(examples_path: str, save_path: str, epochs: int, lr: float, val_split: float,
+          profile_path: str = None, registry_path: str = None) -> dict:
+    """profile_path/registry_path default to PatternProfile/RuleLayer's own
+    real defaults when omitted (the normal CLI path -- see main()). Tests
+    pass isolated tmp_path values so a trained checkpoint's rule_hit_scope1/
+    rule_hit_scope2 features are computed against the SAME capsule registry
+    inference-time InboxAgent tests use -- training against the real
+    project registry.json while testing against an empty one would be a
+    train/inference skew, the exact hazard inbox_features.py's own
+    docstring warns against."""
     examples = load_examples(examples_path)
     if len(examples) < MIN_EXAMPLES:
         raise TooFewExamplesError(
             f"Only {len(examples)} recorded examples found at {examples_path} -- "
             f"need at least {MIN_EXAMPLES} to train a checkpoint that isn't noise."
         )
-    profile = PatternProfile()
-    rule_layer = RuleLayer(profile)
+    profile_kwargs = {"path": profile_path} if profile_path is not None else {}
+    profile = PatternProfile(**profile_kwargs)
+    registry_kwargs = {"registry_path": registry_path} if registry_path is not None else {}
+    rule_layer = RuleLayer(profile, **registry_kwargs)
     x, y, centroids = build_dataset(examples, profile, rule_layer)
 
     n_val = max(1, int(len(examples) * val_split)) if len(examples) >= 10 else 0
@@ -1191,7 +1204,13 @@ class TestFastFillWithTrainedCheckpoint:
                 "leave_alone", source="live", path=examples_path,
             )
         save_path = str(tmp_path / "model.pt")
-        trainer.train(examples_path, save_path, epochs=300, lr=5e-2, val_split=0.0)
+        # Same tmp_path registry/profile _agent() will construct the inference-time
+        # RuleLayer/PatternProfile from below -- training against the real repo's
+        # tasks/registry.json here while inference uses an isolated empty one would
+        # be a train/inference skew on the rule_hit_scope1/scope2 features.
+        trainer.train(examples_path, save_path, epochs=300, lr=5e-2, val_split=0.0,
+                       profile_path=str(tmp_path / "profile.json"),
+                       registry_path=str(tmp_path / "registry.json"))
         return save_path
 
     def test_confident_prediction_fast_fills(self, tmp_path):
@@ -1221,7 +1240,11 @@ class TestFastFillWithTrainedCheckpoint:
                 "leave_alone", source="live", path=examples_path,
             )
         save_path = str(tmp_path / "model.pt")
-        trainer.train(examples_path, save_path, epochs=300, lr=5e-2, val_split=0.0)
+        # Same registry/profile paths _agent() below will use -- both empty,
+        # so the rule_hit_scope1/scope2 features agree at train and inference time.
+        trainer.train(examples_path, save_path, epochs=300, lr=5e-2, val_split=0.0,
+                       profile_path=str(tmp_path / "profile.json"),
+                       registry_path=str(tmp_path / "registry.json"))
         # No capsules registered -- match_capsule() can never verify a name,
         # so even a confident route_scope1 prediction must fall through.
         agent = _agent(tmp_path, checkpoint_path=save_path, high_confidence=0.0, capsules=[])
