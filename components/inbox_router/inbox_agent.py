@@ -9,10 +9,13 @@ step -- not as separate legacy plumbing sitting behind it.
 """
 from __future__ import annotations
 
+import logging
 import os
 import sys
 from dataclasses import dataclass
 from typing import Optional
+
+logger = logging.getLogger(__name__)
 
 _THIS_DIR = os.path.dirname(os.path.abspath(__file__))
 if _THIS_DIR not in sys.path:
@@ -58,10 +61,13 @@ class InboxAgent:
             return   # cold start -- no checkpoint yet, every decision reasons
         try:
             model, artifact = load_model(checkpoint_path)
-        except (FeaturesMismatch, Exception):
+        except (FeaturesMismatch, Exception) as exc:
             # FeaturesMismatch is itself an Exception subclass; both are
             # listed for readability -- a stale/corrupt checkpoint must
             # never crash startup, only fall back to cold-start reasoning.
+            # Broad except clause is deliberate: we want to capture anything
+            # that breaks checkpoint loading and continue gracefully.
+            logger.warning(f"Failed to load checkpoint at {checkpoint_path}: {exc}")
             self._model = None
             return
         self._model = model
@@ -107,8 +113,19 @@ class InboxAgent:
             )
         pattern = self._profile.pattern_for(message.sender_email)
         llm_result = self._llm.classify(message, pattern, rule_result, self._rules.load_capsules())
+        decision, capsule_name, rationale = llm_result.decision, llm_result.capsule_name, llm_result.rationale
+        # Defensive guard against a hallucinated capsule name -- mirrors the
+        # check router.py's old inline logic ran before this pipeline
+        # existed. RuleLayer's own capsule_name always comes from a verified
+        # match_capsule() call, so this only ever matters for the LLM branch.
+        if decision in ("route_scope1", "route_scope2"):
+            valid_names = {c.get("name") for c in self._rules.load_capsules()}
+            if capsule_name not in valid_names:
+                capsule_name = ""
+                decision = "flag"
+                rationale = (rationale + " (capsule name could not be verified — flagged instead)").strip()
         return InboxDecision(
-            decision=llm_result.decision, confidence=llm_result.confidence,
-            rationale=llm_result.rationale, layer="llm",
-            capsule_name=llm_result.capsule_name, forward_to=llm_result.forward_to,
+            decision=decision, confidence=llm_result.confidence,
+            rationale=rationale, layer="llm",
+            capsule_name=capsule_name, forward_to=llm_result.forward_to,
         )

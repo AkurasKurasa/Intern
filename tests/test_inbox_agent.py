@@ -50,6 +50,15 @@ class TestColdStart:
         assert result.decision == "flag"
         assert result.layer == "llm"
 
+    def test_corrupt_checkpoint_falls_back_to_reasoning(self, tmp_path):
+        checkpoint_path = str(tmp_path / "corrupt_checkpoint.pt")
+        (tmp_path / "corrupt_checkpoint.pt").write_bytes(b"not a real checkpoint")
+        # Construction should not raise even with corrupt checkpoint
+        agent = _agent(tmp_path, checkpoint_path=checkpoint_path)
+        # decide() should still work via reasoning
+        result = agent.decide(_msg())
+        assert result.layer in ("rule", "llm")
+
 
 class TestFastFillWithTrainedCheckpoint:
     def _build_checkpoint(self, tmp_path):
