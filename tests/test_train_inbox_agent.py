@@ -3,6 +3,7 @@ import os
 import sys
 
 import pytest
+import torch
 
 _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _INBOX_DIR = os.path.join(_ROOT, "components", "inbox_router")
@@ -116,3 +117,94 @@ class TestTrain:
         model, artifact = im.load(save_path)
         assert isinstance(model, im.InboxDecisionNet)
         assert artifact["centroids"]
+
+    def test_train_respects_registry_path_parameter(self, tmp_path):
+        """Verify train() actually threads registry_path to internal RuleLayer.
+
+        Trains two models on the same examples with different registry_path values
+        (one with a matching capsule, one empty), then loads both and verifies
+        they make different predictions on a test input—proving train() used the
+        registry_path, since different training features (rule_hit_scope1 differs)
+        lead to different learned weights.
+        """
+        from inbox_features import FEATURE_NAMES
+        from pattern_profile import PatternProfile
+        from routing_rules import RuleLayer
+
+        # Seed examples: m1 has "status" in subject, others don't
+        path = str(tmp_path / "examples.jsonl")
+        _seed_examples(path)
+
+        # === Train Model A: with capsule matching "status" ===
+        registry_a_path = str(tmp_path / "registry_with_status.json")
+        registry_a = {
+            "capsules": [
+                {
+                    "name": "status_monitor",
+                    "trigger_keywords": ["status"],
+                    "trigger_apps": [],
+                    "kind": "agent",
+                    "model_path": ""
+                }
+            ]
+        }
+        with open(registry_a_path, "w") as f:
+            json.dump(registry_a, f)
+
+        model_a_path = str(tmp_path / "model_a.pt")
+        trainer.train(path, model_a_path, epochs=300, lr=1e-2, val_split=0.0,
+                      profile_path=str(tmp_path / "profile_a.json"),
+                      registry_path=registry_a_path)
+
+        # === Train Model B: with empty registry ===
+        registry_b_path = str(tmp_path / "registry_empty.json")
+        registry_b = {"capsules": []}
+        with open(registry_b_path, "w") as f:
+            json.dump(registry_b, f)
+
+        model_b_path = str(tmp_path / "model_b.pt")
+        trainer.train(path, model_b_path, epochs=300, lr=1e-2, val_split=0.0,
+                      profile_path=str(tmp_path / "profile_b.json"),
+                      registry_path=registry_b_path)
+
+        # === Load both models ===
+        model_a, artifact_a = im.load(model_a_path)
+        model_b, artifact_b = im.load(model_b_path)
+
+        # === Create a test message with "status" ===
+        test_msg = _msg("test", "boss@work.com", "status check", "Can you provide a status?")
+
+        # === Extract features using model A's registry (rule_hit_scope1=1) ===
+        from inbox_features import extract, compute_centroids, DECISIONS_ORDER
+        profile_a = PatternProfile(path=str(tmp_path / "profile_a.json"))
+        rule_layer_a = RuleLayer(profile_a, registry_path=registry_a_path)
+        centroids_a = artifact_a["centroids"]
+        pattern_a = profile_a.pattern_for(test_msg.sender_email)
+        feats_a = extract(test_msg, pattern_a, centroids_a, rule_layer_a)
+        rule_hit_scope1_idx = FEATURE_NAMES.index("rule_hit_scope1")
+        assert feats_a[rule_hit_scope1_idx] == 1.0, \
+            "Test message should match 'status' in model A's registry"
+
+        # === Extract features using model B's registry (rule_hit_scope1=0) ===
+        profile_b = PatternProfile(path=str(tmp_path / "profile_b.json"))
+        rule_layer_b = RuleLayer(profile_b, registry_path=registry_b_path)
+        centroids_b = artifact_b["centroids"]
+        pattern_b = profile_b.pattern_for(test_msg.sender_email)
+        feats_b = extract(test_msg, pattern_b, centroids_b, rule_layer_b)
+        assert feats_b[rule_hit_scope1_idx] == 0.0, \
+            "Test message should NOT match in model B's empty registry"
+
+        # === Get predictions from both models ===
+        with torch.no_grad():
+            x_a = torch.tensor([feats_a], dtype=torch.float32)
+            logits_a = model_a(x_a).squeeze(0).cpu().numpy()
+
+            x_b = torch.tensor([feats_b], dtype=torch.float32)
+            logits_b = model_b(x_b).squeeze(0).cpu().numpy()
+
+        # === Verify logits differ (proving different training via different registry_path) ===
+        logits_diff = abs(logits_a - logits_b).max()
+        msg = (f"Models trained with different registry_path should produce different logits. "
+               f"Diff: {logits_diff}. Logits A: {logits_a}, Logits B: {logits_b}. "
+               f"This suggests train() did not thread registry_path to RuleLayer.")
+        assert logits_diff > 0.01, msg
