@@ -67,7 +67,7 @@ class RuleLayer:
         except Exception:
             return []
 
-    def _match_capsule(self, message: EmailMessage) -> Optional[dict]:
+    def match_capsule(self, message: EmailMessage) -> Optional[dict]:
         haystack = f"{message.subject}\n{message.body_text}".lower()
         for capsule in self.load_capsules():
             keywords = capsule.get("trigger_keywords") or []
@@ -103,7 +103,7 @@ class RuleLayer:
         # mirrors the real, current 1:1 correspondence in tasks/registry.json
         # -- if a third capsule of a genuinely new kind is ever registered,
         # this mapping is the one place that would need revisiting.
-        capsule = self._match_capsule(message)
+        capsule = self.match_capsule(message)
         if capsule is not None:
             is_scope2 = capsule.get("kind") == "script"
             return RuleDecision(
