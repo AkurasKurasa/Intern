@@ -152,6 +152,7 @@ class TestTrain:
             json.dump(registry_a, f)
 
         model_a_path = str(tmp_path / "model_a.pt")
+        torch.manual_seed(42)
         trainer.train(path, model_a_path, epochs=300, lr=1e-2, val_split=0.0,
                       profile_path=str(tmp_path / "profile_a.json"),
                       registry_path=registry_a_path)
@@ -163,6 +164,7 @@ class TestTrain:
             json.dump(registry_b, f)
 
         model_b_path = str(tmp_path / "model_b.pt")
+        torch.manual_seed(42)
         trainer.train(path, model_b_path, epochs=300, lr=1e-2, val_split=0.0,
                       profile_path=str(tmp_path / "profile_b.json"),
                       registry_path=registry_b_path)
