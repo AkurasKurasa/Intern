@@ -90,6 +90,17 @@ class TestFastFillWithTrainedCheckpoint:
                                     body="Please reply when you can."))
         assert result.layer == "fast_fill"
 
+    def test_confident_prediction_fast_fills_with_shipped_default_threshold(self, tmp_path):
+        # Uses the real shipped default (high_confidence=0.75), not a
+        # degenerate 0.0/0.999999 threshold -- and asserts the fast-filled
+        # *decision* is actually correct, not just that a fast-fill happened.
+        checkpoint_path = self._build_checkpoint(tmp_path)
+        agent = _agent(tmp_path, checkpoint_path=checkpoint_path)
+        result = agent.decide(_msg(sender_email="boss@work.com", subject="status 99",
+                                    body="Please reply when you can."))
+        assert result.layer == "fast_fill"
+        assert result.decision == "reply"
+
     def test_high_threshold_forces_reasoning(self, tmp_path):
         checkpoint_path = self._build_checkpoint(tmp_path)
         agent = _agent(tmp_path, checkpoint_path=checkpoint_path, high_confidence=0.999999)

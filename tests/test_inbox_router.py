@@ -19,6 +19,7 @@ from pattern_profile import PatternProfile
 from routing_rules import RuleLayer
 from llm_classifier import LLMClassifier
 from router import InboxRouter
+import decision_recorder
 
 
 def _write_fixture(data_dir: Path, inbox=None, sent=None) -> None:
@@ -199,7 +200,8 @@ class TestInboxRouterPollOnce:
         classifier = LLMClassifier(provider="none")  # offline -> unresolved emails get "flag"
         history_path = str(tmp_path / "data" / "routed_history.json")
         return InboxRouter(client, profile, rules, classifier, history_path=history_path,
-                            inbox_checkpoint_path=str(tmp_path / "no_such_checkpoint.pt"))
+                            inbox_checkpoint_path=str(tmp_path / "no_such_checkpoint.pt"),
+                            examples_path=str(tmp_path / "data" / "training_examples.jsonl"))
 
     def test_poll_once_routes_and_marks_processed(self, tmp_path):
         router = self._build(tmp_path, inbox=[_msg("i1", "broker@x.com", "insurance intake form")],
@@ -275,6 +277,26 @@ class TestInboxRouterPollOnce:
         assert history[0]["status"] == "overridden"
         assert router._profile.pattern_for("stranger@x.com").ignore_count >= 1
 
+    def test_confirm_suggestion_records_a_training_example(self, tmp_path):
+        router = self._build(tmp_path, inbox=[_msg("i1", "stranger@x.com", "unrelated")])
+        router.poll_once()
+        router.confirm_suggestion("i1", "leave_alone")
+
+        examples = decision_recorder.load_examples(path=router._examples_path)
+        assert len(examples) == 1
+        assert examples[0]["decision"] == "leave_alone"
+        assert examples[0]["source"] == "live"
+
+    def test_override_decision_records_a_training_example(self, tmp_path):
+        router = self._build(tmp_path, inbox=[_msg("i1", "stranger@x.com", "unrelated")])
+        router.poll_once()
+        router.override_decision("i1", "reply", reason="actually needs a reply")
+
+        examples = decision_recorder.load_examples(path=router._examples_path)
+        assert len(examples) == 1
+        assert examples[0]["decision"] == "reply"
+        assert examples[0]["source"] == "live"
+
 
 class TestInboxRouterSessionMetrics:
     """
@@ -302,7 +324,8 @@ class TestInboxRouterSessionMetrics:
         classifier = LLMClassifier(provider="none")
         history_path = str(tmp_path / "data" / "routed_history.json")
         return InboxRouter(client, profile, rules, classifier, history_path=history_path,
-                            inbox_checkpoint_path=str(tmp_path / "no_such_checkpoint.pt"))
+                            inbox_checkpoint_path=str(tmp_path / "no_such_checkpoint.pt"),
+                            examples_path=str(tmp_path / "data" / "training_examples.jsonl"))
 
     def test_record_session_metrics_writes_a_row_tagged_scope3(self, tmp_path):
         router = self._build(tmp_path, inbox=[_msg("i1", "stranger@x.com", "unrelated")])

@@ -67,7 +67,7 @@ from llm_classifier import LLMClassifier
 from pattern_profile import PatternProfile
 from routing_rules import RuleLayer
 from inbox_agent import DEFAULT_CHECKPOINT_PATH, InboxAgent
-from decision_recorder import record_example
+from decision_recorder import DEFAULT_EXAMPLES_PATH, record_example
 
 HISTORY_PATH = os.path.join(_THIS_DIR, "data", "routed_history.json")
 SENT_LOOKBACK_DAYS = 90
@@ -113,7 +113,8 @@ class InboxRouter:
                  rule_layer: RuleLayer, llm_classifier: LLMClassifier,
                  history_path: str = HISTORY_PATH,
                  poll_interval_s: float = DEFAULT_POLL_INTERVAL_S,
-                 inbox_checkpoint_path: str = DEFAULT_CHECKPOINT_PATH) -> None:
+                 inbox_checkpoint_path: str = DEFAULT_CHECKPOINT_PATH,
+                 examples_path: str = DEFAULT_EXAMPLES_PATH) -> None:
         self._gmail = gmail_client
         self._profile = profile
         self._rules = rule_layer
@@ -122,6 +123,7 @@ class InboxRouter:
                                   checkpoint_path=inbox_checkpoint_path)
         self._history_path = history_path
         self._poll_interval_s = poll_interval_s
+        self._examples_path = examples_path
         self._stop = False
         # In-memory cache of what this process has routed, so confirm/
         # override don't need a disk round-trip in the common case --
@@ -213,7 +215,10 @@ class InboxRouter:
         self._update_history_entry(entry)
         if message is not None:
             self._profile.record_confirmed_decision(message, decision)
-            record_example(message, decision, source="live")
+            try:
+                record_example(message, decision, source="live", path=self._examples_path)
+            except Exception as exc:
+                emit("inbox_log", line=f"Failed to record training example: {exc}", level="err")
         self._confirmed_count += 1
         emit("inbox_confirm_applied", message_id=message_id, decision=decision, draft_id=draft_id)
 
@@ -230,7 +235,10 @@ class InboxRouter:
         self._update_history_entry(entry)
         if message is not None:
             self._profile.record_override(message, old_decision, new_decision)
-            record_example(message, new_decision, source="live")
+            try:
+                record_example(message, new_decision, source="live", path=self._examples_path)
+            except Exception as exc:
+                emit("inbox_log", line=f"Failed to record training example: {exc}", level="err")
         self._overridden_count += 1
         emit("inbox_override_applied", message_id=message_id, old_decision=old_decision,
              new_decision=new_decision, reason=reason)

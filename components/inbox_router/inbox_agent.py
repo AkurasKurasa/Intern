@@ -82,26 +82,34 @@ class InboxAgent:
     def _try_fast_fill(self, message: EmailMessage) -> Optional[InboxDecision]:
         if self._model is None:
             return None
-        pattern = self._profile.pattern_for(message.sender_email)
-        feats = extract(message, pattern, self._centroids, self._rules)
-        x = torch.tensor([feats], dtype=torch.float32)
-        probs = self._model.probabilities(x)[0]
-        top_idx = int(torch.argmax(probs))
-        top_conf = float(probs[top_idx])
-        if top_conf < self._high_confidence:
+        try:
+            pattern = self._profile.pattern_for(message.sender_email)
+            feats = extract(message, pattern, self._centroids, self._rules)
+            x = torch.tensor([feats], dtype=torch.float32)
+            probs = self._model.probabilities(x)[0]
+            top_idx = int(torch.argmax(probs))
+            top_conf = float(probs[top_idx])
+            if top_conf < self._high_confidence:
+                return None
+            decision = DECISIONS_ORDER[top_idx]
+            capsule_name, forward_to = "", ""
+            if decision in ("route_scope1", "route_scope2"):
+                capsule = self._rules.match_capsule(message)
+                capsule_name = capsule.get("name", "") if capsule else ""
+                if not capsule_name:
+                    return None   # can't fast-fill a route with no verified capsule
+            if decision == "forward":
+                forward_to = pattern.common_forward_targets[0] if pattern and pattern.common_forward_targets else ""
+                if not forward_to:
+                    return None   # can't fast-fill a forward with no known target -- fall through to reasoning
+            return InboxDecision(
+                decision=decision, confidence=top_conf,
+                rationale=f"Trained model is {top_conf:.0%} confident, based on similar past emails.",
+                layer="fast_fill", capsule_name=capsule_name, forward_to=forward_to,
+            )
+        except Exception as exc:
+            logger.warning(f"Fast-fill scoring failed: {exc}")
             return None
-        decision = DECISIONS_ORDER[top_idx]
-        capsule_name, forward_to = "", ""
-        if decision in ("route_scope1", "route_scope2"):
-            capsule = self._rules.match_capsule(message)
-            capsule_name = capsule.get("name", "") if capsule else ""
-            if not capsule_name:
-                return None   # can't fast-fill a route with no verified capsule
-        return InboxDecision(
-            decision=decision, confidence=top_conf,
-            rationale=f"Trained model is {top_conf:.0%} confident, based on similar past emails.",
-            layer="fast_fill", capsule_name=capsule_name, forward_to=forward_to,
-        )
 
     def _reason(self, message: EmailMessage) -> InboxDecision:
         rule_result = self._rules.classify(message)
