@@ -40,6 +40,14 @@ def _script_capsule(entrypoint, args=None, cwd="", model_path="", checkpoint_fla
     )
 
 
+def _url_capsule(url):
+    return WorkflowCapsule(
+        name="inbox_dispatch", description="x", model_path="",
+        trigger_keywords=[], trigger_apps=[],
+        kind="url", url=url,
+    )
+
+
 class TestLaunchCommandAgentKind:
     def test_returns_run_task_argv_and_repo_root_cwd(self, tmp_path):
         checkpoint = tmp_path / "model.pt"
@@ -177,6 +185,70 @@ class TestLaunchCommandScriptKindWithCheckpoint:
         argv, cwd = capsule.launch_command(str(tmp_path))
 
         assert argv == [sys.executable, "-u", str(script), "--variant", "v0_base"]
+
+
+class TestLaunchCommandUrlKind:
+    """kind="url" (Scope #3's mockup, deliberately built outside the
+    Electron app) has no subprocess at all -- main.js's capsule-run
+    handler opens self.url via shell.openExternal() and never calls
+    launch_command() for this kind. launch_command() itself raises a
+    clear, specific error if it's ever reached anyway, rather than
+    silently falling through to the agent-kind branch's confusing
+    "checkpoint not found" error on an empty model_path."""
+
+    def test_raises_value_error_naming_the_capsule(self, tmp_path):
+        capsule = _url_capsule("https://example.com/mockup")
+
+        try:
+            capsule.launch_command(str(tmp_path))
+            assert False, "expected ValueError"
+        except ValueError as exc:
+            assert "inbox_dispatch" in str(exc)
+            assert "url" in str(exc).lower()
+
+    def test_does_not_raise_file_not_found(self, tmp_path):
+        """Specifically NOT FileNotFoundError -- a url-kind capsule has no
+        file to be missing; ValueError signals a caller-side logic error
+        instead of a misleadingly file-shaped one."""
+        capsule = _url_capsule("https://example.com/mockup")
+
+        try:
+            capsule.launch_command(str(tmp_path))
+        except FileNotFoundError:
+            assert False, "should raise ValueError, not FileNotFoundError"
+        except ValueError:
+            pass
+
+
+class TestRouteNeverReturnsAUrlCapsule:
+    """Same guard as TestRouteNeverReturnsAScriptCapsule, for kind="url" --
+    route() only ever picks a .pt checkpoint for LLMAgent, and a url-kind
+    capsule has no checkpoint at all."""
+
+    def test_empty_trigger_lists_exclude_url_capsule_from_any_goal(self, tmp_path):
+        registry = CapsuleRegistry(registry_path=str(tmp_path / "registry.json"))
+        registry.register(_url_capsule("https://example.com/mockup"))
+        registry.register(WorkflowCapsule(
+            name="form_filling", description="x", model_path="tasks/form_filling/model.pt",
+            trigger_keywords=["form", "insurance"], trigger_apps=["Car Insurance"],
+        ))
+
+        for goal in ("fill the insurance form", "open the inbox dispatch",
+                     "inbox_dispatch", "totally unrelated goal", ""):
+            result = registry.route(goal, "some window", fallback="fallback.pt")
+            assert result != ""  # never the url capsule's empty model_path
+
+    def test_kind_is_checked_structurally_even_with_real_triggers_set(self, tmp_path):
+        registry = CapsuleRegistry(registry_path=str(tmp_path / "registry.json"))
+        registry.register(WorkflowCapsule(
+            name="inbox_dispatch", description="x", model_path="",
+            trigger_keywords=["inbox", "email"], trigger_apps=["Gmail"],
+            kind="url", url="https://example.com/mockup",
+        ))
+
+        result = registry.route("check my inbox", "Gmail", fallback="fallback.pt")
+
+        assert result == "fallback.pt"
 
 
 class TestRouteNeverReturnsAScriptCapsule:

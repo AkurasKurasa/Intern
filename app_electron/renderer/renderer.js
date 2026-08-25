@@ -600,6 +600,8 @@ async function loadCapsuleIntoSlot(capsule) {
   // to swap) still hides it, same as before.
   const runsSummary = capsule.kind === "script"
     ? `runs ${capsule.entrypoint} ${(capsule.args || []).join(" ")}`.trim()
+    : capsule.kind === "url"
+    ? `opens ${capsule.url} in your browser`
     : "";
 
   if (!capsule.model_path) {
@@ -812,9 +814,15 @@ function refreshChipEmojis() {
   });
 }
 
-btnPlay.addEventListener("click", () => {
+btnPlay.addEventListener("click", async () => {
   if (!currentCapsule) return;
-  window.capsulesAPI.run(currentCapsule.name);
+  // kind="url" never enters the running state (no subprocess, no
+  // capsule_started event will ever arrive for it) -- log it directly
+  // instead of leaving the button looking like it did nothing.
+  const result = await window.capsulesAPI.run(currentCapsule.name);
+  if (result && result.opened) {
+    capsuleLog(`Opened ${currentCapsule.name} in your browser.`, "ok");
+  }
 });
 
 btnStopCapsule.addEventListener("click", () => {
@@ -864,7 +872,7 @@ async function populateOutDirOptions() {
   } catch (e) {
     return;
   }
-  const recordable = capsules.filter((c) => c.kind !== "script");
+  const recordable = capsules.filter((c) => c.kind === "agent");
   if (!recordable.length) return;
   const current = outDirInput.value;
   outDirInput.innerHTML = "";
@@ -916,7 +924,9 @@ async function loadWorkflows() {
 // decorative filler, mirroring how the reference's own kickers ("Data
 // Bus Width 64-bits") are real specs, not placeholder labels.
 function taskChipKicker(capsule) {
-  return capsule.kind === "script" ? "TASK · SCRIPT" : "TASK · AGENT";
+  if (capsule.kind === "script") return "TASK · SCRIPT";
+  if (capsule.kind === "url") return "TASK · LINK";
+  return "TASK · AGENT";
 }
 
 // Shared by the chip body click and the info button below -- both need
@@ -1039,7 +1049,7 @@ function renderDetailEmojiGrid() {
 ppDetailEdit.addEventListener("click", () => {
   const capsule = detailsCapsule;
   if (!capsule) return;
-  const isAgent = capsule.kind !== "script";
+  const isAgent = capsule.kind === "agent";
   ppDetailDescInput.value = capsule.description || "";
   detailSelectedEmoji = capsule.emoji || "";
   renderDetailEmojiGrid();
@@ -1062,7 +1072,7 @@ ppDetailClose.addEventListener("click", closeTaskDetails);
 ppDetailSave.addEventListener("click", async () => {
   const capsule = detailsCapsule;
   if (!capsule) return;
-  const isAgent = capsule.kind !== "script";
+  const isAgent = capsule.kind === "agent";
   const updates = {
     description: ppDetailDescInput.value,
     emoji: detailSelectedEmoji,

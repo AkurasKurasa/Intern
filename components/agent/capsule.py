@@ -49,6 +49,12 @@ class WorkflowCapsule:
     # a different checkpoint via the UI actually changes what the next
     # Play run uses.
     checkpoint_flag:  str = ""
+    # kind="url": not a subprocess at all -- Play just opens `url` in the
+    # user's default browser (app_electron/main.js's capsule-run handler
+    # short-circuits before ever reaching launch_command()/Popen for this
+    # kind). Added for Scope #3's standalone mockup, which was deliberately
+    # built OUTSIDE the Electron app rather than as an embedded page.
+    url:              str = ""
 
     def launch_command(self, repo_root: str) -> tuple[list[str], str]:
         """Return (argv, cwd) to Popen for this capsule.
@@ -58,6 +64,20 @@ class WorkflowCapsule:
         of Popen failing deep inside subprocess machinery.
         """
         import sys
+
+        if self.kind == "url":
+            # Never actually reached in normal operation -- main.js's
+            # capsule-run handler short-circuits to shell.openExternal()
+            # before this is ever called. Raising a clear, specific error
+            # here (rather than silently falling through to the "agent"
+            # branch below and failing confusingly on an empty model_path)
+            # is defense-in-depth for a future call site that forgets the
+            # kind check.
+            raise ValueError(
+                f"launch_command() called on a kind=\"url\" capsule ({self.name!r}) -- "
+                "this kind has no subprocess to launch; the caller should have opened "
+                "self.url directly instead."
+            )
 
         if self.kind == "script":
             entrypoint_abs = os.path.join(repo_root, self.entrypoint)

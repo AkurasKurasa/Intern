@@ -647,7 +647,18 @@ ipcMain.handle("capsules-create", (_evt, name, description) => createTask(name, 
 ipcMain.handle("capsules-update", (_evt, name, updates) => updateCapsule(name, updates));
 ipcMain.handle("capsules-delete", (_evt, name) => deleteCapsule(name));
 ipcMain.handle("capsule-run", (_evt, capsuleName) => {
+  // kind="url" isn't a subprocess at all -- there's nothing for
+  // recorder_bridge.py/Python to run, so this short-circuits before ever
+  // reaching queueOrSend(). Scope #3's mockup was deliberately built
+  // OUTSIDE the Electron app (direct request), so "Play" for it just opens
+  // the real browser to that page.
+  const capsule = listCapsules().find((c) => c.name === capsuleName);
+  if (capsule && capsule.kind === "url") {
+    if (capsule.url) shell.openExternal(capsule.url);
+    return { opened: true };
+  }
   queueOrSend({ cmd: "run_capsule", capsule_name: capsuleName });
+  return { opened: false };
 });
 ipcMain.handle("capsule-stop", () => {
   queueOrSend({ cmd: "stop_capsule" });
@@ -847,7 +858,13 @@ ipcMain.handle("settings-save-api-key", (_evt, provider, apiKey) => {
 // always means "run whatever's currently loaded in the main window's
 // Play panel," tracked via capsule-set-current above.
 ipcMain.handle("capsule-run-current", () => {
-  if (currentCapsuleName) queueOrSend({ cmd: "run_capsule", capsule_name: currentCapsuleName });
+  if (!currentCapsuleName) return;
+  const capsule = listCapsules().find((c) => c.name === currentCapsuleName);
+  if (capsule && capsule.kind === "url") {
+    if (capsule.url) shell.openExternal(capsule.url);
+    return;
+  }
+  queueOrSend({ cmd: "run_capsule", capsule_name: currentCapsuleName });
 });
 ipcMain.handle("set-active-section", (_evt, section) => {
   activeSection = section === "workflows" ? "workflows" : "home";

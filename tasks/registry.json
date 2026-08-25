@@ -40,6 +40,18 @@
       ],
       "checkpoint_flag": "--matcher",
       "cwd": ""
+    },
+    {
+      "name": "Inbox Dispatch",
+      "description": "Email triage mockup for Scope #3 (Inbox Router) — opens in your browser, not embedded in this app",
+      "model_path": "",
+      "trigger_keywords": [],
+      "trigger_apps": [],
+      "trace_dir": "",
+      "created": "2026-08-23T00:00:00",
+      "emoji": "📬",
+      "kind": "url",
+      "url": "https://claude.ai/code/artifact/adfb7de1-c852-43dd-9bdb-ca5516e1407a"
     }
   ]
 }
