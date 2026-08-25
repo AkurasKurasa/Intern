@@ -198,7 +198,8 @@ class TestInboxRouterPollOnce:
         rules = RuleLayer(profile, registry_path=str(registry_path))
         classifier = LLMClassifier(provider="none")  # offline -> unresolved emails get "flag"
         history_path = str(tmp_path / "data" / "routed_history.json")
-        return InboxRouter(client, profile, rules, classifier, history_path=history_path)
+        return InboxRouter(client, profile, rules, classifier, history_path=history_path,
+                            inbox_checkpoint_path=str(tmp_path / "no_such_checkpoint.pt"))
 
     def test_poll_once_routes_and_marks_processed(self, tmp_path):
         router = self._build(tmp_path, inbox=[_msg("i1", "broker@x.com", "insurance intake form")],
@@ -300,7 +301,8 @@ class TestInboxRouterSessionMetrics:
         rules = RuleLayer(profile, registry_path=str(registry_path))
         classifier = LLMClassifier(provider="none")
         history_path = str(tmp_path / "data" / "routed_history.json")
-        return InboxRouter(client, profile, rules, classifier, history_path=history_path)
+        return InboxRouter(client, profile, rules, classifier, history_path=history_path,
+                            inbox_checkpoint_path=str(tmp_path / "no_such_checkpoint.pt"))
 
     def test_record_session_metrics_writes_a_row_tagged_scope3(self, tmp_path):
         router = self._build(tmp_path, inbox=[_msg("i1", "stranger@x.com", "unrelated")])

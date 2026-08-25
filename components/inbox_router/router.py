@@ -66,6 +66,8 @@ from gmail_client import EmailMessage, GmailClientBase, RealGmailClient, get_gma
 from llm_classifier import LLMClassifier
 from pattern_profile import PatternProfile
 from routing_rules import RuleLayer
+from inbox_agent import DEFAULT_CHECKPOINT_PATH, InboxAgent
+from decision_recorder import record_example
 
 HISTORY_PATH = os.path.join(_THIS_DIR, "data", "routed_history.json")
 SENT_LOOKBACK_DAYS = 90
@@ -110,11 +112,14 @@ class InboxRouter:
     def __init__(self, gmail_client: GmailClientBase, profile: PatternProfile,
                  rule_layer: RuleLayer, llm_classifier: LLMClassifier,
                  history_path: str = HISTORY_PATH,
-                 poll_interval_s: float = DEFAULT_POLL_INTERVAL_S) -> None:
+                 poll_interval_s: float = DEFAULT_POLL_INTERVAL_S,
+                 inbox_checkpoint_path: str = DEFAULT_CHECKPOINT_PATH) -> None:
         self._gmail = gmail_client
         self._profile = profile
         self._rules = rule_layer
         self._llm = llm_classifier
+        self._agent = InboxAgent(profile, rule_layer, llm_classifier,
+                                  checkpoint_path=inbox_checkpoint_path)
         self._history_path = history_path
         self._poll_interval_s = poll_interval_s
         self._stop = False
@@ -128,7 +133,7 @@ class InboxRouter:
         self._session_start_ts = time.time()
         self._routed_count = 0
         self._decision_counts: dict[str, int] = {}
-        self._layer_counts = {"rule": 0, "llm": 0}
+        self._layer_counts = {"rule": 0, "llm": 0, "fast_fill": 0}
         self._confirmed_count = 0
         self._overridden_count = 0
         self._confidence_sum = 0.0
@@ -158,25 +163,9 @@ class InboxRouter:
         return routed
 
     def _classify_and_record(self, message: EmailMessage) -> dict:
-        rule_result = self._rules.classify(message)
-        if rule_result.decision:
-            decision, confidence, rationale = rule_result.decision, rule_result.confidence, rule_result.rationale
-            capsule_name, forward_to, layer = rule_result.capsule_name, rule_result.forward_to, "rule"
-        else:
-            pattern = self._profile.pattern_for(message.sender_email)
-            llm_result = self._llm.classify(message, pattern, rule_result, self._rules.load_capsules())
-            decision, confidence, rationale = llm_result.decision, llm_result.confidence, llm_result.rationale
-            capsule_name, forward_to, layer = llm_result.capsule_name, llm_result.forward_to, "llm"
-
-        # Defensive guard against a hallucinated capsule name -- never
-        # surface a route_scope1/2 suggestion the UI couldn't actually act
-        # on because window.capsulesAPI.run() would just fail on it.
-        if decision in ("route_scope1", "route_scope2"):
-            valid_names = {c.get("name") for c in self._rules.load_capsules()}
-            if capsule_name not in valid_names:
-                capsule_name = ""
-                decision = "flag"
-                rationale = (rationale + " (capsule name could not be verified — flagged instead)").strip()
+        result = self._agent.decide(message)
+        decision, confidence, rationale = result.decision, result.confidence, result.rationale
+        capsule_name, forward_to, layer = result.capsule_name, result.forward_to, result.layer
 
         entry = {
             "message_id": message.id, "thread_id": message.thread_id,
@@ -224,6 +213,7 @@ class InboxRouter:
         self._update_history_entry(entry)
         if message is not None:
             self._profile.record_confirmed_decision(message, decision)
+            record_example(message, decision, source="live")
         self._confirmed_count += 1
         emit("inbox_confirm_applied", message_id=message_id, decision=decision, draft_id=draft_id)
 
@@ -240,6 +230,7 @@ class InboxRouter:
         self._update_history_entry(entry)
         if message is not None:
             self._profile.record_override(message, old_decision, new_decision)
+            record_example(message, new_decision, source="live")
         self._overridden_count += 1
         emit("inbox_override_applied", message_id=message_id, old_decision=old_decision,
              new_decision=new_decision, reason=reason)
