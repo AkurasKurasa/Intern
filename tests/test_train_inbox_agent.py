@@ -210,3 +210,46 @@ class TestTrain:
                f"Diff: {logits_diff}. Logits A: {logits_a}, Logits B: {logits_b}. "
                f"This suggests train() did not thread registry_path to RuleLayer.")
         assert logits_diff > 0.01, msg
+
+    def test_train_threads_profile_and_registry_paths(self, tmp_path, monkeypatch):
+        """Direct, deterministic proof that train() passes its profile_path/
+        registry_path arguments straight through to the real PatternProfile/
+        RuleLayer constructors -- spies on __init__ itself rather than
+        inferring it from trained-model behavior (which is what the three
+        prior attempts tried, and which had confounds: random init noise,
+        then a test that built its own correctly-constructed RuleLayer at
+        eval time instead of exercising train()'s internal one). This test
+        can't be fooled that way because it captures the literal arguments
+        the constructors were called with, inside train() itself."""
+        from pattern_profile import PatternProfile, DEFAULT_PROFILE_PATH
+        from routing_rules import RuleLayer, DEFAULT_REGISTRY_PATH
+
+        examples_path = str(tmp_path / "examples.jsonl")
+        _seed_examples(examples_path)
+        save_path = str(tmp_path / "model.pt")
+        profile_path = str(tmp_path / "profile.json")
+        registry_path = str(tmp_path / "registry.json")
+
+        captured = {}
+
+        original_profile_init = PatternProfile.__init__
+
+        def spy_profile_init(self, path=DEFAULT_PROFILE_PATH):
+            captured["profile_path"] = path
+            original_profile_init(self, path)
+
+        monkeypatch.setattr(PatternProfile, "__init__", spy_profile_init)
+
+        original_rule_init = RuleLayer.__init__
+
+        def spy_rule_init(self, profile, registry_path=DEFAULT_REGISTRY_PATH, high_confidence=0.75):
+            captured["registry_path"] = registry_path
+            original_rule_init(self, profile, registry_path, high_confidence)
+
+        monkeypatch.setattr(RuleLayer, "__init__", spy_rule_init)
+
+        trainer.train(examples_path, save_path, epochs=5, lr=1e-2, val_split=0.0,
+                      profile_path=profile_path, registry_path=registry_path)
+
+        assert captured["profile_path"] == profile_path
+        assert captured["registry_path"] == registry_path
