@@ -1468,7 +1468,7 @@ to:
         capsule_name, forward_to, layer = result.capsule_name, result.forward_to, result.layer
 ```
 
-(the rest of the method — the hallucinated-capsule guard, building `entry`, updating counters — stays unchanged; it already reads `decision`/`confidence`/`rationale`/`capsule_name`/`forward_to`/`layer` from local variables, which now come from `result` instead of the two branches.)
+**Amended during Task 6's review (ruling recorded in the SDD ledger):** the hallucinated-capsule-name guard that used to sit here — `if decision in ("route_scope1", "route_scope2"): valid_names = {c.get("name") for c in self._rules.load_capsules()}; if capsule_name not in valid_names: capsule_name = ""; decision = "flag"; rationale = (...)` — now lives inside `InboxAgent._reason()` itself (Task 6), since `InboxAgent` is meant to be the complete, self-contained decision-maker, not something a caller has to patch afterward. **Delete that guard block entirely from `router.py`** rather than leaving it in place — it would just be dead, duplicate logic now that `result.decision`/`result.capsule_name` already come out of `InboxAgent.decide()` pre-verified. Everything else in the method — building `entry`, updating counters — stays unchanged; it already reads `decision`/`confidence`/`rationale`/`capsule_name`/`forward_to`/`layer` from local variables, which now come from `result` instead of the two old branches.
 
 Update the layer-counts initializer in `__init__` from:
 ```python
