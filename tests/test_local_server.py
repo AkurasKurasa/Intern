@@ -151,3 +151,25 @@ class TestServeOverHTTP:
         finally:
             httpd.shutdown()
             thread.join(timeout=5)
+
+
+class TestStaticFiles:
+    def test_index_html_is_served(self, tmp_path):
+        router = _build_router(tmp_path)
+        status, _headers, body, content_type = ls.handle_request("GET", "/", b"", router)
+        assert status == 200
+        assert content_type == "text/html"
+        assert b"<html" in body.lower()
+
+    def test_style_css_is_served(self, tmp_path):
+        router = _build_router(tmp_path)
+        status, _headers, _body, content_type = ls.handle_request("GET", "/style.css", b"", router)
+        assert status == 200
+        assert content_type == "text/css"
+
+    def test_app_js_is_served(self, tmp_path):
+        router = _build_router(tmp_path)
+        status, _headers, body, content_type = ls.handle_request("GET", "/app.js", b"", router)
+        assert status == 200
+        assert content_type == "application/javascript"
+        assert b"/api/inbox" in body
