@@ -96,7 +96,7 @@ def handle_request(method: str, path: str, body: bytes, router: InboxRouter) -> 
             data = json.loads(body or b"{}")
             message_id = data["message_id"]
             decision = data["decision"]
-        except (json.JSONDecodeError, KeyError) as exc:
+        except (json.JSONDecodeError, KeyError, TypeError) as exc:
             err = json.dumps({"error": f"Bad request: {exc}"}).encode("utf-8")
             return 400, {}, err, "application/json"
         # confirm_suggestion() itself returns None either way -- it can't
@@ -116,7 +116,7 @@ def handle_request(method: str, path: str, body: bytes, router: InboxRouter) -> 
             message_id = data["message_id"]
             new_decision = data["new_decision"]
             reason = data.get("reason", "")
-        except (json.JSONDecodeError, KeyError) as exc:
+        except (json.JSONDecodeError, KeyError, TypeError) as exc:
             err = json.dumps({"error": f"Bad request: {exc}"}).encode("utf-8")
             return 400, {}, err, "application/json"
         if not any(e["message_id"] == message_id for e in router.pending_entries()):

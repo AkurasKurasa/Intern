@@ -98,6 +98,14 @@ class TestHandleRequestConfirm:
         assert status == 400
         assert json.loads(resp_body)["error"]
 
+    def test_post_confirm_non_dict_json_returns_400(self, tmp_path):
+        # Regression test: body is valid JSON (5) but not an object. json.loads()
+        # succeeds, but indexing data["message_id"] raises TypeError, which must
+        # be caught alongside JSONDecodeError and KeyError.
+        router = _build_router(tmp_path)
+        status, _headers, _body, _ct = ls.handle_request("POST", "/api/confirm", b"5", router)
+        assert status == 400
+
 
 class TestHandleRequestOverride:
     def test_post_override_records_the_new_decision(self, tmp_path):
