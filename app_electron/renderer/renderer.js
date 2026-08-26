@@ -587,9 +587,14 @@ async function loadCapsuleIntoSlot(capsule) {
   applyCapsuleEmojiDisplay(ppCapsuleEmoji, capsule.emoji);
   ppCapsuleName.textContent = capsule.name;
   ppSlot.classList.add("filled");
-  // "Test" shows for any loaded task, unlike Checkpoint -- it's not tied
-  // to having a swappable model, just to a task being selected at all.
-  ppTestGroup.hidden = false;
+  // "Test" shows for any loaded task with a real target app to open,
+  // unlike Checkpoint -- it's not tied to having a swappable model, just
+  // to a task being selected at all. A kind="url" capsule (e.g. Inbox
+  // Dispatch) has no separate target app to open -- Play itself already
+  // opens the one thing there is to look at -- so "Launch mockups" would
+  // just fail with "no test mockups defined" every time. Hidden for that
+  // kind instead of shown-but-guaranteed-to-fail.
+  ppTestGroup.hidden = capsule.kind === "url";
 
   // A script-kind capsule (e.g. Scope #2) may or may not have a real,
   // swappable checkpoint -- Scope #2's matcher.pt is a genuine trained
