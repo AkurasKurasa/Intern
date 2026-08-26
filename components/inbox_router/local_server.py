@@ -39,10 +39,6 @@ if os.path.exists(_env_path):
                 os.environ.setdefault(_k.strip(), _v.strip())
 
 from gmail_client import get_gmail_client
-from llm_classifier import LLMClassifier
-from pattern_profile import PatternProfile
-from routing_rules import RuleLayer
-from router import InboxRouter
 
 DEFAULT_PORT = 8765
 _ALLOWED_ORIGINS = {f"http://localhost:{DEFAULT_PORT}", f"http://127.0.0.1:{DEFAULT_PORT}"}
@@ -71,6 +67,17 @@ def _pick_provider() -> Tuple[str, str]:
 
 
 def build_router() -> InboxRouter:
+    # Imported here, not at module level: router.py pulls in inbox_agent.py,
+    # which does `import torch` at its own module level. That import alone
+    # takes several seconds, so keeping it out of local_server.py's module
+    # scope is what actually makes serve()'s "bind first" trick work --
+    # otherwise the whole torch import chain runs before serve() is even
+    # entered, and the socket never binds any earlier than it does today.
+    from llm_classifier import LLMClassifier
+    from pattern_profile import PatternProfile
+    from routing_rules import RuleLayer
+    from router import InboxRouter
+
     gmail_client = get_gmail_client()
     profile = PatternProfile()
     rule_layer = RuleLayer(profile)

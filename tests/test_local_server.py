@@ -1,5 +1,6 @@
 import json
 import os
+import subprocess
 import sys
 import urllib.request
 import urllib.error
@@ -280,3 +281,38 @@ class TestBulkBarHiddenAttribute:
         finally:
             httpd.shutdown()
             thread.join(timeout=5)
+
+
+class TestModuleImportStaysLight:
+    """Regression: local_server.py used to import `from router import
+    InboxRouter` at module level. router.py imports inbox_agent.py, which
+    does `import torch` at ITS module level -- so the whole torch import
+    chain used to run before serve() (and therefore HTTPServer()) was ever
+    reached, silently defeating serve()'s documented "bind the socket
+    before the slow import chain runs" design. A browser opening
+    http://localhost:8765/ during that 8-12+ second window saw "connection
+    refused", not a slow-loading page, because nothing was listening yet.
+    Fixed by moving the heavy imports inside build_router(), which only
+    runs after HTTPServer() has already bound and started listening.
+
+    Runs in a fresh subprocess: this test file's own top-level `from
+    router import InboxRouter` (needed by other tests) already pulls torch
+    into THIS process, so an in-process check here would be meaningless."""
+
+    def test_importing_local_server_does_not_import_torch(self):
+        script = (
+            "import sys; "
+            f"sys.path.insert(0, {_ROOT!r}); "
+            f"sys.path.insert(0, {_INBOX_DIR!r}); "
+            "import local_server; "
+            "print('torch' in sys.modules)"
+        )
+        result = subprocess.run(
+            [sys.executable, "-c", script],
+            capture_output=True, text=True, timeout=30,
+        )
+        assert result.returncode == 0, result.stderr
+        assert result.stdout.strip() == "False", (
+            f"importing local_server pulled in torch -- "
+            f"stdout={result.stdout!r} stderr={result.stderr!r}"
+        )
