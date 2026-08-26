@@ -589,16 +589,13 @@ async function loadCapsuleIntoSlot(capsule) {
   ppSlot.classList.add("filled");
   // "Test" shows for any loaded task with a real target app to open,
   // unlike Checkpoint -- it's not tied to having a swappable model, just
-  // to a task being selected at all. A kind="url" capsule (e.g. Inbox
-  // Dispatch) has no separate target app to open -- Play itself already
-  // opens the one thing there is to look at -- so "Launch mockups" would
-  // just fail with "no test mockups defined" every time. Hidden for that
-  // kind instead of shown-but-guaranteed-to-fail.
-  // A kind="url" capsule with a local_server (e.g. Inbox Dispatch) now DOES
-  // have something to launch here -- its own practice page, on the same
-  // server Play already starts. Only a genuinely external kind="url" link
-  // with no local_server stays hidden, since that case still has nothing
-  // for this button to open.
+  // to a task being selected at all. A kind="url" capsule with no
+  // local_server (a genuinely external link, nothing to launch here) stays
+  // hidden -- "Launch mockups" would just fail with "no test mockups
+  // defined" every time. Inbox Dispatch is the one kind="url" capsule that
+  // DOES have something to launch: its own practice page, on the same
+  // local server Play already starts -- so it declares a local_server and
+  // this group shows for it.
   ppTestGroup.hidden = capsule.kind === "url" && !capsule.local_server;
 
   // A script-kind capsule (e.g. Scope #2) may or may not have a real,
