@@ -47,11 +47,15 @@ from router import InboxRouter
 DEFAULT_PORT = 8765
 _ALLOWED_ORIGINS = {f"http://localhost:{DEFAULT_PORT}", f"http://127.0.0.1:{DEFAULT_PORT}"}
 _UI_DIR = os.path.join(_THIS_DIR, "local_ui")
+_PRACTICE_UI_DIR = os.path.join(_THIS_DIR, "practice_inbox")
 
 _STATIC_FILES = {
-    "/": ("index.html", "text/html"),
-    "/style.css": ("style.css", "text/css"),
-    "/app.js": ("app.js", "application/javascript"),
+    "/": (_UI_DIR, "index.html", "text/html"),
+    "/style.css": (_UI_DIR, "style.css", "text/css"),
+    "/app.js": (_UI_DIR, "app.js", "application/javascript"),
+    "/practice/": (_PRACTICE_UI_DIR, "index.html", "text/html"),
+    "/practice/style.css": (_PRACTICE_UI_DIR, "style.css", "text/css"),
+    "/practice/app.js": (_PRACTICE_UI_DIR, "app.js", "application/javascript"),
 }
 
 
@@ -99,8 +103,8 @@ def handle_request(method: str, path: str, body: bytes, router: InboxRouter, ori
         return 403, {}, err, "application/json"
 
     if method == "GET" and path in _STATIC_FILES:
-        filename, content_type = _STATIC_FILES[path]
-        file_path = os.path.join(_UI_DIR, filename)
+        directory, filename, content_type = _STATIC_FILES[path]
+        file_path = os.path.join(directory, filename)
         if not os.path.isfile(file_path):
             return 404, {}, b"Not found", "text/plain"
         with open(file_path, "rb") as f:
@@ -137,6 +141,22 @@ def handle_request(method: str, path: str, body: bytes, router: InboxRouter, ori
             err = json.dumps({"error": f"Unknown or already-handled message_id: {message_id}"}).encode("utf-8")
             return 400, {}, err, "application/json"
         router.override_decision(message_id, new_decision, reason)
+        return 200, {}, json.dumps({"ok": True}).encode("utf-8"), "application/json"
+
+    if method == "GET" and path == "/practice/api/inbox":
+        messages = router.list_practice_inbox()
+        payload = json.dumps({"messages": [
+            {"message_id": m.id, "subject": m.subject, "sender": m.sender,
+             "sender_email": m.sender_email, "body_text": m.body_text}
+            for m in messages
+        ]}).encode("utf-8")
+        return 200, {}, payload, "application/json"
+
+    if method == "POST" and path == "/practice/api/record":
+        data, error = _parse_action_body(body, ("message_id", "decision"))
+        if error:
+            return error
+        router.record_practice_decision(data["message_id"], data["decision"])
         return 200, {}, json.dumps({"ok": True}).encode("utf-8"), "application/json"
 
     return 404, {}, json.dumps({"error": "Not found"}).encode("utf-8"), "application/json"

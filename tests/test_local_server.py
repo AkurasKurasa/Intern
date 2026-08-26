@@ -180,3 +180,61 @@ class TestStaticFiles:
         assert status == 200
         assert content_type == "application/javascript"
         assert b"/api/inbox" in body
+
+    def test_original_index_html_still_serves_after_static_files_widened(self, tmp_path):
+        # Regression guard for the _STATIC_FILES shape change in this task --
+        # confirms widening the map to (directory, filename, content_type)
+        # didn't break the three pre-existing entries.
+        router = _build_router(tmp_path)
+        status, _headers, body, content_type = ls.handle_request("GET", "/", b"", router)
+        assert status == 200
+        assert content_type == "text/html"
+        assert b"<html" in body.lower()
+
+
+class TestPracticeInboxRoutes:
+    def test_get_practice_api_inbox_returns_all_messages(self, tmp_path):
+        router = _build_router(tmp_path, inbox=[
+            _msg("i1", "stranger@x.com", "first"),
+            _msg("i2", "stranger@x.com", "second"),
+        ])
+        status, _headers, body, content_type = ls.handle_request("GET", "/practice/api/inbox", b"", router)
+        assert status == 200
+        assert content_type == "application/json"
+        payload = json.loads(body)
+        assert {m["message_id"] for m in payload["messages"]} == {"i1", "i2"}
+
+    def test_post_practice_record_writes_a_real_example(self, tmp_path):
+        router = _build_router(tmp_path, inbox=[_msg("i1", "stranger@x.com", "hello")])
+        body = json.dumps({"message_id": "i1", "decision": "leave_alone"}).encode("utf-8")
+        status, _headers, resp_body, _ct = ls.handle_request("POST", "/practice/api/record", body, router)
+        assert status == 200
+        assert json.loads(resp_body) == {"ok": True}
+        assert len(router.list_practice_inbox()) == 1  # message still there, not removed
+
+    def test_post_practice_record_malformed_json_returns_400(self, tmp_path):
+        router = _build_router(tmp_path)
+        status, _headers, _body, _ct = ls.handle_request("POST", "/practice/api/record", b"not json", router)
+        assert status == 400
+
+
+class TestPracticeStaticFiles:
+    def test_practice_index_html_is_served(self, tmp_path):
+        router = _build_router(tmp_path)
+        status, _headers, body, content_type = ls.handle_request("GET", "/practice/", b"", router)
+        assert status == 200
+        assert content_type == "text/html"
+        assert b"<html" in body.lower()
+
+    def test_practice_style_css_is_served(self, tmp_path):
+        router = _build_router(tmp_path)
+        status, _headers, _body, content_type = ls.handle_request("GET", "/practice/style.css", b"", router)
+        assert status == 200
+        assert content_type == "text/css"
+
+    def test_practice_app_js_is_served(self, tmp_path):
+        router = _build_router(tmp_path)
+        status, _headers, body, content_type = ls.handle_request("GET", "/practice/app.js", b"", router)
+        assert status == 200
+        assert content_type == "application/javascript"
+        assert b"/practice/api" in body
