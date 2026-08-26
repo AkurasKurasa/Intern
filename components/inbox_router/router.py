@@ -273,6 +273,30 @@ class InboxRouter:
         class outside router.py's own stdin/stdout protocol."""
         return [e for e in self._load_history() if e.get("status") == "pending"]
 
+    def list_practice_inbox(self) -> list:
+        """Every mock inbox message available to practice-demonstrate on,
+        unfiltered by processed state -- unlike poll_once()'s
+        list_inbox_unprocessed(), practice mode is meant to be repeatable,
+        not a one-shot triage queue. Wraps the same list_recent_inbox()
+        bootstrap() already uses for a wide lookback window."""
+        since_iso = "2020-01-01T00:00:00+00:00"  # effectively "everything" for the mock fixture
+        return self._gmail.list_recent_inbox(since_iso)
+
+    def record_practice_decision(self, message_id: str, decision: str) -> None:
+        """A raw human demonstration -- no AI suggestion involved anywhere,
+        the opposite of confirm_suggestion()/override_decision(). Fetches
+        the real message and records it exactly like every other recorded
+        example, via the same decision_recorder.record_example() call.
+        Also folds into the sender-pattern profile the same way a real
+        confirm does, since a genuine demonstration is at least as strong
+        a signal as a confirm."""
+        message = self._gmail.get_message(message_id)
+        if message is None:
+            emit("inbox_error", message=f"Unknown message id: {message_id}")
+            return
+        record_example(message, decision, source="live", path=self._examples_path)
+        self._profile.record_confirmed_decision(message, decision)
+
     def _load_history(self) -> list:
         if not os.path.exists(self._history_path):
             return []

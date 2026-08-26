@@ -20,6 +20,7 @@ from routing_rules import RuleLayer
 from llm_classifier import LLMClassifier
 from router import InboxRouter
 import decision_recorder
+from decision_recorder import load_examples
 
 
 def _write_fixture(data_dir: Path, inbox=None, sent=None) -> None:
@@ -459,3 +460,54 @@ class TestInboxRouterSessionMetrics:
         )
         router.run_forever()
         assert len(calls) == 1
+
+
+class TestPracticeInbox:
+    def _build(self, tmp_path, inbox=None, sent=None):
+        _write_fixture(tmp_path / "data", inbox=inbox or [], sent=sent or [])
+        client = MockGmailClient(data_dir=str(tmp_path / "data"))
+        profile = PatternProfile(path=str(tmp_path / "data" / "profile.json"))
+        registry_path = tmp_path / "registry.json"
+        registry_path.write_text(json.dumps({"capsules": []}), encoding="utf-8")
+        rules = RuleLayer(profile, registry_path=str(registry_path))
+        classifier = LLMClassifier(provider="none")
+        history_path = str(tmp_path / "data" / "routed_history.json")
+        return InboxRouter(client, profile, rules, classifier, history_path=history_path,
+                            inbox_checkpoint_path=str(tmp_path / "no_such_checkpoint.pt"),
+                            examples_path=str(tmp_path / "data" / "training_examples.jsonl"))
+
+    def test_list_practice_inbox_returns_all_messages_unfiltered(self, tmp_path):
+        router = self._build(tmp_path, inbox=[
+            _msg("i1", "stranger@x.com", "first"),
+            _msg("i2", "stranger@x.com", "second"),
+        ])
+        # Mark one as already processed via the real triage flow -- practice
+        # mode must still show it, unlike poll_once()'s unprocessed-only view.
+        router.poll_once()
+        messages = router.list_practice_inbox()
+        assert {m.id for m in messages} == {"i1", "i2"}
+
+    def test_record_practice_decision_writes_a_real_example(self, tmp_path):
+        router = self._build(tmp_path, inbox=[_msg("i1", "stranger@x.com", "hello", body="real body text")])
+        router.record_practice_decision("i1", "reply")
+
+        examples = load_examples(path=str(tmp_path / "data" / "training_examples.jsonl"))
+        assert len(examples) == 1
+        assert examples[0]["message_id"] == "i1"
+        assert examples[0]["decision"] == "reply"
+        assert examples[0]["source"] == "live"
+        assert examples[0]["body_text"] == "real body text"
+
+    def test_record_practice_decision_updates_pattern_profile(self, tmp_path):
+        router = self._build(tmp_path, inbox=[_msg("i1", "boss@work.com", "hello")])
+        router.record_practice_decision("i1", "reply")
+
+        pattern = router._profile.pattern_for("boss@work.com")
+        assert pattern is not None
+        assert pattern.reply_count == 1
+
+    def test_record_practice_decision_unknown_message_id_does_not_raise(self, tmp_path):
+        router = self._build(tmp_path)
+        router.record_practice_decision("does-not-exist", "reply")  # must not raise
+        examples = load_examples(path=str(tmp_path / "data" / "training_examples.jsonl"))
+        assert examples == []
