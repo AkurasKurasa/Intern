@@ -708,6 +708,18 @@ const TEST_MOCKUPS = {
 };
 
 ipcMain.handle("test-launch-mockups", (_evt, capsuleName) => {
+  // Inbox Dispatch's practice target isn't a {type, script/target} pair
+  // like form_filling/Sheet-to-Portal Matcher's real, separate apps below
+  // -- it's a page on the SAME local server the Play button already starts
+  // (see ensureLocalServerRunning), just a different URL path. Checked
+  // first, ahead of the flat TEST_MOCKUPS lookup.
+  const capsule = listCapsules().find((c) => c.name === capsuleName);
+  if (capsule && capsule.kind === "url" && capsule.local_server) {
+    ensureLocalServerRunning(capsule.local_server);
+    shell.openExternal(`${capsule.url}practice/`);
+    return { ok: true, opened: ["practice inbox"] };
+  }
+
   const targets = TEST_MOCKUPS[capsuleName];
   if (!targets) {
     return { ok: false, error: `No test mockups defined for '${capsuleName}'.` };

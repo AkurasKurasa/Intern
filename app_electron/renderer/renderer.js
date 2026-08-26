@@ -594,7 +594,12 @@ async function loadCapsuleIntoSlot(capsule) {
   // opens the one thing there is to look at -- so "Launch mockups" would
   // just fail with "no test mockups defined" every time. Hidden for that
   // kind instead of shown-but-guaranteed-to-fail.
-  ppTestGroup.hidden = capsule.kind === "url";
+  // A kind="url" capsule with a local_server (e.g. Inbox Dispatch) now DOES
+  // have something to launch here -- its own practice page, on the same
+  // server Play already starts. Only a genuinely external kind="url" link
+  // with no local_server stays hidden, since that case still has nothing
+  // for this button to open.
+  ppTestGroup.hidden = capsule.kind === "url" && !capsule.local_server;
 
   // A script-kind capsule (e.g. Scope #2) may or may not have a real,
   // swappable checkpoint -- Scope #2's matcher.pt is a genuine trained
