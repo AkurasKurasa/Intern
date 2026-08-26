@@ -1,0 +1,55 @@
+/* components/inbox_router/practice_inbox/style.css */
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font-family: Roboto, "Segoe UI", Arial, sans-serif;
+  background: #ffffff;
+  color: #202124;
+}
+.topbar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 20px; border-bottom: 1px solid #e0e0e0;
+}
+.brand { font-size: 18px; font-weight: 500; }
+.btn {
+  border: none; border-radius: 18px; padding: 8px 20px;
+  font-size: 14px; cursor: pointer;
+}
+.btn-primary { background: #1a73e8; color: #fff; }
+.btn-primary:hover { background: #1558b0; }
+.btn-action {
+  background: #fff; color: #1a73e8; border: 1px solid #1a73e8;
+  padding: 10px 14px;
+}
+.btn-action:hover { background: #f0f6ff; }
+.btn-back { background: none; border: none; font-size: 14px; cursor: pointer; color: #1a73e8; margin-bottom: 12px; }
+
+main { max-width: 760px; margin: 0 auto; padding: 12px 20px; }
+
+.row-list { list-style: none; margin: 0; padding: 0; }
+.row-item {
+  display: flex; gap: 12px; align-items: baseline;
+  padding: 12px 8px; border-bottom: 1px solid #f1f1f1; cursor: pointer;
+}
+.row-item:hover { background: #f8f8f8; }
+.row-sender { width: 180px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.row-subject { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.empty-state { color: #70757a; padding: 24px 8px; }
+
+.detail-header { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
+.avatar {
+  width: 36px; height: 36px; border-radius: 50%;
+  background: #1a73e8; color: #fff; display: flex;
+  align-items: center; justify-content: center; font-weight: 500;
+}
+.detail-sender { font-weight: 500; }
+.detail-subject { font-size: 18px; margin-top: 2px; }
+.detail-body {
+  white-space: pre-wrap; font-family: inherit; font-size: 14px;
+  background: #f8f9fa; padding: 12px; border-radius: 8px;
+}
+.detail-hint { font-weight: 500; margin: 16px 0 8px; }
+.action-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
+}
+.status-line { color: #188038; font-size: 13px; min-height: 18px; margin-top: 12px; }

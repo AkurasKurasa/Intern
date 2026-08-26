@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Inbox Practice</title>
+  <link rel="stylesheet" href="/practice/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <span class="brand">📥 Inbox Practice</span>
+    <button id="refreshBtn" class="btn btn-primary">Refresh</button>
+  </header>
+
+  <main>
+    <div id="listView">
+      <p id="emptyState" class="empty-state" hidden>No emails to practice on. Click Refresh.</p>
+      <ul id="rowList" class="row-list"></ul>
+    </div>
+
+    <div id="detailView" class="detail-view" hidden>
+      <button id="backBtn" class="btn-back">&larr; Back</button>
+      <div class="detail-header">
+        <div class="avatar" id="detailAvatar"></div>
+        <div>
+          <div class="detail-sender" id="detailSender"></div>
+          <div class="detail-subject" id="detailSubject"></div>
+        </div>
+      </div>
+      <pre class="detail-body" id="detailBody"></pre>
+
+      <p class="detail-hint">What would you do with this email?</p>
+      <div class="action-grid">
+        <button class="btn btn-action" data-decision="reply">Reply</button>
+        <button class="btn btn-action" data-decision="forward">Forward</button>
+        <button class="btn btn-action" data-decision="route_scope1">Route to Scope #1</button>
+        <button class="btn btn-action" data-decision="route_scope2">Route to Scope #2</button>
+        <button class="btn btn-action" data-decision="flag">Flag</button>
+        <button class="btn btn-action" data-decision="leave_alone">Leave alone</button>
+      </div>
+      <p id="detailStatus" class="status-line"></p>
+    </div>
+  </main>
+
+  <script src="/practice/app.js"></script>
+</body>
+</html>
