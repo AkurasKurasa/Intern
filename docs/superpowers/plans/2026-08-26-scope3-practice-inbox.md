@@ -310,7 +310,7 @@ Expected: PASS (4 tests)
 - [ ] **Step 5: Run the full suite and commit**
 
 Run: `pytest -q`
-Expected: PASS, 0 failed (the two practice-static-file tests that need Task 3's real files will show as FAILED here, not ERROR — that's expected and matches the earlier plan's own precedent of a task intentionally leaving some tests red for the next task to complete; note this clearly in your commit if the full-suite count reflects it)
+Expected: 3 failures (`test_practice_index_html_is_served`, `test_practice_style_css_is_served`, `test_practice_app_js_is_served` — these need `practice_inbox/`'s real files, which Task 3 creates), 0 other failures. This is a deliberately staged red state, not a regression — the earlier local-UI plan used this exact same pattern (a task's own static-file tests intentionally left red until the next task completes them). Note the 3 expected failures explicitly in your commit message or report so it's clear they're expected, not a surprise.
 
 ```bash
 git add components/inbox_router/local_server.py tests/test_local_server.py
