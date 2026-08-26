@@ -173,6 +173,7 @@ class InboxRouter:
             "message_id": message.id, "thread_id": message.thread_id,
             "subject": message.subject, "sender": message.sender,
             "sender_email": message.sender_email, "received_at": message.received_at,
+            "body_text": message.body_text,
             "decision": decision, "capsule_name": capsule_name, "confidence": confidence,
             "rationale": rationale, "layer": layer, "forward_to": forward_to,
             "status": "pending", "draft_id": "",

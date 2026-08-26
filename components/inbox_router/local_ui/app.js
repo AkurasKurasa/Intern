@@ -56,11 +56,16 @@ function closeMessage() {
 async function confirmCurrent() {
   const email = pendingEmails.find((e) => e.message_id === openMessageId);
   if (!email) return;
-  await fetch("/api/confirm", {
+  const resp = await fetch("/api/confirm", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ message_id: openMessageId, decision: email.decision }),
   });
+  if (!resp.ok) {
+    const err = await resp.json().catch(() => ({}));
+    detailStatus.textContent = `Error: ${err.error || "confirm failed"}`;
+    return;
+  }
   detailStatus.textContent = "Confirmed.";
   await loadInbox();
   closeMessage();
@@ -68,11 +73,16 @@ async function confirmCurrent() {
 
 async function overrideCurrent() {
   const newDecision = document.getElementById("overrideSelect").value;
-  await fetch("/api/override", {
+  const resp = await fetch("/api/override", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ message_id: openMessageId, new_decision: newDecision, reason: "manual override" }),
   });
+  if (!resp.ok) {
+    const err = await resp.json().catch(() => ({}));
+    detailStatus.textContent = `Error: ${err.error || "override failed"}`;
+    return;
+  }
   detailStatus.textContent = "Overridden.";
   await loadInbox();
   closeMessage();

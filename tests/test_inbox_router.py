@@ -309,6 +309,15 @@ class TestInboxRouterPollOnce:
         assert len(pending) == 1
         assert pending[0]["message_id"] == "i2"
 
+    def test_pending_entries_includes_body_text(self, tmp_path):
+        router = self._build(tmp_path, inbox=[
+            _msg("i1", "sender@x.com", "test subject", body="this is the email body text"),
+        ])
+        router.poll_once()
+        pending = router.pending_entries()
+        assert len(pending) == 1
+        assert pending[0]["body_text"] == "this is the email body text"
+
 
 class TestInboxRouterSessionMetrics:
     """
