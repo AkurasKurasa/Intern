@@ -21,6 +21,7 @@ body {
   background: transparent; font-size: 18px; color: #5f6368; cursor: default;
   display: flex; align-items: center; justify-content: center; flex-shrink: 0;
 }
+.icon-btn:disabled { color: #c4c7c5; cursor: not-allowed; }
 .icon-btn-apps { font-size: 6px; line-height: 5px; letter-spacing: 1px; }
 .logo { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
 .logo-mark { font-size: 22px; }
@@ -96,6 +97,7 @@ body {
 #toolbarRefreshBtn:hover, #backBtn:hover, #archiveBtn:hover { background: #f1f3f4; }
 .toolbar-count { margin-left: auto; font-size: 12px; color: #5f6368; }
 .bulk-bar { display: flex; align-items: center; gap: 12px; margin-left: auto; font-size: 13px; color: #5f6368; }
+.bulk-bar[hidden] { display: none; }
 
 .btn {
   border: none; border-radius: 18px; padding: 8px 20px;

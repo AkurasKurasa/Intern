@@ -21,6 +21,7 @@ body {
   background: transparent; font-size: 18px; color: #5f6368; cursor: default;
   display: flex; align-items: center; justify-content: center; flex-shrink: 0;
 }
+.icon-btn:disabled { color: #c4c7c5; cursor: not-allowed; }
 .icon-btn-apps { font-size: 6px; line-height: 5px; letter-spacing: 1px; }
 .logo { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
 .logo-mark { font-size: 22px; }

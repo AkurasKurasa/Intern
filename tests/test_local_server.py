@@ -238,3 +238,45 @@ class TestPracticeStaticFiles:
         assert status == 200
         assert content_type == "application/javascript"
         assert b"/practice/api" in body
+
+
+class TestBulkBarHiddenAttribute:
+    """Regression for a CSS-specificity bug found in local_ui/style.css:
+    `.bulk-bar { display: flex }` is a class selector, which ties in
+    specificity with the browser's own `[hidden] { display: none }` rule --
+    and author styles win a specificity tie over the UA stylesheet. So the
+    bulk-select bar rendered visible even with its `hidden` attribute set,
+    on a page that had never had any rows selected. Fixed with an explicit
+    `.bulk-bar[hidden] { display: none }` override -- the same fix pattern
+    already used for `#ppTestGroup[hidden]` in the Electron app's CSS
+    earlier in this project."""
+
+    def test_bulk_bar_is_actually_invisible_with_nothing_selected(self, tmp_path):
+        pytest.importorskip("playwright.sync_api")
+        from playwright.sync_api import sync_playwright
+
+        router = _build_router(tmp_path, inbox=[_msg("i1", "stranger@x.com", "unrelated")])
+        handler_cls = ls.make_handler(router)
+        httpd = HTTPServer(("127.0.0.1", 0), handler_cls)
+        port = httpd.server_address[1]
+        thread = threading.Thread(target=httpd.serve_forever, daemon=True)
+        thread.start()
+        try:
+            with sync_playwright() as p:
+                browser = p.chromium.launch()
+                page = browser.new_page()
+                page.goto(f"http://127.0.0.1:{port}/")
+                page.wait_for_selector("#rowList .row-item")
+
+                assert page.eval_on_selector("#bulkBar", "el => el.hidden") is True
+                assert page.eval_on_selector("#bulkBar", "el => getComputedStyle(el).display") == "none"
+
+                page.locator(".row-checkbox").first.check()
+                page.wait_for_timeout(100)
+                assert page.eval_on_selector("#bulkBar", "el => el.hidden") is False
+                assert page.eval_on_selector("#bulkBar", "el => getComputedStyle(el).display") == "flex"
+
+                browser.close()
+        finally:
+            httpd.shutdown()
+            thread.join(timeout=5)
