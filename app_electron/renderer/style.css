@@ -484,6 +484,14 @@ textarea.field { resize: vertical; font-family: var(--font-ui); }
 #ppCheckpointGroup, #ppTestGroup {
   display: flex; flex-direction: column; gap: 10px;
 }
+/* An ID selector setting display: flex above beats the browser's own
+   [hidden] { display: none } rule on specificity alone, so setting
+   .hidden = true in JS was silently doing nothing visually -- these two
+   stay hidden even though the rule above still applies whenever they're
+   shown. */
+#ppCheckpointGroup[hidden], #ppTestGroup[hidden] {
+  display: none;
+}
 .field-label { display: block; font-size: 11px; color: var(--text-muted); margin: 2px 0 0; }
 .field {
   width: 100%;
