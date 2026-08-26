@@ -297,6 +297,18 @@ class TestInboxRouterPollOnce:
         assert examples[0]["decision"] == "reply"
         assert examples[0]["source"] == "live"
 
+    def test_pending_entries_returns_only_unconfirmed(self, tmp_path):
+        router = self._build(tmp_path, inbox=[
+            _msg("i1", "stranger@x.com", "totally unrelated"),
+            _msg("i2", "stranger@x.com", "also unrelated"),
+        ])
+        router.poll_once()
+        assert len(router.pending_entries()) == 2
+        router.confirm_suggestion("i1", "leave_alone")
+        pending = router.pending_entries()
+        assert len(pending) == 1
+        assert pending[0]["message_id"] == "i2"
+
 
 class TestInboxRouterSessionMetrics:
     """

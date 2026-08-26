@@ -55,6 +55,13 @@ class WorkflowCapsule:
     # kind). Added for Scope #3's standalone mockup, which was deliberately
     # built OUTSIDE the Electron app rather than as an embedded page.
     url:              str = ""
+    # kind="url" only: the relative path to a Python script that must be
+    # running (as a local HTTP server) before this capsule's url is opened.
+    # "" means the url needs nothing local-served -- either a genuinely
+    # external link, or (today) unused for every non-url kind. Added for
+    # Inbox Dispatch's local, real UI (as opposed to its earlier
+    # Claude-hosted mockup, which could never reach the local backend).
+    local_server:     str = ""
 
     def launch_command(self, repo_root: str) -> tuple[list[str], str]:
         """Return (argv, cwd) to Popen for this capsule.

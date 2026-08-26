@@ -265,6 +265,13 @@ class InboxRouter:
                 return entry
         return None
 
+    def pending_entries(self) -> list:
+        """Every history entry still awaiting a Confirm/Override -- exposed
+        as a real public method (rather than reaching into the private
+        _load_history()) for local_server.py, a second driver of this same
+        class outside router.py's own stdin/stdout protocol."""
+        return [e for e in self._load_history() if e.get("status") == "pending"]
+
     def _load_history(self) -> list:
         if not os.path.exists(self._history_path):
             return []
