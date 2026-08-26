@@ -2,6 +2,14 @@
 let inboxMessages = [];
 let openMessageId = null;
 let searchQuery = "";
+let currentView = "inbox"; // "inbox" | "starred"
+
+let starredIds = new Set();
+try {
+  starredIds = new Set(JSON.parse(localStorage.getItem("inboxPractice.starred") || "[]"));
+} catch (e) {
+  starredIds = new Set();
+}
 
 const rowList = document.getElementById("rowList");
 const emptyState = document.getElementById("emptyState");
@@ -11,10 +19,20 @@ const detailStatus = document.getElementById("detailStatus");
 const inboxCount = document.getElementById("inboxCount");
 const toolbarCount = document.getElementById("toolbarCount");
 const searchInput = document.getElementById("searchInput");
+const navInbox = document.getElementById("navInbox");
+const navStarred = document.getElementById("navStarred");
 
 function snippetOf(bodyText) {
   const flat = (bodyText || "").replace(/\s+/g, " ").trim();
   return flat.length > 70 ? `${flat.slice(0, 70)}...` : flat;
+}
+
+function saveStarred() {
+  try {
+    localStorage.setItem("inboxPractice.starred", JSON.stringify([...starredIds]));
+  } catch (e) {
+    // Best-effort only -- starring is a local convenience, not a pipeline decision.
+  }
 }
 
 async function loadInbox() {
@@ -39,28 +57,55 @@ function matchesSearch(email) {
   return haystack.includes(searchQuery);
 }
 
+function matchesView(email) {
+  return currentView !== "starred" || starredIds.has(email.message_id);
+}
+
+function setView(view) {
+  currentView = view;
+  navInbox.classList.toggle("nav-item-active", view === "inbox");
+  navInbox.classList.toggle("nav-item-muted", view !== "inbox");
+  navStarred.classList.toggle("nav-item-active", view === "starred");
+  navStarred.classList.toggle("nav-item-muted", view !== "starred");
+  renderList();
+}
+
 function renderList() {
+  const viewMessages = inboxMessages.filter(matchesView);
+  const visible = viewMessages.filter(matchesSearch);
+
   rowList.innerHTML = "";
   inboxCount.textContent = inboxMessages.length > 0 ? String(inboxMessages.length) : "";
-  const visible = inboxMessages.filter(matchesSearch);
-  toolbarCount.textContent = inboxMessages.length > 0 ? `1-${visible.length} of ${inboxMessages.length}` : "";
+  toolbarCount.textContent = inboxMessages.length > 0 ? `1-${visible.length} of ${viewMessages.length}` : "";
   emptyState.hidden = visible.length > 0;
-  emptyState.textContent = inboxMessages.length === 0
-    ? "No emails to practice on. Click Refresh."
-    : "No emails match your search.";
+  if (currentView === "starred") {
+    emptyState.textContent = "No starred emails yet. Click the star on an email to star it.";
+  } else {
+    emptyState.textContent = inboxMessages.length === 0
+      ? "No emails to practice on. Click Refresh."
+      : "No emails match your search.";
+  }
+
   visible.forEach((email) => {
+    const id = email.message_id;
     const li = document.createElement("li");
     li.className = "row-item";
     li.innerHTML = `
-      <span class="row-checkbox" aria-hidden="true"></span>
-      <span class="row-star" aria-hidden="true">&#9734;</span>
+      <input type="checkbox" class="row-checkbox" disabled title="Not available in this tool -- each email needs its own practice decision.">
+      <span class="row-star ${starredIds.has(id) ? "starred" : ""}">${starredIds.has(id) ? "&#9733;" : "&#9734;"}</span>
       <span class="row-sender">${escapeHtml(email.sender || email.sender_email || "")}</span>
       <span class="row-snippet">
         <span class="row-subject">${escapeHtml(email.subject || "")}</span>
         <span class="row-preview"> - ${escapeHtml(snippetOf(email.body_text))}</span>
       </span>
     `;
-    li.addEventListener("click", () => openMessage(email.message_id));
+    li.querySelector(".row-star").addEventListener("click", (e) => {
+      e.stopPropagation();
+      if (starredIds.has(id)) starredIds.delete(id); else starredIds.add(id);
+      saveStarred();
+      renderList();
+    });
+    li.addEventListener("click", () => openMessage(id));
     rowList.appendChild(li);
   });
 }
@@ -115,6 +160,8 @@ document.getElementById("backBtn").addEventListener("click", closeMessage);
 document.querySelectorAll(".btn-action").forEach((btn) => {
   btn.addEventListener("click", () => recordDecision(btn.dataset.decision));
 });
+navInbox.addEventListener("click", () => setView("inbox"));
+navStarred.addEventListener("click", () => setView("starred"));
 searchInput.addEventListener("input", () => {
   searchQuery = searchInput.value.trim().toLowerCase();
   renderList();

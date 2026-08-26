@@ -31,40 +31,44 @@
         <button id="refreshBtn" class="compose-btn">
           <span class="compose-icon">&#8635;</span> Refresh
         </button>
-        <div class="nav-item nav-item-active">
+        <button id="navInbox" class="nav-item nav-item-active">
           <span class="nav-icon" aria-hidden="true">&#128229;</span>
           <span class="nav-label">Inbox</span>
           <span class="nav-count" id="inboxCount"></span>
-        </div>
-        <div class="nav-item nav-item-muted" aria-hidden="true">
+        </button>
+        <button id="navStarred" class="nav-item nav-item-muted">
           <span class="nav-icon">&#9733;</span>
           <span class="nav-label">Starred</span>
-        </div>
-        <div class="nav-item nav-item-muted" aria-hidden="true">
+        </button>
+        <button class="nav-item nav-item-muted" disabled title="Not available in this tool -- Scope #3 doesn't track snoozed mail.">
           <span class="nav-icon">&#128340;</span>
           <span class="nav-label">Snoozed</span>
-        </div>
-        <div class="nav-item nav-item-muted" aria-hidden="true">
+        </button>
+        <button class="nav-item nav-item-muted" disabled title="Not available in this tool -- this is an inbox-only view.">
           <span class="nav-icon">&#10148;</span>
           <span class="nav-label">Sent</span>
-        </div>
-        <div class="nav-item nav-item-muted" aria-hidden="true">
+        </button>
+        <button class="nav-item nav-item-muted" disabled title="Not available in this tool -- this is an inbox-only view.">
           <span class="nav-icon">&#128221;</span>
           <span class="nav-label">Drafts</span>
-        </div>
-        <div class="nav-item nav-item-muted nav-item-more" aria-hidden="true">
+        </button>
+        <button class="nav-item nav-item-muted nav-item-more" disabled title="Not available in this tool -- this is an inbox-only view.">
           <span class="nav-icon">&#9662;</span>
           <span class="nav-label">More</span>
-        </div>
+        </button>
       </nav>
 
       <main class="main-pane">
         <div id="listView">
           <div class="list-toolbar">
-            <span class="toolbar-checkbox" aria-hidden="true"></span>
+            <input type="checkbox" id="selectAllCheckbox" class="toolbar-checkbox" title="Select all">
             <button id="toolbarRefreshBtn" class="toolbar-icon-btn" title="Refresh">&#8635;</button>
-            <button class="toolbar-icon-btn" aria-hidden="true" tabindex="-1" title="More">&#8942;</button>
+            <button class="toolbar-icon-btn" disabled title="Not available in this tool">&#8942;</button>
             <span class="toolbar-count" id="toolbarCount"></span>
+            <div id="bulkBar" class="bulk-bar" hidden>
+              <span id="bulkCount"></span>
+              <button id="bulkConfirmBtn" class="btn btn-primary btn-sm">Confirm selected</button>
+            </div>
           </div>
           <p id="emptyState" class="empty-state" hidden>No pending emails. Click Refresh to check again.</p>
           <ul id="rowList" class="row-list"></ul>
@@ -73,10 +77,10 @@
         <div id="detailView" class="detail-view" hidden>
           <div class="detail-toolbar">
             <button id="backBtn" class="toolbar-icon-btn" title="Back to Inbox">&#8592;</button>
-            <button class="toolbar-icon-btn" aria-hidden="true" tabindex="-1" title="Archive">&#128230;</button>
-            <button class="toolbar-icon-btn" aria-hidden="true" tabindex="-1" title="Delete">&#128465;</button>
-            <button class="toolbar-icon-btn" aria-hidden="true" tabindex="-1" title="Mark as unread">&#9993;</button>
-            <button class="toolbar-icon-btn" aria-hidden="true" tabindex="-1" title="Snooze">&#128340;</button>
+            <button id="archiveBtn" class="toolbar-icon-btn" title="Archive (leaves this email alone)">&#128230;</button>
+            <button class="toolbar-icon-btn" disabled title="Not available in this tool -- Scope #3 doesn't delete mail.">&#128465;</button>
+            <button class="toolbar-icon-btn" disabled title="Not available in this tool -- Scope #3 doesn't track read/unread state.">&#9993;</button>
+            <button class="toolbar-icon-btn" disabled title="Not available in this tool -- Scope #3 doesn't support snoozing.">&#128340;</button>
           </div>
           <h1 class="detail-subject" id="detailSubject"></h1>
           <div class="detail-header">
@@ -89,9 +93,9 @@
               </div>
               <div class="detail-rationale" id="detailRationale"></div>
             </div>
-            <div class="detail-header-actions" aria-hidden="true">
-              <button class="toolbar-icon-btn" tabindex="-1" title="Reply">&#8617;</button>
-              <button class="toolbar-icon-btn" tabindex="-1" title="More">&#8942;</button>
+            <div class="detail-header-actions">
+              <button class="toolbar-icon-btn" disabled title="Not available in this tool -- use Confirm or Override below.">&#8617;</button>
+              <button class="toolbar-icon-btn" disabled title="Not available in this tool">&#8942;</button>
             </div>
           </div>
           <pre class="detail-body" id="detailBody"></pre>
