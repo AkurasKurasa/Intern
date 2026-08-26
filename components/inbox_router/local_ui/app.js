@@ -1,12 +1,15 @@
 // components/inbox_router/local_ui/app.js
 let pendingEmails = [];
 let openMessageId = null;
+let searchQuery = "";
 
 const rowList = document.getElementById("rowList");
 const emptyState = document.getElementById("emptyState");
 const listView = document.getElementById("listView");
 const detailView = document.getElementById("detailView");
 const detailStatus = document.getElementById("detailStatus");
+const inboxCount = document.getElementById("inboxCount");
+const searchInput = document.getElementById("searchInput");
 
 async function loadInbox() {
   detailStatus.textContent = "";
@@ -15,7 +18,6 @@ async function loadInbox() {
     if (!resp.ok) throw new Error(`Server returned ${resp.status}`);
     const data = await resp.json();
     pendingEmails = data.pending || [];
-    emptyState.textContent = "No pending emails. Click Refresh to check again.";
     renderList();
   } catch (e) {
     pendingEmails = [];
@@ -25,10 +27,21 @@ async function loadInbox() {
   }
 }
 
+function matchesSearch(email) {
+  if (!searchQuery) return true;
+  const haystack = `${email.sender || ""} ${email.sender_email || ""} ${email.subject || ""}`.toLowerCase();
+  return haystack.includes(searchQuery);
+}
+
 function renderList() {
   rowList.innerHTML = "";
-  emptyState.hidden = pendingEmails.length > 0;
-  pendingEmails.forEach((email) => {
+  inboxCount.textContent = pendingEmails.length > 0 ? String(pendingEmails.length) : "";
+  const visible = pendingEmails.filter(matchesSearch);
+  emptyState.hidden = visible.length > 0;
+  emptyState.textContent = pendingEmails.length === 0
+    ? "No pending emails. Click Refresh to check again."
+    : "No emails match your search.";
+  visible.forEach((email) => {
     const li = document.createElement("li");
     li.className = "row-item";
     li.innerHTML = `
@@ -107,5 +120,9 @@ document.getElementById("refreshBtn").addEventListener("click", loadInbox);
 document.getElementById("backBtn").addEventListener("click", closeMessage);
 document.getElementById("confirmBtn").addEventListener("click", confirmCurrent);
 document.getElementById("overrideBtn").addEventListener("click", overrideCurrent);
+searchInput.addEventListener("input", () => {
+  searchQuery = searchInput.value.trim().toLowerCase();
+  renderList();
+});
 
 loadInbox();

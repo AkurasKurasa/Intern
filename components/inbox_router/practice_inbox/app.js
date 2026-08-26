@@ -1,12 +1,15 @@
 // components/inbox_router/practice_inbox/app.js
 let inboxMessages = [];
 let openMessageId = null;
+let searchQuery = "";
 
 const rowList = document.getElementById("rowList");
 const emptyState = document.getElementById("emptyState");
 const listView = document.getElementById("listView");
 const detailView = document.getElementById("detailView");
 const detailStatus = document.getElementById("detailStatus");
+const inboxCount = document.getElementById("inboxCount");
+const searchInput = document.getElementById("searchInput");
 
 async function loadInbox() {
   detailStatus.textContent = "";
@@ -15,7 +18,6 @@ async function loadInbox() {
     if (!resp.ok) throw new Error(`Server returned ${resp.status}`);
     const data = await resp.json();
     inboxMessages = data.messages || [];
-    emptyState.textContent = "No emails to practice on. Click Refresh.";
     renderList();
   } catch (e) {
     inboxMessages = [];
@@ -25,10 +27,21 @@ async function loadInbox() {
   }
 }
 
+function matchesSearch(email) {
+  if (!searchQuery) return true;
+  const haystack = `${email.sender || ""} ${email.sender_email || ""} ${email.subject || ""}`.toLowerCase();
+  return haystack.includes(searchQuery);
+}
+
 function renderList() {
   rowList.innerHTML = "";
-  emptyState.hidden = inboxMessages.length > 0;
-  inboxMessages.forEach((email) => {
+  inboxCount.textContent = inboxMessages.length > 0 ? String(inboxMessages.length) : "";
+  const visible = inboxMessages.filter(matchesSearch);
+  emptyState.hidden = visible.length > 0;
+  emptyState.textContent = inboxMessages.length === 0
+    ? "No emails to practice on. Click Refresh."
+    : "No emails match your search.";
+  visible.forEach((email) => {
     const li = document.createElement("li");
     li.className = "row-item";
     li.innerHTML = `
@@ -88,6 +101,10 @@ document.getElementById("refreshBtn").addEventListener("click", loadInbox);
 document.getElementById("backBtn").addEventListener("click", closeMessage);
 document.querySelectorAll(".btn-action").forEach((btn) => {
   btn.addEventListener("click", () => recordDecision(btn.dataset.decision));
+});
+searchInput.addEventListener("input", () => {
+  searchQuery = searchInput.value.trim().toLowerCase();
+  renderList();
 });
 
 loadInbox();

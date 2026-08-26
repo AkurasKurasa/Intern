@@ -6,40 +6,65 @@
   <link rel="stylesheet" href="/practice/style.css">
 </head>
 <body>
-  <header class="topbar">
-    <span class="brand">📥 Inbox Practice</span>
-    <button id="refreshBtn" class="btn btn-primary">Refresh</button>
-  </header>
+  <div class="gmail-shell">
+    <header class="topbar">
+      <button class="icon-btn" aria-hidden="true" tabindex="-1">&#9776;</button>
+      <div class="logo">
+        <span class="logo-mark">&#128229;</span>
+        <span class="logo-text">Inbox Practice</span>
+      </div>
+      <div class="search-wrap">
+        <span class="search-icon" aria-hidden="true">&#128269;</span>
+        <input type="text" id="searchInput" class="search-input" placeholder="Search mail">
+      </div>
+      <div class="avatar topbar-avatar" aria-hidden="true">?</div>
+    </header>
 
-  <main>
-    <div id="listView">
-      <p id="emptyState" class="empty-state" hidden>No emails to practice on. Click Refresh.</p>
-      <ul id="rowList" class="row-list"></ul>
-    </div>
-
-    <div id="detailView" class="detail-view" hidden>
-      <button id="backBtn" class="btn-back">&larr; Back</button>
-      <div class="detail-header">
-        <div class="avatar" id="detailAvatar"></div>
-        <div>
-          <div class="detail-sender" id="detailSender"></div>
-          <div class="detail-subject" id="detailSubject"></div>
+    <div class="body-row">
+      <nav class="sidebar">
+        <button id="refreshBtn" class="compose-btn">
+          <span class="compose-icon">&#8635;</span> Refresh
+        </button>
+        <div class="nav-item nav-item-active">
+          <span class="nav-icon" aria-hidden="true">&#128229;</span>
+          <span class="nav-label">Inbox</span>
+          <span class="nav-count" id="inboxCount"></span>
         </div>
-      </div>
-      <pre class="detail-body" id="detailBody"></pre>
+      </nav>
 
-      <p class="detail-hint">What would you do with this email?</p>
-      <div class="action-grid">
-        <button class="btn btn-action" data-decision="reply">Reply</button>
-        <button class="btn btn-action" data-decision="forward">Forward</button>
-        <button class="btn btn-action" data-decision="route_scope1">Route to Scope #1</button>
-        <button class="btn btn-action" data-decision="route_scope2">Route to Scope #2</button>
-        <button class="btn btn-action" data-decision="flag">Flag</button>
-        <button class="btn btn-action" data-decision="leave_alone">Leave alone</button>
-      </div>
-      <p id="detailStatus" class="status-line"></p>
+      <main class="main-pane">
+        <div id="listView">
+          <p id="emptyState" class="empty-state" hidden>No emails to practice on. Click Refresh.</p>
+          <ul id="rowList" class="row-list"></ul>
+        </div>
+
+        <div id="detailView" class="detail-view" hidden>
+          <button id="backBtn" class="btn-back">&larr; Back to Inbox</button>
+          <h1 class="detail-subject" id="detailSubject"></h1>
+          <div class="detail-header">
+            <div class="avatar" id="detailAvatar"></div>
+            <div class="detail-header-text">
+              <div class="detail-sender" id="detailSender"></div>
+            </div>
+          </div>
+          <pre class="detail-body" id="detailBody"></pre>
+
+          <div class="reply-bar">
+            <p class="detail-hint">What would you do with this email?</p>
+            <div class="action-grid">
+              <button class="btn btn-action" data-decision="reply">Reply</button>
+              <button class="btn btn-action" data-decision="forward">Forward</button>
+              <button class="btn btn-action" data-decision="route_scope1">Route to Scope #1</button>
+              <button class="btn btn-action" data-decision="route_scope2">Route to Scope #2</button>
+              <button class="btn btn-action" data-decision="flag">Flag</button>
+              <button class="btn btn-action" data-decision="leave_alone">Leave alone</button>
+            </div>
+          </div>
+          <p id="detailStatus" class="status-line"></p>
+        </div>
+      </main>
     </div>
-  </main>
+  </div>
 
   <script src="/practice/app.js"></script>
 </body>
