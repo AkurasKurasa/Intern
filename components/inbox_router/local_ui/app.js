@@ -10,10 +10,19 @@ const detailStatus = document.getElementById("detailStatus");
 
 async function loadInbox() {
   detailStatus.textContent = "";
-  const resp = await fetch("/api/inbox");
-  const data = await resp.json();
-  pendingEmails = data.pending || [];
-  renderList();
+  try {
+    const resp = await fetch("/api/inbox");
+    if (!resp.ok) throw new Error(`Server returned ${resp.status}`);
+    const data = await resp.json();
+    pendingEmails = data.pending || [];
+    emptyState.textContent = "No pending emails. Click Refresh to check again.";
+    renderList();
+  } catch (e) {
+    pendingEmails = [];
+    rowList.innerHTML = "";
+    emptyState.hidden = false;
+    emptyState.textContent = "Can't reach the local server -- is it running? Try refreshing in a few seconds.";
+  }
 }
 
 function renderList() {

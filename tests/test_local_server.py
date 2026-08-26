@@ -106,6 +106,13 @@ class TestHandleRequestConfirm:
         status, _headers, _body, _ct = ls.handle_request("POST", "/api/confirm", b"5", router)
         assert status == 400
 
+    def test_post_confirm_from_disallowed_origin_returns_403(self, tmp_path):
+        router = _build_router(tmp_path, inbox=[_msg("i1", "stranger@x.com", "unrelated")])
+        router.poll_once()
+        body = json.dumps({"message_id": "i1", "decision": "leave_alone"}).encode("utf-8")
+        status, _headers, _body, _ct = ls.handle_request("POST", "/api/confirm", body, router, origin="http://evil.example.com")
+        assert status == 403
+
 
 class TestHandleRequestOverride:
     def test_post_override_records_the_new_decision(self, tmp_path):

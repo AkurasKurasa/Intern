@@ -45,6 +45,7 @@ from routing_rules import RuleLayer
 from router import InboxRouter
 
 DEFAULT_PORT = 8765
+_ALLOWED_ORIGINS = {f"http://localhost:{DEFAULT_PORT}", f"http://127.0.0.1:{DEFAULT_PORT}"}
 _UI_DIR = os.path.join(_THIS_DIR, "local_ui")
 
 _STATIC_FILES = {
@@ -74,10 +75,29 @@ def build_router() -> InboxRouter:
     return InboxRouter(gmail_client, profile, rule_layer, classifier)
 
 
-def handle_request(method: str, path: str, body: bytes, router: InboxRouter) -> Tuple[int, dict, bytes, str]:
+def _parse_action_body(body: bytes, required_keys) -> Tuple[dict, tuple]:
+    """Parse a POST body as JSON and confirm it has every key in
+    required_keys. Returns (data, None) on success, or (None, error_tuple)
+    on failure -- the caller returns error_tuple directly as its own
+    (status, headers, body, content_type) response."""
+    try:
+        data = json.loads(body or b"{}")
+        for key in required_keys:
+            _ = data[key]
+    except (json.JSONDecodeError, KeyError, TypeError) as exc:
+        err = json.dumps({"error": f"Bad request: {exc}"}).encode("utf-8")
+        return None, (400, {}, err, "application/json")
+    return data, None
+
+
+def handle_request(method: str, path: str, body: bytes, router: InboxRouter, origin: str = None) -> Tuple[int, dict, bytes, str]:
     """Pure request handler, separated from BaseHTTPRequestHandler so it's
     testable without opening a real socket. Returns
     (status_code, extra_headers, response_body_bytes, content_type)."""
+    if method == "POST" and origin is not None and origin not in _ALLOWED_ORIGINS:
+        err = json.dumps({"error": "Origin not allowed"}).encode("utf-8")
+        return 403, {}, err, "application/json"
+
     if method == "GET" and path in _STATIC_FILES:
         filename, content_type = _STATIC_FILES[path]
         file_path = os.path.join(_UI_DIR, filename)
@@ -92,13 +112,10 @@ def handle_request(method: str, path: str, body: bytes, router: InboxRouter) -> 
         return 200, {}, payload, "application/json"
 
     if method == "POST" and path == "/api/confirm":
-        try:
-            data = json.loads(body or b"{}")
-            message_id = data["message_id"]
-            decision = data["decision"]
-        except (json.JSONDecodeError, KeyError, TypeError) as exc:
-            err = json.dumps({"error": f"Bad request: {exc}"}).encode("utf-8")
-            return 400, {}, err, "application/json"
+        data, error = _parse_action_body(body, ("message_id", "decision"))
+        if error:
+            return error
+        message_id, decision = data["message_id"], data["decision"]
         # confirm_suggestion() itself returns None either way -- it can't
         # tell the caller whether message_id was actually found, it just
         # logs and returns on an unknown one. Check pending_entries() (the
@@ -111,14 +128,11 @@ def handle_request(method: str, path: str, body: bytes, router: InboxRouter) -> 
         return 200, {}, json.dumps({"ok": True}).encode("utf-8"), "application/json"
 
     if method == "POST" and path == "/api/override":
-        try:
-            data = json.loads(body or b"{}")
-            message_id = data["message_id"]
-            new_decision = data["new_decision"]
-            reason = data.get("reason", "")
-        except (json.JSONDecodeError, KeyError, TypeError) as exc:
-            err = json.dumps({"error": f"Bad request: {exc}"}).encode("utf-8")
-            return 400, {}, err, "application/json"
+        data, error = _parse_action_body(body, ("message_id", "new_decision"))
+        if error:
+            return error
+        message_id, new_decision = data["message_id"], data["new_decision"]
+        reason = data.get("reason", "")
         if not any(e["message_id"] == message_id for e in router.pending_entries()):
             err = json.dumps({"error": f"Unknown or already-handled message_id: {message_id}"}).encode("utf-8")
             return 400, {}, err, "application/json"
@@ -139,10 +153,10 @@ def make_handler(router: InboxRouter):
         def do_POST(self):
             length = int(self.headers.get("Content-Length", 0))
             body = self.rfile.read(length) if length else b""
-            self._respond("POST", self.path, body)
+            self._respond("POST", self.path, body, self.headers.get("Origin"))
 
-        def _respond(self, method, path, body):
-            status, headers, payload, content_type = handle_request(method, path, body, router)
+        def _respond(self, method, path, body, origin=None):
+            status, headers, payload, content_type = handle_request(method, path, body, router, origin=origin)
             self.send_response(status)
             self.send_header("Content-Type", content_type)
             for k, v in headers.items():
@@ -154,14 +168,20 @@ def make_handler(router: InboxRouter):
 
 
 def serve(port: int = DEFAULT_PORT) -> None:
-    router = build_router()
-    handler_cls = make_handler(router)
+    # Bind and start listening FIRST, before the slow torch/sentence-encoder
+    # import chain build_router() triggers -- a browser connecting during
+    # that window gets its TCP connection accepted into the OS backlog
+    # (instead of "connection refused"), even though nothing is ready to
+    # actually answer yet. The real handler class is installed once ready,
+    # before serve_forever() starts processing any request.
     try:
-        httpd = HTTPServer(("127.0.0.1", port), handler_cls)
+        httpd = HTTPServer(("127.0.0.1", port), BaseHTTPRequestHandler)
     except OSError as exc:
         print(f"Could not start local server on port {port} (already running?): {exc}")
         return
     print(f"Inbox Dispatch local server listening on http://localhost:{port}/")
+    router = build_router()
+    httpd.RequestHandlerClass = make_handler(router)
     httpd.serve_forever()
 
 
