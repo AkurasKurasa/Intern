@@ -9,7 +9,13 @@ const listView = document.getElementById("listView");
 const detailView = document.getElementById("detailView");
 const detailStatus = document.getElementById("detailStatus");
 const inboxCount = document.getElementById("inboxCount");
+const toolbarCount = document.getElementById("toolbarCount");
 const searchInput = document.getElementById("searchInput");
+
+function snippetOf(bodyText) {
+  const flat = (bodyText || "").replace(/\s+/g, " ").trim();
+  return flat.length > 70 ? `${flat.slice(0, 70)}...` : flat;
+}
 
 async function loadInbox() {
   detailStatus.textContent = "";
@@ -37,6 +43,7 @@ function renderList() {
   rowList.innerHTML = "";
   inboxCount.textContent = pendingEmails.length > 0 ? String(pendingEmails.length) : "";
   const visible = pendingEmails.filter(matchesSearch);
+  toolbarCount.textContent = pendingEmails.length > 0 ? `1-${visible.length} of ${pendingEmails.length}` : "";
   emptyState.hidden = visible.length > 0;
   emptyState.textContent = pendingEmails.length === 0
     ? "No pending emails. Click Refresh to check again."
@@ -45,8 +52,13 @@ function renderList() {
     const li = document.createElement("li");
     li.className = "row-item";
     li.innerHTML = `
+      <span class="row-checkbox" aria-hidden="true"></span>
+      <span class="row-star" aria-hidden="true">&#9734;</span>
       <span class="row-sender">${escapeHtml(email.sender || email.sender_email || "")}</span>
-      <span class="row-subject">${escapeHtml(email.subject || "")}</span>
+      <span class="row-snippet">
+        <span class="row-subject">${escapeHtml(email.subject || "")}</span>
+        <span class="row-preview"> - ${escapeHtml(snippetOf(email.body_text))}</span>
+      </span>
       <span class="row-badge">${escapeHtml(email.decision || "")}</span>
     `;
     li.addEventListener("click", () => openMessage(email.message_id));
@@ -117,6 +129,7 @@ function escapeHtml(str) {
 }
 
 document.getElementById("refreshBtn").addEventListener("click", loadInbox);
+document.getElementById("toolbarRefreshBtn").addEventListener("click", loadInbox);
 document.getElementById("backBtn").addEventListener("click", closeMessage);
 document.getElementById("confirmBtn").addEventListener("click", confirmCurrent);
 document.getElementById("overrideBtn").addEventListener("click", overrideCurrent);

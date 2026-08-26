@@ -8,7 +8,7 @@
 <body>
   <div class="gmail-shell">
     <header class="topbar">
-      <button class="icon-btn" aria-hidden="true" tabindex="-1">&#9776;</button>
+      <button class="icon-btn" aria-hidden="true" tabindex="-1" title="Menu">&#9776;</button>
       <div class="logo">
         <span class="logo-mark">&#128235;</span>
         <span class="logo-text">Inbox Dispatch</span>
@@ -16,8 +16,14 @@
       <div class="search-wrap">
         <span class="search-icon" aria-hidden="true">&#128269;</span>
         <input type="text" id="searchInput" class="search-input" placeholder="Search mail">
+        <span class="search-filter-icon" aria-hidden="true" title="Search options">&#9881;</span>
       </div>
-      <div class="avatar topbar-avatar" aria-hidden="true">?</div>
+      <div class="topbar-icons">
+        <button class="icon-btn" aria-hidden="true" tabindex="-1" title="Support">?</button>
+        <button class="icon-btn" aria-hidden="true" tabindex="-1" title="Settings">&#9881;</button>
+        <button class="icon-btn icon-btn-apps" aria-hidden="true" tabindex="-1" title="Google apps">&#9642;&#9642;&#9642;<br>&#9642;&#9642;&#9642;<br>&#9642;&#9642;&#9642;</button>
+        <div class="avatar topbar-avatar" aria-hidden="true">?</div>
+      </div>
     </header>
 
     <div class="body-row">
@@ -30,22 +36,62 @@
           <span class="nav-label">Inbox</span>
           <span class="nav-count" id="inboxCount"></span>
         </div>
+        <div class="nav-item nav-item-muted" aria-hidden="true">
+          <span class="nav-icon">&#9733;</span>
+          <span class="nav-label">Starred</span>
+        </div>
+        <div class="nav-item nav-item-muted" aria-hidden="true">
+          <span class="nav-icon">&#128340;</span>
+          <span class="nav-label">Snoozed</span>
+        </div>
+        <div class="nav-item nav-item-muted" aria-hidden="true">
+          <span class="nav-icon">&#10148;</span>
+          <span class="nav-label">Sent</span>
+        </div>
+        <div class="nav-item nav-item-muted" aria-hidden="true">
+          <span class="nav-icon">&#128221;</span>
+          <span class="nav-label">Drafts</span>
+        </div>
+        <div class="nav-item nav-item-muted nav-item-more" aria-hidden="true">
+          <span class="nav-icon">&#9662;</span>
+          <span class="nav-label">More</span>
+        </div>
       </nav>
 
       <main class="main-pane">
         <div id="listView">
+          <div class="list-toolbar">
+            <span class="toolbar-checkbox" aria-hidden="true"></span>
+            <button id="toolbarRefreshBtn" class="toolbar-icon-btn" title="Refresh">&#8635;</button>
+            <button class="toolbar-icon-btn" aria-hidden="true" tabindex="-1" title="More">&#8942;</button>
+            <span class="toolbar-count" id="toolbarCount"></span>
+          </div>
           <p id="emptyState" class="empty-state" hidden>No pending emails. Click Refresh to check again.</p>
           <ul id="rowList" class="row-list"></ul>
         </div>
 
         <div id="detailView" class="detail-view" hidden>
-          <button id="backBtn" class="btn-back">&larr; Back to Inbox</button>
+          <div class="detail-toolbar">
+            <button id="backBtn" class="toolbar-icon-btn" title="Back to Inbox">&#8592;</button>
+            <button class="toolbar-icon-btn" aria-hidden="true" tabindex="-1" title="Archive">&#128230;</button>
+            <button class="toolbar-icon-btn" aria-hidden="true" tabindex="-1" title="Delete">&#128465;</button>
+            <button class="toolbar-icon-btn" aria-hidden="true" tabindex="-1" title="Mark as unread">&#9993;</button>
+            <button class="toolbar-icon-btn" aria-hidden="true" tabindex="-1" title="Snooze">&#128340;</button>
+          </div>
           <h1 class="detail-subject" id="detailSubject"></h1>
           <div class="detail-header">
             <div class="avatar" id="detailAvatar"></div>
             <div class="detail-header-text">
-              <div class="detail-sender" id="detailSender"></div>
+              <div class="detail-sender-row">
+                <span class="detail-sender" id="detailSender"></span>
+                <span class="detail-tome">to me</span>
+                <span class="detail-chevron" aria-hidden="true">&#9662;</span>
+              </div>
               <div class="detail-rationale" id="detailRationale"></div>
+            </div>
+            <div class="detail-header-actions" aria-hidden="true">
+              <button class="toolbar-icon-btn" tabindex="-1" title="Reply">&#8617;</button>
+              <button class="toolbar-icon-btn" tabindex="-1" title="More">&#8942;</button>
             </div>
           </div>
           <pre class="detail-body" id="detailBody"></pre>
