@@ -111,6 +111,20 @@ let capsuleIsRunning = false;
 // next live event.
 let recorderIsRecording = false;
 
+let localServerProcess = null;
+
+function ensureLocalServerRunning(scriptPath) {
+  if (localServerProcess && localServerProcess.exitCode === null) {
+    return; // already running
+  }
+  const pythonExe = resolvePython();
+  const fullPath = path.join(REPO_ROOT, scriptPath);
+  localServerProcess = spawn(pythonExe, [fullPath], {
+    cwd: REPO_ROOT, detached: true, stdio: "ignore", windowsHide: true,
+  });
+  localServerProcess.unref();
+}
+
 function startBridge() {
   const pythonExe = resolvePython();
   bridge = spawn(pythonExe, [BRIDGE_SCRIPT], {
@@ -649,11 +663,13 @@ ipcMain.handle("capsules-delete", (_evt, name) => deleteCapsule(name));
 ipcMain.handle("capsule-run", (_evt, capsuleName) => {
   // kind="url" isn't a subprocess at all -- there's nothing for
   // recorder_bridge.py/Python to run, so this short-circuits before ever
-  // reaching queueOrSend(). Scope #3's mockup was deliberately built
-  // OUTSIDE the Electron app (direct request), so "Play" for it just opens
-  // the real browser to that page.
+  // reaching queueOrSend(). Scope #3's Inbox Dispatch page is deliberately
+  // built OUTSIDE the Electron app (direct request), so "Play" for it just
+  // opens the real browser to that page -- ensuring its local server is
+  // running first, when the capsule declares one.
   const capsule = listCapsules().find((c) => c.name === capsuleName);
   if (capsule && capsule.kind === "url") {
+    if (capsule.local_server) ensureLocalServerRunning(capsule.local_server);
     if (capsule.url) shell.openExternal(capsule.url);
     return { opened: true };
   }
@@ -861,6 +877,7 @@ ipcMain.handle("capsule-run-current", () => {
   if (!currentCapsuleName) return;
   const capsule = listCapsules().find((c) => c.name === currentCapsuleName);
   if (capsule && capsule.kind === "url") {
+    if (capsule.local_server) ensureLocalServerRunning(capsule.local_server);
     if (capsule.url) shell.openExternal(capsule.url);
     return;
   }

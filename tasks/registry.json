@@ -43,7 +43,7 @@
     },
     {
       "name": "Inbox Dispatch",
-      "description": "Email triage mockup for Scope #3 (Inbox Router) — opens in your browser, not embedded in this app",
+      "description": "Real, locally-served email triage UI for Scope #3 (Inbox Router)",
       "model_path": "",
       "trigger_keywords": [],
       "trigger_apps": [],
@@ -51,7 +51,8 @@
       "created": "2026-08-23T00:00:00",
       "emoji": "📬",
       "kind": "url",
-      "url": "https://claude.ai/code/artifact/adfb7de1-c852-43dd-9bdb-ca5516e1407a"
+      "url": "http://localhost:8765/",
+      "local_server": "components/inbox_router/local_server.py"
     }
   ]
 }
