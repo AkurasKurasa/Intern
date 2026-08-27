@@ -43,14 +43,21 @@
     },
     {
       "name": "Inbox Dispatch",
-      "description": "Real, locally-served email triage UI for Scope #3 (Inbox Router)",
+      "description": "Intern reads each pending email off the real page and clicks the real decision itself (Scope #3)",
       "model_path": "",
       "trigger_keywords": [],
       "trigger_apps": [],
       "trace_dir": "",
       "created": "2026-08-23T00:00:00",
       "emoji": "📬",
-      "kind": "url",
+      "kind": "script",
+      "entrypoint": "components/inbox_router/automate_inbox.py",
+      "args": [
+        "--commit",
+        "--limit",
+        "5"
+      ],
+      "cwd": "",
       "url": "http://localhost:8765/",
       "local_server": "components/inbox_router/local_server.py"
     }

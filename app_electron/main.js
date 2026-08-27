@@ -710,11 +710,14 @@ const TEST_MOCKUPS = {
 ipcMain.handle("test-launch-mockups", (_evt, capsuleName) => {
   // Inbox Dispatch's practice target isn't a {type, script/target} pair
   // like form_filling/Sheet-to-Portal Matcher's real, separate apps below
-  // -- it's a page on the SAME local server the Play button already starts
-  // (see ensureLocalServerRunning), just a different URL path. Checked
-  // first, ahead of the flat TEST_MOCKUPS lookup.
+  // -- it's a page on the SAME local server Play's own automate_inbox.py
+  // run already starts (see ensureLocalServerRunning), just a different
+  // URL path. Checked by `local_server` alone, not `kind === "url"` --
+  // Inbox Dispatch's kind is "script" (Play actually clicks through the
+  // page now), but it still carries `url`/`local_server` purely for this
+  // button.
   const capsule = listCapsules().find((c) => c.name === capsuleName);
-  if (capsule && capsule.kind === "url" && capsule.local_server) {
+  if (capsule && capsule.local_server && capsule.url) {
     ensureLocalServerRunning(capsule.local_server);
     shell.openExternal(`${capsule.url}practice/`);
     return { ok: true, opened: ["practice inbox"] };
