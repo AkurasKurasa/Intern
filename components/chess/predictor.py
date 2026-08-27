@@ -27,6 +27,14 @@ from board_features import encode_fen, similarity  # noqa: E402
 DEFAULT_MIN_SIMILARITY = 0.85
 DEFAULT_GAMES_DIR = Path(_THIS_DIR) / "data" / "games"
 
+# The user always plays Black -- a direct decision, not an assumption.
+# game_recorder.py logs both colors' moves (White's moves are still part
+# of the board history and needed to read the position), but only the
+# user's own color's moves are real examples of what THEY would do.
+# Matching a position and handing back a move the opponent made there
+# would be wrong regardless of how similar the position looked.
+USER_COLOR = "b"
+
 
 def load_recorded_examples(games_dir=DEFAULT_GAMES_DIR) -> List[dict]:
     """Reads every recorded move from every .jsonl file under games_dir
@@ -50,19 +58,27 @@ def load_recorded_examples(games_dir=DEFAULT_GAMES_DIR) -> List[dict]:
 
 
 def predict_move(fen_before: str, examples: List[dict],
-                  min_similarity: float = DEFAULT_MIN_SIMILARITY) -> Optional[Dict]:
+                  min_similarity: float = DEFAULT_MIN_SIMILARITY,
+                  user_color: str = USER_COLOR) -> Optional[Dict]:
     """Finds the recorded example whose position is most similar to
     fen_before and returns what the user actually played there. Returns
-    None if there are no recorded examples, or the closest one isn't
-    similar enough to count as a real prediction rather than a guess --
-    this never falls back to computing a move any other way."""
-    if not examples:
+    None if there are no recorded examples FROM THE USER'S OWN COLOR, or
+    the closest one isn't similar enough to count as a real prediction
+    rather than a guess -- this never falls back to computing a move any
+    other way.
+
+    Filters to user_color first, before similarity scoring: an
+    opponent's move recorded in the same game is real data about the
+    position, but not a demonstration of what the user would do, so it
+    must never be the thing handed back as "the" predicted move."""
+    own_examples = [ex for ex in examples if ex.get("color") == user_color]
+    if not own_examples:
         return None
 
     target = encode_fen(fen_before)
     best_example = None
     best_score = -1.0
-    for example in examples:
+    for example in own_examples:
         score = similarity(target, encode_fen(example["fen_before"]))
         if score > best_score:
             best_score = score

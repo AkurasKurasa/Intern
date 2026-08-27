@@ -21,7 +21,10 @@ AFTER_E4_FEN = "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR"
 EMPTY_BOARD_FEN = "8/8/8/8/8/8/8/8"
 
 
-def _example(fen_before, from_sq, to_sq, piece_type="p", color="w", move_number=1, source="game_1.jsonl"):
+def _example(fen_before, from_sq, to_sq, piece_type="p", color="b", move_number=1, source="game_1.jsonl"):
+    # Defaults to color="b" -- the user always plays Black (a direct
+    # decision), so a plain example with no color override represents a
+    # real demonstration of the user's own play, not an opponent's move.
     return {
         "move_number": move_number, "from_square": from_sq, "to_square": to_sq,
         "color": color, "piece_type": piece_type, "fen_before": fen_before,
@@ -131,3 +134,34 @@ class TestPredictMove:
 
         assert predictor.predict_move(STARTING_FEN_RANKS, examples, min_similarity=0.99) is None
         assert predictor.predict_move(STARTING_FEN_RANKS, examples, min_similarity=0.9) is not None
+
+    def test_ignores_a_closer_opponent_move_in_favor_of_a_farther_own_move(self):
+        # The load-bearing correctness fix: an opponent's (White's) move
+        # sits on an IDENTICAL position (similarity 1.0) but must never
+        # be returned as "the" prediction -- only the user's own (Black)
+        # move counts, even though it's a worse position match.
+        opponent_exact_match = _example(STARTING_FEN_RANKS, "e2", "e4", color="w", source="opponent.jsonl")
+        own_farther_move = _example(AFTER_E4_FEN, "e7", "e5", color="b", source="mine.jsonl")
+
+        result = predictor.predict_move(STARTING_FEN_RANKS, [opponent_exact_match, own_farther_move],
+                                         min_similarity=0.9)
+
+        assert result is not None
+        assert result["based_on_file"] == "mine.jsonl"
+        assert result["color"] == "b"
+
+    def test_only_opponent_moves_recorded_returns_none(self):
+        # No real demonstration of the user's own play exists yet in
+        # this position, even though the position itself is a perfect
+        # match -- must not borrow the opponent's move as a stand-in.
+        examples = [_example(STARTING_FEN_RANKS, "e2", "e4", color="w")]
+        assert predictor.predict_move(STARTING_FEN_RANKS, examples) is None
+
+    def test_a_different_user_color_can_be_requested_explicitly(self):
+        # Not hardcoded to Black -- USER_COLOR is the default, not the
+        # only option, in case this is ever reused for someone who
+        # plays White instead.
+        examples = [_example(STARTING_FEN_RANKS, "e2", "e4", color="w")]
+        result = predictor.predict_move(STARTING_FEN_RANKS, examples, user_color="w")
+        assert result is not None
+        assert result["color"] == "w"
