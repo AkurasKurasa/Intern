@@ -29,6 +29,9 @@ const bulkBar = document.getElementById("bulkBar");
 const bulkCount = document.getElementById("bulkCount");
 const bulkConfirmBtn = document.getElementById("bulkConfirmBtn");
 const snackbar = document.getElementById("snackbar");
+const overrideSelect = document.getElementById("overrideSelect");
+const replyBoxWrap = document.getElementById("replyBoxWrap");
+const replyBody = document.getElementById("replyBody");
 
 const STAR_FILLED = '<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>';
 const STAR_OUTLINE = '<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M12 15.4l3.76 2.27-1-4.28 3.32-2.88-4.38-.38L12 6l-1.71 4.04-4.38.38 3.32 2.88-1 4.28L12 15.4M12 2l2.81 6.63L22 9.24l-5.46 4.73L18.18 21 12 17.27 5.82 21l1.64-7.03L2 9.24l7.19-.61L12 2z"/></svg>';
@@ -159,21 +162,38 @@ function openMessage(messageId) {
   document.getElementById("detailRationale").textContent = email.rationale || "";
   document.getElementById("detailBody").textContent = email.body_text || "(no body available)";
   document.getElementById("detailDecision").textContent = email.decision || "";
+  replyBody.value = "";
+  overrideSelect.value = "route_scope1";
+  refreshReplyBoxVisibility();
   listView.hidden = true;
   detailView.hidden = false;
 }
 
 function closeMessage() {
   openMessageId = null;
+  replyBody.value = "";
   detailView.hidden = true;
   listView.hidden = false;
+}
+
+function isReplyLike(decision) {
+  return decision === "reply" || decision === "forward";
+}
+
+function refreshReplyBoxVisibility() {
+  const email = pendingEmails.find((e) => e.message_id === openMessageId);
+  const suggested = email ? email.decision : "";
+  replyBoxWrap.hidden = !(isReplyLike(suggested) || isReplyLike(overrideSelect.value));
 }
 
 async function submitDecision(newDecision, reason, successMessage) {
   const resp = await fetch("/api/override", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ message_id: openMessageId, new_decision: newDecision, reason }),
+    body: JSON.stringify({
+      message_id: openMessageId, new_decision: newDecision, reason,
+      reply_body: isReplyLike(newDecision) ? replyBody.value : "",
+    }),
   });
   if (!resp.ok) {
     const err = await resp.json().catch(() => ({}));
@@ -191,7 +211,10 @@ async function confirmCurrent() {
   const resp = await fetch("/api/confirm", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ message_id: openMessageId, decision: email.decision }),
+    body: JSON.stringify({
+      message_id: openMessageId, decision: email.decision,
+      reply_body: isReplyLike(email.decision) ? replyBody.value : "",
+    }),
   });
   if (!resp.ok) {
     const err = await resp.json().catch(() => ({}));
@@ -204,18 +227,13 @@ async function confirmCurrent() {
 }
 
 async function overrideCurrent() {
-  const newDecision = document.getElementById("overrideSelect").value;
+  const newDecision = overrideSelect.value;
   await submitDecision(newDecision, "manual override", "Overridden.");
 }
 
 async function archiveCurrent() {
   if (!openMessageId) return;
   await submitDecision("leave_alone", "archived", "Archived.");
-}
-
-async function replyCurrent() {
-  if (!openMessageId) return;
-  await submitDecision("reply", "manual override", "Marked for reply.");
 }
 
 async function confirmSelected() {
@@ -247,7 +265,12 @@ document.getElementById("backBtn").addEventListener("click", closeMessage);
 document.getElementById("confirmBtn").addEventListener("click", confirmCurrent);
 document.getElementById("overrideBtn").addEventListener("click", overrideCurrent);
 document.getElementById("archiveBtn").addEventListener("click", archiveCurrent);
-document.getElementById("replyIconBtn").addEventListener("click", replyCurrent);
+document.getElementById("replyIconBtn").addEventListener("click", () => {
+  overrideSelect.value = "reply";
+  refreshReplyBoxVisibility();
+  replyBody.focus();
+});
+overrideSelect.addEventListener("change", refreshReplyBoxVisibility);
 navInbox.addEventListener("click", () => setView("inbox"));
 navStarred.addEventListener("click", () => setView("starred"));
 selectAllCheckbox.addEventListener("change", () => {

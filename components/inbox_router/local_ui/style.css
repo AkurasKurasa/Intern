@@ -169,6 +169,15 @@ body {
 }
 .decision-bar { margin-bottom: 12px; }
 .decision-label { font-size: 14px; color: #5f6368; }
+.reply-box-wrap { margin-top: 12px; }
+.reply-box-wrap[hidden] { display: none; }
+.reply-textarea {
+  width: 100%; min-height: 120px; resize: vertical;
+  font-family: inherit; font-size: 14px; color: #202124;
+  border: 1px solid #dadce0; border-radius: 8px; padding: 12px;
+  box-sizing: border-box;
+}
+.reply-textarea:focus { outline: none; border-color: #1a73e8; }
 .status-line { color: #188038; font-size: 13px; min-height: 18px; padding: 0 24px; }
 
 /* Snackbar -- Gmail's real feedback pattern: a dark pill that slides up
