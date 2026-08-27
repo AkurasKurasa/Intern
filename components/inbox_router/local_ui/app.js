@@ -5,6 +5,7 @@ let searchQuery = "";
 let currentView = "inbox"; // "inbox" | "starred"
 let selectedIds = new Set();
 let lastVisibleIds = [];
+let snackbarTimer = null;
 
 let starredIds = new Set();
 try {
@@ -27,6 +28,10 @@ const selectAllCheckbox = document.getElementById("selectAllCheckbox");
 const bulkBar = document.getElementById("bulkBar");
 const bulkCount = document.getElementById("bulkCount");
 const bulkConfirmBtn = document.getElementById("bulkConfirmBtn");
+const snackbar = document.getElementById("snackbar");
+
+const STAR_FILLED = '<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>';
+const STAR_OUTLINE = '<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M12 15.4l3.76 2.27-1-4.28 3.32-2.88-4.38-.38L12 6l-1.71 4.04-4.38.38 3.32 2.88-1 4.28L12 15.4M12 2l2.81 6.63L22 9.24l-5.46 4.73L18.18 21 12 17.27 5.82 21l1.64-7.03L2 9.24l7.19-.61L12 2z"/></svg>';
 
 function snippetOf(bodyText) {
   const flat = (bodyText || "").replace(/\s+/g, " ").trim();
@@ -39,6 +44,13 @@ function saveStarred() {
   } catch (e) {
     // Best-effort only -- starring is a local convenience, not a pipeline decision.
   }
+}
+
+function showSnackbar(message) {
+  clearTimeout(snackbarTimer);
+  snackbar.textContent = message;
+  snackbar.hidden = false;
+  snackbarTimer = setTimeout(() => { snackbar.hidden = true; }, 4000);
 }
 
 async function loadInbox() {
@@ -96,11 +108,12 @@ function renderList() {
 
   visible.forEach((email) => {
     const id = email.message_id;
+    const starred = starredIds.has(id);
     const li = document.createElement("li");
     li.className = "row-item";
     li.innerHTML = `
       <input type="checkbox" class="row-checkbox" ${selectedIds.has(id) ? "checked" : ""}>
-      <span class="row-star ${starredIds.has(id) ? "starred" : ""}">${starredIds.has(id) ? "&#9733;" : "&#9734;"}</span>
+      <span class="row-star ${starred ? "starred" : ""}">${starred ? STAR_FILLED : STAR_OUTLINE}</span>
       <span class="row-sender">${escapeHtml(email.sender || email.sender_email || "")}</span>
       <span class="row-snippet">
         <span class="row-subject">${escapeHtml(email.subject || "")}</span>
@@ -156,6 +169,22 @@ function closeMessage() {
   listView.hidden = false;
 }
 
+async function submitDecision(newDecision, reason, successMessage) {
+  const resp = await fetch("/api/override", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ message_id: openMessageId, new_decision: newDecision, reason }),
+  });
+  if (!resp.ok) {
+    const err = await resp.json().catch(() => ({}));
+    detailStatus.textContent = `Error: ${err.error || "request failed"}`;
+    return;
+  }
+  showSnackbar(successMessage);
+  await loadInbox();
+  closeMessage();
+}
+
 async function confirmCurrent() {
   const email = pendingEmails.find((e) => e.message_id === openMessageId);
   if (!email) return;
@@ -169,42 +198,24 @@ async function confirmCurrent() {
     detailStatus.textContent = `Error: ${err.error || "confirm failed"}`;
     return;
   }
-  detailStatus.textContent = "Confirmed.";
+  showSnackbar("Confirmed.");
   await loadInbox();
   closeMessage();
 }
 
 async function overrideCurrent() {
   const newDecision = document.getElementById("overrideSelect").value;
-  const resp = await fetch("/api/override", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ message_id: openMessageId, new_decision: newDecision, reason: "manual override" }),
-  });
-  if (!resp.ok) {
-    const err = await resp.json().catch(() => ({}));
-    detailStatus.textContent = `Error: ${err.error || "override failed"}`;
-    return;
-  }
-  detailStatus.textContent = "Overridden.";
-  await loadInbox();
-  closeMessage();
+  await submitDecision(newDecision, "manual override", "Overridden.");
 }
 
 async function archiveCurrent() {
   if (!openMessageId) return;
-  const resp = await fetch("/api/override", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ message_id: openMessageId, new_decision: "leave_alone", reason: "archived" }),
-  });
-  if (!resp.ok) {
-    const err = await resp.json().catch(() => ({}));
-    detailStatus.textContent = `Error: ${err.error || "archive failed"}`;
-    return;
-  }
-  await loadInbox();
-  closeMessage();
+  await submitDecision("leave_alone", "archived", "Archived.");
+}
+
+async function replyCurrent() {
+  if (!openMessageId) return;
+  await submitDecision("reply", "manual override", "Marked for reply.");
 }
 
 async function confirmSelected() {
@@ -218,8 +229,10 @@ async function confirmSelected() {
       body: JSON.stringify({ message_id: id, decision: email.decision }),
     });
   }
+  const count = ids.length;
   selectedIds.clear();
   await loadInbox();
+  showSnackbar(count === 1 ? "1 email confirmed." : `${count} emails confirmed.`);
 }
 
 function escapeHtml(str) {
@@ -234,6 +247,7 @@ document.getElementById("backBtn").addEventListener("click", closeMessage);
 document.getElementById("confirmBtn").addEventListener("click", confirmCurrent);
 document.getElementById("overrideBtn").addEventListener("click", overrideCurrent);
 document.getElementById("archiveBtn").addEventListener("click", archiveCurrent);
+document.getElementById("replyIconBtn").addEventListener("click", replyCurrent);
 navInbox.addEventListener("click", () => setView("inbox"));
 navStarred.addEventListener("click", () => setView("starred"));
 selectAllCheckbox.addEventListener("change", () => {

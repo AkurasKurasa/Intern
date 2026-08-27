@@ -3,6 +3,7 @@ let inboxMessages = [];
 let openMessageId = null;
 let searchQuery = "";
 let currentView = "inbox"; // "inbox" | "starred"
+let snackbarTimer = null;
 
 let starredIds = new Set();
 try {
@@ -21,6 +22,17 @@ const toolbarCount = document.getElementById("toolbarCount");
 const searchInput = document.getElementById("searchInput");
 const navInbox = document.getElementById("navInbox");
 const navStarred = document.getElementById("navStarred");
+const snackbar = document.getElementById("snackbar");
+
+const STAR_FILLED = '<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>';
+const STAR_OUTLINE = '<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M12 15.4l3.76 2.27-1-4.28 3.32-2.88-4.38-.38L12 6l-1.71 4.04-4.38.38 3.32 2.88-1 4.28L12 15.4M12 2l2.81 6.63L22 9.24l-5.46 4.73L18.18 21 12 17.27 5.82 21l1.64-7.03L2 9.24l7.19-.61L12 2z"/></svg>';
+
+function showSnackbar(message) {
+  clearTimeout(snackbarTimer);
+  snackbar.textContent = message;
+  snackbar.hidden = false;
+  snackbarTimer = setTimeout(() => { snackbar.hidden = true; }, 4000);
+}
 
 function snippetOf(bodyText) {
   const flat = (bodyText || "").replace(/\s+/g, " ").trim();
@@ -92,7 +104,7 @@ function renderList() {
     li.className = "row-item";
     li.innerHTML = `
       <input type="checkbox" class="row-checkbox" disabled title="Not available in this tool -- each email needs its own practice decision.">
-      <span class="row-star ${starredIds.has(id) ? "starred" : ""}">${starredIds.has(id) ? "&#9733;" : "&#9734;"}</span>
+      <span class="row-star ${starredIds.has(id) ? "starred" : ""}">${starredIds.has(id) ? STAR_FILLED : STAR_OUTLINE}</span>
       <span class="row-sender">${escapeHtml(email.sender || email.sender_email || "")}</span>
       <span class="row-snippet">
         <span class="row-subject">${escapeHtml(email.subject || "")}</span>
@@ -143,6 +155,7 @@ async function recordDecision(decision) {
       return;
     }
     closeMessage();
+    showSnackbar("Recorded.");
   } catch (e) {
     detailStatus.textContent = "Error: could not reach the server.";
   }
@@ -160,6 +173,7 @@ document.getElementById("backBtn").addEventListener("click", closeMessage);
 document.querySelectorAll(".btn-action").forEach((btn) => {
   btn.addEventListener("click", () => recordDecision(btn.dataset.decision));
 });
+document.getElementById("replyIconBtn").addEventListener("click", () => recordDecision("reply"));
 navInbox.addEventListener("click", () => setView("inbox"));
 navStarred.addEventListener("click", () => setView("starred"));
 searchInput.addEventListener("input", () => {
