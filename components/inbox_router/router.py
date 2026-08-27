@@ -273,6 +273,35 @@ class InboxRouter:
         class outside router.py's own stdin/stdout protocol."""
         return [e for e in self._load_history() if e.get("status") == "pending"]
 
+    def list_unprocessed_stubs(self) -> list:
+        """What's waiting to be triaged, before any reasoning has happened --
+        sender/subject only, no decision. A non-destructive peek: unlike
+        poll_once()/process_next_unprocessed(), this never marks anything
+        processed. Lets a UI show "N emails waiting" the way a human would
+        glance at an inbox before reading anything in it."""
+        return [
+            {"message_id": m.id, "subject": m.subject, "sender": m.sender,
+             "sender_email": m.sender_email}
+            for m in self._gmail.list_inbox_unprocessed()
+        ]
+
+    def process_next_unprocessed(self) -> Optional[dict]:
+        """Classify exactly one waiting message through the real pipeline
+        (rule layer -> trained agent -> LLM fallback -- the same
+        _classify_and_record() poll_once() already calls per message) and
+        mark it processed. Returns None once nothing is left. Exists so a
+        UI can drive the pipeline one visible step at a time instead of
+        poll_once()'s all-at-once loop, without changing what the pipeline
+        actually decides or why."""
+        unprocessed = self._gmail.list_inbox_unprocessed()
+        if not unprocessed:
+            return None
+        message = unprocessed[0]
+        entry = self._classify_and_record(message)
+        self._gmail.mark_processed(message.id)
+        emit("inbox_routed", **entry)
+        return entry
+
     def list_practice_inbox(self) -> list:
         """Every mock inbox message available to practice-demonstrate on,
         unfiltered by processed state -- unlike poll_once()'s

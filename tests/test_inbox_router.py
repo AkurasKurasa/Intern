@@ -319,6 +319,64 @@ class TestInboxRouterPollOnce:
         assert len(pending) == 1
         assert pending[0]["body_text"] == "this is the email body text"
 
+    def test_list_unprocessed_stubs_has_no_decision_and_does_not_mark_processed(self, tmp_path):
+        router = self._build(tmp_path, inbox=[
+            _msg("i1", "stranger@x.com", "unrelated one"),
+            _msg("i2", "stranger@x.com", "unrelated two"),
+        ])
+        stubs = router.list_unprocessed_stubs()
+        assert len(stubs) == 2
+        assert stubs[0] == {
+            "message_id": "i1", "subject": "unrelated one",
+            "sender": "Someone <stranger@x.com>", "sender_email": "stranger@x.com",
+        }
+        assert "decision" not in stubs[0]
+        # A peek, not a poll -- calling it again must return the same two,
+        # not an empty list.
+        assert len(router.list_unprocessed_stubs()) == 2
+        assert router.pending_entries() == []
+
+    def test_process_next_unprocessed_classifies_exactly_one_via_the_real_pipeline(self, tmp_path):
+        router = self._build(tmp_path, inbox=[
+            _msg("i1", "broker@x.com", "insurance intake form"),
+            _msg("i2", "stranger@x.com", "totally unrelated"),
+        ], capsules=[{"name": "form_filling", "description": "", "model_path": "x.pt",
+                      "trigger_keywords": ["insurance", "intake"], "trigger_apps": []}])
+
+        first = router.process_next_unprocessed()
+        assert first["message_id"] == "i1"
+        assert first["decision"] == "route_scope1"
+        assert first["layer"] == "rule"
+        # Only the one message was processed -- the other is still waiting.
+        assert len(router.list_unprocessed_stubs()) == 1
+        assert len(router.pending_entries()) == 1
+
+        second = router.process_next_unprocessed()
+        assert second["message_id"] == "i2"
+        assert len(router.list_unprocessed_stubs()) == 0
+        assert len(router.pending_entries()) == 2
+
+    def test_process_next_unprocessed_returns_none_when_inbox_is_empty(self, tmp_path):
+        router = self._build(tmp_path, inbox=[])
+        assert router.process_next_unprocessed() is None
+
+    def test_process_next_unprocessed_matches_poll_once_for_the_same_message(self, tmp_path):
+        # Same underlying _classify_and_record() call -- this pins that
+        # stepping through one-at-a-time produces byte-identical decisions
+        # to the existing bulk path, not a second, divergent code path.
+        bulk_router = self._build(tmp_path / "bulk", inbox=[_msg("i1", "broker@x.com", "insurance intake form")],
+                                   capsules=[{"name": "form_filling", "description": "", "model_path": "x.pt",
+                                              "trigger_keywords": ["insurance", "intake"], "trigger_apps": []}])
+        bulk_result = bulk_router.poll_once()[0]
+
+        step_router = self._build(tmp_path / "step", inbox=[_msg("i1", "broker@x.com", "insurance intake form")],
+                                   capsules=[{"name": "form_filling", "description": "", "model_path": "x.pt",
+                                              "trigger_keywords": ["insurance", "intake"], "trigger_apps": []}])
+        step_result = step_router.process_next_unprocessed()
+
+        for key in ("decision", "capsule_name", "confidence", "rationale", "layer"):
+            assert bulk_result[key] == step_result[key]
+
 
 class TestInboxRouterSessionMetrics:
     """

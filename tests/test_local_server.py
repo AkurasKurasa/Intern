@@ -67,6 +67,44 @@ class TestHandleRequestInbox:
         assert status == 404
 
 
+class TestHandleRequestInboxUnprocessed:
+    """The autonomous-run pair: peek at what's waiting, then classify
+    exactly one at a time through the real pipeline -- so a UI can drive
+    the same reasoning poll_once() does, but visibly, one step at a time,
+    instead of dumping the whole inbox pre-decided."""
+
+    def test_get_unprocessed_lists_waiting_mail_with_no_decision(self, tmp_path):
+        router = _build_router(tmp_path, inbox=[_msg("i1", "stranger@x.com", "unrelated")])
+        status, _headers, body, content_type = ls.handle_request("GET", "/api/inbox/unprocessed", b"", router)
+        assert status == 200
+        assert content_type == "application/json"
+        payload = json.loads(body)
+        assert payload["waiting"] == [{
+            "message_id": "i1", "subject": "unrelated",
+            "sender": "stranger@x.com", "sender_email": "stranger@x.com",
+        }]
+        assert "decision" not in payload["waiting"][0]
+
+    def test_post_process_next_classifies_one_via_the_real_pipeline(self, tmp_path):
+        router = _build_router(tmp_path, inbox=[_msg("i1", "stranger@x.com", "unrelated")])
+        status, _headers, body, content_type = ls.handle_request("POST", "/api/inbox/process-next", b"", router)
+        assert status == 200
+        assert content_type == "application/json"
+        payload = json.loads(body)
+        assert payload["done"] is False
+        assert payload["entry"]["message_id"] == "i1"
+        assert payload["entry"]["decision"] == "flag"  # no LLM configured -> flag
+        # The one message just processed no longer shows up as waiting.
+        status, _headers, body, _ct = ls.handle_request("GET", "/api/inbox/unprocessed", b"", router)
+        assert json.loads(body)["waiting"] == []
+
+    def test_post_process_next_reports_done_when_inbox_is_empty(self, tmp_path):
+        router = _build_router(tmp_path, inbox=[])
+        status, _headers, body, _ct = ls.handle_request("POST", "/api/inbox/process-next", b"", router)
+        assert status == 200
+        assert json.loads(body) == {"done": True}
+
+
 class TestHandleRequestConfirm:
     def test_post_confirm_records_a_real_decision(self, tmp_path):
         router = _build_router(tmp_path, inbox=[_msg("i1", "stranger@x.com", "unrelated")])
@@ -113,6 +151,22 @@ class TestHandleRequestConfirm:
         body = json.dumps({"message_id": "i1", "decision": "leave_alone"}).encode("utf-8")
         status, _headers, _body, _ct = ls.handle_request("POST", "/api/confirm", body, router, origin="http://evil.example.com")
         assert status == 403
+
+    def test_post_confirm_from_localhost_on_a_non_default_port_is_allowed(self, tmp_path):
+        # Regression: the origin allowlist used to be an exact-match set
+        # hardcoded to DEFAULT_PORT (8765). The real app always runs on
+        # that port, but a test server binds an OS-assigned random one --
+        # every POST a real browser made against it was silently rejected
+        # as "Origin not allowed", which is exactly what broke the
+        # autonomous-run feature the first time it was driven by an actual
+        # browser instead of a bodyless GET. Any localhost/127.0.0.1 origin
+        # must be accepted regardless of port.
+        router = _build_router(tmp_path, inbox=[_msg("i1", "stranger@x.com", "unrelated")])
+        router.poll_once()
+        body = json.dumps({"message_id": "i1", "decision": "leave_alone"}).encode("utf-8")
+        status, _headers, _body, _ct = ls.handle_request(
+            "POST", "/api/confirm", body, router, origin="http://127.0.0.1:54321")
+        assert status == 200
 
 
 class TestHandleRequestOverride:

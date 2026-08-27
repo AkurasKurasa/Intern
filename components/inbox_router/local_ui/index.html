@@ -45,11 +45,11 @@
 
     <div class="body-row">
       <nav class="sidebar">
-        <button id="refreshBtn" class="compose-btn">
+        <button id="runBtn" class="compose-btn">
           <span class="compose-icon">
-            <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
           </span>
-          Refresh
+          Run
         </button>
         <button id="navInbox" class="nav-item nav-item-active">
           <span class="nav-icon" aria-hidden="true">
@@ -106,8 +106,30 @@
               <button id="bulkConfirmBtn" class="btn btn-primary btn-sm">Confirm selected</button>
             </div>
           </div>
-          <p id="emptyState" class="empty-state" hidden>No pending emails. Click Refresh to check again.</p>
+          <p id="emptyState" class="empty-state" hidden>No pending emails. Click Run to check again.</p>
           <ul id="rowList" class="row-list"></ul>
+        </div>
+
+        <div id="autoRunView" class="auto-run-view" hidden>
+          <p class="auto-progress" id="autoProgress"></p>
+          <div class="detail-header">
+            <div class="avatar" id="autoAvatar"></div>
+            <div class="detail-header-text">
+              <div class="detail-sender-row">
+                <span class="detail-sender" id="autoSender"></span>
+                <span class="detail-tome">to me</span>
+              </div>
+            </div>
+          </div>
+          <h1 class="detail-subject" id="autoSubject"></h1>
+          <pre class="detail-body" id="autoBody"></pre>
+          <div class="auto-status-bar">
+            <span class="auto-status" id="autoStatus"></span>
+            <span class="auto-decision-line" id="autoDecisionLine" hidden>
+              &rarr; <strong id="autoDecisionValue"></strong>
+            </span>
+          </div>
+          <p class="auto-rationale" id="autoRationale"></p>
         </div>
 
         <div id="detailView" class="detail-view" hidden>

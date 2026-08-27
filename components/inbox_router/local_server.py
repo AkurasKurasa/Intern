@@ -19,6 +19,7 @@ import os
 import sys
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from typing import Tuple
+from urllib.parse import urlsplit
 
 _THIS_DIR = os.path.dirname(os.path.abspath(__file__))
 _ROOT = os.path.dirname(os.path.dirname(_THIS_DIR))
@@ -41,7 +42,7 @@ if os.path.exists(_env_path):
 from gmail_client import get_gmail_client
 
 DEFAULT_PORT = 8765
-_ALLOWED_ORIGINS = {f"http://localhost:{DEFAULT_PORT}", f"http://127.0.0.1:{DEFAULT_PORT}"}
+_ALLOWED_ORIGIN_HOSTS = {"localhost", "127.0.0.1"}
 _UI_DIR = os.path.join(_THIS_DIR, "local_ui")
 _PRACTICE_UI_DIR = os.path.join(_THIS_DIR, "practice_inbox")
 
@@ -53,6 +54,17 @@ _STATIC_FILES = {
     "/practice/style.css": (_PRACTICE_UI_DIR, "style.css", "text/css"),
     "/practice/app.js": (_PRACTICE_UI_DIR, "app.js", "application/javascript"),
 }
+
+
+def _is_allowed_origin(origin: str) -> bool:
+    """Same-origin check by scheme+host, not a hardcoded port -- the local
+    server can bind to any port (the real app always uses DEFAULT_PORT, but
+    tests spin one up on an OS-assigned port), so pinning this to 8765
+    would reject every real POST a browser test makes. Blocks anything
+    that isn't plain http(s) on localhost/127.0.0.1, same as the previous
+    exact-match set did for the one port it recognized."""
+    parts = urlsplit(origin)
+    return parts.scheme in ("http", "https") and parts.hostname in _ALLOWED_ORIGIN_HOSTS
 
 
 def _pick_provider() -> Tuple[str, str]:
@@ -105,7 +117,7 @@ def handle_request(method: str, path: str, body: bytes, router: InboxRouter, ori
     """Pure request handler, separated from BaseHTTPRequestHandler so it's
     testable without opening a real socket. Returns
     (status_code, extra_headers, response_body_bytes, content_type)."""
-    if method == "POST" and origin is not None and origin not in _ALLOWED_ORIGINS:
+    if method == "POST" and origin is not None and not _is_allowed_origin(origin):
         err = json.dumps({"error": "Origin not allowed"}).encode("utf-8")
         return 403, {}, err, "application/json"
 
@@ -120,6 +132,17 @@ def handle_request(method: str, path: str, body: bytes, router: InboxRouter, ori
     if method == "GET" and path == "/api/inbox":
         router.poll_once()
         payload = json.dumps({"pending": router.pending_entries()}).encode("utf-8")
+        return 200, {}, payload, "application/json"
+
+    if method == "GET" and path == "/api/inbox/unprocessed":
+        payload = json.dumps({"waiting": router.list_unprocessed_stubs()}).encode("utf-8")
+        return 200, {}, payload, "application/json"
+
+    if method == "POST" and path == "/api/inbox/process-next":
+        entry = router.process_next_unprocessed()
+        if entry is None:
+            return 200, {}, json.dumps({"done": True}).encode("utf-8"), "application/json"
+        payload = json.dumps({"done": False, "entry": entry}).encode("utf-8")
         return 200, {}, payload, "application/json"
 
     if method == "POST" and path == "/api/confirm":
