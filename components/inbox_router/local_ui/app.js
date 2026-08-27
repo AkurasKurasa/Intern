@@ -29,17 +29,6 @@ const bulkBar = document.getElementById("bulkBar");
 const bulkCount = document.getElementById("bulkCount");
 const bulkConfirmBtn = document.getElementById("bulkConfirmBtn");
 const snackbar = document.getElementById("snackbar");
-const autoRunView = document.getElementById("autoRunView");
-const autoProgress = document.getElementById("autoProgress");
-const autoAvatar = document.getElementById("autoAvatar");
-const autoSender = document.getElementById("autoSender");
-const autoSubject = document.getElementById("autoSubject");
-const autoBody = document.getElementById("autoBody");
-const autoStatus = document.getElementById("autoStatus");
-const autoDecisionLine = document.getElementById("autoDecisionLine");
-const autoDecisionValue = document.getElementById("autoDecisionValue");
-const autoRationale = document.getElementById("autoRationale");
-let autoRunInProgress = false;
 
 const STAR_FILLED = '<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>';
 const STAR_OUTLINE = '<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M12 15.4l3.76 2.27-1-4.28 3.32-2.88-4.38-.38L12 6l-1.71 4.04-4.38.38 3.32 2.88-1 4.28L12 15.4M12 2l2.81 6.63L22 9.24l-5.46 4.73L18.18 21 12 17.27 5.82 21l1.64-7.03L2 9.24l7.19-.61L12 2z"/></svg>';
@@ -113,7 +102,7 @@ function renderList() {
     emptyState.textContent = "No starred emails yet. Click the star on an email to star it.";
   } else {
     emptyState.textContent = pendingEmails.length === 0
-      ? "No pending emails. Click Run to check again."
+      ? "No pending emails. Click Refresh to check again."
       : "No emails match your search.";
   }
 
@@ -246,98 +235,13 @@ async function confirmSelected() {
   showSnackbar(count === 1 ? "1 email confirmed." : `${count} emails confirmed.`);
 }
 
-function sleep(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-function showThinking(index, total, email) {
-  autoProgress.textContent = `Processing ${index} of ${total}`;
-  autoAvatar.textContent = (email.sender || email.sender_email || "?").charAt(0).toUpperCase();
-  autoSender.textContent = email.sender || email.sender_email || "";
-  autoSubject.textContent = email.subject || "";
-  autoBody.textContent = email.body_text || "(no body available)";
-  autoStatus.textContent = "Reading this email";
-  autoStatus.className = "auto-status auto-thinking";
-  autoDecisionLine.hidden = true;
-  autoRationale.textContent = "";
-}
-
-function revealDecision(entry) {
-  autoStatus.textContent = "Decided";
-  autoStatus.className = "auto-status";
-  autoDecisionLine.hidden = false;
-  autoDecisionValue.textContent = entry.decision || "";
-  autoRationale.textContent = entry.rationale || "";
-}
-
-// The real demonstration: Intern works through the inbox itself, one
-// message at a time, so its reasoning is watchable instead of a finished
-// list appearing all at once. Genuinely new mail is classified live
-// through the real pipeline (rule layer -> trained agent -> LLM fallback --
-// process_next_unprocessed() calls the exact same _classify_and_record()
-// poll_once() always has). If there's nothing new to poll (e.g. it was
-// already polled earlier), it replays the already-decided pending queue
-// with the same pacing instead -- real data either way, just visible.
-async function runAutonomousTriage() {
-  if (autoRunInProgress) return;
-  autoRunInProgress = true;
-  try {
-    let waiting;
-    try {
-      const waitingResp = await fetch("/api/inbox/unprocessed");
-      if (!waitingResp.ok) throw new Error(`Server returned ${waitingResp.status}`);
-      ({ waiting } = await waitingResp.json());
-    } catch (e) {
-      emptyState.hidden = false;
-      emptyState.textContent = "Can't reach the local server -- is it running? Try Run again in a few seconds.";
-      return;
-    }
-
-    listView.hidden = true;
-    detailView.hidden = true;
-    autoRunView.hidden = false;
-
-    if (waiting.length > 0) {
-      for (let i = 0; i < waiting.length; i++) {
-        showThinking(i + 1, waiting.length, waiting[i]);
-        await sleep(700);
-        const resp = await fetch("/api/inbox/process-next", { method: "POST" });
-        if (!resp.ok) {
-          autoStatus.textContent = "Couldn't reach the local server -- stopping here.";
-          autoStatus.className = "auto-status";
-          break;
-        }
-        const data = await resp.json();
-        if (data.done) break;
-        revealDecision(data.entry);
-        await sleep(1400);
-      }
-    } else {
-      await loadInbox();
-      const replay = pendingEmails;
-      for (let i = 0; i < replay.length; i++) {
-        showThinking(i + 1, replay.length, replay[i]);
-        await sleep(700);
-        revealDecision(replay[i]);
-        await sleep(1400);
-      }
-    }
-
-    autoRunView.hidden = true;
-    listView.hidden = false;
-    await loadInbox();
-  } finally {
-    autoRunInProgress = false;
-  }
-}
-
 function escapeHtml(str) {
   const div = document.createElement("div");
   div.textContent = str;
   return div.innerHTML;
 }
 
-document.getElementById("runBtn").addEventListener("click", runAutonomousTriage);
+document.getElementById("refreshBtn").addEventListener("click", loadInbox);
 document.getElementById("toolbarRefreshBtn").addEventListener("click", loadInbox);
 document.getElementById("backBtn").addEventListener("click", closeMessage);
 document.getElementById("confirmBtn").addEventListener("click", confirmCurrent);
@@ -360,4 +264,4 @@ searchInput.addEventListener("input", () => {
   renderList();
 });
 
-runAutonomousTriage();
+loadInbox();

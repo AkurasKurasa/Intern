@@ -171,28 +171,6 @@ body {
 .decision-label { font-size: 14px; color: #5f6368; }
 .status-line { color: #188038; font-size: 13px; min-height: 18px; padding: 0 24px; }
 
-/* Autonomous run -- Intern working through the inbox on its own, one
-   message at a time, so the reasoning is watchable instead of a finished
-   list appearing all at once. */
-.auto-run-view { padding: 24px; max-width: 760px; }
-.auto-run-view[hidden] { display: none; }
-.auto-progress { color: #5f6368; font-size: 13px; margin: 0 0 16px; }
-.auto-status-bar {
-  display: flex; align-items: center; gap: 8px; margin-top: 16px;
-  padding-top: 16px; border-top: 1px solid #f1f1f1; font-size: 15px;
-}
-.auto-status { color: #5f6368; }
-.auto-status.auto-thinking::after {
-  content: ""; display: inline-block; width: 6px; height: 6px; margin-left: 6px;
-  border-radius: 50%; background: #5f6368; animation: auto-pulse 1s ease-in-out infinite;
-}
-@keyframes auto-pulse {
-  0%, 100% { opacity: 0.25; }
-  50% { opacity: 1; }
-}
-.auto-decision-line { color: #d93025; font-weight: 500; }
-.auto-rationale { color: #5f6368; font-style: italic; font-size: 13px; margin-top: 8px; }
-
 /* Snackbar -- Gmail's real feedback pattern: a dark pill that slides up
    from the bottom-left after an action, instead of a persistent status
    line no one would otherwise notice. */
