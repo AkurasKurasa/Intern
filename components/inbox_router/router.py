@@ -68,6 +68,7 @@ from pattern_profile import PatternProfile
 from routing_rules import RuleLayer
 from inbox_agent import DEFAULT_CHECKPOINT_PATH, InboxAgent
 from decision_recorder import DEFAULT_EXAMPLES_PATH, record_example
+from reply_recorder import DEFAULT_REPLY_EXAMPLES_PATH, record_reply_example
 
 HISTORY_PATH = os.path.join(_THIS_DIR, "data", "routed_history.json")
 SENT_LOOKBACK_DAYS = 90
@@ -114,7 +115,8 @@ class InboxRouter:
                  history_path: str = HISTORY_PATH,
                  poll_interval_s: float = DEFAULT_POLL_INTERVAL_S,
                  inbox_checkpoint_path: str = DEFAULT_CHECKPOINT_PATH,
-                 examples_path: str = DEFAULT_EXAMPLES_PATH) -> None:
+                 examples_path: str = DEFAULT_EXAMPLES_PATH,
+                 reply_examples_path: str = DEFAULT_REPLY_EXAMPLES_PATH) -> None:
         self._gmail = gmail_client
         self._profile = profile
         self._rules = rule_layer
@@ -124,6 +126,7 @@ class InboxRouter:
         self._history_path = history_path
         self._poll_interval_s = poll_interval_s
         self._examples_path = examples_path
+        self._reply_examples_path = reply_examples_path
         self._stop = False
         # In-memory cache of what this process has routed, so confirm/
         # override don't need a disk round-trip in the common case --
@@ -192,7 +195,15 @@ class InboxRouter:
         return entry
 
     # ── confirm / override -- the only place create_draft() is ever called ──
-    def confirm_suggestion(self, message_id: str, decision: str) -> None:
+    def confirm_suggestion(self, message_id: str, decision: str, reply_body: str = "") -> None:
+        """reply_body is real text a human actually typed -- never
+        generated. When decision is "reply"/"forward" and reply_body is
+        given, that's the draft's real content, and it's saved as a real
+        example for the reply model to learn from later. When no
+        reply_body is given, the draft is created empty rather than
+        asking the LLM to invent content -- this project doesn't put
+        AI-authored words in front of anyone as if they were the user's
+        own."""
         entry = self._pending.get(message_id) or self._find_history_entry(message_id)
         if entry is None:
             emit("inbox_error", message=f"Unknown message id: {message_id}")
@@ -200,11 +211,15 @@ class InboxRouter:
         message = self._gmail.get_message(message_id)
         draft_id = ""
         if decision in ("reply", "forward") and message is not None:
-            body = self._llm.draft_message(message, decision, entry.get("forward_to", ""))
             to = entry.get("forward_to", "") if decision == "forward" else message.sender_email
             subject = ("Fwd: " if decision == "forward" else "Re: ") + message.subject
-            draft_id = self._gmail.create_draft(to=to, subject=subject, body=body, thread_id=message.thread_id)
+            draft_id = self._gmail.create_draft(to=to, subject=subject, body=reply_body, thread_id=message.thread_id)
             emit("inbox_draft_created", message_id=message_id, draft_id=draft_id, decision=decision)
+            if reply_body.strip():
+                try:
+                    record_reply_example(message, reply_body, source="live", path=self._reply_examples_path)
+                except Exception as exc:
+                    emit("inbox_log", line=f"Failed to record reply example: {exc}", level="err")
         # route_scope1/route_scope2: nothing Gmail-side happens here at all
         # -- the real capsule run already happened client-side (see
         # renderer.js's onInboxConfirmClick -> window.capsulesAPI.run())
@@ -223,16 +238,34 @@ class InboxRouter:
         self._confirmed_count += 1
         emit("inbox_confirm_applied", message_id=message_id, decision=decision, draft_id=draft_id)
 
-    def override_decision(self, message_id: str, new_decision: str, reason: str = "") -> None:
+    def override_decision(self, message_id: str, new_decision: str, reason: str = "",
+                           reply_body: str = "") -> None:
+        """reply_body: same contract as confirm_suggestion() -- real
+        human-typed text only. Overriding TO "reply"/"forward" now
+        creates a real draft (it didn't before -- there was no way to
+        override into a reply and actually get a draft out of it), and
+        saves reply_body as a real example when it's given."""
         entry = self._pending.get(message_id) or self._find_history_entry(message_id)
         if entry is None:
             emit("inbox_error", message=f"Unknown message id: {message_id}")
             return
         old_decision = entry.get("decision", "")
         message = self._gmail.get_message(message_id)
+        draft_id = ""
+        if new_decision in ("reply", "forward") and message is not None:
+            to = entry.get("forward_to", "") if new_decision == "forward" else message.sender_email
+            subject = ("Fwd: " if new_decision == "forward" else "Re: ") + message.subject
+            draft_id = self._gmail.create_draft(to=to, subject=subject, body=reply_body, thread_id=message.thread_id)
+            emit("inbox_draft_created", message_id=message_id, draft_id=draft_id, decision=new_decision)
+            if reply_body.strip():
+                try:
+                    record_reply_example(message, reply_body, source="live", path=self._reply_examples_path)
+                except Exception as exc:
+                    emit("inbox_log", line=f"Failed to record reply example: {exc}", level="err")
         entry["decision"] = new_decision
         entry["status"] = "overridden"
         entry["override_reason"] = reason
+        entry["draft_id"] = draft_id
         self._update_history_entry(entry)
         if message is not None:
             self._profile.record_override(message, old_decision, new_decision)

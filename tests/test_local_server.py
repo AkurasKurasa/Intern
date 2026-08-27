@@ -21,6 +21,7 @@ from pattern_profile import PatternProfile
 from routing_rules import RuleLayer
 from router import InboxRouter
 import local_server as ls
+import reply_recorder
 
 
 def _write_fixture(data_dir, inbox=None, sent=None):
@@ -48,7 +49,8 @@ def _build_router(tmp_path, inbox=None):
     history_path = str(data_dir / "routed_history.json")
     return InboxRouter(client, profile, rules, classifier, history_path=history_path,
                         inbox_checkpoint_path=str(tmp_path / "no_such_checkpoint.pt"),
-                        examples_path=str(tmp_path / "training_examples.jsonl"))
+                        examples_path=str(tmp_path / "training_examples.jsonl"),
+                        reply_examples_path=str(tmp_path / "reply_examples.jsonl"))
 
 
 class TestHandleRequestInbox:
@@ -115,6 +117,17 @@ class TestHandleRequestConfirm:
         assert json.loads(resp_body) == {"ok": True}
         assert router.pending_entries() == []
 
+    def test_post_confirm_reply_with_real_text_creates_a_draft_with_that_text(self, tmp_path):
+        router = _build_router(tmp_path, inbox=[_msg("i1", "stranger@x.com", "unrelated")])
+        router.poll_once()
+        body = json.dumps({"message_id": "i1", "decision": "reply",
+                            "reply_body": "Thanks, I'll get back to you."}).encode("utf-8")
+        status, _headers, resp_body, _ct = ls.handle_request("POST", "/api/confirm", body, router)
+        assert status == 200
+        assert json.loads(resp_body) == {"ok": True}
+        examples = reply_recorder.load_reply_examples(path=router._reply_examples_path)
+        assert examples[0]["reply_body"] == "Thanks, I'll get back to you."
+
     def test_post_confirm_malformed_json_returns_400(self, tmp_path):
         router = _build_router(tmp_path)
         status, _headers, _body, _ct = ls.handle_request("POST", "/api/confirm", b"not json", router)
@@ -177,6 +190,16 @@ class TestHandleRequestOverride:
         status, _headers, resp_body, _ct = ls.handle_request("POST", "/api/override", body, router)
         assert status == 200
         assert json.loads(resp_body) == {"ok": True}
+
+    def test_post_override_to_reply_with_real_text_creates_a_draft(self, tmp_path):
+        router = _build_router(tmp_path, inbox=[_msg("i1", "stranger@x.com", "unrelated")])
+        router.poll_once()
+        body = json.dumps({"message_id": "i1", "new_decision": "reply",
+                            "reply_body": "Sure, sounds good."}).encode("utf-8")
+        status, _headers, resp_body, _ct = ls.handle_request("POST", "/api/override", body, router)
+        assert status == 200
+        examples = reply_recorder.load_reply_examples(path=router._reply_examples_path)
+        assert examples[0]["reply_body"] == "Sure, sounds good."
 
     def test_post_override_unknown_message_id_returns_400(self, tmp_path):
         router = _build_router(tmp_path)

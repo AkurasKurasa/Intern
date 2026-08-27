@@ -20,6 +20,7 @@ from routing_rules import RuleLayer
 from llm_classifier import LLMClassifier
 from router import InboxRouter
 import decision_recorder
+import reply_recorder
 from decision_recorder import load_examples
 
 
@@ -202,7 +203,8 @@ class TestInboxRouterPollOnce:
         history_path = str(tmp_path / "data" / "routed_history.json")
         return InboxRouter(client, profile, rules, classifier, history_path=history_path,
                             inbox_checkpoint_path=str(tmp_path / "no_such_checkpoint.pt"),
-                            examples_path=str(tmp_path / "data" / "training_examples.jsonl"))
+                            examples_path=str(tmp_path / "data" / "training_examples.jsonl"),
+                            reply_examples_path=str(tmp_path / "data" / "reply_examples.jsonl"))
 
     def test_poll_once_routes_and_marks_processed(self, tmp_path):
         router = self._build(tmp_path, inbox=[_msg("i1", "broker@x.com", "insurance intake form")],
@@ -246,16 +248,58 @@ class TestInboxRouterPollOnce:
         assert routed[0]["decision"] == "flag"
         assert routed[0]["capsule_name"] == ""
 
-    def test_confirm_reply_creates_exactly_one_draft(self, tmp_path):
+    def test_confirm_reply_with_real_text_creates_one_draft_with_that_text(self, tmp_path):
+        # No LLM involved: the draft's body is exactly the real text
+        # passed in, nothing generated.
         router = self._build(tmp_path, inbox=[_msg("i1", "stranger@x.com", "unrelated")])
         router.poll_once()  # -> flag (no LLM configured)
-        # Simulate the user overriding to "reply" then confirming it.
-        router.override_decision("i1", "reply")
-        router.confirm_suggestion("i1", "reply")
+        router.confirm_suggestion("i1", "reply", reply_body="Thanks, I'll take a look.")
 
         drafts = json.loads((tmp_path / "data" / "mock_drafts.json").read_text())["drafts"]
         assert len(drafts) == 1
         assert drafts[0]["to"] == "stranger@x.com"
+        assert drafts[0]["body"] == "Thanks, I'll take a look."
+
+    def test_confirm_reply_with_no_text_creates_an_empty_draft_not_an_ai_one(self, tmp_path):
+        # The honesty guarantee: no reply_body means an empty draft, never
+        # an LLM filling in words on the user's behalf.
+        router = self._build(tmp_path, inbox=[_msg("i1", "stranger@x.com", "unrelated")])
+        router.poll_once()
+        router.confirm_suggestion("i1", "reply")
+
+        drafts = json.loads((tmp_path / "data" / "mock_drafts.json").read_text())["drafts"]
+        assert len(drafts) == 1
+        assert drafts[0]["body"] == ""
+
+    def test_override_to_reply_with_real_text_now_creates_a_draft(self, tmp_path):
+        # Regression: override_decision() used to do nothing Gmail-side
+        # at all when overriding TO "reply" -- there was no way to
+        # override into a reply and actually get a draft out of it.
+        router = self._build(tmp_path, inbox=[_msg("i1", "stranger@x.com", "unrelated")])
+        router.poll_once()
+        router.override_decision("i1", "reply", reply_body="Sure, sounds good.")
+
+        drafts = json.loads((tmp_path / "data" / "mock_drafts.json").read_text())["drafts"]
+        assert len(drafts) == 1
+        assert drafts[0]["body"] == "Sure, sounds good."
+
+    def test_confirm_reply_with_real_text_records_a_real_reply_example(self, tmp_path):
+        router = self._build(tmp_path, inbox=[_msg("i1", "stranger@x.com", "unrelated", body="Can you help?")])
+        router.poll_once()
+        router.confirm_suggestion("i1", "reply", reply_body="Yes, happy to.")
+
+        examples = reply_recorder.load_reply_examples(path=router._reply_examples_path)
+        assert len(examples) == 1
+        assert examples[0]["reply_body"] == "Yes, happy to."
+        assert examples[0]["body_text"] == "Can you help?"
+
+    def test_confirm_reply_with_no_text_records_no_reply_example(self, tmp_path):
+        # Nothing real was written, so nothing gets saved as if it were.
+        router = self._build(tmp_path, inbox=[_msg("i1", "stranger@x.com", "unrelated")])
+        router.poll_once()
+        router.confirm_suggestion("i1", "reply")
+
+        assert reply_recorder.load_reply_examples(path=router._reply_examples_path) == []
 
     def test_confirm_route_scope1_creates_no_draft(self, tmp_path):
         router = self._build(tmp_path, inbox=[_msg("i1", "broker@x.com", "insurance intake")],
@@ -405,7 +449,8 @@ class TestInboxRouterSessionMetrics:
         history_path = str(tmp_path / "data" / "routed_history.json")
         return InboxRouter(client, profile, rules, classifier, history_path=history_path,
                             inbox_checkpoint_path=str(tmp_path / "no_such_checkpoint.pt"),
-                            examples_path=str(tmp_path / "data" / "training_examples.jsonl"))
+                            examples_path=str(tmp_path / "data" / "training_examples.jsonl"),
+                            reply_examples_path=str(tmp_path / "data" / "reply_examples.jsonl"))
 
     def test_record_session_metrics_writes_a_row_tagged_scope3(self, tmp_path):
         router = self._build(tmp_path, inbox=[_msg("i1", "stranger@x.com", "unrelated")])
@@ -532,7 +577,8 @@ class TestPracticeInbox:
         history_path = str(tmp_path / "data" / "routed_history.json")
         return InboxRouter(client, profile, rules, classifier, history_path=history_path,
                             inbox_checkpoint_path=str(tmp_path / "no_such_checkpoint.pt"),
-                            examples_path=str(tmp_path / "data" / "training_examples.jsonl"))
+                            examples_path=str(tmp_path / "data" / "training_examples.jsonl"),
+                            reply_examples_path=str(tmp_path / "data" / "reply_examples.jsonl"))
 
     def test_list_practice_inbox_returns_all_messages_unfiltered(self, tmp_path):
         router = self._build(tmp_path, inbox=[
