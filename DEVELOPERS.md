@@ -755,7 +755,7 @@ waiting on them.
   2. **Train a real small model on captured replies (not started).** Same `InboxDecisionNet`-shaped approach as the existing decision classifier — trained weights pick the best-fitting past reply for a new email, not hand-written text-similarity matching.
   3. **Autonomous sending, gated on that model's confidence (not started).** Wires into `autonomous_watcher.py`'s `handle_entry()` for `reply` decisions — sends only when confident, never guesses.
 
-  Frontend gap, not yet closed: Inbox Dispatch's `local_ui` has no textbox yet for typing/editing a reply, so step 1's backend is real but not yet reachable by a human through the page.
+  Frontend gap closed same day: `local_ui`'s detail view now has a real `<textarea>` in the reply bar, shown whenever the suggested decision or the selected override is "reply"/"forward" (the only two cases the backend does anything with `reply_body`); Confirm/Override send whatever's actually typed. The pencil "Reply" icon no longer fires an override immediately (it couldn't send anything meaningful without a text box) — it now switches the override dropdown to "Reply" and focuses the textarea. Smoke-tested against the real running server (fetched `/` and `/app.js` from `localhost:8765`, confirmed the new markup/wiring is actually served). Step 1 of the 3-step plan is now fully reachable by a human through the page, not just the backend.
 - [ ] `scope3_email_triage` *(superseded framing — predates the concrete
   shape above)*: the very original bare stub, a GUI-demonstration-based
   triage system (watch UIA/screen state the way Scope #1/#2 do). Still a
