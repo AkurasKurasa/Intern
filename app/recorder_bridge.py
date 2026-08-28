@@ -148,7 +148,11 @@ class Bridge:
             self._out_dir = output_dir if os.path.isabs(output_dir) else os.path.join(_ROOT, output_dir)
 
         if trace_type == "web":
-            ensure_server_running()
+            try:
+                ensure_server_running()
+            except (Exception, SystemExit) as exc:
+                emit("error", message=f"Could not start the local server for web recording: {exc}")
+                return
 
         try:
             self._recorder = DemoRecorder(output_dir=self._out_dir, trace_type=trace_type, url=url)

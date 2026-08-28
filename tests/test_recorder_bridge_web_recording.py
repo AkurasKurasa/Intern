@@ -78,3 +78,21 @@ def test_start_with_non_web_trace_type_does_not_touch_server(monkeypatch):
     bridge.start()
 
     assert calls == []
+
+
+def test_start_emits_error_and_returns_when_server_fails_to_start(monkeypatch):
+    events = []
+    monkeypatch.setattr(rb, "emit", lambda event, **fields: events.append({"event": event, **fields}))
+
+    def fake_ensure_server_running():
+        raise SystemExit("local_server.py didn't come up within 20s")
+    monkeypatch.setattr(rb, "ensure_server_running", fake_ensure_server_running)
+    monkeypatch.setattr(rb, "DemoRecorder", lambda output_dir="", trace_type="form_filling", url="": _FakeRecorder())
+
+    bridge = rb.Bridge()
+    bridge.start(trace_type="web", url="http://localhost:8765/")
+
+    errors = [e for e in events if e["event"] == "error"]
+    assert len(errors) == 1
+    assert "Could not start the local server for web recording" in errors[0]["message"]
+    assert bridge._recorder is None  # DemoRecorder must never have been constructed
