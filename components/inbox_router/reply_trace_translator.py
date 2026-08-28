@@ -11,14 +11,12 @@ already uses. Manually run, same as train_reply_model.py:
 
 A step counts as a submitted reply when its own textarea value is
 non-empty AND that same message_id-labeled textarea is absent from
-the next step (Confirm/Override closed the detail view) -- or it's
-the last step in the session (Stop was pressed right after
-submitting). This avoids matching a raw click position against a DOM
-element's bounding box: pynput's click_pos is in absolute screen
-coordinates, WebObserver's bbox is viewport-relative, and the two
-aren't directly comparable without also knowing the browser window's
-on-screen position -- a problem this state-transition check sidesteps
-entirely.
+the step's own next_state (indicating the action closed the detail
+view). DemoRecorder captures a before/after pair for every action
+within a single step file: state is before, next_state is after for
+that exact click or keystroke. The submitting click's own before/after
+state pair, captured within that one step, already shows the textarea
+gone in next_state — no special-casing for session position is needed.
 """
 from __future__ import annotations
 
@@ -75,24 +73,19 @@ def translate_session(session_dir: str, gmail_client, reply_examples_path: str =
         if not message_id:
             continue
 
-        is_last_step = (i == len(steps) - 1)
-        if not is_last_step:
-            next_state = steps[i + 1].get("state", {})
-            next_textarea = _find_reply_textarea(next_state)
-            still_open = (
-                next_textarea is not None
-                and (next_textarea.get("label") or next_textarea.get("text")) == message_id
-            )
-            if still_open:
-                continue  # detail view stayed open -- nothing submitted yet
-        else:
-            # Last step: check if previous step had same message_id textarea (continuation)
-            if i > 0:
-                prev_state = steps[i - 1].get("state", {})
-                prev_textarea = _find_reply_textarea(prev_state)
-                if (prev_textarea is not None and
-                    (prev_textarea.get("label") or prev_textarea.get("text")) == message_id):
-                    continue  # continuation from previous step, not a new submission
+        # DemoRecorder captures a before/after pair for every action within
+        # ONE step file -- next_state is "right after this exact action."
+        # If the same textarea is still open in next_state, this action
+        # didn't submit anything (e.g. it was itself a keystroke, not the
+        # Confirm/Override click) -- more typing, not a submission.
+        next_state = step.get("next_state", {})
+        next_textarea = _find_reply_textarea(next_state)
+        still_open = (
+            next_textarea is not None
+            and (next_textarea.get("label") or next_textarea.get("text")) == message_id
+        )
+        if still_open:
+            continue
 
         message = gmail_client.get_message(message_id)
         if message is None:

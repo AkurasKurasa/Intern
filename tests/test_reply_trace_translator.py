@@ -1,29 +1,44 @@
 import json
 import os
 import sys
-from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "components" / "inbox_router"))
+_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_INBOX_DIR = os.path.join(_ROOT, "components", "inbox_router")
+for _p in (_ROOT, _INBOX_DIR):
+    if _p not in sys.path:
+        sys.path.insert(0, _p)
 
 from gmail_client import EmailMessage, MockGmailClient
 import reply_recorder as rr
 import reply_trace_translator as translator
 
 
-def _step(step_idx, textarea_value="", message_id="", include_textarea=True):
-    elements = []
-    if include_textarea:
-        elements.append({
-            "element_id": "web_0", "type": "input", "control_type": "textarea",
-            "text": message_id, "value": textarea_value, "label": message_id,
-            "enabled": True, "visible": True, "source": "web",
-        })
+def _step(step_idx, textarea_value="", message_id="",
+          include_textarea_in_state=True, include_textarea_in_next_state=None):
+    """Build a step with state and next_state that can differ.
+
+    If include_textarea_in_next_state is None, defaults to include_textarea_in_state
+    (i.e., state and next_state are the same). Set explicitly to test transitions.
+    """
+    if include_textarea_in_next_state is None:
+        include_textarea_in_next_state = include_textarea_in_state
+
+    def _build_elements(include_textarea):
+        elements = []
+        if include_textarea:
+            elements.append({
+                "element_id": "web_0", "type": "input", "control_type": "textarea",
+                "text": message_id, "value": textarea_value, "label": message_id,
+                "enabled": True, "visible": True, "source": "web",
+            })
+        return elements
+
     return {
         "trace_id": f"live_step_{step_idx:04d}", "timestamp": "2026-08-28T00:00:00",
         "duration": 1.0, "type": "web",
-        "state": {"application": "browser", "elements": elements},
+        "state": {"application": "browser", "elements": _build_elements(include_textarea_in_state)},
         "mouse": {}, "keyboard": {},
-        "next_state": {"application": "browser", "elements": elements},
+        "next_state": {"application": "browser", "elements": _build_elements(include_textarea_in_next_state)},
     }
 
 
@@ -52,11 +67,12 @@ def _msg(mid, sender_email, subject, body="body text"):
 
 class TestTranslateSession:
     def test_submitted_reply_is_recorded(self, tmp_path):
-        # Step 0: textarea has real text for message m1.
-        # Step 1: that textarea is gone -- Confirm/Override closed the detail view.
+        # One step: state has textarea with real text, next_state has no textarea.
+        # The Confirm/Override action closed the detail view within this step's
+        # before/after pair.
         steps = [
-            _step(0, textarea_value="Thanks, that works for me.", message_id="m1"),
-            _step(1, include_textarea=False),
+            _step(0, textarea_value="Thanks, that works for me.", message_id="m1",
+                  include_textarea_in_state=True, include_textarea_in_next_state=False),
         ]
         session_dir = _write_session(tmp_path, steps)
         gmail_client = _build_gmail_client(tmp_path, inbox=[_msg("m1", "boss@work.com", "status update")])
@@ -71,9 +87,14 @@ class TestTranslateSession:
         assert examples[0]["reply_body"] == "Thanks, that works for me."
         assert examples[0]["source"] == "live"
 
-    def test_last_step_in_session_with_text_still_counts(self, tmp_path):
-        # No "next" step at all -- Stop was pressed right after submitting.
-        steps = [_step(0, textarea_value="Sure, call me in 10.", message_id="m1")]
+    def test_single_step_session_with_submitted_reply(self, tmp_path):
+        # Single-file session where the action submits a reply: state has textarea,
+        # next_state has no textarea. Confirms the algorithm works with just one
+        # step file (no special "last step" logic needed).
+        steps = [
+            _step(0, textarea_value="Sure, call me in 10.", message_id="m1",
+                  include_textarea_in_state=True, include_textarea_in_next_state=False),
+        ]
         session_dir = _write_session(tmp_path, steps)
         gmail_client = _build_gmail_client(tmp_path, inbox=[_msg("m1", "boss@work.com", "quick question")])
         examples_path = str(tmp_path / "reply_examples.jsonl")
@@ -82,11 +103,13 @@ class TestTranslateSession:
 
         assert count == 1
 
-    def test_textarea_still_present_in_next_step_is_not_counted(self, tmp_path):
-        # Detail view stayed open -- nothing was submitted yet.
+    def test_textarea_still_open_in_next_state_is_not_counted(self, tmp_path):
+        # One step: state has textarea, next_state still has the same textarea
+        # (value may have changed, but the detail view stayed open).
+        # This action was a keystroke, not a submit.
         steps = [
-            _step(0, textarea_value="typing...", message_id="m1"),
-            _step(1, textarea_value="typing... more", message_id="m1"),
+            _step(0, textarea_value="typing...", message_id="m1",
+                  include_textarea_in_state=True, include_textarea_in_next_state=True),
         ]
         session_dir = _write_session(tmp_path, steps)
         gmail_client = _build_gmail_client(tmp_path, inbox=[_msg("m1", "boss@work.com", "status update")])
@@ -98,9 +121,11 @@ class TestTranslateSession:
         assert rr.load_reply_examples(examples_path) == []
 
     def test_empty_textarea_produces_no_example(self, tmp_path):
+        # Even though next_state has no textarea (would normally indicate submission),
+        # an empty reply_body is skipped (nothing real to save).
         steps = [
-            _step(0, textarea_value="", message_id="m1"),
-            _step(1, include_textarea=False),
+            _step(0, textarea_value="", message_id="m1",
+                  include_textarea_in_state=True, include_textarea_in_next_state=False),
         ]
         session_dir = _write_session(tmp_path, steps)
         gmail_client = _build_gmail_client(tmp_path, inbox=[_msg("m1", "boss@work.com", "status update")])
@@ -111,9 +136,11 @@ class TestTranslateSession:
         assert count == 0
 
     def test_unresolvable_message_id_is_skipped_without_raising(self, tmp_path):
+        # A submitted reply (state has textarea, next_state doesn't) but the
+        # message_id does not resolve in the inbox -- skipped silently with logging.
         steps = [
-            _step(0, textarea_value="Thanks!", message_id="does-not-exist"),
-            _step(1, include_textarea=False),
+            _step(0, textarea_value="Thanks!", message_id="does-not-exist",
+                  include_textarea_in_state=True, include_textarea_in_next_state=False),
         ]
         session_dir = _write_session(tmp_path, steps)
         gmail_client = _build_gmail_client(tmp_path, inbox=[])  # empty inbox -- nothing resolves
