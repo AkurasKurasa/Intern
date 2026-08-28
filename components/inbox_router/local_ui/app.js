@@ -163,6 +163,7 @@ function openMessage(messageId) {
   document.getElementById("detailBody").textContent = email.body_text || "(no body available)";
   document.getElementById("detailDecision").textContent = email.decision || "";
   replyBody.value = "";
+  replyBody.name = email.message_id;
   overrideSelect.value = "route_scope1";
   refreshReplyBoxVisibility();
   listView.hidden = true;

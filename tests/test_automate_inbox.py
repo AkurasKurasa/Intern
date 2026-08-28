@@ -193,3 +193,13 @@ class TestProcessOneCommit:
 
         assert len(results) == 3
         assert real_page.locator(".row-item").count() == 0
+
+
+class TestReplyTextareaCarriesMessageId:
+    def test_reply_body_name_attribute_matches_open_message_id(self, real_page):
+        real_page.locator(".row-item").nth(0).click()
+        real_page.wait_for_selector("#detailView:not([hidden])")
+
+        name_attr = real_page.locator("#replyBody").get_attribute("name")
+
+        assert name_attr == "i1"  # real_page's fixture opens messages i1/i2/i3 in order
