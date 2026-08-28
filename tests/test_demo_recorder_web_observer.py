@@ -1,4 +1,5 @@
 import sys
+import threading
 from pathlib import Path
 from unittest.mock import MagicMock
 
@@ -60,6 +61,30 @@ class _FakeWebObserverThatLaunchesThenFailsToConnect(_FakeWebObserver):
         self.connected_to = url
         self.launched = True
         return False
+
+
+class _ThreadRecordingWebObserver(_FakeWebObserver):
+    """Records which OS thread each call arrived on. Playwright's sync API is
+    bound to the thread that started it -- so 'which thread' is not a detail
+    here, it is the entire correctness condition."""
+    _last_instance = None
+
+    def __init__(self, headless=False):
+        super().__init__(headless=headless)
+        self.call_threads = {}
+        _ThreadRecordingWebObserver._last_instance = self
+
+    def connect(self, url=None):
+        self.call_threads["connect"] = threading.current_thread().ident
+        return super().connect(url=url)
+
+    def snapshot(self):
+        self.call_threads.setdefault("snapshot", threading.current_thread().ident)
+        return super().snapshot()
+
+    def disconnect(self):
+        self.call_threads["disconnect"] = threading.current_thread().ident
+        return super().disconnect()
 
 
 def _patch_pynput(monkeypatch):
@@ -141,3 +166,64 @@ class TestWebObserverCleanup:
         rec.run(auto_start=False)
 
         assert rec._observer.disconnected is True
+
+
+class TestPlaywrightThreadAffinity:
+    """C2 regression.
+
+    Playwright's sync API runs on a greenlet dispatcher owned by whichever OS
+    thread started it; any call from a different thread raises greenlet.error.
+    The recorder used to build+connect the WebObserver in __init__ (the
+    caller's thread) while every snapshot ran on self._worker_thread. Result:
+    every real snapshot raised, WebObserver.snapshot() swallowed it
+    (`except Exception: return _empty_state()`), _request_snapshot() swallowed
+    it again (`except Exception: return {}`), and every recorded step held an
+    empty state with nothing logged anywhere.
+
+    Nothing about that is visible from return values -- only from which thread
+    the calls land on. Hence this test.
+    """
+
+    def test_connect_snapshot_and_disconnect_all_run_on_one_non_caller_thread(
+            self, tmp_path, monkeypatch):
+        _patch_pynput(monkeypatch)
+        monkeypatch.setattr(recorder_module, "_WEB_OBSERVER_AVAILABLE", True)
+        monkeypatch.setattr(recorder_module, "_WebObserver", _ThreadRecordingWebObserver)
+
+        caller_ident = threading.current_thread().ident
+
+        rec = recorder_module.DemoRecorder(
+            output_dir=str(tmp_path), trace_type="web", url="http://localhost:8765/")
+        rec._quit_event.set()
+        rec.run(auto_start=False)     # run() also executes on the caller's thread
+
+        obs = rec._observer
+        assert set(obs.call_threads) == {"connect", "snapshot", "disconnect"}, (
+            f"not every lifecycle call happened: {obs.call_threads}")
+
+        idents = set(obs.call_threads.values())
+        assert len(idents) == 1, (
+            f"Playwright touched from more than one thread: {obs.call_threads}")
+
+        used_ident = idents.pop()
+        assert used_ident == rec._worker_thread.ident, (
+            "observer must live on the worker thread -- the one that snapshots")
+        assert used_ident != caller_ident, (
+            "observer was used on the thread that constructed/ran the recorder; "
+            "that is exactly the greenlet.error case")
+
+    def test_run_does_not_return_before_the_worker_has_disconnected(
+            self, tmp_path, monkeypatch):
+        """The disconnect moved onto the worker thread, so run() must join it.
+        Without the join this assertion is a race, not a guarantee."""
+        _patch_pynput(monkeypatch)
+        monkeypatch.setattr(recorder_module, "_WEB_OBSERVER_AVAILABLE", True)
+        monkeypatch.setattr(recorder_module, "_WebObserver", _ThreadRecordingWebObserver)
+
+        rec = recorder_module.DemoRecorder(
+            output_dir=str(tmp_path), trace_type="web", url="http://localhost:8765/")
+        rec._quit_event.set()
+        rec.run(auto_start=False)
+
+        assert rec._observer.disconnected is True
+        assert not rec._worker_thread.is_alive()

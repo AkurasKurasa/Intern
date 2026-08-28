@@ -137,6 +137,11 @@ class Bridge:
         self._capsule_proc: subprocess.Popen | None = None
         self._registry = registry if registry is not None else CapsuleRegistry()
         self._inbox_proc: subprocess.Popen | None = None
+        # Handle for a local_server.py that THIS bridge started for a web
+        # recording. ensure_server_running() returns None when a server was
+        # already up -- that one belongs to someone else and must never be
+        # touched here. Same own-it-or-leave-it pattern as _inbox_proc above.
+        self._local_server_proc: subprocess.Popen | None = None
 
     # ── start / stop ─────────────────────────────────────────────────────────
     def start(self, output_dir: str | None = None, trace_type: str = "form_filling",
@@ -149,7 +154,11 @@ class Bridge:
 
         if trace_type == "web":
             try:
-                ensure_server_running()
+                # KEEP the handle. It's non-None only when this call actually
+                # spawned local_server.py; discarding it left that Python
+                # process running forever -- it outlived Electron itself,
+                # holding the port, one more orphan per web recording.
+                self._local_server_proc = ensure_server_running()
             except (Exception, SystemExit) as exc:
                 emit("error", message=f"Could not start the local server for web recording: {exc}")
                 return
@@ -158,6 +167,9 @@ class Bridge:
             self._recorder = DemoRecorder(output_dir=self._out_dir, trace_type=trace_type, url=url)
         except Exception as exc:
             emit("error", message=f"Failed to start recorder: {exc}")
+            # We may have just started the server for a recording that then
+            # never began -- don't leave it behind.
+            self._stop_local_server()
             return
 
         self._running = True
@@ -199,11 +211,29 @@ class Bridge:
                 emit("frame_count", value=n, pending=pending)
             time.sleep(0.3)
 
+    def _stop_local_server(self) -> None:
+        """Terminate the local_server.py THIS bridge started, if any.
+        A None handle means ensure_server_running() found one already up --
+        that server belongs to another process; leave it alone."""
+        proc = self._local_server_proc
+        self._local_server_proc = None
+        if proc is None or proc.poll() is not None:
+            return
+        try:
+            proc.terminate()
+            proc.wait(timeout=5)
+        except Exception:
+            try:
+                proc.kill()
+            except Exception:
+                pass
+
     def stop(self) -> None:
         if not self._running or self._recorder is None:
             emit("error", message="Not currently recording.")
             return
         self._recorder._quit_event.set()
+        self._stop_local_server()
 
     # ── replay (pure file duplication, same as app/main.py's _do_replay) ─────
     def replay(self, n: int) -> None:
@@ -522,6 +552,10 @@ class Bridge:
                             self._inbox_proc.send_signal(signal.CTRL_BREAK_EVENT)
                         except Exception:
                             pass
+                # Shutdown can arrive without a preceding "stop" (Electron
+                # quitting mid-recording) -- same cleanup, so the server we
+                # started never outlives this process either.
+                self._stop_local_server()
                 break
             else:
                 emit("error", message=f"Unknown command: {cmd!r}")

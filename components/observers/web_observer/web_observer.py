@@ -189,8 +189,16 @@ class WebObserver:
             "input, select, textarea, button, a[href], "
             "[role='button'], [role='textbox'], [role='combobox'], "
             "[role='checkbox'], [role='radio'], [role='tab'], "
-            "[role='menuitem'], [role='link']"
+            "[role='menuitem'], [role='link'], [role='status']"
         )
+        # [role='status'] added 2026-08-28: a "status message" is an ARIA
+        # landmark role in exactly the same family as the interactive roles
+        # above -- generic, standards-defined, and useful to ANY observed
+        # page, not this one. Without it, a snapshot could see what a page
+        # LOOKS like but never what it just SAID ("saved", "sent", "error"),
+        # so downstream consumers had no positive evidence an action actually
+        # succeeded -- only the negative "the form went away", which is also
+        # what Cancel/Back does.
 
         try:
             handles = page.query_selector_all(selector)
@@ -205,6 +213,19 @@ class WebObserver:
 
                 tag      = handle.evaluate("el => el.tagName.toLowerCase()")
                 role     = handle.get_attribute("role") or tag
+                # The DOM `name` attribute, kept SEPARATE from the
+                # human-readable display label below. Added 2026-08-28 after a
+                # real, silent data-loss bug: the display label is a priority
+                # chain (aria-label > placeholder > title > name > inner_text),
+                # so any element that carries a real placeholder can never
+                # expose its name= attribute through that chain. Pages that
+                # use name= to carry a machine identity (a record id, a field
+                # key) were therefore invisible to every consumer, and the
+                # consumer silently got the placeholder's UX prose instead.
+                # Reordering the chain would break every element's readable
+                # label; dropping the placeholder would break real UX text.
+                # A dedicated key is the only fix that costs nothing else.
+                dom_name = handle.get_attribute("name") or ""
                 name     = (
                     handle.get_attribute("aria-label")
                     or handle.get_attribute("placeholder")
@@ -235,6 +256,7 @@ class WebObserver:
                     "text":         name,
                     "value":        value,
                     "label":        name,
+                    "name":         dom_name,
                     "enabled":      enabled,
                     "visible":      True,
                     "focused":      False,

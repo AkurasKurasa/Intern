@@ -6,6 +6,7 @@ Same subprocess.Popen-is-never-real approach as
 test_recorder_bridge_capsule_run.py.
 """
 import sys
+import threading
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "app"))
@@ -96,3 +97,100 @@ def test_start_emits_error_and_returns_when_server_fails_to_start(monkeypatch):
     assert len(errors) == 1
     assert "Could not start the local server for web recording" in errors[0]["message"]
     assert bridge._recorder is None  # DemoRecorder must never have been constructed
+
+
+# ── local_server.py lifecycle ────────────────────────────────────────────────
+# ensure_server_running() returns a Popen handle ONLY when that call actually
+# spawned the server; None means one was already up and belongs to someone
+# else. The bridge used to throw the return value away, so every web recording
+# that started its own server leaked a Python process that outlived Electron.
+
+class _FakeServerProc:
+    def __init__(self):
+        self.terminated = False
+        self.killed = False
+        self._alive = True
+
+    def poll(self):
+        return None if self._alive else 0
+
+    def terminate(self):
+        self.terminated = True
+        self._alive = False
+
+    def wait(self, timeout=None):
+        return 0
+
+    def kill(self):
+        self.killed = True
+        self._alive = False
+
+
+class _BlockingFakeRecorder(_FakeRecorder):
+    """run() blocks until released, so bridge._running is still True when the
+    test calls stop() -- a run() that returns instantly would race it."""
+    def __init__(self, *a, **k):
+        super().__init__(*a, **k)
+        self._release = threading.Event()
+        # Bridge._poll() reads these on its own thread while "recording".
+        self._lock = threading.Lock()
+        self._pending_text = ""
+        self._pending_keys = []
+
+        class _Ev:
+            def __init__(self, outer): self._outer = outer
+            def set(self): self._outer._release.set()
+        self._quit_event = _Ev(self)
+
+    def run(self):
+        self._release.wait(timeout=5.0)
+
+
+def test_web_recording_terminates_the_server_it_started(monkeypatch):
+    proc = _FakeServerProc()
+    monkeypatch.setattr(rb, "ensure_server_running", lambda: proc)
+    monkeypatch.setattr(rb, "DemoRecorder",
+                        lambda output_dir="", trace_type="form_filling", url="": _BlockingFakeRecorder())
+    bridge = rb.Bridge()
+
+    bridge.start(trace_type="web", url="http://localhost:8765/")
+    assert bridge._local_server_proc is proc   # handle kept, not discarded
+
+    bridge.stop()
+
+    assert proc.terminated is True
+    assert bridge._local_server_proc is None
+
+
+def test_bridge_never_touches_a_server_it_did_not_start(monkeypatch):
+    """A None return means another process owns that server -- terminating it
+    would kill a server the user (or another window) is relying on."""
+    monkeypatch.setattr(rb, "ensure_server_running", lambda: None)
+    monkeypatch.setattr(rb, "DemoRecorder",
+                        lambda output_dir="", trace_type="form_filling", url="": _BlockingFakeRecorder())
+    bridge = rb.Bridge()
+
+    bridge.start(trace_type="web", url="http://localhost:8765/")
+    assert bridge._local_server_proc is None
+
+    bridge.stop()   # must not raise
+
+    assert bridge._local_server_proc is None
+
+
+def test_server_is_cleaned_up_when_the_recorder_fails_to_construct(monkeypatch):
+    """The server got started, then DemoRecorder raised -- there will never be
+    a stop() for this session, so start() has to clean up its own mess."""
+    proc = _FakeServerProc()
+    monkeypatch.setattr(rb, "ensure_server_running", lambda: proc)
+    monkeypatch.setattr(rb, "emit", lambda event, **fields: None)
+
+    def _boom(output_dir="", trace_type="form_filling", url=""):
+        raise RuntimeError("WebObserver could not connect")
+    monkeypatch.setattr(rb, "DemoRecorder", _boom)
+
+    bridge = rb.Bridge()
+    bridge.start(trace_type="web", url="http://localhost:8765/")
+
+    assert proc.terminated is True
+    assert bridge._local_server_proc is None

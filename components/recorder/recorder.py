@@ -1369,13 +1369,23 @@ class DemoRecorder:
                 raise ImportError("WebObserver not found in components/observers/.")
             if not url:
                 raise ValueError('trace_type="web" requires a url to record against.')
-            self._observer = _WebObserver(headless=False)
-            if not self._observer.connect(url=url):
-                try:
-                    self._observer.disconnect()
-                except Exception:
-                    pass
-                raise RuntimeError(f"WebObserver could not connect to {url!r}.")
+            # Playwright's SYNC api is thread-bound (it runs on a greenlet
+            # dispatcher owned by whichever OS thread started it); touching it
+            # from any other thread raises greenlet.error. Constructing and
+            # connecting the WebObserver HERE bound it to whatever thread built
+            # the DemoRecorder -- but every real snapshot happens on
+            # self._worker_thread instead (_worker -> _request_snapshot ->
+            # self._observer.snapshot()). So every single snapshot raised, and
+            # both WebObserver.snapshot() and _request_snapshot() catch bare
+            # Exception -- so it was swallowed twice and every recorded step
+            # silently held an empty state, with nothing logged anywhere.
+            # Same class of bug as the COM/UIA one _worker() documents below,
+            # and it gets the identical fix: do the thread-sensitive setup as
+            # the first thing INSIDE _worker(), on the thread that will use it.
+            self._web_url = url
+            self._web_connect_event = threading.Event()
+            self._web_connect_error: Exception | None = None
+            self._observer = None   # set by _worker() itself, on the worker thread
         else:
             if not _UIA_OBSERVER_AVAILABLE:
                 raise ImportError("UIAutomationObserver not found in components/observers/.")
@@ -1441,6 +1451,18 @@ class DemoRecorder:
 
         self._worker_thread = threading.Thread(target=self._worker, daemon=True)
         self._worker_thread.start()
+
+        # Keep __init__'s existing fail-loudly contract: constructing a
+        # DemoRecorder(trace_type="web", ...) must still RAISE synchronously if
+        # the browser can't be connected, exactly as it did when connect() ran
+        # inline here. The connect itself now happens on the worker thread (see
+        # above), so block until that thread reports back one way or the other.
+        if trace_type == "web":
+            if not self._web_connect_event.wait(timeout=30.0):
+                raise RuntimeError(
+                    f"WebObserver did not finish connecting to {url!r} within 30s.")
+            if self._web_connect_error is not None:
+                raise self._web_connect_error
 
     def _request_snapshot(self, action_type: str = "", timeout: float = 4.0) -> dict:
         """Ask the subprocess for ONE fresh snapshot (+ Notepad context for the
@@ -1579,24 +1601,26 @@ class DemoRecorder:
             except Exception: pass
             try: listeners["k"].stop()
             except Exception: pass
-            if self.trace_type == "web":
-                try:
-                    self._observer.disconnect()
-                except Exception:
-                    pass
-            # PROCESS (don't discard) remaining queued actions so nothing is lost.
-            import queue as _q
-            print(f"\n  Flushing {self._action_queue.qsize()} pending action(s)…")
-            deadline = time.time() + 15.0
-            while time.time() < deadline:
-                try:
-                    event = self._action_queue.get_nowait()
-                except _q.Empty:
-                    break
-                try:
-                    self._process_event(event)
-                except Exception:
-                    self._log_crash("drain._process_event")
+            # Always join the worker before returning. For trace_type="web" the
+            # worker owns the final drain AND the disconnect (Playwright is
+            # bound to that thread -- see _worker()); without this join, run()
+            # could return to its caller while the disconnect hadn't happened
+            # yet, which is both a real leak window and a flaky-test window.
+            self._worker_thread.join(timeout=20.0)
+            if self.trace_type != "web":
+                # PROCESS (don't discard) remaining queued actions so nothing is lost.
+                import queue as _q
+                print(f"\n  Flushing {self._action_queue.qsize()} pending action(s)…")
+                deadline = time.time() + 15.0
+                while time.time() < deadline:
+                    try:
+                        event = self._action_queue.get_nowait()
+                    except _q.Empty:
+                        break
+                    try:
+                        self._process_event(event)
+                    except Exception:
+                        self._log_crash("drain._process_event")
             self._flush_pending(self._capture())
             if self._steps:
                 out = self._save()
@@ -2102,7 +2126,28 @@ class DemoRecorder:
         # each subprocess is its own fresh process with its own COM state;
         # taking that isolation away means this thread needs its own COM
         # init, same as every other thread in this file that touches UIA.
-        self._init_com()
+        #
+        # trace_type="web" gets the SAME shape for a different library's
+        # identical constraint: Playwright's sync API is bound to the thread
+        # that started it, so the WebObserver must be built AND connected
+        # right here, on this thread, not in __init__ on the caller's thread.
+        # __init__ waits on _web_connect_event for the result so its
+        # "constructing a web recorder raises if the browser won't connect"
+        # contract still holds.
+        if self.trace_type == "web":
+            self._observer = _WebObserver(headless=False)
+            if not self._observer.connect(url=self._web_url):
+                try:
+                    self._observer.disconnect()
+                except Exception:
+                    pass
+                self._web_connect_error = RuntimeError(
+                    f"WebObserver could not connect to {self._web_url!r}.")
+                self._web_connect_event.set()
+                return   # never enter the main loop; __init__ raises the error above
+            self._web_connect_event.set()
+        else:
+            self._init_com()
         # initial baseline snapshot (on-demand)
         self._last_state = self._request_snapshot() or {}
         while not self._quit_event.is_set():
@@ -2114,6 +2159,29 @@ class DemoRecorder:
                 self._process_event(event)
             except Exception:
                 self._log_crash("worker._process_event")
+
+        # ── web-only post-loop cleanup, ON THIS THREAD ───────────────────────
+        # For trace_type="web" this replaces work that used to live in run()'s
+        # finally: block. Both the final drain (which snapshots, i.e. touches
+        # Playwright) and disconnect() must happen on the thread Playwright is
+        # bound to -- run()'s own thread cannot touch self._observer safely.
+        # run() joins this thread before returning, so the ordering is kept.
+        if self.trace_type == "web" and self._observer is not None:
+            print(f"\n  Flushing {self._action_queue.qsize()} pending action(s)…")
+            deadline = time.time() + 15.0
+            while time.time() < deadline:
+                try:
+                    event = self._action_queue.get_nowait()
+                except _queue.Empty:
+                    break
+                try:
+                    self._process_event(event)
+                except Exception:
+                    self._log_crash("drain._process_event")
+            try:
+                self._observer.disconnect()
+            except Exception:
+                pass
 
     def _process_event(self, event: dict):
         """pre = snapshot before this action (= prior action's post); take ONE

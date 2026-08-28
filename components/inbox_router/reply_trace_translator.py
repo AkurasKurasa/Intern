@@ -10,13 +10,34 @@ already uses. Manually run, same as train_reply_model.py:
     python components/inbox_router/reply_trace_translator.py --session-dir <path>
 
 A step counts as a submitted reply when its own textarea value is
-non-empty AND that same message_id-labeled textarea is absent from
-the step's own next_state (indicating the action closed the detail
-view). DemoRecorder captures a before/after pair for every action
-within a single step file: state is before, next_state is after for
-that exact click or keystroke. The submitting click's own before/after
-state pair, captured within that one step, already shows the textarea
-gone in next_state — no special-casing for session position is needed.
+non-empty AND the step's own next_state contains the real success
+status message the UI shows on a submit ("Confirmed." / "Overridden.").
+DemoRecorder captures a before/after pair for every action within a
+single step file: state is before, next_state is after for that exact
+click or keystroke. The submitting click's own before/after pair,
+captured within that one step, already shows the success message in
+next_state — no special-casing for session position is needed.
+
+Why a POSITIVE signal, not "the textarea disappeared" (fixed 2026-08-28)
+-----------------------------------------------------------------------
+The original check was negative: textarea present in state, absent in
+next_state => submitted. That was wrong twice over.
+
+  1. Back and Archive ALSO close the detail view and hide the textarea.
+     A draft the human typed and then deliberately abandoned was being
+     recorded as a real, sent reply -- the exact opposite of this file's
+     entire purpose, which is to learn only from text a human actually
+     stood behind and sent.
+  2. It failed OPEN. If next_state was missing or empty for ANY reason
+     (a snapshot that returned nothing, a truncated session, a recorder
+     bug), "no textarea in next_state" was trivially true, so absence of
+     evidence was read as proof of submission. A translator whose only
+     job is honesty must fail CLOSED: no evidence => don't record.
+
+Requiring the success status message inverts both. Confirm/Override are
+the only two actions that produce it; Back produces nothing and Archive
+produces a different message ("Archived."). Missing/empty next_state now
+correctly means "no evidence", so nothing is written.
 """
 from __future__ import annotations
 
@@ -37,11 +58,30 @@ from gmail_client import get_gmail_client
 from reply_recorder import DEFAULT_REPLY_EXAMPLES_PATH, record_reply_example
 
 
+# The two literal strings local_ui/app.js shows in its #snackbar
+# (role="status") when a decision is really submitted -- confirmCurrent()
+# shows "Confirmed.", overrideCurrent() shows "Overridden.". Archive's own
+# message ("Archived.") is deliberately NOT here: archiving is not a reply.
+_SUBMIT_STATUS_TEXTS = {"Confirmed.", "Overridden."}
+
+
 def _find_reply_textarea(state: dict) -> Optional[dict]:
     for el in state.get("elements", []):
         if el.get("control_type") == "textarea":
             return el
     return None
+
+
+def _has_submit_status(state: dict) -> bool:
+    """True only if this state actually contains one of the UI's real
+    success status messages. Missing/empty state => False (fail closed)."""
+    if not isinstance(state, dict):
+        return False
+    for el in state.get("elements", []) or []:
+        text = (el.get("text") or el.get("label") or "").strip()
+        if text in _SUBMIT_STATUS_TEXTS:
+            return True
+    return False
 
 
 def _load_steps(session_dir: str) -> list:
@@ -69,22 +109,23 @@ def translate_session(session_dir: str, gmail_client, reply_examples_path: str =
         reply_body = (textarea.get("value") or "").strip()
         if not reply_body:
             continue
-        message_id = textarea.get("label") or textarea.get("text") or ""
+        # `name` FIRST: local_ui/app.js sets replyBody.name = email.message_id,
+        # and WebObserver now exposes the DOM name= attribute on its own key.
+        # label/text are the human-readable display label, which for this
+        # textarea is its placeholder prose, not an id -- they stay only as a
+        # fallback for older traces recorded before the `name` key existed.
+        message_id = textarea.get("name") or textarea.get("label") or textarea.get("text") or ""
         if not message_id:
             continue
 
         # DemoRecorder captures a before/after pair for every action within
         # ONE step file -- next_state is "right after this exact action."
-        # If the same textarea is still open in next_state, this action
-        # didn't submit anything (e.g. it was itself a keystroke, not the
-        # Confirm/Override click) -- more typing, not a submission.
-        next_state = step.get("next_state", {})
-        next_textarea = _find_reply_textarea(next_state)
-        still_open = (
-            next_textarea is not None
-            and (next_textarea.get("label") or next_textarea.get("text")) == message_id
-        )
-        if still_open:
+        # Record ONLY when that after-state actually shows the UI's real
+        # success message. A keystroke shows none; Back shows none; Archive
+        # shows a different one. See this module's docstring for why the old
+        # "textarea disappeared" test was both wrong and fail-open.
+        next_state = step.get("next_state", {}) or {}
+        if not _has_submit_status(next_state):
             continue
 
         message = gmail_client.get_message(message_id)
