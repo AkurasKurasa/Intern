@@ -90,17 +90,27 @@ def ensure_server_running(timeout_s: float = 20.0) -> subprocess.Popen | None:
     raise SystemExit(f"local_server.py didn't come up within {timeout_s:.0f}s")
 
 
-def process_one(page, commit: bool, index: int):
+def process_one(page, commit: bool, index: int, skipped: int = 0):
     """Reads one pending row off the real DOM, opens it, prints the real
     decision + rationale, then clicks Confirm for real if --commit.
     Returns a result dict, or None once the inbox is empty.
 
-    Confirming removes a row from the list, so committed runs always read
-    row 0 -- the next one is always at the top. A dry run never removes
-    anything, so reading row 0 every time would just reopen the same
-    email forever; it reads row `index` instead, advancing through the
-    list without ever changing it."""
-    row = page.locator(".row-item").nth(0 if commit else index)
+    Confirming removes a row from the list, so committed runs read row
+    `skipped` -- every row already skipped-in-place (see below) still
+    sits above it, and every confirmed row is gone, so `skipped` always
+    points at the next row actually needing a decision. A dry run never
+    removes or skips anything, so it reads row `index` instead, advancing
+    through the list without ever changing it.
+
+    A "reply"/"forward" decision is never auto-confirmed here, commit or
+    not -- this script has no real reply text to type, and confirming
+    with none would silently create an empty Gmail draft and skip
+    recording a training example, defeating the whole point of the
+    reply textbox a human types into on the real page. Those are left
+    pending -- in place, not removed -- for a human to actually open and
+    answer themselves."""
+    row_index = skipped if commit else index
+    row = page.locator(".row-item").nth(row_index)
     if row.count() == 0:
         return None
 
@@ -117,7 +127,10 @@ def process_one(page, commit: bool, index: int):
     print(f"    decided: {decision}")
     print(f"    because: {rationale}")
 
-    if commit:
+    if decision in ("reply", "forward"):
+        page.click("#backBtn")
+        outcome = "left pending -- needs a real reply typed by a human"
+    elif commit:
         page.click("#confirmBtn")
         page.wait_for_selector("#listView:not([hidden])")
         outcome = "confirmed"
@@ -161,11 +174,14 @@ def main():
         page.wait_for_timeout(600)
 
         banner(1, "Working through the inbox")
+        skipped = 0
         while args.limit is None or len(results) < args.limit:
-            result = process_one(page, args.commit, len(results))
+            result = process_one(page, args.commit, len(results), skipped)
             if result is None:
                 break
             results.append(result)
+            if result["outcome"] != "confirmed":
+                skipped += 1
             time.sleep(args.pace)
 
         if not args.headless:
@@ -179,6 +195,10 @@ def main():
     print(f"  emails processed  {len(results)}")
     for r in results:
         print(f"    {r['decision']:<14} {r['subject']}")
+    needing_reply = [r for r in results if r["decision"] in ("reply", "forward")]
+    if needing_reply:
+        print(f"\n  {len(needing_reply)} email(s) need a real reply typed by a human -- "
+              f"open http://localhost:8765/ yourself to answer them.")
     if not args.commit:
         print("\n  Nothing was clicked for real. Re-run with --commit to actually confirm each one.")
 

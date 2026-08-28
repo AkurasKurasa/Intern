@@ -164,7 +164,22 @@ class TestStopAndCommandForwarding:
         bridge.inbox_confirm_suggestion("m1", "reply")
 
         assert json.loads(fake_proc.written[0].strip()) == {
+            "cmd": "confirm", "message_id": "m1", "decision": "reply", "reply_body": "",
+        }
+
+    def test_confirm_suggestion_forwards_real_reply_text(self, monkeypatch):
+        # The whole point of threading reply_body through this bridge:
+        # confirming a "reply" decision with real typed text must not
+        # silently become an empty draft.
+        bridge = rb.Bridge()
+        fake_proc = _FakeInboxProc()
+        bridge._inbox_proc = fake_proc
+
+        bridge.inbox_confirm_suggestion("m1", "reply", "Thanks, that works for me.")
+
+        assert json.loads(fake_proc.written[0].strip()) == {
             "cmd": "confirm", "message_id": "m1", "decision": "reply",
+            "reply_body": "Thanks, that works for me.",
         }
 
     def test_override_decision_forwards_correct_command(self, monkeypatch):
@@ -176,6 +191,19 @@ class TestStopAndCommandForwarding:
 
         assert json.loads(fake_proc.written[0].strip()) == {
             "cmd": "override", "message_id": "m1", "new_decision": "forward", "reason": "wrong guess",
+            "reply_body": "",
+        }
+
+    def test_override_decision_forwards_real_reply_text(self, monkeypatch):
+        bridge = rb.Bridge()
+        fake_proc = _FakeInboxProc()
+        bridge._inbox_proc = fake_proc
+
+        bridge.inbox_override_decision("m1", "reply", "wrong guess", "Sure, call me in 10.")
+
+        assert json.loads(fake_proc.written[0].strip()) == {
+            "cmd": "override", "message_id": "m1", "new_decision": "reply", "reason": "wrong guess",
+            "reply_body": "Sure, call me in 10.",
         }
 
     def test_confirm_refuses_when_nothing_running(self, monkeypatch):
@@ -200,10 +228,11 @@ class TestDispatchLoopWiring:
         elif cmd == "stop_inbox_router":
             bridge.stop_inbox_router()
         elif cmd == "inbox_confirm_suggestion":
-            bridge.inbox_confirm_suggestion(msg.get("message_id", ""), msg.get("decision", ""))
+            bridge.inbox_confirm_suggestion(msg.get("message_id", ""), msg.get("decision", ""),
+                                             msg.get("reply_body", ""))
         elif cmd == "inbox_override_decision":
             bridge.inbox_override_decision(msg.get("message_id", ""), msg.get("new_decision", ""),
-                                            msg.get("reason", ""))
+                                            msg.get("reason", ""), msg.get("reply_body", ""))
 
     def test_start_inbox_router_command(self, monkeypatch):
         popen_calls = []
@@ -223,3 +252,15 @@ class TestDispatchLoopWiring:
         self._dispatch(bridge, {"cmd": "inbox_confirm_suggestion", "message_id": "m1", "decision": "flag"})
 
         assert json.loads(fake_proc.written[0].strip())["decision"] == "flag"
+
+    def test_inbox_confirm_suggestion_command_carries_reply_body(self, monkeypatch):
+        bridge = rb.Bridge()
+        fake_proc = _FakeInboxProc()
+        bridge._inbox_proc = fake_proc
+
+        self._dispatch(bridge, {
+            "cmd": "inbox_confirm_suggestion", "message_id": "m1", "decision": "reply",
+            "reply_body": "Got it, thanks.",
+        })
+
+        assert json.loads(fake_proc.written[0].strip())["reply_body"] == "Got it, thanks."

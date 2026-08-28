@@ -441,12 +441,15 @@ class Bridge:
             return
         self._send_inbox_cmd({"cmd": "shutdown"})
 
-    def inbox_confirm_suggestion(self, message_id: str, decision: str) -> None:
-        self._send_inbox_cmd({"cmd": "confirm", "message_id": message_id, "decision": decision})
+    def inbox_confirm_suggestion(self, message_id: str, decision: str, reply_body: str = "") -> None:
+        self._send_inbox_cmd({"cmd": "confirm", "message_id": message_id, "decision": decision,
+                               "reply_body": reply_body})
 
-    def inbox_override_decision(self, message_id: str, new_decision: str, reason: str = "") -> None:
+    def inbox_override_decision(self, message_id: str, new_decision: str, reason: str = "",
+                                 reply_body: str = "") -> None:
         self._send_inbox_cmd({"cmd": "override", "message_id": message_id,
-                               "new_decision": new_decision, "reason": reason})
+                               "new_decision": new_decision, "reason": reason,
+                               "reply_body": reply_body})
 
     def _send_inbox_cmd(self, cmd: dict) -> None:
         if self._inbox_proc is None or self._inbox_proc.poll() is not None:
@@ -487,10 +490,11 @@ class Bridge:
             elif cmd == "stop_inbox_router":
                 self.stop_inbox_router()
             elif cmd == "inbox_confirm_suggestion":
-                self.inbox_confirm_suggestion(msg.get("message_id", ""), msg.get("decision", ""))
+                self.inbox_confirm_suggestion(msg.get("message_id", ""), msg.get("decision", ""),
+                                               msg.get("reply_body", ""))
             elif cmd == "inbox_override_decision":
                 self.inbox_override_decision(msg.get("message_id", ""), msg.get("new_decision", ""),
-                                              msg.get("reason", ""))
+                                              msg.get("reason", ""), msg.get("reply_body", ""))
             elif cmd == "shutdown":
                 if self._running and self._recorder is not None:
                     self._recorder._quit_event.set()

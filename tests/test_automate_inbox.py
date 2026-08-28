@@ -29,12 +29,21 @@ def _msg(mid, sender_email, subject, body="body text"):
     }
 
 
-def _build_router(tmp_path, inbox):
+def _build_router(tmp_path, inbox, dominant_reply_sender_domain=None):
+    """dominant_reply_sender_domain: when given, seeds that sender's
+    pattern with a 100%-reply history before the router is built, so the
+    rule layer confidently decides "reply" for that sender without
+    needing a real LLM call -- the same seeding technique
+    test_inbox_features.py uses."""
     data_dir = tmp_path / "data"
     os.makedirs(data_dir, exist_ok=True)
     (data_dir / "mock_inbox.json").write_text(json.dumps({"inbox": inbox, "sent": []}), encoding="utf-8")
     client = MockGmailClient(data_dir=str(data_dir))
     profile = PatternProfile(path=str(data_dir / "profile.json"))
+    if dominant_reply_sender_domain:
+        pattern = profile._get_or_create(dominant_reply_sender_domain)
+        pattern.reply_count, pattern.forward_count, pattern.ignore_count = 3, 0, 0
+        profile.save()
     registry_path = tmp_path / "registry.json"
     registry_path.write_text(json.dumps({"capsules": []}), encoding="utf-8")
     rules = RuleLayer(profile, registry_path=str(registry_path))
@@ -77,6 +86,70 @@ def real_page(tmp_path):
     finally:
         httpd.shutdown()
         thread.join(timeout=5)
+
+
+@pytest.fixture
+def real_page_with_reply(tmp_path):
+    """Two real emails: one from a sender whose seeded pattern history
+    makes the rule layer confidently decide "reply" (no LLM call
+    needed), one generic (decides "flag", same as real_page's
+    messages). Used to prove process_one() actually leaves a
+    reply-decision row pending instead of blank-confirming it -- a real
+    DOM/pipeline test, not a guess from reading the code."""
+    pytest.importorskip("playwright.sync_api")
+    from playwright.sync_api import sync_playwright
+
+    router = _build_router(tmp_path, inbox=[
+        _msg("r1", "boss@work.com", "status update"),
+        _msg("g1", "someone@else.com", "generic email"),
+    ], dominant_reply_sender_domain="work.com")
+    handler_cls = ls.make_handler(router)
+    httpd = HTTPServer(("127.0.0.1", 0), handler_cls)
+    port = httpd.server_address[1]
+    thread = threading.Thread(target=httpd.serve_forever, daemon=True)
+    thread.start()
+    try:
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=True)
+            page = browser.new_page()
+            page.goto(f"http://127.0.0.1:{port}/")
+            page.click("#toolbarRefreshBtn")
+            page.wait_for_timeout(500)
+            yield page
+            browser.close()
+    finally:
+        httpd.shutdown()
+        thread.join(timeout=5)
+
+
+class TestProcessOneSkipsReplyForward:
+    def test_reply_decision_is_left_pending_not_blank_confirmed(self, real_page_with_reply):
+        # Regression: process_one() used to click #confirmBtn for every
+        # decision, including "reply" -- with no text ever typed into the
+        # reply textbox, that silently created an empty Gmail draft and
+        # recorded nothing for the reply-training pipeline.
+        assert real_page_with_reply.locator(".row-item").count() == 2
+
+        result = automate_inbox.process_one(real_page_with_reply, commit=True, index=0, skipped=0)
+
+        assert result["decision"] == "reply"
+        assert result["outcome"] == "left pending -- needs a real reply typed by a human"
+        # The row must still be there -- nothing was confirmed or drafted.
+        assert real_page_with_reply.locator(".row-item").count() == 2
+
+    def test_the_other_email_still_gets_confirmed_normally(self, real_page_with_reply):
+        # First call hits the reply-decision row and leaves it pending;
+        # skipped=1 on the next call must correctly point past it to the
+        # generic (still-confirmable) row.
+        first = automate_inbox.process_one(real_page_with_reply, commit=True, index=0, skipped=0)
+        assert first["outcome"] == "left pending -- needs a real reply typed by a human"
+
+        second = automate_inbox.process_one(real_page_with_reply, commit=True, index=1, skipped=1)
+
+        assert second["decision"] != "reply"
+        assert second["outcome"] == "confirmed"
+        # The reply row is still there; only the confirmed one is gone.
+        assert real_page_with_reply.locator(".row-item").count() == 1
 
 
 class TestProcessOneDryRun:

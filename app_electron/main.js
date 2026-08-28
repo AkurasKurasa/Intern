@@ -927,13 +927,16 @@ ipcMain.handle("inbox-stop", () => {
   queueOrSend({ cmd: "stop_inbox_router" });
 });
 ipcMain.handle("inbox-list", () => listInboxMessages());
-ipcMain.handle("inbox-confirm", (_evt, messageId, decision) => {
-  queueOrSend({ cmd: "inbox_confirm_suggestion", message_id: messageId, decision });
+ipcMain.handle("inbox-confirm", (_evt, messageId, decision, replyBody) => {
+  queueOrSend({
+    cmd: "inbox_confirm_suggestion", message_id: messageId, decision,
+    reply_body: replyBody || "",
+  });
 });
-ipcMain.handle("inbox-override", (_evt, messageId, newDecision, reason) => {
+ipcMain.handle("inbox-override", (_evt, messageId, newDecision, reason, replyBody) => {
   queueOrSend({
     cmd: "inbox_override_decision", message_id: messageId,
-    new_decision: newDecision, reason: reason || "",
+    new_decision: newDecision, reason: reason || "", reply_body: replyBody || "",
   });
 });
 ipcMain.handle("inbox-open-log", () => {

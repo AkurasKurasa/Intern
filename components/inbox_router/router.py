@@ -435,10 +435,11 @@ class InboxRouter:
             cmd = msg.get("cmd")
             try:
                 if cmd == "confirm":
-                    self.confirm_suggestion(msg.get("message_id", ""), msg.get("decision", ""))
+                    self.confirm_suggestion(msg.get("message_id", ""), msg.get("decision", ""),
+                                             reply_body=msg.get("reply_body", ""))
                 elif cmd == "override":
                     self.override_decision(msg.get("message_id", ""), msg.get("new_decision", ""),
-                                            msg.get("reason", ""))
+                                            msg.get("reason", ""), reply_body=msg.get("reply_body", ""))
                 elif cmd == "shutdown":
                     self._stop = True
                     break
