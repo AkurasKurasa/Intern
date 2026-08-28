@@ -68,6 +68,7 @@ for _p in (_ROOT, _COMP):
 
 from recorder.recorder import DemoRecorder
 from agent.capsule import CapsuleRegistry
+from inbox_router.automate_inbox import ensure_server_running
 
 # Full, persisted transcript of everything the Play panel's Activity log
 # receives -- direct user request ("add a log feature... so you could
@@ -138,15 +139,19 @@ class Bridge:
         self._inbox_proc: subprocess.Popen | None = None
 
     # ── start / stop ─────────────────────────────────────────────────────────
-    def start(self, output_dir: str | None = None) -> None:
+    def start(self, output_dir: str | None = None, trace_type: str = "form_filling",
+              url: str = "") -> None:
         if self._running:
             emit("error", message="Already recording.")
             return
         if output_dir:
             self._out_dir = output_dir if os.path.isabs(output_dir) else os.path.join(_ROOT, output_dir)
 
+        if trace_type == "web":
+            ensure_server_running()
+
         try:
-            self._recorder = DemoRecorder(output_dir=self._out_dir, trace_type="form_filling")
+            self._recorder = DemoRecorder(output_dir=self._out_dir, trace_type=trace_type, url=url)
         except Exception as exc:
             emit("error", message=f"Failed to start recorder: {exc}")
             return
@@ -476,7 +481,8 @@ class Bridge:
 
             cmd = msg.get("cmd")
             if cmd == "start":
-                self.start(msg.get("output_dir"))
+                self.start(msg.get("output_dir"), msg.get("trace_type", "form_filling"),
+                           msg.get("url", ""))
             elif cmd == "stop":
                 self.stop()
             elif cmd == "replay":
