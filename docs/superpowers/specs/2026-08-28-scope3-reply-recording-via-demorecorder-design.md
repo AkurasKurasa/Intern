@@ -25,17 +25,41 @@ thrown away.
 
 ## What already exists, checked directly rather than assumed
 
-- **`components/recorder/recorder.py`'s `ScreenObserver`** (the actual
-  class behind Electron's "Start recording" button, launched via
-  `app/recorder_bridge.py`'s `DemoRecorder` import) already declares a
-  `trace_type: "web" | "excel" | "gui"` parameter — `"web"` is an
-  existing, documented, but **entirely unimplemented** value. Its real
-  observer-selection chain (`__init__`, lines ~463-494) only ever
-  branches to `_vision_observer` → `_excel_observer` (gated on
-  `trace_type == "excel"`) → `_uia_observer` (generic Windows
-  accessibility tree, works for "all apps" but with no browser-DOM
-  awareness) → raw OCR fallback. There is no `_web_observer` anywhere
-  in this file today.
+**Correction made while writing the plan, not left in from the first
+draft:** this design originally targeted `ScreenObserver` — wrong.
+`app/recorder_bridge.py`'s `Bridge.start()` (the code Electron's "Start
+recording" button actually calls) constructs `recorder.recorder`'s
+**`DemoRecorder`** class (line 1320), a separate, more sophisticated
+mechanism from `ScreenObserver`: not time-interval polling, but
+**action-triggered** — pynput listeners fire on every real mouse click
+or keyboard group, and each fires an immediate before/after snapshot
+via `self._observer.snapshot()`. `ScreenObserver` exists in the same
+file and is real, tested code, but it is not what Electron's Recording
+button uses, so it is out of scope for this design entirely.
+
+- **`DemoRecorder.__init__`** (`components/recorder/recorder.py:1346`)
+  hard-requires `_UIA_OBSERVER_AVAILABLE` (raises `ImportError`
+  otherwise) and unconditionally sets `self._observer =
+  _UIAObserver(background_apps={"notepad", ".txt"})`. `trace_type` is
+  accepted as a constructor argument but today is **pure metadata** —
+  a string written into saved output, never used to select which
+  observer runs. There is no per-`trace_type` branching in this class
+  at all, and `WebObserver` is not imported anywhere in
+  `recorder.py` — not even the lazy `try/except ImportError` pattern
+  every other observer (`_ExcelObserver`, `_UIAObserver`,
+  `_CVVisionObserver`, lines 69-97) already follows.
+- **Every downstream consumer of `self._observer` only ever calls
+  `.snapshot()`** (`_request_snapshot()`, line 1421, and its one
+  non-subprocess call site `self._observer.snapshot()`, line 1458) and
+  treats the result as an opaque dict. `WebObserver.snapshot()`
+  already returns, by its own docstring, "the same dict format as
+  UIAutomationObserver so the rest of the pipeline needs no changes" —
+  confirmed directly against `WebObserver._capture()`'s actual return
+  shape (`elements`, `application`, `window_title`, etc.), which
+  matches. This means swapping `self._observer` to a `WebObserver`
+  instance for `trace_type == "web"` is a genuinely small, contained
+  change — nothing downstream of the assignment needs to know or care
+  which concrete class it's holding.
 - **`components/observers/web_observer/web_observer.py`'s
   `WebObserver`** already exists, fully implemented, and already a
   documented but unwired dependency of `TraceTranslator`'s own
@@ -48,20 +72,6 @@ thrown away.
   `label`, `enabled`, `visible`. This is architecturally the same
   precision `automate_inbox.py` already relies on (same Playwright
   dependency), just never connected to the Recorder.
-- **`ScreenObserver._capture_loop()`** (lines 861-899) calls whichever
-  observer is active's `.snapshot()` once per interval tick and stores
-  `(timestamp, frame_image, semantic_state)`. `_translate_and_save()`
-  (lines 687+) turns consecutive semantic-state pairs into trace JSON
-  files via `TraceTranslator.states_to_trace()` — `state_before`,
-  `state_after`, inferred `mouse`/`keyboard`/`action` from
-  `_derive_action_from()`, one file per step, all under one
-  timestamped session folder.
-- **`_derive_action_from()`** (lines 566-680+) already reconstructs
-  actual typed text from raw keystroke groups, backspace-aware —
-  already fixed for real edge cases (empty/malformed key values, lone
-  modifier presses). This machinery is reused as-is, unmodified — it
-  already does correctly what a naive from-scratch reply-recording
-  translator would otherwise have to redo.
 - **`WebObserver._extract_elements()`**'s selector
   (`input, select, textarea, button, a[href], [role=...]`) captures
   the reply `<textarea>` and the Confirm/Override buttons in
@@ -73,45 +83,78 @@ thrown away.
 
 ## Design
 
-### 1. Wire `WebObserver` into `ScreenObserver` for real
+### 1. Give `DemoRecorder` a real `trace_type == "web"` path
 
-Add a fourth observer slot to `ScreenObserver.__init__`, checked
-**before** `_uia_observer` (an explicit `trace_type == "web"` request
-must not silently fall through to the generic, browser-blind UIA
-reader):
+**Import**, mirroring the exact existing lazy pattern (lines 69-97)
+for the other three observers:
 
 ```python
-self._web_observer: Optional[Any] = None
-if (self._vision_observer is None and self._excel_observer is None
-        and trace_type == "web" and _WEB_OBSERVER_AVAILABLE):
-    obs = _WebObserver()
-    if obs.connect(browser_url="http://localhost:9222"):  # attach, don't launch a second browser
-        self._web_observer = obs
-        print("[ScreenObserver] WebObserver connected — browser DOM semantic mode active.")
-    else:
-        print("[ScreenObserver] WebObserver could not connect — falling back to UIAutomation.")
+try:
+    from observers.web_observer import WebObserver as _WebObserver
+    _WEB_OBSERVER_AVAILABLE = True
+except ImportError:
+    try:
+        from components.observers.web_observer import WebObserver as _WebObserver
+        _WEB_OBSERVER_AVAILABLE = True
+    except ImportError:
+        _WEB_OBSERVER_AVAILABLE = False
 ```
 
-`_capture_loop()` gains one more `elif` branch, same shape as the
-existing `_excel_observer`/`_uia_observer` branches:
+**`DemoRecorder.__init__`** (`recorder.py:1346`) gains one new
+parameter, `url: str = ""` — the page to open and record against, only
+meaningful when `trace_type == "web"`. The existing unconditional
+`_UIA_OBSERVER_AVAILABLE` guard and unconditional `_UIAObserver(...)`
+construction both become the **non-web** branch of a new if/else — the
+`"web"` branch requires `_WEB_OBSERVER_AVAILABLE` and a non-empty
+`url` instead, and constructs a real, visible (`headless=False`)
+`WebObserver`, connecting it immediately:
 
 ```python
-elif self._web_observer is not None:
-    semantic_state = self._web_observer.snapshot()
-    self._frames.append((ts, img, semantic_state))
+if trace_type == "web":
+    if not _WEB_OBSERVER_AVAILABLE:
+        raise ImportError("WebObserver not found in components/observers/.")
+    if not url:
+        raise ValueError('trace_type="web" requires a url to record against.')
+    self._observer = _WebObserver(headless=False)
+    if not self._observer.connect(url=url):
+        raise RuntimeError(f"WebObserver could not connect to {url!r}.")
+else:
+    if not _UIA_OBSERVER_AVAILABLE:
+        raise ImportError("UIAutomationObserver not found in components/observers/.")
+    try:
+        self._observer = _UIAObserver(background_apps={"notepad", ".txt"})
+    except TypeError:
+        self._observer = _UIAObserver()
 ```
 
-**Attaching to an already-open browser, not launching a new one**:
-Inbox Dispatch is already running (Play already starts
-`local_server.py` and opens the page). `WebObserver.connect()` accepts
-`browser_url` for exactly this — attach via Chrome DevTools Protocol
-to the browser tab the user is already looking at and already
-interacting with, rather than opening a second, invisible browser the
-human never touches. This requires the browser Electron opens for
-Inbox Dispatch to be launched with `--remote-debugging-port=9222` (or
-an assigned free port passed through) — a small, contained change
-where Play currently calls `shell.openExternal` for the `kind: "url"`
-capsule.
+Nothing else in `DemoRecorder` changes — `_request_snapshot()`,
+`_on_click()`/`_on_key_press()`, the action queue, F10 save — all
+already call `self._observer.snapshot()` generically and are
+unaffected by which concrete class that is (see the compatible-dict-
+shape finding above).
+
+**Cleanup**: `run()`'s existing `finally:` block (~line 1552, where
+listeners are stopped and pending actions flushed) gains one line —
+`if trace_type == "web": self._observer.disconnect()` — so the
+recording browser window closes itself once F10/Stop ends the
+session, rather than lingering as an orphaned window.
+
+**Launches its own browser — does not attach to one Electron already
+opened.** An earlier draft of this design (written before finding that
+`DemoRecorder`, not `ScreenObserver`, is the real target) planned to
+attach via Chrome DevTools Protocol to whatever browser Play's
+`shell.openExternal` had already opened. That's wrong on inspection:
+`shell.openExternal` hands a URL to the OS's default browser handler —
+Electron gets no launch flags, no `--remote-debugging-port`, and no
+guarantee the result is even Chromium. `WebObserver.connect(url=...)`
+with no `browser_url` already does exactly the right thing with zero
+new code: it launches its **own** real, visible Chromium via
+Playwright (the identical mechanism `automate_inbox.py` already uses
+today) and navigates straight to the given `url`. No CDP port, no
+flag-threading through `main.js`, no dependency on however the OS's
+default browser happens to be configured. The human interacts with
+that window; the raw screen+keystroke capture (pynput, system-wide)
+records it exactly the same as any other window.
 
 ### 2. Make the reply textarea identify which email it belongs to, without new selector logic
 
@@ -131,34 +174,61 @@ New module `components/inbox_router/reply_trace_translator.py`,
 manually run the same way `train_reply_model.py`/
 `bootstrap_from_sent.py` already are (Record and Train stay separate,
 explicit steps — matching this project's own established pattern, not
-an automatic hook inside `ScreenObserver.stop()`, which stays entirely
+an automatic hook inside `DemoRecorder`, which stays entirely
 task-agnostic on purpose):
 
 ```
 python components/inbox_router/reply_trace_translator.py --session-dir <path>
 ```
 
-For each trace step JSON in the session folder, in order:
-- Find the reply `<textarea>` element in `state_after["elements"]`
-  (`type == "input"`, `control_type == "textarea"`) — its `value` is
-  the exact real typed text at that point, its `label`/`text` is the
-  `message_id` from step 2.
-- Find whether `#confirmBtn` or `#overrideBtn` was the clicked element
-  for this step (via `action`/`mouse` — already-inferred click target,
-  same shape `_derive_action_from()` already produces for every other
-  Scope #1 trace).
-- On a step where Confirm/Override was clicked **and** the textarea's
-  `value` is non-empty: look up the real email by `message_id` via
-  `InboxRouter`'s already-existing history (`routed_history.json`,
-  read through the same `MockGmailClient`/`RealGmailClient.get_message()`
-  every other real code path already uses — no new lookup mechanism),
-  and call the **existing, unmodified**
-  `reply_recorder.record_reply_example(message, reply_body, source="live", path=...)`.
+**Each saved step is `live_step_NNNN.json`** (`recorder.py:2234-2243`,
+confirmed by reading the actual write, not assumed from
+`ScreenObserver`'s different shape): `{"trace_id", "timestamp",
+"duration", "type", "state": <before>, "mouse", "keyboard",
+"next_state": <after>}` — `state`/`next_state` here, **not**
+`state_before`/`state_after` (that naming belongs to a different,
+unused-for-this-feature class). Both `state` and `next_state` are
+`_fmt_state()`-projected dicts with an `elements` list whose per-element
+shape (`element_id`, `type`, `control_type`, `bbox`, `text`, `value`,
+`label`) is identical whether it came from `UIAutomationObserver` or
+`WebObserver` — confirmed above.
+
+**Click-target matching by pixel position doesn't work here — checked,
+not assumed.** `_on_click()` (`recorder.py:1841`) records raw
+`click_pos` in absolute physical screen coordinates from pynput.
+`WebObserver._extract_elements()`'s `bbox` comes from Playwright's
+`bounding_box()`, which is relative to the page **viewport**, not the
+screen — the two are not directly comparable without also knowing the
+browser window's on-screen position and chrome height, which nothing
+here currently tracks. Rather than solve that coordinate-system
+problem, the translator uses a **state-transition signal instead of a
+click-target lookup**, avoiding it entirely:
+
+For each step, in order, look at `next_state["elements"]` for the
+reply `<textarea>` (`control_type == "textarea"`) — its `value` is the
+exact real typed text at that point (Playwright's own
+`input_value()`, not reconstructed from keystrokes), its `label`/`text`
+is the `message_id` from Design §2. A step counts as **a submitted
+reply** when:
+1. This step's `state["elements"]` has that textarea with a non-empty
+   `value`, **and**
+2. The *next* step's `state["elements"]` no longer contains that same
+   `message_id`-labeled textarea at all (Confirm/Override closes the
+   detail view and returns to the list — the textarea element simply
+   isn't present in the next snapshot), **or** this is the last step
+   in the session (Stop was pressed right after submitting).
+
+On a step matching that pattern: look up the real email by
+`message_id` via `InboxRouter`'s already-existing history
+(`routed_history.json`, read through the same
+`MockGmailClient`/`RealGmailClient.get_message()` every other real
+code path already uses — no new lookup mechanism), and call the
+**existing, unmodified**
+`reply_recorder.record_reply_example(message, reply_body, source="live", path=...)`.
 
 This is the same honesty guarantee `reply_recorder.py` already
 enforces (blank/whitespace-only text saves nothing) — a step where the
-textarea was empty when Confirm was clicked (e.g. a non-reply
-decision) produces no example, exactly like today.
+textarea was empty produces no example, exactly like today.
 
 ### 4. What does NOT change
 
@@ -181,13 +251,19 @@ decision) produces no example, exactly like today.
 
 ## Error handling
 
-- `WebObserver.connect()` failing (browser not reachable at the given
-  CDP port, Playwright not installed) falls through to the existing
-  `_uia_observer` branch, exactly the same graceful-degradation shape
-  `_excel_observer`'s own connect-failure handling already has one
-  level up. Recording still produces *something* (raw OCR/UIA trace),
-  it just won't yield precise reply text — a human would notice zero
-  new lines in `reply_examples.jsonl` after translating, not a crash.
+- `WebObserver.connect()` failing (Playwright not installed, or the
+  browser fails to launch) raises `RuntimeError` from
+  `DemoRecorder.__init__` immediately — it does **not** silently fall
+  back to `UIAutomationObserver`. An explicit `trace_type="web"`
+  request that can't actually observe the web page would otherwise
+  record a UIA trace of some unrelated foreground window and call it a
+  "web recording" — worse than failing loudly, since it produces a
+  session that looks complete but translates to zero real reply
+  examples with no explanation why. `Bridge.start()` catches this the
+  same way it already catches any other recorder construction failure
+  (`except Exception as exc: emit("error", message=f"Failed to start
+  recorder: {exc}")`, `recorder_bridge.py:150-152` — no new error
+  path needed).
 - `reply_trace_translator.py` on a session with no Confirm/Override
   steps carrying real text: writes nothing, prints a plain count
   ("0 real replies found in this session"), never raises.
@@ -199,19 +275,28 @@ decision) produces no example, exactly like today.
 
 ## Testing
 
-- `ScreenObserver.__init__`/`_capture_loop()`: new tests mirroring the
-  existing `_excel_observer`-gated-by-`trace_type` tests (if any exist
-  today — check first) — `trace_type="web"` selects `_web_observer`
-  when available and connectable; falls through to UIA when it isn't;
-  never touches `_excel_observer`/`_vision_observer`'s own gating.
+- `DemoRecorder.__init__`: new tests (check for existing
+  `DemoRecorder.__init__` test coverage first, mirror its style) —
+  `trace_type="web"` with a reachable `url` selects a `WebObserver` as
+  `self._observer`; `trace_type="web"` with no `url` raises
+  `ValueError`; `trace_type="web"` when `WebObserver.connect()` fails
+  raises `RuntimeError` (does not silently fall back — an explicit
+  request for web recording that can't actually record web state
+  should fail loudly, not quietly produce a UIA trace of the wrong
+  window); every non-"web" `trace_type` behaves exactly as today
+  (`_UIAObserver` constructed, unaffected by the new branch).
 - `reply_trace_translator.py`: unit tests against a small, hand-built
-  fake session folder (2-3 trace step JSONs matching the real schema
-  `states_to_trace()` produces) — confirms it extracts exactly the
-  steps where Confirm/Override was clicked with non-empty textarea
-  value, skips empty-textarea steps, skips unresolvable message_ids
-  without raising, and produces the exact same `reply_examples.jsonl`
-  row shape `reply_recorder.record_reply_example()` already writes and
-  is already tested against.
+  fake session folder (2-3 `live_step_NNNN.json` files matching the
+  real schema `DemoRecorder` actually writes, §3) — confirms it
+  extracts exactly the steps matching the submitted-reply
+  state-transition pattern (non-empty textarea value, then that
+  textarea's `message_id` absent from the next step), skips
+  empty-textarea steps, skips a textarea that's still present in the
+  next step (detail view stayed open — nothing was submitted), skips
+  unresolvable `message_id`s without raising, and produces the exact
+  same `reply_examples.jsonl` row shape
+  `reply_recorder.record_reply_example()` already writes and is
+  already tested against.
 - `local_ui/app.js`'s new `replyBody.name = email.message_id` line: one
   small addition to the existing `openMessage()` test coverage (if
   any JS-level coverage exists — this codebase's JS is otherwise
@@ -227,24 +312,24 @@ decision) produces no example, exactly like today.
   real, non-mocked verification `scope3_local_ui`'s own smoke test
   used.
 
-## Two decisions resolved here, not left to the plan
+## One decision resolved here, not left to the plan
 
-**CDP port: assigned free port, not a hardcoded one.** `9222` is
-Chrome's own conventional default remote-debugging port — hardcoding
-it risks colliding with some other Chrome-based tool the user might
-already have running. `main.js` picks a free port the same trivial way
-`local_server.py`'s own `DEFAULT_PORT`-with-fallback pattern already
-exists for a comparable problem (`Could not start local server on port
-{port} (already running?)`), passes `--remote-debugging-port=<port>`
-when launching the browser for the Inbox Dispatch capsule, and threads
-that same port to `WebObserver(browser_url=f"http://localhost:{port}")`.
-
-**`trace_type="web"` is inferred, not a new toggle.** `main.js` already
-tracks which capsule is currently loaded into the Play slot
-(`currentCapsuleName`, per `scope3_mockup_workflow_launcher`). When
-Start Recording is pressed while the loaded capsule is specifically
-the `kind: "url"` Inbox Dispatch capsule, `recorder_bridge.py`'s
-`start_recording()` command carries `trace_type="web"` instead of the
-otherwise-hardcoded `"form_filling"`. No new UI element — this mirrors
-the same by-capsule-kind branching the Play panel's checkbox-group
-show/hide already does today.
+**`trace_type="web"` (and the recording `url`) is inferred, not a new
+toggle.** `main.js` already tracks which capsule is currently loaded
+into the Play slot (`currentCapsuleName`, per
+`scope3_mockup_workflow_launcher`). When Start Recording is pressed
+while the loaded capsule is specifically the `kind: "url"` Inbox
+Dispatch capsule, the `start` command sent to `recorder_bridge.py`
+carries `trace_type="web"` and `url=capsule.url`; `Bridge.start()`
+(`app/recorder_bridge.py:141`, the real method — its current signature
+is `start(self, output_dir: str | None = None)`, gaining `trace_type:
+str = "form_filling"` and `url: str = ""` params) passes both straight
+through to `DemoRecorder(output_dir=self._out_dir,
+trace_type=trace_type, url=url)` in place of today's hardcoded
+`trace_type="form_filling"` call. No new UI element — this mirrors the
+same by-capsule-kind branching the Play panel's checkbox-group
+show/hide already does today. `Bridge.start()` must call
+`ensure_local_server_running()` (reusing `automate_inbox.py`'s
+existing helper of the same shape, not a second copy of it) before
+constructing `DemoRecorder` with `trace_type="web"`, so the page
+actually exists for `WebObserver` to navigate to.
