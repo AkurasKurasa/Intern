@@ -2,6 +2,9 @@ const { contextBridge, ipcRenderer } = require("electron");
 
 contextBridge.exposeInMainWorld("recorderAPI", {
   start: (outputDir) => ipcRenderer.invoke("recorder-start", outputDir),
+  // trace_type/url are never passed by the renderer directly -- main.js
+  // infers them from whichever capsule is currently loaded (see
+  // "recorder-start" handler), so Start Recording needs no new button.
   stop: () => ipcRenderer.invoke("recorder-stop"),
   replay: (n) => ipcRenderer.invoke("recorder-replay", n),
   restoreMain: () => ipcRenderer.invoke("restore-main"),

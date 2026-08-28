@@ -641,7 +641,15 @@ app.on("window-all-closed", () => {
 });
 
 ipcMain.handle("recorder-start", (_evt, outputDir) => {
-  queueOrSend({ cmd: "start", output_dir: outputDir || null });
+  const capsule = currentCapsuleName
+    ? listCapsules().find((c) => c.name === currentCapsuleName)
+    : null;
+  const isWebCapsule = !!capsule && capsule.kind === "url";
+  queueOrSend({
+    cmd: "start", output_dir: outputDir || null,
+    trace_type: isWebCapsule ? "web" : "form_filling",
+    url: isWebCapsule ? capsule.url : "",
+  });
 });
 ipcMain.handle("recorder-stop", () => {
   queueOrSend({ cmd: "stop" });
