@@ -96,6 +96,16 @@ except ImportError:
     except ImportError:
         _VISION_OBSERVER_AVAILABLE = False
 
+try:
+    from observers.web_observer import WebObserver as _WebObserver
+    _WEB_OBSERVER_AVAILABLE = True
+except ImportError:
+    try:
+        from components.observers.web_observer import WebObserver as _WebObserver
+        _WEB_OBSERVER_AVAILABLE = True
+    except ImportError:
+        _WEB_OBSERVER_AVAILABLE = False
+
 
 # =============================================================================
 # MOUSE INPUT
@@ -1343,11 +1353,10 @@ class DemoRecorder:
                    "tab", "enter", "return", "escape", "esc"}
     _CAPTURE_DELAY = 0.30   # seconds to wait after action before snapshotting
 
-    def __init__(self, output_dir: str = "data/demos/human", trace_type: str = "form_filling"):
+    def __init__(self, output_dir: str = "data/demos/human", trace_type: str = "form_filling",
+                 url: str = ""):
         if not _PYNPUT_AVAILABLE:
             raise ImportError("pynput is required. Install with: pip install pynput")
-        if not _UIA_OBSERVER_AVAILABLE:
-            raise ImportError("UIAutomationObserver not found in components/observers/.")
 
         from datetime import datetime as _dt
         _session_ts   = _dt.now().strftime("%Y%m%d_%H%M%S")
@@ -1355,12 +1364,23 @@ class DemoRecorder:
         self.output_dir = os.path.join(_intern_dir, output_dir, f"session_{_session_ts}")
         self.trace_type = trace_type
 
-        # Option A: only walk the foreground form + Notepad source window.
-        # ~10x faster snapshots than walking every visible window.
-        try:
-            self._observer = _UIAObserver(background_apps={"notepad", ".txt"})
-        except TypeError:
-            self._observer = _UIAObserver()  # older signature fallback
+        if trace_type == "web":
+            if not _WEB_OBSERVER_AVAILABLE:
+                raise ImportError("WebObserver not found in components/observers/.")
+            if not url:
+                raise ValueError('trace_type="web" requires a url to record against.')
+            self._observer = _WebObserver(headless=False)
+            if not self._observer.connect(url=url):
+                raise RuntimeError(f"WebObserver could not connect to {url!r}.")
+        else:
+            if not _UIA_OBSERVER_AVAILABLE:
+                raise ImportError("UIAutomationObserver not found in components/observers/.")
+            # Option A: only walk the foreground form + Notepad source window.
+            # ~10x faster snapshots than walking every visible window.
+            try:
+                self._observer = _UIAObserver(background_apps={"notepad", ".txt"})
+            except TypeError:
+                self._observer = _UIAObserver()  # older signature fallback
         self._steps: list = []
         self._lock   = threading.Lock()
 
@@ -1555,6 +1575,11 @@ class DemoRecorder:
             except Exception: pass
             try: listeners["k"].stop()
             except Exception: pass
+            if self.trace_type == "web":
+                try:
+                    self._observer.disconnect()
+                except Exception:
+                    pass
             # PROCESS (don't discard) remaining queued actions so nothing is lost.
             import queue as _q
             print(f"\n  Flushing {self._action_queue.qsize()} pending action(s)…")
