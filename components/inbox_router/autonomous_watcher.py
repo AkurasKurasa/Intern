@@ -14,6 +14,14 @@ Scope #1 needs your real screen, so it is NEVER auto-launched here --
 this only ever surfaces "this needs Scope #1" and waits for you to
 press Play on it yourself. That boundary doesn't move.
 
+For a "reply"/"forward" decision, this asks the trained ReplyAgent
+(step 2 of the learned-autonomous-reply plan) whether one of your own
+past replies confidently fits the new email. If so, it creates the
+Gmail draft for you automatically -- gmail_client.py deliberately has
+no send() method anywhere in this project, so the furthest this ever
+goes is a draft sitting in Gmail waiting for you to read and send it
+yourself. That boundary doesn't move either.
+
     python autonomous_watcher.py                  # runs until Ctrl+C
     python autonomous_watcher.py --once            # one pass, then exit
     python autonomous_watcher.py --poll 30         # check every 30s when idle
@@ -41,6 +49,7 @@ from agent.capsule import CapsuleRegistry  # noqa: E402
 
 NEEDS_ATTENTION_PATH = Path(_THIS_DIR) / "data" / "needs_attention.jsonl"
 DISPATCH_LOG_PATH = Path(_THIS_DIR) / "data" / "dispatch_log.jsonl"
+AUTO_DRAFT_LOG_PATH = Path(_THIS_DIR) / "data" / "autonomous_drafts.jsonl"
 
 
 def _append_jsonl(path: Path, entry: dict) -> None:
@@ -69,16 +78,41 @@ def dispatch_scope2(entry: dict, registry: CapsuleRegistry, repo_root: str,
 
 def handle_entry(entry: dict, registry: CapsuleRegistry, repo_root: str,
                   popen=subprocess.Popen,
+                  reply_agent=None, gmail_client=None,
                   dispatch_log_path: Path = DISPATCH_LOG_PATH,
-                  needs_attention_path: Path = NEEDS_ATTENTION_PATH) -> dict:
+                  needs_attention_path: Path = NEEDS_ATTENTION_PATH,
+                  auto_draft_log_path: Path = AUTO_DRAFT_LOG_PATH) -> dict:
     """Decides what to do with one freshly-classified email. Pure
     dispatch logic, kept separate from the polling loop so every branch
-    is testable without a real process or a real timer. The two log
-    paths default to the real project files but are injectable so tests
-    write to a tmp_path instead of polluting real project data on every
-    test run."""
+    is testable without a real process or a real timer. The log paths
+    default to the real project files but are injectable so tests write
+    to a tmp_path instead of polluting real project data on every test
+    run.
+
+    reply_agent/gmail_client default to None -- omit both (as most
+    tests that don't care about replies do) and a reply/forward
+    decision just falls through to left_pending exactly like before
+    this feature existed."""
     decision = entry.get("decision")
     capsule_name = entry.get("capsule_name")
+
+    if decision in ("reply", "forward") and reply_agent is not None and gmail_client is not None:
+        message = gmail_client.get_message(entry.get("message_id"))
+        suggestion = reply_agent.suggest_reply(message) if message is not None else None
+        if suggestion is not None and suggestion.reply_body:
+            to = entry.get("forward_to", "") if decision == "forward" else message.sender_email
+            subject = ("Fwd: " if decision == "forward" else "Re: ") + message.subject
+            draft_id = gmail_client.create_draft(to=to, subject=subject, body=suggestion.reply_body,
+                                                  thread_id=message.thread_id)
+            outcome = {
+                "action": "auto_drafted", "message_id": entry.get("message_id"),
+                "subject": entry.get("subject"), "decision": decision,
+                "draft_id": draft_id, "confidence": suggestion.confidence,
+                "source_message_id": suggestion.source_message_id,
+                "at": datetime.now(timezone.utc).isoformat(),
+            }
+            _append_jsonl(auto_draft_log_path, outcome)
+            return outcome
 
     if decision == "route_scope2" and capsule_name:
         dispatch_result = dispatch_scope2(entry, registry, repo_root, popen=popen)
@@ -111,8 +145,10 @@ def watch(router, registry: CapsuleRegistry, repo_root: str,
           poll_interval: float = 30.0, max_iterations: Optional[int] = None,
           stop_when_idle: bool = False,
           popen=subprocess.Popen, sleep=time.sleep,
+          reply_agent=None, gmail_client=None,
           dispatch_log_path: Path = DISPATCH_LOG_PATH,
-          needs_attention_path: Path = NEEDS_ATTENTION_PATH) -> list:
+          needs_attention_path: Path = NEEDS_ATTENTION_PATH,
+          auto_draft_log_path: Path = AUTO_DRAFT_LOG_PATH) -> list:
     """The continuous loop: process one newly-classified email at a
     time, react to it, repeat.
 
@@ -137,13 +173,18 @@ def watch(router, registry: CapsuleRegistry, repo_root: str,
             sleep(poll_interval)
             continue
         outcome = handle_entry(entry, registry, repo_root, popen=popen,
+                                reply_agent=reply_agent, gmail_client=gmail_client,
                                 dispatch_log_path=dispatch_log_path,
-                                needs_attention_path=needs_attention_path)
+                                needs_attention_path=needs_attention_path,
+                                auto_draft_log_path=auto_draft_log_path)
         outcomes.append(outcome)
         if outcome["action"] == "dispatched_scope2":
             print(f"  DISPATCHED: '{entry.get('subject')}' -> {entry.get('capsule_name')} (Scope #2, running now)")
         elif outcome["action"] == "needs_attention":
             print(f"  NEEDS YOUR ATTENTION: '{entry.get('subject')}' -> {entry.get('capsule_name')} (Scope #1)")
+        elif outcome["action"] == "auto_drafted":
+            print(f"  DRAFT READY: '{entry.get('subject')}' -- reply drafted for you to review and send "
+                  f"(confidence {outcome.get('confidence', 0.0):.0%})")
         elif outcome["action"] == "left_pending":
             print(f"  left pending for manual review: '{entry.get('subject')}' ({entry.get('decision')})")
     return outcomes
@@ -159,14 +200,19 @@ def main():
     args = ap.parse_args()
 
     from local_server import build_router  # noqa: E402 -- lazy, keeps torch out of module scope
+    from reply_agent import ReplyAgent  # noqa: E402 -- lazy, same reason
+    from gmail_client import get_gmail_client  # noqa: E402
 
     router = build_router()
     registry = CapsuleRegistry()
+    reply_agent = ReplyAgent()
+    gmail_client = get_gmail_client()
 
     print("Watching for new mail" + ("" if args.once else " -- Ctrl+C to stop") + ".\n")
     try:
         outcomes = watch(router, registry, _ROOT, poll_interval=args.poll,
-                          stop_when_idle=args.once)
+                          stop_when_idle=args.once,
+                          reply_agent=reply_agent, gmail_client=gmail_client)
         if args.once:
             print(f"\nProcessed {len(outcomes)} email(s).")
     except KeyboardInterrupt:
