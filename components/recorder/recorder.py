@@ -1371,6 +1371,10 @@ class DemoRecorder:
                 raise ValueError('trace_type="web" requires a url to record against.')
             self._observer = _WebObserver(headless=False)
             if not self._observer.connect(url=url):
+                try:
+                    self._observer.disconnect()
+                except Exception:
+                    pass
                 raise RuntimeError(f"WebObserver could not connect to {url!r}.")
         else:
             if not _UIA_OBSERVER_AVAILABLE:

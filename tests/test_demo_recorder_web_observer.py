@@ -46,6 +46,22 @@ class _FakeWebObserverThatFailsToConnect(_FakeWebObserver):
         return False
 
 
+class _FakeWebObserverThatLaunchesThenFailsToConnect(_FakeWebObserver):
+    """Models connect() failing AFTER a real browser was already launched
+    (e.g. page.goto() throwing) -- the realistic failure case, distinct
+    from failing before anything was launched."""
+    _last_instance = None
+
+    def __init__(self, headless=False):
+        super().__init__(headless=headless)
+        _FakeWebObserverThatLaunchesThenFailsToConnect._last_instance = self
+
+    def connect(self, url=None):
+        self.connected_to = url
+        self.launched = True
+        return False
+
+
 def _patch_pynput(monkeypatch):
     monkeypatch.setattr(recorder_module, "_pynput_mouse", MagicMock(Listener=_FakeMouseKeyboard))
     monkeypatch.setattr(recorder_module, "_pynput_keyboard", MagicMock(Listener=_FakeMouseKeyboard))
@@ -87,6 +103,20 @@ class TestWebTraceType:
         with pytest.raises(RuntimeError):
             recorder_module.DemoRecorder(
                 output_dir=str(tmp_path), trace_type="web", url="http://localhost:8765/")
+
+    def test_web_trace_type_disconnects_on_partial_connect_failure(self, tmp_path, monkeypatch):
+        _patch_pynput(monkeypatch)
+        monkeypatch.setattr(recorder_module, "_WEB_OBSERVER_AVAILABLE", True)
+        monkeypatch.setattr(recorder_module, "_WebObserver", _FakeWebObserverThatLaunchesThenFailsToConnect)
+
+        with pytest.raises(RuntimeError):
+            recorder_module.DemoRecorder(
+                output_dir=str(tmp_path), trace_type="web", url="http://localhost:8765/")
+
+        # Verify disconnect() was called even though connection failed
+        # This proves the cleanup happens on the partial-failure path (launched, then failed)
+        assert _FakeWebObserverThatLaunchesThenFailsToConnect._last_instance is not None
+        assert _FakeWebObserverThatLaunchesThenFailsToConnect._last_instance.disconnected is True
 
     def test_non_web_trace_type_is_unaffected(self, tmp_path, monkeypatch):
         _patch_pynput(monkeypatch)
