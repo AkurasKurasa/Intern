@@ -644,7 +644,7 @@ ipcMain.handle("recorder-start", (_evt, outputDir) => {
   const capsule = currentCapsuleName
     ? listCapsules().find((c) => c.name === currentCapsuleName)
     : null;
-  const isWebCapsule = !!capsule && capsule.kind === "url";
+  const isWebCapsule = !!(capsule && capsule.url);
   queueOrSend({
     cmd: "start", output_dir: outputDir || null,
     trace_type: isWebCapsule ? "web" : "form_filling",
