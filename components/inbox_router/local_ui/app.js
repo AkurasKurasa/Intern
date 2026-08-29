@@ -178,7 +178,7 @@ function closeMessage() {
 }
 
 function isReplyLike(decision) {
-  return decision === "reply" || decision === "forward";
+  return decision === "reply" || decision === "forward" || decision === "schedule";
 }
 
 function refreshReplyBoxVisibility() {

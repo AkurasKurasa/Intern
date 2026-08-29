@@ -570,6 +570,63 @@ class TestPracticeInbox:
         assert examples == []
 
 
+class TestScheduleRecording:
+    def _build(self, tmp_path, inbox=None, sent=None, capsules=None):
+        _write_fixture(tmp_path / "data", inbox=inbox or [], sent=sent or [])
+        client = MockGmailClient(data_dir=str(tmp_path / "data"))
+        profile = PatternProfile(path=str(tmp_path / "data" / "profile.json"))
+        registry_path = tmp_path / "registry.json"
+        registry_path.write_text(json.dumps({"capsules": capsules or []}), encoding="utf-8")
+        rules = RuleLayer(profile, registry_path=str(registry_path))
+        classifier = LLMClassifier(provider="none")
+        history_path = str(tmp_path / "data" / "routed_history.json")
+        return InboxRouter(client, profile, rules, classifier, history_path=history_path,
+                            inbox_checkpoint_path=str(tmp_path / "no_such_checkpoint.pt"),
+                            examples_path=str(tmp_path / "data" / "training_examples.jsonl"),
+                            reply_examples_path=str(tmp_path / "data" / "reply_examples.jsonl"),
+                            schedule_log_path=str(tmp_path / "data" / "schedule.txt"))
+
+    def test_confirm_schedule_with_real_text_records_a_schedule_entry(self, tmp_path):
+        router = self._build(tmp_path, inbox=[_msg("i1", "boss@work.com", "vendor call")])
+        router.poll_once()
+
+        router.confirm_suggestion("i1", "schedule", reply_body="Aug 30 -- vendor call re: pricing")
+
+        schedule_path = str(tmp_path / "data" / "schedule.txt")
+        with open(schedule_path, "r", encoding="utf-8") as f:
+            content = f.read()
+        assert "Aug 30 -- vendor call re: pricing" in content
+
+    def test_confirm_schedule_with_no_text_records_nothing(self, tmp_path):
+        router = self._build(tmp_path, inbox=[_msg("i1", "boss@work.com", "vendor call")])
+        router.poll_once()
+
+        router.confirm_suggestion("i1", "schedule", reply_body="")
+
+        schedule_path = str(tmp_path / "data" / "schedule.txt")
+        assert not os.path.exists(schedule_path)
+
+    def test_confirm_schedule_does_not_touch_reply_examples(self, tmp_path):
+        router = self._build(tmp_path, inbox=[_msg("i1", "boss@work.com", "vendor call")])
+        router.poll_once()
+
+        router.confirm_suggestion("i1", "schedule", reply_body="a real note")
+
+        reply_examples_path = str(tmp_path / "data" / "reply_examples.jsonl")
+        assert not os.path.exists(reply_examples_path)
+
+    def test_override_to_schedule_with_real_text_records_a_schedule_entry(self, tmp_path):
+        router = self._build(tmp_path, inbox=[_msg("i1", "boss@work.com", "random subject")])
+        router.poll_once()
+
+        router.override_decision("i1", "schedule", "manual override", reply_body="Sept 2 -- follow up")
+
+        schedule_path = str(tmp_path / "data" / "schedule.txt")
+        with open(schedule_path, "r", encoding="utf-8") as f:
+            content = f.read()
+        assert "Sept 2 -- follow up" in content
+
+
 class TestReadStdinCommandsCarryReplyBody:
     """_read_stdin_commands() is the far end of the Electron 'Inbox' tab's
     own confirm/override chain (preload.js -> main.js -> recorder_bridge.py

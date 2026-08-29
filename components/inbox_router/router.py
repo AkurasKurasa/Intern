@@ -69,6 +69,7 @@ from routing_rules import RuleLayer
 from inbox_agent import DEFAULT_CHECKPOINT_PATH, InboxAgent
 from decision_recorder import DEFAULT_EXAMPLES_PATH, record_example
 from reply_recorder import DEFAULT_REPLY_EXAMPLES_PATH, record_reply_example
+from schedule_recorder import DEFAULT_SCHEDULE_LOG_PATH, record_schedule_entry
 
 HISTORY_PATH = os.path.join(_THIS_DIR, "data", "routed_history.json")
 SENT_LOOKBACK_DAYS = 90
@@ -116,7 +117,8 @@ class InboxRouter:
                  poll_interval_s: float = DEFAULT_POLL_INTERVAL_S,
                  inbox_checkpoint_path: str = DEFAULT_CHECKPOINT_PATH,
                  examples_path: str = DEFAULT_EXAMPLES_PATH,
-                 reply_examples_path: str = DEFAULT_REPLY_EXAMPLES_PATH) -> None:
+                 reply_examples_path: str = DEFAULT_REPLY_EXAMPLES_PATH,
+                 schedule_log_path: str = DEFAULT_SCHEDULE_LOG_PATH) -> None:
         self._gmail = gmail_client
         self._profile = profile
         self._rules = rule_layer
@@ -127,6 +129,7 @@ class InboxRouter:
         self._poll_interval_s = poll_interval_s
         self._examples_path = examples_path
         self._reply_examples_path = reply_examples_path
+        self._schedule_log_path = schedule_log_path
         self._stop = False
         # In-memory cache of what this process has routed, so confirm/
         # override don't need a disk round-trip in the common case --
@@ -220,6 +223,12 @@ class InboxRouter:
                     record_reply_example(message, reply_body, source="live", path=self._reply_examples_path)
                 except Exception as exc:
                     emit("inbox_log", line=f"Failed to record reply example: {exc}", level="err")
+        elif decision == "schedule":
+            if reply_body.strip():
+                try:
+                    record_schedule_entry(message, reply_body, path=self._schedule_log_path)
+                except Exception as exc:
+                    emit("inbox_log", line=f"Failed to record schedule entry: {exc}", level="err")
         # route_scope1/route_scope2: nothing Gmail-side happens here at all
         # -- the real capsule run already happened client-side (see
         # renderer.js's onInboxConfirmClick -> window.capsulesAPI.run())
@@ -262,6 +271,12 @@ class InboxRouter:
                     record_reply_example(message, reply_body, source="live", path=self._reply_examples_path)
                 except Exception as exc:
                     emit("inbox_log", line=f"Failed to record reply example: {exc}", level="err")
+        elif new_decision == "schedule":
+            if reply_body.strip():
+                try:
+                    record_schedule_entry(message, reply_body, path=self._schedule_log_path)
+                except Exception as exc:
+                    emit("inbox_log", line=f"Failed to record schedule entry: {exc}", level="err")
         entry["decision"] = new_decision
         entry["status"] = "overridden"
         entry["override_reason"] = reason
