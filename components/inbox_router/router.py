@@ -223,17 +223,15 @@ class InboxRouter:
                     record_reply_example(message, reply_body, source="live", path=self._reply_examples_path)
                 except Exception as exc:
                     emit("inbox_log", line=f"Failed to record reply example: {exc}", level="err")
-        elif decision == "schedule":
+        elif decision == "schedule" and message is not None:
             if reply_body.strip():
                 try:
                     record_schedule_entry(message, reply_body, path=self._schedule_log_path)
                 except Exception as exc:
                     emit("inbox_log", line=f"Failed to record schedule entry: {exc}", level="err")
-        # route_scope1/route_scope2: nothing Gmail-side happens here at all
-        # -- the real capsule run already happened client-side (see
-        # renderer.js's onInboxConfirmClick -> window.capsulesAPI.run())
-        # before this command was ever sent. flag/leave_alone need no
-        # Gmail action either.
+        elif decision == "cold_email":
+            emit("inbox_log", line="Cold Email isn't implemented yet -- no action taken.", level="info")
+        # flag/leave_alone need no Gmail-side action at all.
         entry["status"] = "confirmed"
         entry["decision"] = decision
         entry["draft_id"] = draft_id
@@ -271,12 +269,14 @@ class InboxRouter:
                     record_reply_example(message, reply_body, source="live", path=self._reply_examples_path)
                 except Exception as exc:
                     emit("inbox_log", line=f"Failed to record reply example: {exc}", level="err")
-        elif new_decision == "schedule":
+        elif new_decision == "schedule" and message is not None:
             if reply_body.strip():
                 try:
                     record_schedule_entry(message, reply_body, path=self._schedule_log_path)
                 except Exception as exc:
                     emit("inbox_log", line=f"Failed to record schedule entry: {exc}", level="err")
+        elif new_decision == "cold_email":
+            emit("inbox_log", line="Cold Email isn't implemented yet -- no action taken.", level="info")
         entry["decision"] = new_decision
         entry["status"] = "overridden"
         entry["override_reason"] = reason

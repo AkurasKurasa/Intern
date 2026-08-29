@@ -25,7 +25,6 @@ from __future__ import annotations
 import argparse
 import json
 import os
-import subprocess
 import sys
 import time
 from datetime import datetime, timezone
@@ -39,10 +38,6 @@ for _p in (_ROOT, _COMP, _THIS_DIR):
     if _p not in sys.path:
         sys.path.insert(0, _p)
 
-from agent.capsule import CapsuleRegistry  # noqa: E402
-
-NEEDS_ATTENTION_PATH = Path(_THIS_DIR) / "data" / "needs_attention.jsonl"
-DISPATCH_LOG_PATH = Path(_THIS_DIR) / "data" / "dispatch_log.jsonl"
 AUTO_DRAFT_LOG_PATH = Path(_THIS_DIR) / "data" / "autonomous_drafts.jsonl"
 
 
@@ -52,16 +47,12 @@ def _append_jsonl(path: Path, entry: dict) -> None:
         f.write(json.dumps(entry) + "\n")
 
 
-def handle_entry(entry: dict, registry: CapsuleRegistry, repo_root: str,
-                  popen=subprocess.Popen,
-                  reply_agent=None, gmail_client=None,
-                  dispatch_log_path: Path = DISPATCH_LOG_PATH,
-                  needs_attention_path: Path = NEEDS_ATTENTION_PATH,
+def handle_entry(entry: dict, reply_agent=None, gmail_client=None,
                   auto_draft_log_path: Path = AUTO_DRAFT_LOG_PATH) -> dict:
     """Decides what to do with one freshly-classified email. Pure
     dispatch logic, kept separate from the polling loop so every branch
-    is testable without a real process or a real timer. The log paths
-    default to the real project files but are injectable so tests write
+    is testable without a real process or a real timer. The log path
+    defaults to the real project file but is injectable so tests write
     to a tmp_path instead of polluting real project data on every test
     run.
 
@@ -96,13 +87,11 @@ def handle_entry(entry: dict, registry: CapsuleRegistry, repo_root: str,
     }
 
 
-def watch(router, registry: CapsuleRegistry, repo_root: str,
+def watch(router,
           poll_interval: float = 30.0, max_iterations: Optional[int] = None,
           stop_when_idle: bool = False,
-          popen=subprocess.Popen, sleep=time.sleep,
+          sleep=time.sleep,
           reply_agent=None, gmail_client=None,
-          dispatch_log_path: Path = DISPATCH_LOG_PATH,
-          needs_attention_path: Path = NEEDS_ATTENTION_PATH,
           auto_draft_log_path: Path = AUTO_DRAFT_LOG_PATH) -> list:
     """The continuous loop: process one newly-classified email at a
     time, react to it, repeat.
@@ -127,10 +116,8 @@ def watch(router, registry: CapsuleRegistry, repo_root: str,
                 break
             sleep(poll_interval)
             continue
-        outcome = handle_entry(entry, registry, repo_root, popen=popen,
+        outcome = handle_entry(entry,
                                 reply_agent=reply_agent, gmail_client=gmail_client,
-                                dispatch_log_path=dispatch_log_path,
-                                needs_attention_path=needs_attention_path,
                                 auto_draft_log_path=auto_draft_log_path)
         outcomes.append(outcome)
         if outcome["action"] == "auto_drafted":
@@ -155,13 +142,12 @@ def main():
     from gmail_client import get_gmail_client  # noqa: E402
 
     router = build_router()
-    registry = CapsuleRegistry()
     reply_agent = ReplyAgent()
     gmail_client = get_gmail_client()
 
     print("Watching for new mail" + ("" if args.once else " -- Ctrl+C to stop") + ".\n")
     try:
-        outcomes = watch(router, registry, _ROOT, poll_interval=args.poll,
+        outcomes = watch(router, poll_interval=args.poll,
                           stop_when_idle=args.once,
                           reply_agent=reply_agent, gmail_client=gmail_client)
         if args.once:

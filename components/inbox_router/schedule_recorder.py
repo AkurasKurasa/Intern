@@ -25,6 +25,7 @@ def record_schedule_entry(message: EmailMessage, note: str,
     note = (note or "").strip()
     if not note:
         return
+    note = note.replace("\n", " ")
     os.makedirs(os.path.dirname(path), exist_ok=True)
     recorded_at = datetime.now(timezone.utc).isoformat()
     line = f"[{recorded_at}] {message.subject!r} ({message.sender_email}): {note}\n"

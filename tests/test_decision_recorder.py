@@ -48,6 +48,12 @@ class TestRecordExample:
         with pytest.raises(ValueError):
             rec.record_example(_msg(), "reply", source="bogus", path=path)
 
+    def test_invalid_decision_raises_and_writes_nothing(self, tmp_path):
+        path = str(tmp_path / "examples.jsonl")
+        with pytest.raises(ValueError):
+            rec.record_example(_msg(), "bogus_decision", source="live", path=path)
+        assert not os.path.exists(path)
+
     def test_creates_parent_directory(self, tmp_path):
         path = str(tmp_path / "nested" / "dir" / "examples.jsonl")
         rec.record_example(_msg(), "reply", source="live", path=path)

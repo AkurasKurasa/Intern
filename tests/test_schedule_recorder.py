@@ -41,9 +41,19 @@ class TestRecordScheduleEntry:
         sr.record_schedule_entry(_msg(mid="m2"), "second note", path=path)
 
         with open(path, "r", encoding="utf-8") as f:
-            content = f.read()
-        assert "first note" in content
-        assert "second note" in content
+            lines = f.readlines()
+        assert len(lines) == 2
+        assert "first note" in lines[0]
+        assert "second note" in lines[1]
+
+    def test_embedded_newline_in_note_stays_on_one_line(self, tmp_path):
+        path = str(tmp_path / "schedule.txt")
+        sr.record_schedule_entry(_msg(), "Aug 30 -- vendor call\nre: pricing, confirm time", path=path)
+
+        with open(path, "r", encoding="utf-8") as f:
+            lines = f.readlines()
+        assert len(lines) == 1
+        assert "Aug 30 -- vendor call re: pricing, confirm time" in lines[0]
 
     def test_default_path_is_under_data_dir(self):
         assert "data" in sr.DEFAULT_SCHEDULE_LOG_PATH

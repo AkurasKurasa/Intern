@@ -90,17 +90,29 @@ class TestTrain:
             trainer.train(path, save_path, epochs=5, lr=1e-2, val_split=0.15)
 
     def test_stale_decisions_from_before_a_decision_space_redefinition_are_skipped(self, tmp_path):
-        # decision_recorder.py doesn't validate decision strings at write
-        # time, so examples recorded under the old route_scope1/route_scope2
-        # vocabulary can still be sitting in a real project's log after
-        # Task 1's redefinition. train() must skip them, not crash on
+        # decision_recorder.record_example() now validates decision strings
+        # at write time (a later fix closed that gap), so a stale
+        # route_scope1/route_scope2 row can no longer be written through it
+        # -- but a real project's log can still have rows like this sitting
+        # on disk from before that validation existed, or from an older
+        # version of the code. train() must skip them, not crash on
         # DECISIONS_ORDER.index() for a decision that no longer exists.
+        # Appended directly (bypassing record_example()'s validation) to
+        # simulate exactly that pre-existing, already-on-disk data.
         path = str(tmp_path / "examples.jsonl")
         _seed_examples(path)   # 6 valid examples
-        rec.record_example(_msg("m7", "broker@insure.com", "intake", "form"),
-                            "route_scope1", source="live", path=path)
-        rec.record_example(_msg("m8", "reg@x.edu", "grades", "sheet"),
-                            "route_scope2", source="live", path=path)
+        import json
+        stale_rows = [
+            {"message_id": "m7", "subject": "intake", "sender_email": "broker@insure.com",
+             "body_text": "form", "decision": "route_scope1", "source": "live",
+             "recorded_at": "2026-08-20T00:00:00+00:00"},
+            {"message_id": "m8", "subject": "grades", "sender_email": "reg@x.edu",
+             "body_text": "sheet", "decision": "route_scope2", "source": "live",
+             "recorded_at": "2026-08-20T00:00:00+00:00"},
+        ]
+        with open(path, "a", encoding="utf-8") as f:
+            for row in stale_rows:
+                f.write(json.dumps(row) + "\n")
         save_path = str(tmp_path / "model.pt")
 
         result = trainer.train(path, save_path, epochs=5, lr=1e-2, val_split=0.0,

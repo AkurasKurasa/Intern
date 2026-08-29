@@ -21,6 +21,7 @@ if _THIS_DIR not in sys.path:
     sys.path.insert(0, _THIS_DIR)
 
 from gmail_client import EmailMessage
+from inbox_features import DECISIONS_ORDER
 
 DEFAULT_EXAMPLES_PATH = os.path.join(_THIS_DIR, "data", "training_examples.jsonl")
 
@@ -31,6 +32,8 @@ def record_example(message: EmailMessage, decision: str, source: str,
                     path: str = DEFAULT_EXAMPLES_PATH) -> None:
     if source not in VALID_SOURCES:
         raise ValueError(f"source must be one of {VALID_SOURCES}, got {source!r}")
+    if decision not in DECISIONS_ORDER:
+        raise ValueError(f"decision must be one of {DECISIONS_ORDER}, got {decision!r}")
     row = {
         "message_id": message.id,
         "subject": message.subject,

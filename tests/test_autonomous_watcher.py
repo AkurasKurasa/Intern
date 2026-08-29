@@ -9,7 +9,6 @@ for _p in (_ROOT, _COMP, _INBOX_DIR):
     if _p not in sys.path:
         sys.path.insert(0, _p)
 
-from agent.capsule import CapsuleRegistry
 from gmail_client import EmailMessage
 import autonomous_watcher as watcher
 
@@ -107,18 +106,6 @@ def _entry(decision, capsule_name="", message_id="m1", subject="Test email"):
     }
 
 
-def _build_registry(tmp_path, script_entrypoint=None):
-    registry_path = tmp_path / "registry.json"
-    capsules = [{
-        "name": "Sheet-to-Portal Matcher", "description": "", "model_path": "",
-        "trigger_keywords": [], "trigger_apps": [], "kind": "script",
-        "entrypoint": script_entrypoint or "components/scope2/automate.py",
-        "args": ["--variant", "v0_base", "--commit"], "cwd": "",
-    }]
-    registry_path.write_text(json.dumps({"capsules": capsules}), encoding="utf-8")
-    return CapsuleRegistry(registry_path=str(registry_path))
-
-
 class TestHandleEntry:
     def test_all_non_reply_forward_decisions_are_left_pending(self, tmp_path):
         # Task 1 removed routing entirely -- there is nothing left to
@@ -126,15 +113,12 @@ class TestHandleEntry:
         # doesn't have reply_agent/gmail_client wiring for (which is all
         # of them here, since neither is supplied) falls to the one
         # remaining fallback outcome.
-        registry = _build_registry(tmp_path)
         popen = FakePopen()
         dispatch_log = tmp_path / "dispatch_log.jsonl"
         needs_attention = tmp_path / "needs_attention.jsonl"
 
         for decision in ("reply", "forward", "schedule", "cold_email", "flag", "leave_alone"):
-            outcome = watcher.handle_entry(_entry(decision), registry, _ROOT, popen=popen,
-                                            dispatch_log_path=dispatch_log,
-                                            needs_attention_path=needs_attention)
+            outcome = watcher.handle_entry(_entry(decision))
             assert outcome["action"] == "left_pending"
 
         assert popen.calls == []
@@ -144,7 +128,6 @@ class TestHandleEntry:
 
 class TestHandleEntryAutoDraft:
     def test_confident_reply_creates_draft_and_logs(self, tmp_path):
-        registry = _build_registry(tmp_path)
         message = _msg(mid="m1", sender_email="boss@work.com", subject="Status update")
         gmail_client = FakeGmailClient([message])
         reply_agent = FakeReplyAgent(FakeReplySuggestion(
@@ -152,7 +135,7 @@ class TestHandleEntryAutoDraft:
         entry = _entry("reply", message_id="m1", subject="Status update")
         auto_draft_log = tmp_path / "auto_drafts.jsonl"
 
-        outcome = watcher.handle_entry(entry, registry, _ROOT,
+        outcome = watcher.handle_entry(entry,
                                         reply_agent=reply_agent, gmail_client=gmail_client,
                                         auto_draft_log_path=auto_draft_log)
 
@@ -167,7 +150,6 @@ class TestHandleEntryAutoDraft:
         assert logged["source_message_id"] == "old1"
 
     def test_forward_decision_uses_forward_to_and_fwd_subject(self, tmp_path):
-        registry = _build_registry(tmp_path)
         message = _msg(mid="m2", subject="Weekly doc")
         gmail_client = FakeGmailClient([message])
         reply_agent = FakeReplyAgent(FakeReplySuggestion(
@@ -175,7 +157,7 @@ class TestHandleEntryAutoDraft:
         entry = _entry("forward", message_id="m2", subject="Weekly doc")
         entry["forward_to"] = "team@work.com"
 
-        outcome = watcher.handle_entry(entry, registry, _ROOT,
+        outcome = watcher.handle_entry(entry,
                                         reply_agent=reply_agent, gmail_client=gmail_client,
                                         auto_draft_log_path=tmp_path / "auto_drafts.jsonl")
 
@@ -185,7 +167,6 @@ class TestHandleEntryAutoDraft:
         assert draft["subject"] == "Fwd: Weekly doc"
 
     def test_low_confidence_suggestion_falls_through_to_left_pending(self, tmp_path):
-        registry = _build_registry(tmp_path)
         message = _msg(mid="m1")
         gmail_client = FakeGmailClient([message])
         # An empty reply_body is exactly ReplyAgent's own contract for
@@ -193,7 +174,7 @@ class TestHandleEntryAutoDraft:
         reply_agent = FakeReplyAgent(FakeReplySuggestion(reply_body="", confidence=0.3))
         entry = _entry("reply", message_id="m1")
 
-        outcome = watcher.handle_entry(entry, registry, _ROOT,
+        outcome = watcher.handle_entry(entry,
                                         reply_agent=reply_agent, gmail_client=gmail_client,
                                         auto_draft_log_path=tmp_path / "auto_drafts.jsonl")
 
@@ -201,12 +182,11 @@ class TestHandleEntryAutoDraft:
         assert gmail_client.drafts_created == []
 
     def test_missing_message_falls_through_to_left_pending(self, tmp_path):
-        registry = _build_registry(tmp_path)
         gmail_client = FakeGmailClient([])   # message not found
         reply_agent = FakeReplyAgent(FakeReplySuggestion(reply_body="won't be reached", confidence=0.99))
         entry = _entry("reply", message_id="does-not-exist")
 
-        outcome = watcher.handle_entry(entry, registry, _ROOT,
+        outcome = watcher.handle_entry(entry,
                                         reply_agent=reply_agent, gmail_client=gmail_client)
 
         assert outcome["action"] == "left_pending"
@@ -214,35 +194,31 @@ class TestHandleEntryAutoDraft:
         assert reply_agent.calls == []
 
     def test_requires_both_reply_agent_and_gmail_client_to_activate(self, tmp_path):
-        registry = _build_registry(tmp_path)
         message = _msg(mid="m1")
         gmail_client = FakeGmailClient([message])
         reply_agent = FakeReplyAgent(FakeReplySuggestion(reply_body="would draft this", confidence=0.99))
         entry = _entry("reply", message_id="m1")
 
         # Only reply_agent supplied, no gmail_client -- must not half-activate.
-        outcome = watcher.handle_entry(entry, registry, _ROOT, reply_agent=reply_agent)
+        outcome = watcher.handle_entry(entry, reply_agent=reply_agent)
         assert outcome["action"] == "left_pending"
         assert gmail_client.drafts_created == []
 
         # Only gmail_client supplied, no reply_agent -- same.
-        outcome = watcher.handle_entry(entry, registry, _ROOT, gmail_client=gmail_client)
+        outcome = watcher.handle_entry(entry, gmail_client=gmail_client)
         assert outcome["action"] == "left_pending"
         assert gmail_client.drafts_created == []
 
     def test_non_reply_forward_decision_unaffected_by_reply_agent_presence(self, tmp_path):
         # Sanity: wiring in reply_agent/gmail_client must not cause a
         # non-reply/forward decision to do anything Gmail-side.
-        registry = _build_registry(tmp_path)
         popen = FakePopen()
         gmail_client = FakeGmailClient([_msg(mid="m1")])
         reply_agent = FakeReplyAgent(FakeReplySuggestion(reply_body="irrelevant", confidence=0.99))
         entry = _entry("flag", message_id="m1")
 
-        outcome = watcher.handle_entry(entry, registry, _ROOT, popen=popen,
-                                        reply_agent=reply_agent, gmail_client=gmail_client,
-                                        dispatch_log_path=tmp_path / "d.jsonl",
-                                        needs_attention_path=tmp_path / "n.jsonl")
+        outcome = watcher.handle_entry(entry,
+                                        reply_agent=reply_agent, gmail_client=gmail_client)
 
         assert outcome["action"] == "left_pending"
         assert popen.calls == []
@@ -255,14 +231,10 @@ class TestWatch:
             _entry("flag", message_id="m1"),
             _entry("schedule", message_id="m2"),
         ])
-        registry = _build_registry(tmp_path)
-        popen = FakePopen()
         slept = []
 
-        outcomes = watcher.watch(router, registry, _ROOT, stop_when_idle=True,
-                                  popen=popen, sleep=lambda s: slept.append(s),
-                                  dispatch_log_path=tmp_path / "d.jsonl",
-                                  needs_attention_path=tmp_path / "n.jsonl")
+        outcomes = watcher.watch(router, stop_when_idle=True,
+                                  sleep=lambda s: slept.append(s))
 
         assert len(outcomes) == 2
         assert outcomes[0]["action"] == "left_pending"
@@ -271,8 +243,6 @@ class TestWatch:
 
     def test_continuous_mode_sleeps_when_idle_then_keeps_watching(self, tmp_path):
         router = FakeRouter([_entry("flag")])  # one entry, then None forever
-        registry = _build_registry(tmp_path)
-        popen = FakePopen()
         slept = []
 
         def fake_sleep(seconds):
@@ -281,10 +251,8 @@ class TestWatch:
                 raise StopIteration  # ends the test's own patience, not the loop's
 
         try:
-            watcher.watch(router, registry, _ROOT, poll_interval=5, stop_when_idle=False,
-                          popen=popen, sleep=fake_sleep,
-                          dispatch_log_path=tmp_path / "d.jsonl",
-                          needs_attention_path=tmp_path / "n.jsonl")
+            watcher.watch(router, poll_interval=5, stop_when_idle=False,
+                          sleep=fake_sleep)
         except StopIteration:
             pass
 
@@ -292,28 +260,21 @@ class TestWatch:
 
     def test_max_iterations_caps_even_with_more_pending(self, tmp_path):
         router = FakeRouter([_entry("flag", message_id=f"m{i}") for i in range(5)])
-        registry = _build_registry(tmp_path)
-        popen = FakePopen()
 
-        outcomes = watcher.watch(router, registry, _ROOT, stop_when_idle=True,
-                                  max_iterations=2, popen=popen, sleep=lambda s: None,
-                                  dispatch_log_path=tmp_path / "d.jsonl",
-                                  needs_attention_path=tmp_path / "n.jsonl")
+        outcomes = watcher.watch(router, stop_when_idle=True,
+                                  max_iterations=2, sleep=lambda s: None)
 
         assert len(outcomes) == 2
 
     def test_threads_reply_agent_and_gmail_client_into_handle_entry(self, tmp_path):
         message = _msg(mid="m1", subject="Status update")
         router = FakeRouter([_entry("reply", message_id="m1", subject="Status update")])
-        registry = _build_registry(tmp_path)
         gmail_client = FakeGmailClient([message])
         reply_agent = FakeReplyAgent(FakeReplySuggestion(reply_body="Thanks!", confidence=0.9))
 
-        outcomes = watcher.watch(router, registry, _ROOT, stop_when_idle=True,
-                                  popen=FakePopen(), sleep=lambda s: None,
+        outcomes = watcher.watch(router, stop_when_idle=True,
+                                  sleep=lambda s: None,
                                   reply_agent=reply_agent, gmail_client=gmail_client,
-                                  dispatch_log_path=tmp_path / "d.jsonl",
-                                  needs_attention_path=tmp_path / "n.jsonl",
                                   auto_draft_log_path=tmp_path / "auto.jsonl")
 
         assert len(outcomes) == 1
