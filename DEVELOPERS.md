@@ -2469,11 +2469,14 @@ one form."
    = web source, action on cells, demos, train.
 3. **Email / Ticket Triage** — *in progress ([Scope #3](#task-list)), Inbox
    Router approach.* Based on a passively-learned per-sender pattern profile
-   (Gmail API + OAuth2, no manual labeling), an incoming email is routed to
-   Scope #1's form-fill, routed to Scope #2's sheet-match, replied to
-   directly, forwarded, flagged for a person, or left alone — then the
-   outcome is confirmed by reply. Chosen approach (2026-08-16) doesn't need
-   branching ([Big Three #3](#task-list)) at all, unlike the
+   (Gmail API + OAuth2, no manual labeling), an incoming email is replied to,
+   forwarded, scheduled (content extracted to a plain log, no reuse model
+   needed), sent as a cold email (task-list-driven, not yet built), flagged
+   for a person, or left alone — then the outcome is confirmed by reply.
+   Redefined (2026-08-28) to the tasks a virtual assistant actually does on
+   email, dropping the earlier Route-to-Scope-#1/#2 model entirely — Scope #3
+   no longer connects to Scope #1/#2 at all. Chosen approach (2026-08-16)
+   doesn't need branching ([Big Three #3](#task-list)) at all, unlike the
    originally-planned GUI-demonstration path — decisions come from Gmail API
    classification, not a cloned UI action loop. Kept to decisions inferable
    from *visible* content (avoid hidden-intent, Fundamental roadblock A).
