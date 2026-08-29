@@ -1,18 +1,12 @@
 """
 components/inbox_router/autonomous_watcher.py
 ==================================================
-Scope #3's actual point: turns Scope #1 and #2 from tools you have to
-remember to click Play on into a system that watches your real inbox
-and runs them itself when real work shows up. Runs InboxRouter's real
+Scope #3's actual point: a system that watches your real inbox and acts
+on it itself when real work shows up, instead of waiting for you to
+open Inbox Dispatch and click through it. Runs InboxRouter's real
 classification pipeline (rule layer -> trained InboxDecisionNet -> LLM
 fallback -- the same one Inbox Dispatch and automate_inbox.py already
-use) continuously against real new mail. For each email the classifier
-decides needs Scope #2, this actually launches that automation live --
-no click from anyone.
-
-Scope #1 needs your real screen, so it is NEVER auto-launched here --
-this only ever surfaces "this needs Scope #1" and waits for you to
-press Play on it yourself. That boundary doesn't move.
+use) continuously against real new mail.
 
 For a "reply"/"forward" decision, this asks the trained ReplyAgent
 (step 2 of the learned-autonomous-reply plan) whether one of your own
@@ -58,24 +52,6 @@ def _append_jsonl(path: Path, entry: dict) -> None:
         f.write(json.dumps(entry) + "\n")
 
 
-def dispatch_scope2(entry: dict, registry: CapsuleRegistry, repo_root: str,
-                     popen=subprocess.Popen) -> dict:
-    """Actually launches the real Scope #2 automation matched to this
-    email. `popen` is injectable so tests can verify the exact command
-    that WOULD run without spawning a real process. Never raises -- a
-    launch failure is a normal, loggable outcome, not fatal to the
-    watcher's own loop."""
-    capsule = next((c for c in registry.list_capsules() if c.name == entry.get("capsule_name")), None)
-    if capsule is None:
-        return {"ok": False, "reason": f"capsule '{entry.get('capsule_name')}' not found in registry"}
-    try:
-        argv, cwd = capsule.launch_command(repo_root)
-    except FileNotFoundError as exc:
-        return {"ok": False, "reason": str(exc)}
-    process = popen(argv, cwd=cwd)
-    return {"ok": True, "pid": process.pid, "argv": argv}
-
-
 def handle_entry(entry: dict, registry: CapsuleRegistry, repo_root: str,
                   popen=subprocess.Popen,
                   reply_agent=None, gmail_client=None,
@@ -94,7 +70,6 @@ def handle_entry(entry: dict, registry: CapsuleRegistry, repo_root: str,
     decision just falls through to left_pending exactly like before
     this feature existed."""
     decision = entry.get("decision")
-    capsule_name = entry.get("capsule_name")
 
     if decision in ("reply", "forward") and reply_agent is not None and gmail_client is not None:
         message = gmail_client.get_message(entry.get("message_id"))
@@ -113,26 +88,6 @@ def handle_entry(entry: dict, registry: CapsuleRegistry, repo_root: str,
             }
             _append_jsonl(auto_draft_log_path, outcome)
             return outcome
-
-    if decision == "route_scope2" and capsule_name:
-        dispatch_result = dispatch_scope2(entry, registry, repo_root, popen=popen)
-        outcome = {
-            "action": "dispatched_scope2", "message_id": entry.get("message_id"),
-            "subject": entry.get("subject"), "capsule_name": capsule_name,
-            "dispatch_result": dispatch_result, "at": datetime.now(timezone.utc).isoformat(),
-        }
-        _append_jsonl(dispatch_log_path, outcome)
-        return outcome
-
-    if decision == "route_scope1" and capsule_name:
-        outcome = {
-            "action": "needs_attention", "message_id": entry.get("message_id"),
-            "subject": entry.get("subject"), "capsule_name": capsule_name,
-            "reason": "Scope #1 needs your real screen -- press Play on this capsule yourself.",
-            "at": datetime.now(timezone.utc).isoformat(),
-        }
-        _append_jsonl(needs_attention_path, outcome)
-        return outcome
 
     return {
         "action": "left_pending", "message_id": entry.get("message_id"),
@@ -178,11 +133,7 @@ def watch(router, registry: CapsuleRegistry, repo_root: str,
                                 needs_attention_path=needs_attention_path,
                                 auto_draft_log_path=auto_draft_log_path)
         outcomes.append(outcome)
-        if outcome["action"] == "dispatched_scope2":
-            print(f"  DISPATCHED: '{entry.get('subject')}' -> {entry.get('capsule_name')} (Scope #2, running now)")
-        elif outcome["action"] == "needs_attention":
-            print(f"  NEEDS YOUR ATTENTION: '{entry.get('subject')}' -> {entry.get('capsule_name')} (Scope #1)")
-        elif outcome["action"] == "auto_drafted":
+        if outcome["action"] == "auto_drafted":
             print(f"  DRAFT READY: '{entry.get('subject')}' -- reply drafted for you to review and send "
                   f"(confidence {outcome.get('confidence', 0.0):.0%})")
         elif outcome["action"] == "left_pending":

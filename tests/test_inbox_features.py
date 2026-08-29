@@ -1,4 +1,3 @@
-import math
 import os
 import sys
 
@@ -12,7 +11,6 @@ for _p in (_ROOT, _INBOX_DIR):
 
 from gmail_client import EmailMessage
 from pattern_profile import PatternProfile
-from routing_rules import RuleLayer
 import inbox_features as feats
 
 
@@ -23,18 +21,9 @@ def _msg(sender_email="alice@vendor.com", subject="Hello", body="Just checking i
     )
 
 
-def _rule_layer(tmp_path, profile, capsules=None):
-    import json
-    registry_path = tmp_path / "registry.json"
-    registry_path.write_text(json.dumps({"capsules": capsules or []}), encoding="utf-8")
-    return RuleLayer(profile, registry_path=str(registry_path))
-
-
 class TestExtract:
-    def test_returns_correct_length(self, tmp_path):
-        profile = PatternProfile(path=str(tmp_path / "profile.json"))
-        rules = _rule_layer(tmp_path, profile)
-        result = feats.extract(_msg(), None, {}, rules)
+    def test_returns_correct_length(self):
+        result = feats.extract(_msg(), None, {})
         assert len(result) == feats.DIMS
         assert all(isinstance(v, float) for v in result)
 
@@ -42,70 +31,30 @@ class TestExtract:
         profile = PatternProfile(path=str(tmp_path / "profile.json"))
         pattern = profile._get_or_create("vendor.com")
         pattern.reply_count, pattern.forward_count, pattern.ignore_count = 3, 1, 0
-        rules = _rule_layer(tmp_path, profile)
-        result = feats.extract(_msg(), pattern, {}, rules)
+        result = feats.extract(_msg(), pattern, {})
         idx = feats.FEATURE_NAMES.index("pattern_reply_ratio")
         assert result[idx] == pytest.approx(0.75)
 
-    def test_no_pattern_gives_zero_ratios(self, tmp_path):
-        profile = PatternProfile(path=str(tmp_path / "profile.json"))
-        rules = _rule_layer(tmp_path, profile)
-        result = feats.extract(_msg(), None, {}, rules)
+    def test_no_pattern_gives_zero_ratios(self):
+        result = feats.extract(_msg(), None, {})
         idx = feats.FEATURE_NAMES.index("pattern_reply_ratio")
         assert result[idx] == 0.0
 
-    def test_rule_hit_scope1_sets_correct_feature(self, tmp_path):
-        profile = PatternProfile(path=str(tmp_path / "profile.json"))
-        rules = _rule_layer(tmp_path, profile, capsules=[
-            {"name": "form_filling", "description": "", "model_path": "x.pt",
-             "trigger_keywords": ["insurance"], "trigger_apps": []},
-        ])
-        result = feats.extract(_msg(subject="insurance intake"), None, {}, rules)
-        idx1 = feats.FEATURE_NAMES.index("rule_hit_scope1")
-        idx2 = feats.FEATURE_NAMES.index("rule_hit_scope2")
-        assert result[idx1] == 1.0
-        assert result[idx2] == 0.0
-
-    def test_rule_hit_scope2_sets_correct_feature(self, tmp_path):
-        profile = PatternProfile(path=str(tmp_path / "profile.json"))
-        rules = _rule_layer(tmp_path, profile, capsules=[
-            {"name": "Sheet-to-Portal Matcher", "description": "", "kind": "script",
-             "model_path": "", "trigger_keywords": ["grades"], "trigger_apps": []},
-        ])
-        result = feats.extract(_msg(subject="grades roster"), None, {}, rules)
-        idx1 = feats.FEATURE_NAMES.index("rule_hit_scope1")
-        idx2 = feats.FEATURE_NAMES.index("rule_hit_scope2")
-        assert result[idx1] == 0.0
-        assert result[idx2] == 1.0
-
-    def test_no_rule_match_sets_both_zero(self, tmp_path):
-        profile = PatternProfile(path=str(tmp_path / "profile.json"))
-        rules = _rule_layer(tmp_path, profile)
-        result = feats.extract(_msg(subject="totally unrelated"), None, {}, rules)
-        idx1 = feats.FEATURE_NAMES.index("rule_hit_scope1")
-        idx2 = feats.FEATURE_NAMES.index("rule_hit_scope2")
-        assert result[idx1] == 0.0
-        assert result[idx2] == 0.0
-
-    def test_body_length_scaled_is_bounded(self, tmp_path):
-        profile = PatternProfile(path=str(tmp_path / "profile.json"))
-        rules = _rule_layer(tmp_path, profile)
-        short = feats.extract(_msg(body="hi"), None, {}, rules)
-        long = feats.extract(_msg(body="word " * 5000), None, {}, rules)
+    def test_body_length_scaled_is_bounded(self):
+        short = feats.extract(_msg(body="hi"), None, {})
+        long = feats.extract(_msg(body="word " * 5000), None, {})
         idx = feats.FEATURE_NAMES.index("body_length_scaled")
         assert 0.0 <= short[idx] <= 1.0
         assert 0.0 <= long[idx] <= 1.0
         assert long[idx] > short[idx]
 
-    def test_semantic_features_favor_matching_centroid(self, tmp_path):
-        profile = PatternProfile(path=str(tmp_path / "profile.json"))
-        rules = _rule_layer(tmp_path, profile)
+    def test_semantic_features_favor_matching_centroid(self):
         centroids = feats.compute_centroids([
             {"subject": "please reply soon", "body_text": "Can you get back to me?", "decision": "reply"},
             {"subject": "fwd this along", "body_text": "Please pass this to the team.", "decision": "forward"},
         ])
         result = feats.extract(_msg(subject="please reply soon", body="Can you get back to me?"),
-                                None, centroids, rules)
+                                None, centroids)
         reply_idx = feats.FEATURE_NAMES.index("sem_sim_reply")
         forward_idx = feats.FEATURE_NAMES.index("sem_sim_forward")
         assert result[reply_idx] > result[forward_idx]
@@ -124,3 +73,16 @@ class TestComputeCentroids:
         centroids = feats.compute_centroids(examples)
         assert set(centroids.keys()) == {"reply", "forward"}
         assert len(centroids["reply"]) == len(centroids["forward"])
+
+
+class TestDecisionsOrder:
+    def test_matches_the_redefined_decision_space(self):
+        # Task 1's whole point: route_scope1/route_scope2 are gone,
+        # schedule/cold_email are the replacements. Every later task in
+        # this plan assumes this exact list, in this exact order.
+        assert feats.DECISIONS_ORDER == ["reply", "forward", "schedule", "cold_email", "flag", "leave_alone"]
+
+    def test_feature_names_has_no_rule_hit_scope_features(self):
+        assert "rule_hit_scope1" not in feats.FEATURE_NAMES
+        assert "rule_hit_scope2" not in feats.FEATURE_NAMES
+        assert feats.DIMS == len(feats.FEATURE_NAMES)

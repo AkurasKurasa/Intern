@@ -29,26 +29,23 @@ for _p in (_THIS_DIR, _SCOPE2_DIR):
 from features import encoders  # noqa: E402
 from gmail_client import EmailMessage  # noqa: E402
 from pattern_profile import SenderPattern  # noqa: E402
-from routing_rules import RuleLayer  # noqa: E402
 
-VERSION = "inbox-features-v1-13d"
+VERSION = "inbox-features-v2-11d"
 
-DECISIONS_ORDER = ["route_scope1", "route_scope2", "reply", "forward", "flag", "leave_alone"]
+DECISIONS_ORDER = ["reply", "forward", "schedule", "cold_email", "flag", "leave_alone"]
 
 FEATURE_NAMES = [
-    "sem_sim_route_scope1",   # 1
-    "sem_sim_route_scope2",   # 2
-    "sem_sim_reply",          # 3
-    "sem_sim_forward",        # 4
+    "sem_sim_reply",          # 1
+    "sem_sim_forward",        # 2
+    "sem_sim_schedule",       # 3
+    "sem_sim_cold_email",     # 4
     "sem_sim_flag",           # 5
     "sem_sim_leave_alone",    # 6
     "pattern_reply_ratio",    # 7
     "pattern_forward_ratio",  # 8
     "pattern_ignore_ratio",   # 9
-    "rule_hit_scope1",        # 10
-    "rule_hit_scope2",        # 11
-    "body_length_scaled",     # 12
-    "has_sender_history",     # 13
+    "body_length_scaled",     # 10
+    "has_sender_history",     # 11
 ]
 
 DIMS = len(FEATURE_NAMES)
@@ -77,7 +74,7 @@ def compute_centroids(examples: List[dict]) -> Dict[str, List[float]]:
 
 
 def extract(message: EmailMessage, pattern: Optional[SenderPattern],
-            centroids: Dict[str, List[float]], rule_layer: RuleLayer) -> List[float]:
+            centroids: Dict[str, List[float]]) -> List[float]:
     text = f"{message.subject}\n{message.body_text}".strip()
     email_vec = encoders.encode(text) if text else [0.0] * encoders.DIMS
 
@@ -96,13 +93,8 @@ def extract(message: EmailMessage, pattern: Optional[SenderPattern],
     else:
         pattern_feats = [0.0, 0.0, 0.0]
 
-    capsule = rule_layer.match_capsule(message)
-    is_scope2 = bool(capsule) and capsule.get("kind") == "script"
-    is_scope1 = bool(capsule) and not is_scope2
-    rule_feats = [1.0 if is_scope1 else 0.0, 1.0 if is_scope2 else 0.0]
-
     body_len = len(message.body_text or "")
     body_length_scaled = min(1.0, math.log1p(body_len) / math.log1p(_BODY_LENGTH_CAP))
     has_sender_history = 1.0 if total > 0 else 0.0
 
-    return sem_feats + pattern_feats + rule_feats + [body_length_scaled, has_sender_history]
+    return sem_feats + pattern_feats + [body_length_scaled, has_sender_history]

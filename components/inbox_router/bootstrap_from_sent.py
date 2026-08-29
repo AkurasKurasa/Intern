@@ -5,8 +5,8 @@ One-time Record bootstrap: replays the same Sent-folder correlation
 PatternProfile.observe_sent_history() already does, but emits one recorded
 training example per correlated thread instead of (only) updating pattern
 counters. Reply/forward only -- Sent history structurally cannot teach
-route_scope1/route_scope2, since those decisions never produce a sent
-message.
+schedule, cold_email, flag, or leave_alone, since none of those
+decisions ever produce a sent message.
 
 Usage:
     python components/inbox_router/bootstrap_from_sent.py

@@ -31,7 +31,6 @@ from gmail_client import EmailMessage
 from inbox_features import DECISIONS_ORDER, DIMS, compute_centroids, extract
 from inbox_model import InboxDecisionNet, save as save_model
 from pattern_profile import PatternProfile
-from routing_rules import RuleLayer
 
 MIN_EXAMPLES = 6   # at least one per decision class, in spirit
 
@@ -48,14 +47,13 @@ def _example_to_message(ex: dict) -> EmailMessage:
     )
 
 
-def build_dataset(examples: list, profile: PatternProfile,
-                   rule_layer: RuleLayer) -> Tuple[torch.Tensor, torch.Tensor, dict]:
+def build_dataset(examples: list, profile: PatternProfile) -> Tuple[torch.Tensor, torch.Tensor, dict]:
     centroids = compute_centroids(examples)
     xs, ys = [], []
     for ex in examples:
         message = _example_to_message(ex)
         pattern = profile.pattern_for(message.sender_email)
-        feats = extract(message, pattern, centroids, rule_layer)
+        feats = extract(message, pattern, centroids)
         xs.append(feats)
         ys.append(DECISIONS_ORDER.index(ex["decision"]))
     return torch.tensor(xs, dtype=torch.float32), torch.tensor(ys, dtype=torch.long), centroids
@@ -71,16 +69,27 @@ def _accuracy(model: InboxDecisionNet, x: torch.Tensor, y: torch.Tensor):
 
 
 def train(examples_path: str, save_path: str, epochs: int, lr: float, val_split: float,
-          profile_path: str = None, registry_path: str = None) -> dict:
-    """profile_path/registry_path default to PatternProfile/RuleLayer's own
-    real defaults when omitted (the normal CLI path -- see main()). Tests
-    pass isolated tmp_path values so a trained checkpoint's rule_hit_scope1/
-    rule_hit_scope2 features are computed against the SAME capsule registry
-    inference-time InboxAgent tests use -- training against the real
-    project registry.json while testing against an empty one would be a
-    train/inference skew, the exact hazard inbox_features.py's own
-    docstring warns against."""
+          profile_path: str = None) -> dict:
+    """profile_path defaults to PatternProfile's own real default when
+    omitted (the normal CLI path -- see main()). Tests pass an isolated
+    tmp_path value so a trained checkpoint's pattern_*_ratio features are
+    computed against the SAME sender history inference-time InboxAgent
+    tests use -- training against the real project profile while testing
+    against an empty one would be a train/inference skew, the exact
+    hazard inbox_features.py's own docstring warns against."""
     examples = load_examples(examples_path)
+    # decision_recorder.py records whatever decision string it's handed,
+    # with no validation against DECISIONS_ORDER at write time -- so a
+    # decision space redefinition (like Task 1's route_scope1/route_scope2
+    # removal) can leave stale labels sitting in already-recorded examples
+    # from before the change. DECISIONS_ORDER.index() below would raise on
+    # those, so they're dropped here rather than crashing every future
+    # training run over old data.
+    stale = [ex for ex in examples if ex.get("decision") not in DECISIONS_ORDER]
+    if stale:
+        print(f"Skipping {len(stale)} recorded example(s) with a decision no longer "
+              f"in DECISIONS_ORDER: {sorted({ex.get('decision') for ex in stale})}")
+    examples = [ex for ex in examples if ex.get("decision") in DECISIONS_ORDER]
     if len(examples) < MIN_EXAMPLES:
         raise TooFewExamplesError(
             f"Only {len(examples)} recorded examples found at {examples_path} -- "
@@ -88,9 +97,7 @@ def train(examples_path: str, save_path: str, epochs: int, lr: float, val_split:
         )
     profile_kwargs = {"path": profile_path} if profile_path is not None else {}
     profile = PatternProfile(**profile_kwargs)
-    registry_kwargs = {"registry_path": registry_path} if registry_path is not None else {}
-    rule_layer = RuleLayer(profile, **registry_kwargs)
-    x, y, centroids = build_dataset(examples, profile, rule_layer)
+    x, y, centroids = build_dataset(examples, profile)
 
     n_val = max(1, int(len(examples) * val_split)) if len(examples) >= 10 else 0
     n_train = len(examples) - n_val

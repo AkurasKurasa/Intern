@@ -1,4 +1,3 @@
-import json
 import os
 import sys
 
@@ -41,59 +40,45 @@ def _seed_examples(path):
 class TestBuildDataset:
     def test_produces_matching_tensor_and_label_shapes(self, tmp_path):
         from pattern_profile import PatternProfile
-        from routing_rules import RuleLayer
         path = str(tmp_path / "examples.jsonl")
         n = _seed_examples(path)
         examples = rec.load_examples(path)
         profile = PatternProfile(path=str(tmp_path / "profile.json"))
-        rules = RuleLayer(profile, registry_path=str(tmp_path / "registry.json"))
-        x, y, centroids = trainer.build_dataset(examples, profile, rules)
+        x, y, centroids = trainer.build_dataset(examples, profile)
         assert x.shape == (n, trainer.DIMS)
         assert y.shape == (n,)
         assert set(centroids.keys()) == {"reply", "leave_alone", "forward"}
 
-    def test_registry_path_affects_rule_hit_scope1_feature(self, tmp_path):
+    def test_pattern_profile_affects_pattern_ratio_features(self, tmp_path):
+        # Replaces the old rule_hit_scope1/scope2 registry-driven test --
+        # the analogous "an injected dependency actually changes the
+        # feature vector" property now lives in the pattern-ratio features,
+        # since that's the only per-sender signal extract() still computes.
         from inbox_features import FEATURE_NAMES
         from pattern_profile import PatternProfile
-        from routing_rules import RuleLayer
 
-        # Seed examples
         path = str(tmp_path / "examples.jsonl")
         _seed_examples(path)
         examples = rec.load_examples(path)
 
-        # Create a registry with a capsule that matches m1's subject ("status update")
-        registry_path = str(tmp_path / "registry.json")
-        registry = {
-            "capsules": [
-                {
-                    "name": "status_monitor",
-                    "trigger_keywords": ["status"],
-                    "trigger_apps": [],
-                    "kind": "agent",
-                    "model_path": ""
-                }
-            ]
-        }
-        with open(registry_path, "w") as f:
-            json.dump(registry, f)
-
-        # Build dataset with the registry
         profile = PatternProfile(path=str(tmp_path / "profile.json"))
-        rules = RuleLayer(profile, registry_path=registry_path)
-        x, y, centroids = trainer.build_dataset(examples, profile, rules)
+        pattern = profile._get_or_create("work.com")
+        pattern.reply_count, pattern.forward_count, pattern.ignore_count = 5, 0, 0
+        profile.save()
 
-        # Find the feature index for rule_hit_scope1
-        rule_hit_scope1_idx = FEATURE_NAMES.index("rule_hit_scope1")
+        x, y, centroids = trainer.build_dataset(examples, profile)
+        reply_ratio_idx = FEATURE_NAMES.index("pattern_reply_ratio")
 
-        # m1 (index 0) has subject "status update" -- should match the "status" keyword
-        assert x[0, rule_hit_scope1_idx].item() == 1.0, \
-            "Example m1 (status update) should have rule_hit_scope1=1.0"
+        # m1/m2/m3 (boss@work.com) and m6 (team@work.com) all share the
+        # work.com domain -- should reflect the seeded lopsided reply
+        # history, keyed by domain not exact sender address.
+        for i in (0, 1, 2, 5):
+            assert x[i, reply_ratio_idx].item() == pytest.approx(1.0)
 
-        # m2, m3, m4, m5, m6 don't have "status" in subject/body -- should be 0.0
-        for i in [1, 2, 3, 4, 5]:
-            assert x[i, rule_hit_scope1_idx].item() == 0.0, \
-                f"Example at index {i} should have rule_hit_scope1=0.0"
+        # m4/m5 (newsletter@vendor.com) have no seeded pattern history for
+        # their domain -- zero ratio.
+        for i in (3, 4):
+            assert x[i, reply_ratio_idx].item() == 0.0
 
 
 class TestTrain:
@@ -104,13 +89,33 @@ class TestTrain:
         with pytest.raises(trainer.TooFewExamplesError):
             trainer.train(path, save_path, epochs=5, lr=1e-2, val_split=0.15)
 
+    def test_stale_decisions_from_before_a_decision_space_redefinition_are_skipped(self, tmp_path):
+        # decision_recorder.py doesn't validate decision strings at write
+        # time, so examples recorded under the old route_scope1/route_scope2
+        # vocabulary can still be sitting in a real project's log after
+        # Task 1's redefinition. train() must skip them, not crash on
+        # DECISIONS_ORDER.index() for a decision that no longer exists.
+        path = str(tmp_path / "examples.jsonl")
+        _seed_examples(path)   # 6 valid examples
+        rec.record_example(_msg("m7", "broker@insure.com", "intake", "form"),
+                            "route_scope1", source="live", path=path)
+        rec.record_example(_msg("m8", "reg@x.edu", "grades", "sheet"),
+                            "route_scope2", source="live", path=path)
+        save_path = str(tmp_path / "model.pt")
+
+        result = trainer.train(path, save_path, epochs=5, lr=1e-2, val_split=0.0,
+                                profile_path=str(tmp_path / "profile.json"))
+
+        # Only the 6 examples with a decision still in DECISIONS_ORDER
+        # were actually used to train.
+        assert result["num_examples"] == 6
+
     def test_trains_and_saves_loadable_checkpoint(self, tmp_path):
         path = str(tmp_path / "examples.jsonl")
         _seed_examples(path)
         save_path = str(tmp_path / "model.pt")
         result = trainer.train(path, save_path, epochs=20, lr=1e-2, val_split=0.15,
-                                profile_path=str(tmp_path / "profile.json"),
-                                registry_path=str(tmp_path / "registry.json"))
+                                profile_path=str(tmp_path / "profile.json"))
         assert os.path.exists(save_path)
         assert 0.0 <= result["train_acc"] <= 1.0
         assert result["num_examples"] == 6
@@ -118,117 +123,19 @@ class TestTrain:
         assert isinstance(model, im.InboxDecisionNet)
         assert artifact["centroids"]
 
-    def test_train_respects_registry_path_parameter(self, tmp_path):
-        """Verify train() actually threads registry_path to internal RuleLayer.
-
-        Trains two models on the same examples with different registry_path values
-        (one with a matching capsule, one empty), then loads both and verifies
-        they make different predictions on a test input—proving train() used the
-        registry_path, since different training features (rule_hit_scope1 differs)
-        lead to different learned weights.
-        """
-        from inbox_features import FEATURE_NAMES
-        from pattern_profile import PatternProfile
-        from routing_rules import RuleLayer
-
-        # Seed examples: m1 has "status" in subject, others don't
-        path = str(tmp_path / "examples.jsonl")
-        _seed_examples(path)
-
-        # === Train Model A: with capsule matching "status" ===
-        registry_a_path = str(tmp_path / "registry_with_status.json")
-        registry_a = {
-            "capsules": [
-                {
-                    "name": "status_monitor",
-                    "trigger_keywords": ["status"],
-                    "trigger_apps": [],
-                    "kind": "agent",
-                    "model_path": ""
-                }
-            ]
-        }
-        with open(registry_a_path, "w") as f:
-            json.dump(registry_a, f)
-
-        model_a_path = str(tmp_path / "model_a.pt")
-        torch.manual_seed(42)
-        trainer.train(path, model_a_path, epochs=300, lr=1e-2, val_split=0.0,
-                      profile_path=str(tmp_path / "profile_a.json"),
-                      registry_path=registry_a_path)
-
-        # === Train Model B: with empty registry ===
-        registry_b_path = str(tmp_path / "registry_empty.json")
-        registry_b = {"capsules": []}
-        with open(registry_b_path, "w") as f:
-            json.dump(registry_b, f)
-
-        model_b_path = str(tmp_path / "model_b.pt")
-        torch.manual_seed(42)
-        trainer.train(path, model_b_path, epochs=300, lr=1e-2, val_split=0.0,
-                      profile_path=str(tmp_path / "profile_b.json"),
-                      registry_path=registry_b_path)
-
-        # === Load both models ===
-        model_a, artifact_a = im.load(model_a_path)
-        model_b, artifact_b = im.load(model_b_path)
-
-        # === Create a test message with "status" ===
-        test_msg = _msg("test", "boss@work.com", "status check", "Can you provide a status?")
-
-        # === Extract features using model A's registry (rule_hit_scope1=1) ===
-        from inbox_features import extract, compute_centroids, DECISIONS_ORDER
-        profile_a = PatternProfile(path=str(tmp_path / "profile_a.json"))
-        rule_layer_a = RuleLayer(profile_a, registry_path=registry_a_path)
-        centroids_a = artifact_a["centroids"]
-        pattern_a = profile_a.pattern_for(test_msg.sender_email)
-        feats_a = extract(test_msg, pattern_a, centroids_a, rule_layer_a)
-        rule_hit_scope1_idx = FEATURE_NAMES.index("rule_hit_scope1")
-        assert feats_a[rule_hit_scope1_idx] == 1.0, \
-            "Test message should match 'status' in model A's registry"
-
-        # === Extract features using model B's registry (rule_hit_scope1=0) ===
-        profile_b = PatternProfile(path=str(tmp_path / "profile_b.json"))
-        rule_layer_b = RuleLayer(profile_b, registry_path=registry_b_path)
-        centroids_b = artifact_b["centroids"]
-        pattern_b = profile_b.pattern_for(test_msg.sender_email)
-        feats_b = extract(test_msg, pattern_b, centroids_b, rule_layer_b)
-        assert feats_b[rule_hit_scope1_idx] == 0.0, \
-            "Test message should NOT match in model B's empty registry"
-
-        # === Get predictions from both models ===
-        with torch.no_grad():
-            x_a = torch.tensor([feats_a], dtype=torch.float32)
-            logits_a = model_a(x_a).squeeze(0).cpu().numpy()
-
-            x_b = torch.tensor([feats_b], dtype=torch.float32)
-            logits_b = model_b(x_b).squeeze(0).cpu().numpy()
-
-        # === Verify logits differ (proving different training via different registry_path) ===
-        logits_diff = abs(logits_a - logits_b).max()
-        msg = (f"Models trained with different registry_path should produce different logits. "
-               f"Diff: {logits_diff}. Logits A: {logits_a}, Logits B: {logits_b}. "
-               f"This suggests train() did not thread registry_path to RuleLayer.")
-        assert logits_diff > 0.01, msg
-
-    def test_train_threads_profile_and_registry_paths(self, tmp_path, monkeypatch):
-        """Direct, deterministic proof that train() passes its profile_path/
-        registry_path arguments straight through to the real PatternProfile/
-        RuleLayer constructors -- spies on __init__ itself rather than
-        inferring it from trained-model behavior (which is what the three
-        prior attempts tried, and which had confounds: random init noise,
-        then a test that built its own correctly-constructed RuleLayer at
-        eval time instead of exercising train()'s internal one). This test
-        can't be fooled that way because it captures the literal arguments
-        the constructors were called with, inside train() itself."""
+    def test_train_threads_profile_path(self, tmp_path, monkeypatch):
+        """Direct, deterministic proof that train() passes its profile_path
+        argument straight through to the real PatternProfile constructor --
+        spies on __init__ itself rather than inferring it from trained-model
+        behavior. This test can't be fooled by random init noise because it
+        captures the literal argument the constructor was called with,
+        inside train() itself."""
         from pattern_profile import PatternProfile, DEFAULT_PROFILE_PATH
-        from routing_rules import RuleLayer, DEFAULT_REGISTRY_PATH
 
         examples_path = str(tmp_path / "examples.jsonl")
         _seed_examples(examples_path)
         save_path = str(tmp_path / "model.pt")
         profile_path = str(tmp_path / "profile.json")
-        registry_path = str(tmp_path / "registry.json")
 
         captured = {}
 
@@ -240,16 +147,7 @@ class TestTrain:
 
         monkeypatch.setattr(PatternProfile, "__init__", spy_profile_init)
 
-        original_rule_init = RuleLayer.__init__
-
-        def spy_rule_init(self, profile, registry_path=DEFAULT_REGISTRY_PATH, high_confidence=0.75):
-            captured["registry_path"] = registry_path
-            original_rule_init(self, profile, registry_path, high_confidence)
-
-        monkeypatch.setattr(RuleLayer, "__init__", spy_rule_init)
-
         trainer.train(examples_path, save_path, epochs=5, lr=1e-2, val_split=0.0,
-                      profile_path=profile_path, registry_path=registry_path)
+                      profile_path=profile_path)
 
         assert captured["profile_path"] == profile_path
-        assert captured["registry_path"] == registry_path

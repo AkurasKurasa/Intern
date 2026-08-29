@@ -164,7 +164,7 @@ function openMessage(messageId) {
   document.getElementById("detailDecision").textContent = email.decision || "";
   replyBody.value = "";
   replyBody.name = email.message_id;
-  overrideSelect.value = "route_scope1";
+  overrideSelect.value = "schedule";
   refreshReplyBoxVisibility();
   listView.hidden = true;
   detailView.hidden = false;

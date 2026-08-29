@@ -18,7 +18,7 @@ import os
 import re
 import sys
 from dataclasses import dataclass, field
-from typing import List, Optional
+from typing import Optional
 
 _THIS_DIR = os.path.dirname(os.path.abspath(__file__))
 if _THIS_DIR not in sys.path:
@@ -56,19 +56,19 @@ _GROQ_BASE_URL = "https://api.groq.com/openai/v1"
 
 _SYSTEM_PROMPT = (
     "You triage a single email for a real person. Choose exactly one of these outcomes:\n"
-    "  route_scope1 - hand off to a GUI form-filling assistant (data entry / intake tasks)\n"
-    "  route_scope2 - hand off to a spreadsheet-to-portal matcher (grades/rosters/sheets)\n"
     "  reply        - the user should reply directly\n"
     "  forward      - the user should forward this to someone else\n"
+    "  schedule     - this is about scheduling something (a meeting, appointment, "
+    "deadline) that belongs on a calendar\n"
+    "  cold_email   - unsolicited outreach from someone with no prior relationship "
+    "to the user\n"
     "  flag         - this needs a person's judgment, don't act automatically\n"
     "  leave_alone  - no action needed\n"
-    "You are given the email, what's known about how this same sender has been "
-    "handled before, and which capsules (if any) are registered. Respond with ONLY "
-    "a JSON object: "
+    "You are given the email and what's known about how this same sender has been "
+    "handled before. Respond with ONLY a JSON object: "
     '{"decision": "...", "confidence": 0.0-1.0, "rationale": "one short sentence", '
-    '"capsule_name": "" , "forward_to": ""}. '
-    "capsule_name is only meaningful for route_scope1/route_scope2 and must be one of "
-    "the registered capsule names you were given, or empty if unsure."
+    '"capsule_name": "", "forward_to": ""}. '
+    "capsule_name is unused and should always be left empty."
 )
 
 
@@ -133,13 +133,13 @@ class LLMClassifier:
         return self._llm_client is not None
 
     def classify(self, message: EmailMessage, pattern: Optional[SenderPattern],
-                 rule_hint: RuleDecision, capsule_hints: List[dict]) -> ClassificationResult:
+                 rule_hint: RuleDecision) -> ClassificationResult:
         if not self.available:
             return ClassificationResult(
                 decision="flag", confidence=0.0,
                 rationale="No LLM provider configured — flagged for a person to decide.",
             )
-        user_msg = self._build_prompt(message, pattern, capsule_hints)
+        user_msg = self._build_prompt(message, pattern)
         try:
             if self.provider == "anthropic":
                 raw = self._call_anthropic(user_msg)
@@ -192,21 +192,16 @@ class LLMClassifier:
             return ""
         return ""
 
-    def _build_prompt(self, message: EmailMessage, pattern: Optional[SenderPattern],
-                       capsule_hints: List[dict]) -> str:
+    def _build_prompt(self, message: EmailMessage, pattern: Optional[SenderPattern]) -> str:
         pattern_desc = "No prior history with this sender."
         if pattern is not None and pattern.total() > 0:
             pattern_desc = (f"Prior history with {pattern.sender_domain}: "
                             f"replied {pattern.reply_count}x, forwarded {pattern.forward_count}x, "
                             f"left alone {pattern.ignore_count}x.")
-        capsules_desc = "\n".join(
-            f"  - {c.get('name')}: {c.get('description', '')}" for c in capsule_hints
-        ) or "  (none registered)"
         return (
             f"EMAIL\nFrom: {message.sender}\nSubject: {message.subject}\n\n"
             f"{message.body_text[:2000]}\n\n"
-            f"PATTERN PROFILE\n{pattern_desc}\n\n"
-            f"REGISTERED CAPSULES\n{capsules_desc}"
+            f"PATTERN PROFILE\n{pattern_desc}"
         )
 
     def _call_anthropic(self, user_msg: str) -> str:

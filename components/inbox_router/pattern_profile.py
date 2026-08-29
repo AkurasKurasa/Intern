@@ -152,10 +152,8 @@ class PatternProfile:
             pattern.forward_count += 1
         elif decision == "leave_alone":
             pattern.ignore_count += 1
-        # route_scope1/route_scope2/flag intentionally don't move these
-        # three counters -- they're not reply/forward/ignore outcomes, and
-        # RuleLayer.classify()'s keyword-based path already handles routing
-        # confidence independently of this sender-behavior profile.
+        # schedule/cold_email/flag intentionally don't move these three
+        # counters -- they're not reply/forward/ignore outcomes.
         pattern.last_updated = datetime.now(timezone.utc).isoformat()
         self.save()
 

@@ -149,27 +149,6 @@ class TestRuleLayer:
         assert result.decision == "reply"
         assert result.confidence > 0.5
 
-    def test_keyword_match_routes_to_scope1(self, tmp_path):
-        registry_path = self._registry(tmp_path, [
-            {"name": "form_filling", "description": "", "model_path": "x.pt",
-             "trigger_keywords": ["insurance", "intake"], "trigger_apps": []},
-        ])
-        rules = RuleLayer(PatternProfile(path=str(tmp_path / "profile.json")), registry_path=registry_path)
-
-        result = rules.classify(EmailMessage(**_msg("i1", "broker@x.com", "New insurance intake form")))
-        assert result.decision == "route_scope1"
-        assert result.capsule_name == "form_filling"
-
-    def test_keyword_match_routes_to_scope2_for_script_kind_capsule(self, tmp_path):
-        registry_path = self._registry(tmp_path, [
-            {"name": "Sheet-to-Portal Matcher", "description": "", "model_path": "",
-             "trigger_keywords": ["grade sheet"], "trigger_apps": [], "kind": "script"},
-        ])
-        rules = RuleLayer(PatternProfile(path=str(tmp_path / "profile.json")), registry_path=registry_path)
-
-        result = rules.classify(EmailMessage(**_msg("i1", "reg@x.edu", "grade sheet ready")))
-        assert result.decision == "route_scope2"
-
     def test_no_signal_defers_to_llm(self, tmp_path):
         registry_path = self._registry(tmp_path, [])
         rules = RuleLayer(PatternProfile(path=str(tmp_path / "profile.json")), registry_path=registry_path)
@@ -182,7 +161,7 @@ class TestLLMClassifierOffline:
     def test_no_provider_is_not_available_and_flags(self):
         classifier = LLMClassifier(provider="none")
         assert classifier.available is False
-        result = classifier.classify(EmailMessage(**_msg("i1", "a@b.com", "x")), None, None, [])
+        result = classifier.classify(EmailMessage(**_msg("i1", "a@b.com", "x")), None, None)
         assert result.decision == "flag"
         assert result.confidence == 0.0
 
@@ -206,15 +185,10 @@ class TestInboxRouterPollOnce:
                             examples_path=str(tmp_path / "data" / "training_examples.jsonl"),
                             reply_examples_path=str(tmp_path / "data" / "reply_examples.jsonl"))
 
-    def test_poll_once_routes_and_marks_processed(self, tmp_path):
-        router = self._build(tmp_path, inbox=[_msg("i1", "broker@x.com", "insurance intake form")],
-                              capsules=[{"name": "form_filling", "description": "", "model_path": "x.pt",
-                                         "trigger_keywords": ["insurance", "intake"], "trigger_apps": []}])
+    def test_poll_once_marks_processed_so_it_does_not_reappear(self, tmp_path):
+        router = self._build(tmp_path, inbox=[_msg("i1", "stranger@x.com", "totally unrelated")])
         routed = router.poll_once()
         assert len(routed) == 1
-        assert routed[0]["decision"] == "route_scope1"
-        assert routed[0]["capsule_name"] == "form_filling"
-        assert routed[0]["layer"] == "rule"
 
         # Second poll: the message was marked processed, must not reappear.
         assert router.poll_once() == []
@@ -231,22 +205,6 @@ class TestInboxRouterPollOnce:
         history = json.loads(Path(router._history_path).read_text())["messages"]
         assert len(history) == 1
         assert history[0]["message_id"] == "i1"
-
-    def test_hallucinated_capsule_name_is_rejected_and_flagged(self, tmp_path, monkeypatch):
-        router = self._build(tmp_path, inbox=[_msg("i1", "stranger@x.com", "unrelated")])
-        # Force the LLM path to "succeed" with a decision + a capsule name
-        # that was never registered -- the guard in _classify_and_record()
-        # must catch this, since the UI would otherwise call
-        # capsulesAPI.run() on a name that doesn't exist.
-        from llm_classifier import ClassificationResult
-        monkeypatch.setattr(
-            router._llm, "classify",
-            lambda *a, **k: ClassificationResult(decision="route_scope1", confidence=0.9,
-                                                  rationale="x", capsule_name="not_a_real_capsule"),
-        )
-        routed = router.poll_once()
-        assert routed[0]["decision"] == "flag"
-        assert routed[0]["capsule_name"] == ""
 
     def test_confirm_reply_with_real_text_creates_one_draft_with_that_text(self, tmp_path):
         # No LLM involved: the draft's body is exactly the real text
@@ -301,12 +259,10 @@ class TestInboxRouterPollOnce:
 
         assert reply_recorder.load_reply_examples(path=router._reply_examples_path) == []
 
-    def test_confirm_route_scope1_creates_no_draft(self, tmp_path):
-        router = self._build(tmp_path, inbox=[_msg("i1", "broker@x.com", "insurance intake")],
-                              capsules=[{"name": "form_filling", "description": "", "model_path": "x.pt",
-                                         "trigger_keywords": ["insurance"], "trigger_apps": []}])
+    def test_confirm_flag_creates_no_draft(self, tmp_path):
+        router = self._build(tmp_path, inbox=[_msg("i1", "stranger@x.com", "unrelated")])
         router.poll_once()
-        router.confirm_suggestion("i1", "route_scope1")
+        router.confirm_suggestion("i1", "flag")
 
         assert not (tmp_path / "data" / "mock_drafts.json").exists()
         history = json.loads(Path(router._history_path).read_text())["messages"]
@@ -384,13 +340,12 @@ class TestInboxRouterPollOnce:
         router = self._build(tmp_path, inbox=[
             _msg("i1", "broker@x.com", "insurance intake form"),
             _msg("i2", "stranger@x.com", "totally unrelated"),
-        ], capsules=[{"name": "form_filling", "description": "", "model_path": "x.pt",
-                      "trigger_keywords": ["insurance", "intake"], "trigger_apps": []}])
+        ])
 
         first = router.process_next_unprocessed()
         assert first["message_id"] == "i1"
-        assert first["decision"] == "route_scope1"
-        assert first["layer"] == "rule"
+        assert first["decision"] == "flag"
+        assert first["layer"] == "llm"
         # Only the one message was processed -- the other is still waiting.
         assert len(router.list_unprocessed_stubs()) == 1
         assert len(router.pending_entries()) == 1
@@ -408,14 +363,10 @@ class TestInboxRouterPollOnce:
         # Same underlying _classify_and_record() call -- this pins that
         # stepping through one-at-a-time produces byte-identical decisions
         # to the existing bulk path, not a second, divergent code path.
-        bulk_router = self._build(tmp_path / "bulk", inbox=[_msg("i1", "broker@x.com", "insurance intake form")],
-                                   capsules=[{"name": "form_filling", "description": "", "model_path": "x.pt",
-                                              "trigger_keywords": ["insurance", "intake"], "trigger_apps": []}])
+        bulk_router = self._build(tmp_path / "bulk", inbox=[_msg("i1", "broker@x.com", "insurance intake form")])
         bulk_result = bulk_router.poll_once()[0]
 
-        step_router = self._build(tmp_path / "step", inbox=[_msg("i1", "broker@x.com", "insurance intake form")],
-                                   capsules=[{"name": "form_filling", "description": "", "model_path": "x.pt",
-                                              "trigger_keywords": ["insurance", "intake"], "trigger_apps": []}])
+        step_router = self._build(tmp_path / "step", inbox=[_msg("i1", "broker@x.com", "insurance intake form")])
         step_result = step_router.process_next_unprocessed()
 
         for key in ("decision", "capsule_name", "confidence", "rationale", "layer"):
@@ -468,28 +419,30 @@ class TestInboxRouterSessionMetrics:
     def test_record_session_metrics_counts_by_decision_type(self, tmp_path):
         router = self._build(
             tmp_path,
-            inbox=[_msg("i1", "broker@x.com", "insurance intake form"),
+            inbox=[_msg("i1", "boss@work.com", "status update"),
                    _msg("i2", "stranger@x.com", "unrelated")],
-            capsules=[{"name": "form_filling", "description": "", "model_path": "x.pt",
-                       "trigger_keywords": ["insurance", "intake"], "trigger_apps": []}],
         )
+        # Keyword-based capsule routing is gone -- a lopsided sender
+        # pattern is now the only thing that resolves at the rule layer.
+        pattern = router._profile._get_or_create("work.com")
+        pattern.reply_count, pattern.forward_count, pattern.ignore_count = 9, 0, 1
         router.poll_once()
         metrics_path = tmp_path / "run_metrics.jsonl"
         router._record_session_metrics(path=str(metrics_path))
 
         row = json.loads(metrics_path.read_text(encoding="utf-8").splitlines()[0])
-        assert row["decisions"]["route_scope1"] == 1
+        assert row["decisions"]["reply"] == 1
         assert row["decisions"]["flag"] == 1
 
     def test_record_session_metrics_counts_rule_vs_llm_layer(self, tmp_path):
         router = self._build(
             tmp_path,
-            inbox=[_msg("i1", "broker@x.com", "insurance intake form"),
+            inbox=[_msg("i1", "boss@work.com", "status update"),
                    _msg("i2", "stranger@x.com", "unrelated")],
-            capsules=[{"name": "form_filling", "description": "", "model_path": "x.pt",
-                       "trigger_keywords": ["insurance", "intake"], "trigger_apps": []}],
         )
-        router.poll_once()  # i1 -> rule (keyword match), i2 -> llm (falls through, no LLM configured -> flag)
+        pattern = router._profile._get_or_create("work.com")
+        pattern.reply_count, pattern.forward_count, pattern.ignore_count = 9, 0, 1
+        router.poll_once()  # i1 -> rule (lopsided pattern), i2 -> llm (falls through, no LLM configured -> flag)
         metrics_path = tmp_path / "run_metrics.jsonl"
         router._record_session_metrics(path=str(metrics_path))
 

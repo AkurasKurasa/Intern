@@ -84,7 +84,7 @@ class InboxAgent:
             return None
         try:
             pattern = self._profile.pattern_for(message.sender_email)
-            feats = extract(message, pattern, self._centroids, self._rules)
+            feats = extract(message, pattern, self._centroids)
             x = torch.tensor([feats], dtype=torch.float32)
             probs = self._model.probabilities(x)[0]
             top_idx = int(torch.argmax(probs))
@@ -93,11 +93,6 @@ class InboxAgent:
                 return None
             decision = DECISIONS_ORDER[top_idx]
             capsule_name, forward_to = "", ""
-            if decision in ("route_scope1", "route_scope2"):
-                capsule = self._rules.match_capsule(message)
-                capsule_name = capsule.get("name", "") if capsule else ""
-                if not capsule_name:
-                    return None   # can't fast-fill a route with no verified capsule
             if decision == "forward":
                 forward_to = pattern.common_forward_targets[0] if pattern and pattern.common_forward_targets else ""
                 if not forward_to:
@@ -120,18 +115,8 @@ class InboxAgent:
                 capsule_name=rule_result.capsule_name, forward_to=rule_result.forward_to,
             )
         pattern = self._profile.pattern_for(message.sender_email)
-        llm_result = self._llm.classify(message, pattern, rule_result, self._rules.load_capsules())
+        llm_result = self._llm.classify(message, pattern, rule_result)
         decision, capsule_name, rationale = llm_result.decision, llm_result.capsule_name, llm_result.rationale
-        # Defensive guard against a hallucinated capsule name -- mirrors the
-        # check router.py's old inline logic ran before this pipeline
-        # existed. RuleLayer's own capsule_name always comes from a verified
-        # match_capsule() call, so this only ever matters for the LLM branch.
-        if decision in ("route_scope1", "route_scope2"):
-            valid_names = {c.get("name") for c in self._rules.load_capsules()}
-            if capsule_name not in valid_names:
-                capsule_name = ""
-                decision = "flag"
-                rationale = (rationale + " (capsule name could not be verified — flagged instead)").strip()
         return InboxDecision(
             decision=decision, confidence=llm_result.confidence,
             rationale=rationale, layer="llm",
