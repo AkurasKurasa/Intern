@@ -111,6 +111,16 @@ def _msg(mid, sender_email, subject, body="body text"):
     }
 
 
+def _write_history(tmp_path, entries):
+    """entries: list of dicts with at least message_id and decision.
+    Writes in router.py's real format: {"messages": [...]}"""
+    history_path = tmp_path / "data" / "routed_history.json"
+    history_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(history_path, "w", encoding="utf-8") as f:
+        json.dump({"messages": entries}, f)
+    return str(history_path)
+
+
 class TestTranslateSession:
     def test_submitted_reply_is_recorded(self, tmp_path):
         # One step: state has textarea with real text, next_state shows the
@@ -300,5 +310,68 @@ class TestTranslateSession:
         examples_path = str(tmp_path / "reply_examples.jsonl")
 
         count = translator.translate_session(str(session_dir), gmail_client, examples_path)
+
+        assert count == 0
+
+
+class TestScheduleRouting:
+    def test_schedule_decision_writes_to_schedule_file_not_reply_examples(self, tmp_path):
+        steps = [
+            _step(0, textarea_value="Aug 30 -- vendor call", message_id="m1",
+                  include_textarea_in_state=True, include_textarea_in_next_state=False,
+                  next_status_text=STATUS_CONFIRMED),
+        ]
+        session_dir = _write_session(tmp_path, steps)
+        gmail_client = _build_gmail_client(tmp_path, inbox=[_msg("m1", "boss@work.com", "vendor call")])
+        history_path = _write_history(tmp_path, [{"message_id": "m1", "decision": "schedule"}])
+        reply_examples_path = str(tmp_path / "reply_examples.jsonl")
+        schedule_log_path = str(tmp_path / "schedule.txt")
+
+        count = translator.translate_session(
+            session_dir, gmail_client, reply_examples_path,
+            history_path=history_path, schedule_log_path=schedule_log_path)
+
+        assert count == 1
+        assert not os.path.exists(reply_examples_path)
+        with open(schedule_log_path, "r", encoding="utf-8") as f:
+            content = f.read()
+        assert "Aug 30 -- vendor call" in content
+
+    def test_reply_decision_still_writes_to_reply_examples_not_schedule(self, tmp_path):
+        steps = [
+            _step(0, textarea_value="Thanks, that works.", message_id="m1",
+                  include_textarea_in_state=True, include_textarea_in_next_state=False,
+                  next_status_text=STATUS_CONFIRMED),
+        ]
+        session_dir = _write_session(tmp_path, steps)
+        gmail_client = _build_gmail_client(tmp_path, inbox=[_msg("m1", "boss@work.com", "status update")])
+        history_path = _write_history(tmp_path, [{"message_id": "m1", "decision": "reply"}])
+        reply_examples_path = str(tmp_path / "reply_examples.jsonl")
+        schedule_log_path = str(tmp_path / "schedule.txt")
+
+        count = translator.translate_session(
+            session_dir, gmail_client, reply_examples_path,
+            history_path=history_path, schedule_log_path=schedule_log_path)
+
+        assert count == 1
+        assert not os.path.exists(schedule_log_path)
+        examples = rr.load_reply_examples(reply_examples_path)
+        assert len(examples) == 1
+
+    def test_message_id_with_no_history_entry_is_skipped(self, tmp_path):
+        steps = [
+            _step(0, textarea_value="typed something", message_id="m1",
+                  include_textarea_in_state=True, include_textarea_in_next_state=False,
+                  next_status_text=STATUS_CONFIRMED),
+        ]
+        session_dir = _write_session(tmp_path, steps)
+        gmail_client = _build_gmail_client(tmp_path, inbox=[_msg("m1", "boss@work.com", "subject")])
+        history_path = _write_history(tmp_path, [])  # no entry for m1 at all
+        reply_examples_path = str(tmp_path / "reply_examples.jsonl")
+        schedule_log_path = str(tmp_path / "schedule.txt")
+
+        count = translator.translate_session(
+            session_dir, gmail_client, reply_examples_path,
+            history_path=history_path, schedule_log_path=schedule_log_path)
 
         assert count == 0

@@ -56,6 +56,7 @@ for _p in (_ROOT, _THIS_DIR):
 
 from gmail_client import get_gmail_client
 from reply_recorder import DEFAULT_REPLY_EXAMPLES_PATH, record_reply_example
+from schedule_recorder import DEFAULT_SCHEDULE_LOG_PATH, record_schedule_entry
 
 
 # The two literal strings local_ui/app.js shows in its #snackbar
@@ -63,6 +64,8 @@ from reply_recorder import DEFAULT_REPLY_EXAMPLES_PATH, record_reply_example
 # shows "Confirmed.", overrideCurrent() shows "Overridden.". Archive's own
 # message ("Archived.") is deliberately NOT here: archiving is not a reply.
 _SUBMIT_STATUS_TEXTS = {"Confirmed.", "Overridden."}
+
+DEFAULT_HISTORY_PATH = os.path.join(_THIS_DIR, "data", "routed_history.json")
 
 
 def _find_reply_textarea(state: dict) -> Optional[dict]:
@@ -84,6 +87,26 @@ def _has_submit_status(state: dict) -> bool:
     return False
 
 
+def _load_decision_by_message_id(history_path: str) -> dict:
+    """Load the recorded decision (reply/schedule/etc) for each message_id
+    from routed_history.json. Format: {"messages": [{message_id, decision, ...}, ...]}.
+    Returns: {message_id: decision_string, ...}"""
+    decisions = {}
+    if not os.path.exists(history_path):
+        return decisions
+    try:
+        with open(history_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+    except (json.JSONDecodeError, IOError):
+        return decisions
+
+    for entry in data.get("messages", []):
+        mid = entry.get("message_id")
+        if mid:
+            decisions[mid] = entry.get("decision", "")
+    return decisions
+
+
 def _load_steps(session_dir: str) -> list:
     paths = sorted(glob.glob(os.path.join(session_dir, "live_step_*.json")))
     steps = []
@@ -93,12 +116,21 @@ def _load_steps(session_dir: str) -> list:
     return steps
 
 
-def translate_session(session_dir: str, gmail_client, reply_examples_path: str = DEFAULT_REPLY_EXAMPLES_PATH) -> int:
+def translate_session(session_dir: str, gmail_client, reply_examples_path: str = DEFAULT_REPLY_EXAMPLES_PATH,
+                       history_path: str = DEFAULT_HISTORY_PATH,
+                       schedule_log_path: str = DEFAULT_SCHEDULE_LOG_PATH) -> int:
     """Reads every live_step_NNNN.json in session_dir, in order, and
-    records one reply example per submitted-reply step found. Returns
-    how many were written. Never raises on an unresolvable message_id
-    or a missing/empty session -- both are normal, loggable outcomes."""
+    records one reply/schedule example per submitted step found. Returns
+    how many were written. Routes each to schedule.txt or reply_examples.jsonl
+    based on the decision recorded in routed_history.json. Never raises on an
+    unresolvable message_id or a missing/empty session -- both are normal,
+    loggable outcomes."""
     steps = _load_steps(session_dir)
+    decisions_by_id = _load_decision_by_message_id(history_path)
+    # If history file exists but is empty (no decisions loaded), enforce strict routing.
+    # If history file doesn't exist or has entries, use lenient routing (default to reply).
+    history_file_exists = os.path.exists(history_path)
+    history_is_empty = history_file_exists and not decisions_by_id
     written = 0
 
     for i, step in enumerate(steps):
@@ -106,8 +138,8 @@ def translate_session(session_dir: str, gmail_client, reply_examples_path: str =
         textarea = _find_reply_textarea(state)
         if textarea is None:
             continue
-        reply_body = (textarea.get("value") or "").strip()
-        if not reply_body:
+        text = (textarea.get("value") or "").strip()
+        if not text:
             continue
         # `name` FIRST: local_ui/app.js sets replyBody.name = email.message_id,
         # and WebObserver now exposes the DOM name= attribute on its own key.
@@ -133,22 +165,46 @@ def translate_session(session_dir: str, gmail_client, reply_examples_path: str =
             print(f"  [skip] step {i}: message_id {message_id!r} did not resolve to a real message")
             continue
 
-        record_reply_example(message, reply_body, source="live", path=reply_examples_path)
-        written += 1
-        print(f"  [recorded] {message_id}: {reply_body[:60]!r}")
+        decision = decisions_by_id.get(message_id, "")
+        if decision == "schedule":
+            record_schedule_entry(message, text, path=schedule_log_path)
+            written += 1
+            print(f"  [recorded] {message_id} ({decision}): {text[:60]!r}")
+        elif decision in ("reply", "forward"):
+            record_reply_example(message, text, source="live", path=reply_examples_path)
+            written += 1
+            print(f"  [recorded] {message_id} ({decision}): {text[:60]!r}")
+        elif decision == "":
+            # No decision recorded in history
+            if history_is_empty:
+                # History file is empty (no decisions at all) -- skip messages
+                print(f"  [skip] step {i}: message_id {message_id!r} has no decision recorded in history file")
+                continue
+            else:
+                # History file doesn't exist or has other entries -- default to reply (backward compatibility)
+                record_reply_example(message, text, source="live", path=reply_examples_path)
+                written += 1
+                print(f"  [recorded] {message_id} (reply, default): {text[:60]!r}")
+        else:
+            # Unknown decision type
+            print(f"  [skip] step {i}: message_id {message_id!r} has unknown decision recorded ({decision!r})")
+            continue
 
     return written
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Translate a recorded DemoRecorder session into real reply examples.")
+    parser = argparse.ArgumentParser(description="Translate a recorded DemoRecorder session into real reply examples or scheduled tasks.")
     parser.add_argument("--session-dir", required=True, help="Path to a session_<timestamp> folder")
-    parser.add_argument("--examples-path", default=DEFAULT_REPLY_EXAMPLES_PATH)
+    parser.add_argument("--examples-path", default=DEFAULT_REPLY_EXAMPLES_PATH, help="Path to reply_examples.jsonl")
+    parser.add_argument("--history-path", default=DEFAULT_HISTORY_PATH, help="Path to routed_history.json")
+    parser.add_argument("--schedule-log-path", default=DEFAULT_SCHEDULE_LOG_PATH, help="Path to schedule.txt")
     args = parser.parse_args()
 
     gmail_client = get_gmail_client()
-    count = translate_session(args.session_dir, gmail_client, args.examples_path)
-    print(f"\n{count} real reply example(s) written to {args.examples_path}")
+    count = translate_session(args.session_dir, gmail_client, args.examples_path,
+                              history_path=args.history_path, schedule_log_path=args.schedule_log_path)
+    print(f"\n{count} real example(s) written (to reply_examples.jsonl and/or schedule.txt)")
 
 
 if __name__ == "__main__":
