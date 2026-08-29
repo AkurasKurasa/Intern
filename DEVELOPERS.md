@@ -2473,7 +2473,7 @@ one form."
    forwarded, scheduled (content extracted to a plain log, no reuse model
    needed), sent as a cold email (task-list-driven, not yet built), flagged
    for a person, or left alone — then the outcome is confirmed by reply.
-   Redefined (2026-08-28) to the tasks a virtual assistant actually does on
+   Redefined (2026-08-29) to the tasks a virtual assistant actually does on
    email, dropping the earlier Route-to-Scope-#1/#2 model entirely — Scope #3
    no longer connects to Scope #1/#2 at all. Chosen approach (2026-08-16)
    doesn't need branching ([Big Three #3](#task-list)) at all, unlike the
