@@ -61,27 +61,6 @@ def _msg(mid="m1", sender_email="boss@work.com", subject="Status update", thread
     )
 
 
-class FakePopen:
-    """Stands in for subprocess.Popen -- records every call instead of
-    actually spawning a real process, so tests can verify exactly what
-    WOULD have been launched (e.g. real Scope #2 automation) without any
-    real automation ever running during a test."""
-
-    def __init__(self):
-        self.calls = []
-        self._next_pid = 1000
-
-    def __call__(self, argv, cwd=None):
-        self._next_pid += 1
-        self.calls.append({"argv": argv, "cwd": cwd})
-        return _FakeProcess(self._next_pid)
-
-
-class _FakeProcess:
-    def __init__(self, pid):
-        self.pid = pid
-
-
 class FakeRouter:
     """Returns a scripted sequence of pending-entry dicts from
     process_next_unprocessed(), then None once the script is exhausted
@@ -113,17 +92,9 @@ class TestHandleEntry:
         # doesn't have reply_agent/gmail_client wiring for (which is all
         # of them here, since neither is supplied) falls to the one
         # remaining fallback outcome.
-        popen = FakePopen()
-        dispatch_log = tmp_path / "dispatch_log.jsonl"
-        needs_attention = tmp_path / "needs_attention.jsonl"
-
         for decision in ("reply", "forward", "schedule", "cold_email", "flag", "leave_alone"):
             outcome = watcher.handle_entry(_entry(decision))
             assert outcome["action"] == "left_pending"
-
-        assert popen.calls == []
-        assert not dispatch_log.exists()
-        assert not needs_attention.exists()
 
 
 class TestHandleEntryAutoDraft:
@@ -212,7 +183,6 @@ class TestHandleEntryAutoDraft:
     def test_non_reply_forward_decision_unaffected_by_reply_agent_presence(self, tmp_path):
         # Sanity: wiring in reply_agent/gmail_client must not cause a
         # non-reply/forward decision to do anything Gmail-side.
-        popen = FakePopen()
         gmail_client = FakeGmailClient([_msg(mid="m1")])
         reply_agent = FakeReplyAgent(FakeReplySuggestion(reply_body="irrelevant", confidence=0.99))
         entry = _entry("flag", message_id="m1")
@@ -221,7 +191,6 @@ class TestHandleEntryAutoDraft:
                                         reply_agent=reply_agent, gmail_client=gmail_client)
 
         assert outcome["action"] == "left_pending"
-        assert popen.calls == []
         assert gmail_client.drafts_created == []
 
 
