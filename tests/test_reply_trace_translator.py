@@ -133,9 +133,10 @@ class TestTranslateSession:
         ]
         session_dir = _write_session(tmp_path, steps)
         gmail_client = _build_gmail_client(tmp_path, inbox=[_msg("m1", "boss@work.com", "status update")])
+        history_path = _write_history(tmp_path, [{"message_id": "m1", "decision": "reply"}])
         examples_path = str(tmp_path / "reply_examples.jsonl")
 
-        count = translator.translate_session(session_dir, gmail_client, examples_path)
+        count = translator.translate_session(session_dir, gmail_client, examples_path, history_path=history_path)
 
         assert count == 1
         examples = rr.load_reply_examples(examples_path)
@@ -155,9 +156,10 @@ class TestTranslateSession:
         ]
         session_dir = _write_session(tmp_path, steps)
         gmail_client = _build_gmail_client(tmp_path, inbox=[_msg("m1", "boss@work.com", "quick question")])
+        history_path = _write_history(tmp_path, [{"message_id": "m1", "decision": "reply"}])
         examples_path = str(tmp_path / "reply_examples.jsonl")
 
-        count = translator.translate_session(session_dir, gmail_client, examples_path)
+        count = translator.translate_session(session_dir, gmail_client, examples_path, history_path=history_path)
 
         assert count == 1
 
@@ -230,9 +232,10 @@ class TestTranslateSession:
 
         session_dir = _write_session(tmp_path, steps)
         gmail_client = _build_gmail_client(tmp_path, inbox=[_msg("m1", "boss@work.com", "status update")])
+        history_path = _write_history(tmp_path, [{"message_id": "m1", "decision": "reply"}])
         examples_path = str(tmp_path / "reply_examples.jsonl")
 
-        count = translator.translate_session(session_dir, gmail_client, examples_path)
+        count = translator.translate_session(session_dir, gmail_client, examples_path, history_path=history_path)
 
         assert count == 1
         assert rr.load_reply_examples(examples_path)[0]["message_id"] == "m1"
@@ -375,3 +378,27 @@ class TestScheduleRouting:
             history_path=history_path, schedule_log_path=schedule_log_path)
 
         assert count == 0
+
+    def test_message_with_no_decision_when_history_has_other_entries_is_skipped(self, tmp_path):
+        """Bug fix: when history file exists with entries for OTHER messages
+        but not this one, the message must be SKIPPED, not silently recorded
+        as reply (fabricating training data). This was the regression bug."""
+        steps = [
+            _step(0, textarea_value="typed something", message_id="unknown",
+                  include_textarea_in_state=True, include_textarea_in_next_state=False,
+                  next_status_text=STATUS_CONFIRMED),
+        ]
+        session_dir = _write_session(tmp_path, steps)
+        gmail_client = _build_gmail_client(tmp_path, inbox=[_msg("unknown", "boss@work.com", "subject")])
+        # History has entries for OTHER messages, but not for "unknown"
+        history_path = _write_history(tmp_path, [{"message_id": "m1", "decision": "reply"}])
+        reply_examples_path = str(tmp_path / "reply_examples.jsonl")
+        schedule_log_path = str(tmp_path / "schedule.txt")
+
+        count = translator.translate_session(
+            session_dir, gmail_client, reply_examples_path,
+            history_path=history_path, schedule_log_path=schedule_log_path)
+
+        # Must be skipped, not recorded as reply (which was the bug)
+        assert count == 0
+        assert not os.path.exists(reply_examples_path)

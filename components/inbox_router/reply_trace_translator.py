@@ -127,10 +127,6 @@ def translate_session(session_dir: str, gmail_client, reply_examples_path: str =
     loggable outcomes."""
     steps = _load_steps(session_dir)
     decisions_by_id = _load_decision_by_message_id(history_path)
-    # If history file exists but is empty (no decisions loaded), enforce strict routing.
-    # If history file doesn't exist or has entries, use lenient routing (default to reply).
-    history_file_exists = os.path.exists(history_path)
-    history_is_empty = history_file_exists and not decisions_by_id
     written = 0
 
     for i, step in enumerate(steps):
@@ -174,20 +170,9 @@ def translate_session(session_dir: str, gmail_client, reply_examples_path: str =
             record_reply_example(message, text, source="live", path=reply_examples_path)
             written += 1
             print(f"  [recorded] {message_id} ({decision}): {text[:60]!r}")
-        elif decision == "":
-            # No decision recorded in history
-            if history_is_empty:
-                # History file is empty (no decisions at all) -- skip messages
-                print(f"  [skip] step {i}: message_id {message_id!r} has no decision recorded in history file")
-                continue
-            else:
-                # History file doesn't exist or has other entries -- default to reply (backward compatibility)
-                record_reply_example(message, text, source="live", path=reply_examples_path)
-                written += 1
-                print(f"  [recorded] {message_id} (reply, default): {text[:60]!r}")
         else:
-            # Unknown decision type
-            print(f"  [skip] step {i}: message_id {message_id!r} has unknown decision recorded ({decision!r})")
+            # No decision recorded or unknown decision type -- fail closed: no evidence => don't record
+            print(f"  [skip] step {i}: message_id {message_id!r} has no valid decision recorded ({decision!r})")
             continue
 
     return written
