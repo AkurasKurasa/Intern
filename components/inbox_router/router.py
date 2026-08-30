@@ -318,8 +318,20 @@ class InboxRouter:
         """Every history entry still awaiting a Confirm/Override -- exposed
         as a real public method (rather than reaching into the private
         _load_history()) for local_server.py, a second driver of this same
-        class outside router.py's own stdin/stdout protocol."""
-        return [e for e in self._load_history() if e.get("status") == "pending"]
+        class outside router.py's own stdin/stdout protocol.
+
+        Deduplicated by message_id, keeping only the latest history row per
+        message -- a message can end up with more than one "pending" row on
+        disk (e.g. it was routed, never confirmed, then later re-polled and
+        routed again), and it should only ever appear once here. The most
+        recent row for a given id also correctly wins over an older one:
+        if the latest row is "confirmed"/"overridden", the message is gone
+        from this list even if an earlier abandoned "pending" row for the
+        same id is still sitting in history."""
+        latest_by_id: dict = {}
+        for e in self._load_history():
+            latest_by_id[e.get("message_id")] = e
+        return [e for e in latest_by_id.values() if e.get("status") == "pending"]
 
     def list_unprocessed_stubs(self) -> list:
         """What's waiting to be triaged, before any reasoning has happened --

@@ -310,6 +310,35 @@ class TestInboxRouterPollOnce:
         assert len(pending) == 1
         assert pending[0]["message_id"] == "i2"
 
+    def test_pending_entries_deduplicates_a_message_polled_more_than_once(self, tmp_path):
+        # A message can end up with more than one "pending" history row for
+        # the same message_id -- e.g. it was routed, the session ended
+        # before it was ever confirmed, and a later poll (against the same
+        # still-unprocessed message) routed it again. pending_entries()
+        # must show it once, not once per leftover row.
+        router = self._build(tmp_path, inbox=[
+            _msg("i1", "stranger@x.com", "totally unrelated"),
+        ])
+        router.poll_once()
+        assert len(router.pending_entries()) == 1
+        # Simulate a second, later routing of the SAME message (the mock
+        # gmail client's own list_inbox_unprocessed() would normally not
+        # return an already-polled id again, but the history file itself
+        # has no such guard -- append a second "pending" row for i1 by
+        # hand, matching what a genuine abandoned-then-repolled session
+        # would leave on disk).
+        router._append_history({
+            "message_id": "i1", "thread_id": "t1", "subject": "totally unrelated",
+            "sender": "Someone <stranger@x.com>", "sender_email": "stranger@x.com",
+            "received_at": "", "body_text": "", "decision": "flag",
+            "capsule_name": "", "confidence": 0.0, "rationale": "", "layer": "rule",
+            "forward_to": "", "status": "pending", "draft_id": "",
+            "routed_at": "2099-01-01T00:00:00+00:00",
+        })
+        pending = router.pending_entries()
+        assert len(pending) == 1
+        assert pending[0]["message_id"] == "i1"
+
     def test_pending_entries_includes_body_text(self, tmp_path):
         router = self._build(tmp_path, inbox=[
             _msg("i1", "sender@x.com", "test subject", body="this is the email body text"),
