@@ -40,6 +40,19 @@ def _msg(id_, sender_email, subject, thread_id=None, body="", to=""):
     }
 
 
+class FakeCalendarClient:
+    def __init__(self):
+        self.events = []
+
+    def create_event(self, summary, description, start_iso, end_iso):
+        event_id = f"fake-event-{len(self.events) + 1}"
+        self.events.append({
+            "summary": summary, "description": description,
+            "start": start_iso, "end": end_iso, "event_id": event_id,
+        })
+        return event_id
+
+
 class TestMockGmailClient:
     def test_processed_ids_persist_across_new_instances(self, tmp_path):
         _write_fixture(tmp_path, inbox=[_msg("m1", "a@b.com", "Hi")])
@@ -676,7 +689,7 @@ class TestPracticeInbox:
 
 
 class TestScheduleRecording:
-    def _build(self, tmp_path, inbox=None, sent=None, capsules=None):
+    def _build(self, tmp_path, inbox=None, sent=None, capsules=None, calendar_client=None):
         _write_fixture(tmp_path / "data", inbox=inbox or [], sent=sent or [])
         client = MockGmailClient(data_dir=str(tmp_path / "data"))
         profile = PatternProfile(path=str(tmp_path / "data" / "profile.json"))
@@ -689,7 +702,8 @@ class TestScheduleRecording:
                             inbox_checkpoint_path=str(tmp_path / "no_such_checkpoint.pt"),
                             examples_path=str(tmp_path / "data" / "training_examples.jsonl"),
                             reply_examples_path=str(tmp_path / "data" / "reply_examples.jsonl"),
-                            schedule_log_path=str(tmp_path / "data" / "schedule.txt"))
+                            schedule_log_path=str(tmp_path / "data" / "schedule.txt"),
+                            calendar_client=calendar_client)
 
     def test_confirm_schedule_with_real_text_records_a_schedule_entry(self, tmp_path):
         router = self._build(tmp_path, inbox=[_msg("i1", "boss@work.com", "vendor call")])
@@ -730,6 +744,60 @@ class TestScheduleRecording:
         with open(schedule_path, "r", encoding="utf-8") as f:
             content = f.read()
         assert "Sept 2 -- follow up" in content
+
+    def test_confirm_schedule_with_dates_creates_a_calendar_event(self, tmp_path):
+        calendar = FakeCalendarClient()
+        router = self._build(tmp_path, inbox=[_msg("i1", "boss@work.com", "vendor call")],
+                              calendar_client=calendar)
+        router.poll_once()
+        entry_id = router.pending_entries()[0]["message_id"]
+        router.confirm_suggestion(entry_id, "schedule", reply_body="Vendor call about Q3.",
+                                   event_start="2026-09-03T14:00:00-07:00",
+                                   event_end="2026-09-03T14:30:00-07:00")
+
+        assert len(calendar.events) == 1
+        assert calendar.events[0]["description"] == "Vendor call about Q3."
+        assert calendar.events[0]["start"] == "2026-09-03T14:00:00-07:00"
+        assert calendar.events[0]["end"] == "2026-09-03T14:30:00-07:00"
+
+    def test_confirm_schedule_without_dates_creates_no_calendar_event(self, tmp_path):
+        calendar = FakeCalendarClient()
+        router = self._build(tmp_path, inbox=[_msg("i1", "boss@work.com", "vendor call")],
+                              calendar_client=calendar)
+        router.poll_once()
+        entry_id = router.pending_entries()[0]["message_id"]
+        router.confirm_suggestion(entry_id, "schedule", reply_body="Vendor call about Q3.")
+
+        assert calendar.events == []
+
+    def test_override_to_schedule_with_dates_creates_a_calendar_event(self, tmp_path):
+        calendar = FakeCalendarClient()
+        router = self._build(tmp_path, inbox=[_msg("i1", "boss@work.com", "random subject")],
+                              calendar_client=calendar)
+        router.poll_once()
+        entry_id = router.pending_entries()[0]["message_id"]
+        router.override_decision(entry_id, "schedule", reason="needs scheduling",
+                                  reply_body="Follow-up call.",
+                                  event_start="2026-09-04T10:00:00-07:00",
+                                  event_end="2026-09-04T10:30:00-07:00")
+
+        assert len(calendar.events) == 1
+        assert calendar.events[0]["description"] == "Follow-up call."
+
+    def test_confirm_schedule_calendar_failure_does_not_crash(self, tmp_path):
+        class BrokenCalendarClient:
+            def create_event(self, *a, **kw):
+                raise RuntimeError("calendar API down")
+        router = self._build(tmp_path, inbox=[_msg("i1", "boss@work.com", "vendor call")],
+                              calendar_client=BrokenCalendarClient())
+        router.poll_once()
+        entry_id = router.pending_entries()[0]["message_id"]
+        # Must not raise -- a calendar failure is logged, not fatal, same as
+        # every other real-action failure in this file (draft creation,
+        # flag labels).
+        router.confirm_suggestion(entry_id, "schedule", reply_body="note",
+                                   event_start="2026-09-03T14:00:00-07:00",
+                                   event_end="2026-09-03T14:30:00-07:00")
 
 
 class TestReadStdinCommandsCarryReplyBody:

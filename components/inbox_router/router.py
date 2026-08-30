@@ -70,6 +70,7 @@ from inbox_agent import DEFAULT_CHECKPOINT_PATH, InboxAgent
 from decision_recorder import DEFAULT_EXAMPLES_PATH, record_example
 from reply_recorder import DEFAULT_REPLY_EXAMPLES_PATH, record_reply_example
 from schedule_recorder import DEFAULT_SCHEDULE_LOG_PATH, record_schedule_entry
+from calendar_client import CalendarClientBase, MockCalendarClient
 
 HISTORY_PATH = os.path.join(_THIS_DIR, "data", "routed_history.json")
 SENT_LOOKBACK_DAYS = 90
@@ -118,7 +119,8 @@ class InboxRouter:
                  inbox_checkpoint_path: str = DEFAULT_CHECKPOINT_PATH,
                  examples_path: str = DEFAULT_EXAMPLES_PATH,
                  reply_examples_path: str = DEFAULT_REPLY_EXAMPLES_PATH,
-                 schedule_log_path: str = DEFAULT_SCHEDULE_LOG_PATH) -> None:
+                 schedule_log_path: str = DEFAULT_SCHEDULE_LOG_PATH,
+                 calendar_client: CalendarClientBase = None) -> None:
         self._gmail = gmail_client
         self._profile = profile
         self._rules = rule_layer
@@ -130,6 +132,7 @@ class InboxRouter:
         self._examples_path = examples_path
         self._reply_examples_path = reply_examples_path
         self._schedule_log_path = schedule_log_path
+        self._calendar = calendar_client if calendar_client is not None else MockCalendarClient()
         self._stop = False
         # In-memory cache of what this process has routed, so confirm/
         # override don't need a disk round-trip in the common case --
@@ -198,7 +201,8 @@ class InboxRouter:
         return entry
 
     # ── confirm / override -- the only place create_draft() is ever called ──
-    def confirm_suggestion(self, message_id: str, decision: str, reply_body: str = "") -> None:
+    def confirm_suggestion(self, message_id: str, decision: str, reply_body: str = "",
+                            event_start: str = "", event_end: str = "") -> None:
         """reply_body is real text a human actually typed -- never
         generated. When decision is "reply"/"forward" and reply_body is
         given, that's the draft's real content, and it's saved as a real
@@ -229,6 +233,12 @@ class InboxRouter:
                     record_schedule_entry(message, reply_body, path=self._schedule_log_path)
                 except Exception as exc:
                     emit("inbox_log", line=f"Failed to record schedule entry: {exc}", level="err")
+            if event_start.strip() and event_end.strip():
+                try:
+                    self._calendar.create_event(summary=message.subject, description=reply_body,
+                                                 start_iso=event_start, end_iso=event_end)
+                except Exception as exc:
+                    emit("inbox_log", line=f"Failed to create calendar event: {exc}", level="err")
         elif decision == "cold_email":
             emit("inbox_log", line="Cold Email isn't implemented yet -- no action taken.", level="info")
         elif decision == "flag" and message is not None:
@@ -251,7 +261,7 @@ class InboxRouter:
         emit("inbox_confirm_applied", message_id=message_id, decision=decision, draft_id=draft_id)
 
     def override_decision(self, message_id: str, new_decision: str, reason: str = "",
-                           reply_body: str = "") -> None:
+                           reply_body: str = "", event_start: str = "", event_end: str = "") -> None:
         """reply_body: same contract as confirm_suggestion() -- real
         human-typed text only. Overriding TO "reply"/"forward" now
         creates a real draft (it didn't before -- there was no way to
@@ -280,6 +290,12 @@ class InboxRouter:
                     record_schedule_entry(message, reply_body, path=self._schedule_log_path)
                 except Exception as exc:
                     emit("inbox_log", line=f"Failed to record schedule entry: {exc}", level="err")
+            if event_start.strip() and event_end.strip():
+                try:
+                    self._calendar.create_event(summary=message.subject, description=reply_body,
+                                                 start_iso=event_start, end_iso=event_end)
+                except Exception as exc:
+                    emit("inbox_log", line=f"Failed to create calendar event: {exc}", level="err")
         elif new_decision == "cold_email":
             emit("inbox_log", line="Cold Email isn't implemented yet -- no action taken.", level="info")
         elif new_decision == "flag" and message is not None:
