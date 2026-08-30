@@ -202,7 +202,8 @@ class TestInboxRouterPollOnce:
         router = self._build(tmp_path, inbox=[_msg("i1", "stranger@x.com", "totally unrelated")])
         routed = router.poll_once()
         assert len(routed) == 1
-
+        # Second poll: the message was marked processed, must not reappear.
+        assert router.poll_once() == []
 
     def test_unresolved_email_falls_through_to_flag_with_no_llm(self, tmp_path):
         router = self._build(tmp_path, inbox=[_msg("i1", "stranger@x.com", "totally unrelated")])
@@ -474,9 +475,6 @@ class TestInboxRouterDefaultCalendarClient:
                               reply_examples_path=str(tmp_path / "data" / "reply_examples.jsonl"))
 
         assert isinstance(router._calendar, calendar_client_module.MockCalendarClient)
-
-        # Second poll: the message was marked processed, must not reappear.
-        assert router.poll_once() == []
 
 
 class TestInboxRouterSessionMetrics:
