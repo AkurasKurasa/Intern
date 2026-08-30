@@ -237,6 +237,90 @@
         "INBOX",
         "UNREAD"
       ]
+    },
+    {
+      "id": "mock-301",
+      "thread_id": "thread-301",
+      "sender": "Priya Ramaswami <priya@ramaswami-consulting.example.com>",
+      "sender_email": "priya@ramaswami-consulting.example.com",
+      "subject": "Kickoff call for the Q3 partnership - your availability?",
+      "snippet": "Would Thursday Sept 4th at 10am work for a kickoff call on the partnership?",
+      "body_text": "Hi,\n\nWould Thursday, September 4th at 10am work for a kickoff call on the partnership? Should only take 30 minutes.\n\nBest,\nPriya",
+      "received_at": "2026-08-27T14:00:00-07:00",
+      "labels": [
+        "INBOX",
+        "UNREAD"
+      ]
+    },
+    {
+      "id": "mock-302",
+      "thread_id": "thread-302",
+      "sender": "Marcus Oyelaran <m.oyelaran@delridge.example.com>",
+      "sender_email": "m.oyelaran@delridge.example.com",
+      "subject": "Procurement review meeting - Sept 8, 11am",
+      "snippet": "Scheduling a procurement review for Sept 8th at 11am, please confirm attendance.",
+      "body_text": "Hi,\n\nWe're scheduling a procurement review for September 8th at 11am to go over the Q3 terms. Please confirm you can attend.\n\nMarcus",
+      "received_at": "2026-08-28T09:30:00-07:00",
+      "labels": [
+        "INBOX",
+        "UNREAD"
+      ]
+    },
+    {
+      "id": "mock-303",
+      "thread_id": "thread-303",
+      "sender": "Events Team <events@insurtechconf.example.com>",
+      "sender_email": "events@insurtechconf.example.com",
+      "subject": "Registration deadline for InsurTech Summit - Sept 10",
+      "snippet": "Early registration for the InsurTech Summit closes September 10th.",
+      "body_text": "Hi,\n\nJust a reminder that early registration for the InsurTech Summit closes September 10th. Register before then to lock in the discounted rate.\n\nEvents Team",
+      "received_at": "2026-08-28T15:45:00-07:00",
+      "labels": [
+        "INBOX",
+        "UNREAD"
+      ]
+    },
+    {
+      "id": "mock-304",
+      "thread_id": "thread-304",
+      "sender": "Registrar Office <registrar@campusportal.edu>",
+      "sender_email": "registrar@campusportal.edu",
+      "subject": "Grade appeal window opens Sept 2, closes Sept 12",
+      "snippet": "The grade appeal window for Section 4B opens September 2nd and closes September 12th.",
+      "body_text": "Hello,\n\nThe grade appeal window for Section 4B opens September 2nd and closes September 12th. Please make sure any pending reviews are handled within that window.\n\nRegistrar Office",
+      "received_at": "2026-08-29T08:20:00-07:00",
+      "labels": [
+        "INBOX",
+        "UNREAD"
+      ]
+    },
+    {
+      "id": "mock-305",
+      "thread_id": "thread-305",
+      "sender": "Jordan Reyes <jordan.reyes@acmebroker.com>",
+      "sender_email": "jordan.reyes@acmebroker.com",
+      "subject": "Client walkthrough - can we do Monday Sept 1st, 3pm?",
+      "snippet": "Client wants a walkthrough of the new policy terms, proposing Monday Sept 1st at 3pm.",
+      "body_text": "Hi,\n\nThe client wants a walkthrough of the new policy terms before signing. Proposing Monday, September 1st at 3pm -- let me know if that works.\n\nJordan",
+      "received_at": "2026-08-29T12:10:00-07:00",
+      "labels": [
+        "INBOX",
+        "UNREAD"
+      ]
+    },
+    {
+      "id": "mock-306",
+      "thread_id": "thread-306",
+      "sender": "Contracts Team <contracts@meyerlegal.example.com>",
+      "sender_email": "contracts@meyerlegal.example.com",
+      "subject": "Follow-up call on Meyer contract terms - propose Sept 4th",
+      "snippet": "Before the Sept 5th deadline, can we do a quick call on Sept 4th to clarify a few terms?",
+      "body_text": "Hello,\n\nBefore the September 5th deadline, can we do a quick call on September 4th to clarify a couple of terms in the Meyer contract? Any time that afternoon works on our end.\n\nContracts Team",
+      "received_at": "2026-08-29T16:30:00-07:00",
+      "labels": [
+        "INBOX",
+        "UNREAD"
+      ]
     }
   ],
   "sent": [
