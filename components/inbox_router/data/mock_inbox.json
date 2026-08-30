@@ -321,6 +321,62 @@
         "INBOX",
         "UNREAD"
       ]
+    },
+    {
+      "id": "mock-307",
+      "thread_id": "thread-307",
+      "sender": "Dana Whitfield <dana.whitfield@northline.example.com>",
+      "sender_email": "dana.whitfield@northline.example.com",
+      "subject": "Follow-up: can we push the Sept 3rd call to Sept 9th, 1pm?",
+      "snippet": "Something came up -- could we move our call to Sept 9th at 1pm instead?",
+      "body_text": "Hi,\n\nSomething came up on our end -- could we move our call to September 9th at 1pm instead of the 3rd? Sorry for the shuffle.\n\nBest,\nDana",
+      "received_at": "2026-08-30T09:00:00-07:00",
+      "labels": [
+        "INBOX",
+        "UNREAD"
+      ]
+    },
+    {
+      "id": "mock-308",
+      "thread_id": "thread-308",
+      "sender": "Alex Rivera <alex.rivera@teamcollab.example.com>",
+      "sender_email": "alex.rivera@teamcollab.example.com",
+      "subject": "Team retro - Friday Sept 6th, 2:30pm",
+      "snippet": "Putting the retro on the calendar for Friday Sept 6th at 2:30pm.",
+      "body_text": "Hey,\n\nPutting the team retro on the calendar for Friday, September 6th at 2:30pm. Same room as usual.\n\nAlex",
+      "received_at": "2026-08-30T10:15:00-07:00",
+      "labels": [
+        "INBOX",
+        "UNREAD"
+      ]
+    },
+    {
+      "id": "mock-309",
+      "thread_id": "thread-309",
+      "sender": "Payroll Team <payroll@companyhr.example.com>",
+      "sender_email": "payroll@companyhr.example.com",
+      "subject": "Timesheet submission deadline - Sept 2, 5pm",
+      "snippet": "All timesheets for this pay period are due by Sept 2nd, 5pm.",
+      "body_text": "Hi,\n\nA reminder that all timesheets for this pay period are due by September 2nd, 5pm. Late submissions may delay payment.\n\nPayroll Team",
+      "received_at": "2026-08-30T07:30:00-07:00",
+      "labels": [
+        "INBOX",
+        "UNREAD"
+      ]
+    },
+    {
+      "id": "mock-310",
+      "thread_id": "thread-310",
+      "sender": "Priya Ramaswami <priya@ramaswami-consulting.example.com>",
+      "sender_email": "priya@ramaswami-consulting.example.com",
+      "subject": "Loved the proposal - let's talk pricing Sept 11th?",
+      "snippet": "Really liked the proposal. Could we set up a pricing discussion Sept 11th?",
+      "body_text": "Hi,\n\nReally liked the proposal you sent over. Could we set up a call to talk through pricing on September 11th, any time in the morning?\n\nBest,\nPriya",
+      "received_at": "2026-08-30T11:45:00-07:00",
+      "labels": [
+        "INBOX",
+        "UNREAD"
+      ]
     }
   ],
   "sent": [
