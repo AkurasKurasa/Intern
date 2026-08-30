@@ -806,6 +806,10 @@ waiting on them.
   Also fixed while wiring this in, a real training-data-fabrication bug: `reply_trace_translator.py` had a backward-compatibility fallback that silently recorded a message as `"reply"` whenever no decision was found in `routed_history.json` — violating the module's own documented contract ("a translator whose only job is honesty must fail CLOSED: no evidence => don't record"). Removed; a missing or unrecognized decision is now always skipped, never guessed.
 
   Full suite: 1523 passed, 9 skipped, 0 failed.
+
+  **Extended 2026-08-30/31**: the Schedule decision's `data/schedule.txt` log described above stayed as-is, but it's no longer the whole story — a Schedule confirm now also creates a real Google Calendar event. New module `calendar_client.py` mirrors `gmail_client.py`'s existing mock/real client-swap pattern exactly: same OAuth credentials file, same "mock unless real creds are present" seam. `gmail_client.py`'s `SCOPES` list gained the Calendar scope alongside the Gmail scope it already had, so the one OAuth grant now covers both. The plain-text log is genuinely unchanged — the calendar event is additive, not a replacement, matching this project's own pattern of layering new output on top of an existing one rather than swapping it out. The event's date/time is never inferred from the email body: the human always types the real start/end directly, through two new datetime-local fields added to Inbox Dispatch's reply box, wired the same way the existing reply/schedule text fields already are — the same "never invent" rule this project holds everywhere else (Reply's confidence-gated fast-fill, `reply_trace_translator.py`'s fail-closed recording), just applied to dates instead of text. Also added: a small "View Schedule" button, bundled into the Electron app, that just opens `schedule.txt` in Notepad — a one-line convenience, not a new subsystem.
+
+  Full suite (this task's own final run): 1550 passed, 9 skipped, 0 failed. Commit range `4273876d`..`71215295` on this branch. The whole-plan review for this piece is still pending as of this entry.
 - [ ] `scope3_email_triage` *(superseded framing — predates the concrete
   shape above)*: the very original bare stub, a GUI-demonstration-based
   triage system (watch UIA/screen state the way Scope #1/#2 do). Still a
@@ -2472,8 +2476,9 @@ one form."
 3. **Email / Ticket Triage** — *in progress ([Scope #3](#task-list)), Inbox
    Router approach.* Based on a passively-learned per-sender pattern profile
    (Gmail API + OAuth2, no manual labeling), an incoming email is replied to,
-   forwarded, scheduled (content extracted to a plain log, no reuse model
-   needed), sent as a cold email (task-list-driven, not yet built), flagged
+   forwarded, scheduled (content extracted to a plain log plus a real Google
+   Calendar event as of 2026-08-30/31, no reuse model needed), sent as a
+   cold email (task-list-driven, not yet built), flagged
    for a person, or left alone — then the outcome is confirmed by reply.
    Redefined (2026-08-29) to the tasks a virtual assistant actually does on
    email, dropping the earlier Route-to-Scope-#1/#2 model entirely — Scope #3
