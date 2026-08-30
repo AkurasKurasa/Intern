@@ -306,6 +306,7 @@ const ppCheckpointGroup = document.getElementById("ppCheckpointGroup");
 const ppCheckpoint   = document.getElementById("ppCheckpoint");
 const ppTestGroup    = document.getElementById("ppTestGroup");
 const btnLaunchMockups = document.getElementById("btnLaunchMockups");
+const btnViewSchedule = document.getElementById("btnViewSchedule");
 const btnPlay        = document.getElementById("btnPlay");
 const btnStopCapsule = document.getElementById("btnStopCapsule");
 const btnDeploy      = document.getElementById("btnDeploy");
@@ -703,6 +704,14 @@ btnLaunchMockups.addEventListener("click", async () => {
     capsuleLog(`Couldn't launch mockups: ${e.message || e}`, "err");
   } finally {
     btnLaunchMockups.disabled = false;
+  }
+});
+
+btnViewSchedule.addEventListener("click", async () => {
+  try {
+    await window.capsulesAPI.viewSchedule();
+  } catch (e) {
+    capsuleLog(`Couldn't open schedule: ${e.message || e}`, "err");
   }
 });
 

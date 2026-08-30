@@ -764,6 +764,18 @@ ipcMain.handle("test-launch-mockups", (_evt, capsuleName) => {
   return { ok: true, opened };
 });
 
+ipcMain.handle("view-schedule", () => {
+  const scheduleDir = path.join(REPO_ROOT, "components", "inbox_router", "data");
+  const schedulePath = path.join(scheduleDir, "schedule.txt");
+  if (!fs.existsSync(schedulePath)) {
+    fs.mkdirSync(scheduleDir, { recursive: true });
+    fs.writeFileSync(schedulePath, "");
+  }
+  const child = spawn("notepad.exe", [schedulePath], { detached: true, stdio: "ignore" });
+  child.unref();
+  return { ok: true };
+});
+
 // ── Settings tab -- LM Studio control via its own CLI (lms.exe), not a
 // new HTTP client of our own -- the exact same local server run_task.py's
 // LLMAgent already talks to at http://localhost:1234/v1 once it's running

@@ -61,6 +61,7 @@ contextBridge.exposeInMainWorld("capsulesAPI", {
   // user can get the environment ready (or just look around) before
   // pressing Play.
   launchTestMockups: (capsuleName) => ipcRenderer.invoke("test-launch-mockups", capsuleName),
+  viewSchedule: () => ipcRenderer.invoke("view-schedule"),
 });
 
 contextBridge.exposeInMainWorld("inboxAPI", {
