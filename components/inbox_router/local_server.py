@@ -188,7 +188,11 @@ def handle_request(method: str, path: str, body: bytes, router: InboxRouter, ori
         data, error = _parse_action_body(body, ("message_id", "decision"))
         if error:
             return error
-        router.record_practice_decision(data["message_id"], data["decision"])
+        try:
+            router.record_practice_decision(data["message_id"], data["decision"])
+        except ValueError as exc:
+            err = json.dumps({"error": f"Bad request: {exc}"}).encode("utf-8")
+            return 400, {}, err, "application/json"
         return 200, {}, json.dumps({"ok": True}).encode("utf-8"), "application/json"
 
     return 404, {}, json.dumps({"error": "Not found"}).encode("utf-8"), "application/json"

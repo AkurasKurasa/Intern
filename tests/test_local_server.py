@@ -295,6 +295,21 @@ class TestPracticeInboxRoutes:
         status, _headers, _body, _ct = ls.handle_request("POST", "/practice/api/record", b"not json", router)
         assert status == 400
 
+    def test_post_practice_record_invalid_decision_returns_400_not_a_dropped_connection(self, tmp_path):
+        # decision_recorder.record_example() validates against
+        # DECISIONS_ORDER and raises ValueError on an unrecognized
+        # decision (e.g. a stale "route_scope1"). Before this test was
+        # added, that ValueError propagated straight out of
+        # handle_request() uncaught, which the real HTTP server turns
+        # into a dropped connection instead of a clean error response --
+        # found by hand-testing the real running server against an
+        # invalid decision.
+        router = _build_router(tmp_path, inbox=[_msg("i1", "stranger@x.com", "hello")])
+        body = json.dumps({"message_id": "i1", "decision": "route_scope1"}).encode("utf-8")
+        status, _headers, resp_body, _ct = ls.handle_request("POST", "/practice/api/record", body, router)
+        assert status == 400
+        assert "route_scope1" in json.loads(resp_body)["error"]
+
 
 class TestPracticeStaticFiles:
     def test_practice_index_html_is_served(self, tmp_path):
