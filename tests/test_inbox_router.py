@@ -268,6 +268,37 @@ class TestInboxRouterPollOnce:
         history = json.loads(Path(router._history_path).read_text())["messages"]
         assert history[0]["status"] == "confirmed"
 
+    def test_confirm_flag_applies_a_real_flag_label(self, tmp_path):
+        # Flag is meant to be a concrete action, not just a recorded
+        # decision -- confirming "flag" must actually flag the real
+        # message so it's findable, not just logged in this project's
+        # own history.
+        router = self._build(tmp_path, inbox=[_msg("i1", "stranger@x.com", "unrelated")])
+        router.poll_once()
+        router.confirm_suggestion("i1", "flag")
+
+        state = json.loads((tmp_path / "data" / "mock_state.json").read_text())
+        assert state.get("flagged_ids") == ["i1"]
+
+    def test_override_to_flag_applies_a_real_flag_label(self, tmp_path):
+        router = self._build(tmp_path, inbox=[_msg("i1", "stranger@x.com", "unrelated")])
+        router.poll_once()
+        router.override_decision("i1", "flag", reason="needs a person's judgment")
+
+        state = json.loads((tmp_path / "data" / "mock_state.json").read_text())
+        assert state.get("flagged_ids") == ["i1"]
+
+    def test_confirm_leave_alone_does_not_apply_flag_label(self, tmp_path):
+        # leave_alone is correctly a real no-op -- must not accidentally
+        # also flag the message.
+        router = self._build(tmp_path, inbox=[_msg("i1", "stranger@x.com", "unrelated")])
+        router.poll_once()
+        router.confirm_suggestion("i1", "leave_alone")
+
+        state_path = tmp_path / "data" / "mock_state.json"
+        state = json.loads(state_path.read_text()) if state_path.exists() else {}
+        assert not state.get("flagged_ids")
+
     def test_override_updates_history_and_pattern_profile(self, tmp_path):
         router = self._build(tmp_path, inbox=[_msg("i1", "stranger@x.com", "unrelated")])
         router.poll_once()

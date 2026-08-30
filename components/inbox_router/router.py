@@ -231,7 +231,12 @@ class InboxRouter:
                     emit("inbox_log", line=f"Failed to record schedule entry: {exc}", level="err")
         elif decision == "cold_email":
             emit("inbox_log", line="Cold Email isn't implemented yet -- no action taken.", level="info")
-        # flag/leave_alone need no Gmail-side action at all.
+        elif decision == "flag" and message is not None:
+            try:
+                self._gmail.apply_flag_label(message_id)
+            except Exception as exc:
+                emit("inbox_log", line=f"Failed to apply flag label: {exc}", level="err")
+        # leave_alone needs no Gmail-side action at all.
         entry["status"] = "confirmed"
         entry["decision"] = decision
         entry["draft_id"] = draft_id
@@ -277,6 +282,11 @@ class InboxRouter:
                     emit("inbox_log", line=f"Failed to record schedule entry: {exc}", level="err")
         elif new_decision == "cold_email":
             emit("inbox_log", line="Cold Email isn't implemented yet -- no action taken.", level="info")
+        elif new_decision == "flag" and message is not None:
+            try:
+                self._gmail.apply_flag_label(message_id)
+            except Exception as exc:
+                emit("inbox_log", line=f"Failed to apply flag label: {exc}", level="err")
         entry["decision"] = new_decision
         entry["status"] = "overridden"
         entry["override_reason"] = reason

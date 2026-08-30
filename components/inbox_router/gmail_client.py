@@ -30,6 +30,7 @@ DEFAULT_CREDENTIALS_DIR = os.path.join(_THIS_DIR, "credentials")
 
 SCOPES = ["https://www.googleapis.com/auth/gmail.modify"]
 PROCESSED_LABEL_NAME = "Intern/Processed"
+FLAGGED_LABEL_NAME = "Intern/Flagged"
 
 
 @dataclass
@@ -74,6 +75,14 @@ class GmailClientBase(ABC):
 
     @abstractmethod
     def mark_processed(self, message_id: str) -> None: ...
+
+    @abstractmethod
+    def apply_flag_label(self, message_id: str) -> None:
+        """The real, concrete action a "flag" decision takes: applies a
+        real, visible Gmail label so a flagged message actually shows up
+        somewhere for a human to find -- not just a decision recorded in
+        this project's own local history with nothing to show for it."""
+        ...
 
 
 class MockGmailClient(GmailClientBase):
@@ -159,6 +168,13 @@ class MockGmailClient(GmailClientBase):
         state["processed_ids"] = sorted(ids)
         self._save_state(state)
 
+    def apply_flag_label(self, message_id: str) -> None:
+        state = self._load_state()
+        ids = set(state.get("flagged_ids", []))
+        ids.add(message_id)
+        state["flagged_ids"] = sorted(ids)
+        self._save_state(state)
+
 
 class RealGmailClient(GmailClientBase):
     """Standard google-auth-oauthlib Desktop-app OAuth flow. First
@@ -172,6 +188,7 @@ class RealGmailClient(GmailClientBase):
         self._token_path = os.path.join(credentials_dir, "token.json")
         self._service = None
         self._processed_label_id: Optional[str] = None
+        self._flagged_label_id: Optional[str] = None
         # Loud, one-time, impossible-to-miss -- mirrors run_task.py's own
         # [EMERGENCY STOP] banner convention for "this is about to do
         # something real." Printed once per process, at construction, not
@@ -201,21 +218,28 @@ class RealGmailClient(GmailClientBase):
                 f.write(creds.to_json())
         self._service = build("gmail", "v1", credentials=creds)
 
+    def _ensure_label(self, name: str) -> str:
+        resp = self._service.users().labels().list(userId="me").execute()
+        for lbl in resp.get("labels", []):
+            if lbl["name"] == name:
+                return lbl["id"]
+        created = self._service.users().labels().create(
+            userId="me",
+            body={"name": name, "labelListVisibility": "labelShow", "messageListVisibility": "show"},
+        ).execute()
+        return created["id"]
+
     def _ensure_processed_label(self) -> str:
         if self._processed_label_id:
             return self._processed_label_id
-        resp = self._service.users().labels().list(userId="me").execute()
-        for lbl in resp.get("labels", []):
-            if lbl["name"] == PROCESSED_LABEL_NAME:
-                self._processed_label_id = lbl["id"]
-                return self._processed_label_id
-        created = self._service.users().labels().create(
-            userId="me",
-            body={"name": PROCESSED_LABEL_NAME, "labelListVisibility": "labelShow",
-                  "messageListVisibility": "show"},
-        ).execute()
-        self._processed_label_id = created["id"]
+        self._processed_label_id = self._ensure_label(PROCESSED_LABEL_NAME)
         return self._processed_label_id
+
+    def _ensure_flagged_label(self) -> str:
+        if self._flagged_label_id:
+            return self._flagged_label_id
+        self._flagged_label_id = self._ensure_label(FLAGGED_LABEL_NAME)
+        return self._flagged_label_id
 
     def _header(self, headers: list, name: str) -> str:
         for h in headers:
@@ -299,6 +323,12 @@ class RealGmailClient(GmailClientBase):
 
     def mark_processed(self, message_id: str) -> None:
         label_id = self._ensure_processed_label()
+        self._service.users().messages().modify(
+            userId="me", id=message_id, body={"addLabelIds": [label_id]},
+        ).execute()
+
+    def apply_flag_label(self, message_id: str) -> None:
+        label_id = self._ensure_flagged_label()
         self._service.users().messages().modify(
             userId="me", id=message_id, body={"addLabelIds": [label_id]},
         ).execute()
