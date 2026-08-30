@@ -371,18 +371,34 @@ class InboxRouter:
         since_iso = "2020-01-01T00:00:00+00:00"  # effectively "everything" for the mock fixture
         return self._gmail.list_recent_inbox(since_iso)
 
-    def record_practice_decision(self, message_id: str, decision: str) -> None:
+    def record_practice_decision(self, message_id: str, decision: str, reply_body: str = "") -> None:
         """A raw human demonstration -- no AI suggestion involved anywhere,
         the opposite of confirm_suggestion()/override_decision(). Fetches
         the real message and records it exactly like every other recorded
         example, via the same decision_recorder.record_example() call.
         Also folds into the sender-pattern profile the same way a real
         confirm does, since a genuine demonstration is at least as strong
-        a signal as a confirm."""
+        a signal as a confirm.
+
+        reply_body: same contract as confirm_suggestion()'s -- real
+        human-typed text only, never invented. When given for a
+        reply/forward/schedule decision, it's recorded as real content
+        the same way confirm_suggestion()/override_decision() do, via the
+        same record_reply_example()/record_schedule_entry() calls. A
+        blank reply_body records nothing extra -- the decision label
+        alone still gets recorded either way."""
         message = self._gmail.get_message(message_id)
         if message is None:
             emit("inbox_error", message=f"Unknown message id: {message_id}")
             return
+        if reply_body.strip():
+            try:
+                if decision in ("reply", "forward"):
+                    record_reply_example(message, reply_body, source="live", path=self._reply_examples_path)
+                elif decision == "schedule":
+                    record_schedule_entry(message, reply_body, path=self._schedule_log_path)
+            except Exception as exc:
+                emit("inbox_log", line=f"Failed to record practice reply/schedule content: {exc}", level="err")
         record_example(message, decision, source="live", path=self._examples_path)
         self._profile.record_confirmed_decision(message, decision)
 

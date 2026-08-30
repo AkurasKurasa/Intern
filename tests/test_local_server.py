@@ -50,7 +50,8 @@ def _build_router(tmp_path, inbox=None):
     return InboxRouter(client, profile, rules, classifier, history_path=history_path,
                         inbox_checkpoint_path=str(tmp_path / "no_such_checkpoint.pt"),
                         examples_path=str(tmp_path / "training_examples.jsonl"),
-                        reply_examples_path=str(tmp_path / "reply_examples.jsonl"))
+                        reply_examples_path=str(tmp_path / "reply_examples.jsonl"),
+                        schedule_log_path=str(tmp_path / "schedule.txt"))
 
 
 class TestHandleRequestInbox:
@@ -294,6 +295,26 @@ class TestPracticeInboxRoutes:
         router = _build_router(tmp_path)
         status, _headers, _body, _ct = ls.handle_request("POST", "/practice/api/record", b"not json", router)
         assert status == 400
+
+    def test_post_practice_record_with_reply_body_records_real_content(self, tmp_path):
+        router = _build_router(tmp_path, inbox=[_msg("i1", "stranger@x.com", "hello")])
+        body = json.dumps({"message_id": "i1", "decision": "reply", "reply_body": "Sounds good."}).encode("utf-8")
+        status, _headers, resp_body, _ct = ls.handle_request("POST", "/practice/api/record", body, router)
+        assert status == 200
+        assert json.loads(resp_body) == {"ok": True}
+        examples = reply_recorder.load_reply_examples(path=str(tmp_path / "reply_examples.jsonl"))
+        assert len(examples) == 1
+        assert examples[0]["reply_body"] == "Sounds good."
+
+    def test_post_practice_record_without_reply_body_still_works(self, tmp_path):
+        # reply_body is optional -- omitting it entirely (not just sending
+        # blank) must not break the existing decision-only flow.
+        router = _build_router(tmp_path, inbox=[_msg("i1", "stranger@x.com", "hello")])
+        body = json.dumps({"message_id": "i1", "decision": "flag"}).encode("utf-8")
+        status, _headers, resp_body, _ct = ls.handle_request("POST", "/practice/api/record", body, router)
+        assert status == 200
+        assert json.loads(resp_body) == {"ok": True}
+        assert not (tmp_path / "reply_examples.jsonl").exists()
 
     def test_post_practice_record_invalid_decision_returns_400_not_a_dropped_connection(self, tmp_path):
         # decision_recorder.record_example() validates against

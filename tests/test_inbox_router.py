@@ -560,7 +560,8 @@ class TestPracticeInbox:
         return InboxRouter(client, profile, rules, classifier, history_path=history_path,
                             inbox_checkpoint_path=str(tmp_path / "no_such_checkpoint.pt"),
                             examples_path=str(tmp_path / "data" / "training_examples.jsonl"),
-                            reply_examples_path=str(tmp_path / "data" / "reply_examples.jsonl"))
+                            reply_examples_path=str(tmp_path / "data" / "reply_examples.jsonl"),
+                            schedule_log_path=str(tmp_path / "data" / "schedule.txt"))
 
     def test_list_practice_inbox_returns_all_messages_unfiltered(self, tmp_path):
         router = self._build(tmp_path, inbox=[
@@ -597,6 +598,50 @@ class TestPracticeInbox:
         router.record_practice_decision("does-not-exist", "reply")  # must not raise
         examples = load_examples(path=str(tmp_path / "data" / "training_examples.jsonl"))
         assert examples == []
+
+    def test_record_practice_decision_with_reply_body_records_real_reply_content(self, tmp_path):
+        router = self._build(tmp_path, inbox=[_msg("i1", "stranger@x.com", "hello")])
+        router.record_practice_decision("i1", "reply", reply_body="Sure, that works for me.")
+
+        reply_examples = reply_recorder.load_reply_examples(path=str(tmp_path / "data" / "reply_examples.jsonl"))
+        assert len(reply_examples) == 1
+        assert reply_examples[0]["reply_body"] == "Sure, that works for me."
+        # The decision label is still recorded too, same as always.
+        examples = load_examples(path=str(tmp_path / "data" / "training_examples.jsonl"))
+        assert len(examples) == 1
+        assert examples[0]["decision"] == "reply"
+
+    def test_record_practice_decision_with_schedule_body_writes_to_schedule_file(self, tmp_path):
+        router = self._build(tmp_path, inbox=[_msg("i1", "stranger@x.com", "vendor call")])
+        router.record_practice_decision("i1", "schedule", reply_body="Vendor call Sept 3rd, 2pm.")
+
+        schedule_path = tmp_path / "data" / "schedule.txt"
+        assert schedule_path.exists()
+        content = schedule_path.read_text(encoding="utf-8")
+        assert "Vendor call Sept 3rd, 2pm." in content
+        # Recording to schedule.txt must never touch reply_examples.jsonl.
+        assert not (tmp_path / "data" / "reply_examples.jsonl").exists()
+
+    def test_record_practice_decision_blank_reply_body_records_no_content(self, tmp_path):
+        router = self._build(tmp_path, inbox=[_msg("i1", "stranger@x.com", "hello")])
+        router.record_practice_decision("i1", "reply", reply_body="   ")
+
+        # The honesty guarantee holds here too -- blank/whitespace-only
+        # text records nothing, but the decision label is still saved.
+        assert not (tmp_path / "data" / "reply_examples.jsonl").exists()
+        examples = load_examples(path=str(tmp_path / "data" / "training_examples.jsonl"))
+        assert len(examples) == 1
+        assert examples[0]["decision"] == "reply"
+
+    def test_record_practice_decision_reply_body_ignored_for_non_text_decisions(self, tmp_path):
+        router = self._build(tmp_path, inbox=[_msg("i1", "stranger@x.com", "hello")])
+        # A stray reply_body sent alongside flag/cold_email/leave_alone
+        # must never be written anywhere -- only reply/forward/schedule
+        # ever record typed content.
+        router.record_practice_decision("i1", "flag", reply_body="this should never be saved")
+
+        assert not (tmp_path / "data" / "reply_examples.jsonl").exists()
+        assert not (tmp_path / "data" / "schedule.txt").exists()
 
 
 class TestScheduleRecording:

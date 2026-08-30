@@ -23,6 +23,14 @@ const searchInput = document.getElementById("searchInput");
 const navInbox = document.getElementById("navInbox");
 const navStarred = document.getElementById("navStarred");
 const snackbar = document.getElementById("snackbar");
+const replyBoxWrap = document.getElementById("replyBoxWrap");
+const replyBody = document.getElementById("replyBody");
+const submitReplyBtn = document.getElementById("submitReplyBtn");
+
+// Decisions where what you'd actually type is the whole point -- these
+// select-then-type instead of recording immediately on click.
+const NEEDS_TEXT = new Set(["reply", "forward", "schedule"]);
+let pendingDecision = null;
 
 const STAR_FILLED = '<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>';
 const STAR_OUTLINE = '<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M12 15.4l3.76 2.27-1-4.28 3.32-2.88-4.38-.38L12 6l-1.71 4.04-4.38.38 3.32 2.88-1 4.28L12 15.4M12 2l2.81 6.63L22 9.24l-5.46 4.73L18.18 21 12 17.27 5.82 21l1.64-7.03L2 9.24l7.19-.61L12 2z"/></svg>';
@@ -122,6 +130,13 @@ function renderList() {
   });
 }
 
+function clearPendingSelection() {
+  pendingDecision = null;
+  replyBoxWrap.hidden = true;
+  replyBody.value = "";
+  document.querySelectorAll(".btn-action.selected").forEach((b) => b.classList.remove("selected"));
+}
+
 function openMessage(messageId) {
   const email = inboxMessages.find((e) => e.message_id === messageId);
   if (!email) return;
@@ -131,23 +146,36 @@ function openMessage(messageId) {
   document.getElementById("detailSender").textContent = email.sender || email.sender_email || "";
   document.getElementById("detailSubject").textContent = email.subject || "";
   document.getElementById("detailBody").textContent = email.body_text || "(no body available)";
+  clearPendingSelection();
   listView.hidden = true;
   detailView.hidden = false;
 }
 
 function closeMessage() {
   openMessageId = null;
+  clearPendingSelection();
   detailView.hidden = true;
   listView.hidden = false;
 }
 
-async function recordDecision(decision) {
+// Reply/forward/schedule select first (show the box, wait for real typed
+// text); cold_email/flag/leave_alone record immediately -- there's
+// nothing to type for those.
+function selectDecision(decision, btn) {
+  pendingDecision = decision;
+  document.querySelectorAll(".btn-action.selected").forEach((b) => b.classList.remove("selected"));
+  if (btn) btn.classList.add("selected");
+  replyBoxWrap.hidden = false;
+  replyBody.focus();
+}
+
+async function recordDecision(decision, body = "") {
   if (!openMessageId) return;
   try {
     const resp = await fetch("/practice/api/record", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message_id: openMessageId, decision }),
+      body: JSON.stringify({ message_id: openMessageId, decision, reply_body: body }),
     });
     if (!resp.ok) {
       const err = await resp.json().catch(() => ({}));
@@ -171,9 +199,23 @@ document.getElementById("refreshBtn").addEventListener("click", loadInbox);
 document.getElementById("toolbarRefreshBtn").addEventListener("click", loadInbox);
 document.getElementById("backBtn").addEventListener("click", closeMessage);
 document.querySelectorAll(".btn-action").forEach((btn) => {
-  btn.addEventListener("click", () => recordDecision(btn.dataset.decision));
+  btn.addEventListener("click", () => {
+    const decision = btn.dataset.decision;
+    if (NEEDS_TEXT.has(decision)) {
+      selectDecision(decision, btn);
+    } else {
+      recordDecision(decision);
+    }
+  });
 });
-document.getElementById("replyIconBtn").addEventListener("click", () => recordDecision("reply"));
+submitReplyBtn.addEventListener("click", () => {
+  if (!pendingDecision) return;
+  recordDecision(pendingDecision, replyBody.value);
+});
+document.getElementById("replyIconBtn").addEventListener("click", () => {
+  const replyBtn = document.querySelector('.btn-action[data-decision="reply"]');
+  selectDecision("reply", replyBtn);
+});
 navInbox.addEventListener("click", () => setView("inbox"));
 navStarred.addEventListener("click", () => setView("starred"));
 searchInput.addEventListener("input", () => {
