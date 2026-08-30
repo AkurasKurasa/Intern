@@ -28,7 +28,8 @@ _THIS_DIR = os.path.dirname(os.path.abspath(__file__))
 DEFAULT_DATA_DIR = os.path.join(_THIS_DIR, "data")
 DEFAULT_CREDENTIALS_DIR = os.path.join(_THIS_DIR, "credentials")
 
-SCOPES = ["https://www.googleapis.com/auth/gmail.modify"]
+SCOPES = ["https://www.googleapis.com/auth/gmail.modify",
+          "https://www.googleapis.com/auth/calendar.events"]
 PROCESSED_LABEL_NAME = "Intern/Processed"
 FLAGGED_LABEL_NAME = "Intern/Flagged"
 
