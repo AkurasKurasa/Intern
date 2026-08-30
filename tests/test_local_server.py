@@ -252,6 +252,35 @@ class TestHandleRequestOverride:
         assert status == 400
         assert json.loads(resp_body)["error"]
 
+    def test_post_api_override_schedule_with_dates_creates_calendar_event(self, tmp_path):
+        calendar = FakeCalendarClient()
+        router = _build_router(tmp_path, inbox=[_msg("i1", "stranger@x.com", "vendor call")],
+                                calendar_client=calendar)
+        router.poll_once()
+        body = json.dumps({
+            "message_id": "i1", "new_decision": "schedule",
+            "reply_body": "Vendor call Sept 3rd.",
+            "event_start": "2026-09-03T14:00:00-07:00",
+            "event_end": "2026-09-03T14:30:00-07:00",
+        }).encode("utf-8")
+        status, _headers, resp_body, _ct = ls.handle_request("POST", "/api/override", body, router)
+
+        assert status == 200
+        assert json.loads(resp_body) == {"ok": True}
+        assert len(calendar.events) == 1
+        assert calendar.events[0]["start"] == "2026-09-03T14:00:00-07:00"
+
+    def test_post_api_override_schedule_without_dates_creates_no_event(self, tmp_path):
+        calendar = FakeCalendarClient()
+        router = _build_router(tmp_path, inbox=[_msg("i1", "stranger@x.com", "vendor call")],
+                                calendar_client=calendar)
+        router.poll_once()
+        body = json.dumps({"message_id": "i1", "new_decision": "schedule", "reply_body": "note"}).encode("utf-8")
+        status, _headers, _resp_body, _ct = ls.handle_request("POST", "/api/override", body, router)
+
+        assert status == 200
+        assert calendar.events == []
+
 
 class TestBuildRouter:
     def test_returns_a_real_inbox_router(self, tmp_path, monkeypatch):

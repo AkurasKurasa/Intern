@@ -70,7 +70,7 @@ from inbox_agent import DEFAULT_CHECKPOINT_PATH, InboxAgent
 from decision_recorder import DEFAULT_EXAMPLES_PATH, record_example
 from reply_recorder import DEFAULT_REPLY_EXAMPLES_PATH, record_reply_example
 from schedule_recorder import DEFAULT_SCHEDULE_LOG_PATH, record_schedule_entry
-from calendar_client import CalendarClientBase, MockCalendarClient
+from calendar_client import CalendarClientBase, MockCalendarClient, get_calendar_client
 
 HISTORY_PATH = os.path.join(_THIS_DIR, "data", "routed_history.json")
 SENT_LOOKBACK_DAYS = 90
@@ -120,7 +120,7 @@ class InboxRouter:
                  examples_path: str = DEFAULT_EXAMPLES_PATH,
                  reply_examples_path: str = DEFAULT_REPLY_EXAMPLES_PATH,
                  schedule_log_path: str = DEFAULT_SCHEDULE_LOG_PATH,
-                 calendar_client: CalendarClientBase = None) -> None:
+                 calendar_client: Optional[CalendarClientBase] = None) -> None:
         self._gmail = gmail_client
         self._profile = profile
         self._rules = rule_layer
@@ -132,7 +132,7 @@ class InboxRouter:
         self._examples_path = examples_path
         self._reply_examples_path = reply_examples_path
         self._schedule_log_path = schedule_log_path
-        self._calendar = calendar_client if calendar_client is not None else MockCalendarClient()
+        self._calendar = calendar_client if calendar_client is not None else get_calendar_client()
         self._stop = False
         # In-memory cache of what this process has routed, so confirm/
         # override don't need a disk round-trip in the common case --

@@ -16,10 +16,23 @@ from __future__ import annotations
 import json
 import os
 from abc import ABC, abstractmethod
+from datetime import datetime
 
 _THIS_DIR = os.path.dirname(os.path.abspath(__file__))
 DEFAULT_DATA_DIR = os.path.join(_THIS_DIR, "data")
 DEFAULT_CREDENTIALS_DIR = os.path.join(_THIS_DIR, "credentials")
+
+
+def _to_rfc3339(value: str) -> str:
+    """Normalizes a datetime-local input value (e.g. "2026-09-03T14:00",
+    no seconds, no offset -- exactly what a browser's
+    <input type="datetime-local"> produces) into a real RFC3339 string
+    the Calendar API accepts. Interprets the naive value as the machine's
+    own local wall-clock time (the honest reading of what a human typed
+    into a local datetime field, not a guess) and attaches that machine's
+    real UTC offset -- invents no time information the human didn't
+    provide."""
+    return datetime.fromisoformat(value).astimezone().isoformat()
 
 
 class CalendarClientBase(ABC):
@@ -108,8 +121,8 @@ class RealCalendarClient(CalendarClientBase):
             calendarId="primary",
             body={
                 "summary": summary, "description": description,
-                "start": {"dateTime": start_iso},
-                "end": {"dateTime": end_iso},
+                "start": {"dateTime": _to_rfc3339(start_iso)},
+                "end": {"dateTime": _to_rfc3339(end_iso)},
             },
         ).execute()
         return event["id"]

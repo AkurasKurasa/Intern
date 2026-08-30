@@ -1,6 +1,7 @@
 import json
 import os
 import sys
+from datetime import datetime
 
 _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _INBOX_DIR = os.path.join(_ROOT, "components", "inbox_router")
@@ -8,7 +9,7 @@ for _p in (_ROOT, _INBOX_DIR):
     if _p not in sys.path:
         sys.path.insert(0, _p)
 
-from calendar_client import MockCalendarClient
+from calendar_client import MockCalendarClient, _to_rfc3339
 
 
 class TestMockCalendarClient:
@@ -48,8 +49,41 @@ class TestMockCalendarClient:
 
 
 class TestGetCalendarClient:
-    def test_returns_mock_when_no_credentials_file(self, tmp_path):
+    def test_returns_mock_when_no_credentials_file(self, tmp_path, monkeypatch):
+        # get_calendar_client()'s `root` parameter is ignored (matches
+        # get_gmail_client()'s own real behavior) -- the function actually
+        # always checks the real components/inbox_router/credentials/
+        # client_secret.json path. Passing root=str(tmp_path) used to only
+        # pass because that real directory happened to be empty on this
+        # developer's machine; monkeypatching the module's actual
+        # DEFAULT_CREDENTIALS_DIR constant makes this deterministic instead,
+        # so it keeps passing (mock, no browser OAuth flow) once real
+        # credentials are set up for this project.
         from calendar_client import get_calendar_client, MockCalendarClient
-        # No client_secret.json anywhere under tmp_path -- must fall back to mock.
-        client = get_calendar_client(root=str(tmp_path))
+        import calendar_client as calendar_client_module
+        monkeypatch.setattr(calendar_client_module, "DEFAULT_CREDENTIALS_DIR", str(tmp_path))
+        client = get_calendar_client()
         assert isinstance(client, MockCalendarClient)
+
+
+class TestToRfc3339:
+    """_to_rfc3339() is the fix for the datetime-local -> RFC3339 gap:
+    <input type="datetime-local"> hands the UI a naive, second-less string
+    (e.g. "2026-09-03T14:00") that the real Calendar API rejects outright.
+    These tests exercise the standalone function directly -- no need to
+    construct a RealCalendarClient, which requires real OAuth credentials."""
+
+    def test_browser_datetime_local_string_gains_seconds_and_offset(self):
+        result = _to_rfc3339("2026-09-03T14:00")
+        assert "T14:00:00" in result
+        reparsed = datetime.fromisoformat(result)
+        assert reparsed.tzinfo is not None
+
+    def test_already_offset_aware_string_still_parses(self):
+        # Backward compatibility: the old fabricated test format used
+        # elsewhere in this codebase (e.g. test_calendar_client.py's own
+        # MockCalendarClient tests above) already includes a real offset.
+        # _to_rfc3339() must not choke on it.
+        result = _to_rfc3339("2026-09-03T14:00:00-07:00")
+        reparsed = datetime.fromisoformat(result)
+        assert reparsed.tzinfo is not None

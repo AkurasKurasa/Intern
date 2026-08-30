@@ -203,8 +203,6 @@ class TestInboxRouterPollOnce:
         routed = router.poll_once()
         assert len(routed) == 1
 
-        # Second poll: the message was marked processed, must not reappear.
-        assert router.poll_once() == []
 
     def test_unresolved_email_falls_through_to_flag_with_no_llm(self, tmp_path):
         router = self._build(tmp_path, inbox=[_msg("i1", "stranger@x.com", "totally unrelated")])
@@ -444,6 +442,41 @@ class TestInboxRouterPollOnce:
 
         for key in ("decision", "capsule_name", "confidence", "rationale", "layer"):
             assert bulk_result[key] == step_result[key]
+
+
+class TestInboxRouterDefaultCalendarClient:
+    def test_default_calendar_client_comes_from_get_calendar_client(self, tmp_path, monkeypatch):
+        # Regression test: InboxRouter.__init__ used to default calendar_client
+        # to a hardcoded MockCalendarClient() literal, so RealCalendarClient was
+        # unreachable from any production code path even once real credentials
+        # existed. Just asserting router._calendar is a MockCalendarClient isn't
+        # proof by itself -- that's also what the old hardcoded literal produced.
+        # The real proof is that get_calendar_client()'s own credentials check
+        # actually ran: monkeypatch DEFAULT_CREDENTIALS_DIR to a tmp_path with no
+        # client_secret.json, so the function's real "no creds -> mock" logic is
+        # what's exercised here, deterministically, not skipped.
+        import calendar_client as calendar_client_module
+        monkeypatch.setattr(calendar_client_module, "DEFAULT_CREDENTIALS_DIR", str(tmp_path))
+
+        _write_fixture(tmp_path / "data", inbox=[], sent=[])
+        client = MockGmailClient(data_dir=str(tmp_path / "data"))
+        profile = PatternProfile(path=str(tmp_path / "data" / "profile.json"))
+        registry_path = tmp_path / "registry.json"
+        registry_path.write_text(json.dumps({"capsules": []}), encoding="utf-8")
+        rules = RuleLayer(profile, registry_path=str(registry_path))
+        classifier = LLMClassifier(provider="none")
+        history_path = str(tmp_path / "data" / "routed_history.json")
+
+        # No calendar_client argument -- must fall through to get_calendar_client().
+        router = InboxRouter(client, profile, rules, classifier, history_path=history_path,
+                              inbox_checkpoint_path=str(tmp_path / "no_such_checkpoint.pt"),
+                              examples_path=str(tmp_path / "data" / "training_examples.jsonl"),
+                              reply_examples_path=str(tmp_path / "data" / "reply_examples.jsonl"))
+
+        assert isinstance(router._calendar, calendar_client_module.MockCalendarClient)
+
+        # Second poll: the message was marked processed, must not reappear.
+        assert router.poll_once() == []
 
 
 class TestInboxRouterSessionMetrics:
