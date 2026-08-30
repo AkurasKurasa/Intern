@@ -159,7 +159,10 @@ def handle_request(method: str, path: str, body: bytes, router: InboxRouter, ori
             err = json.dumps({"error": f"Unknown or already-handled message_id: {message_id}"}).encode("utf-8")
             return 400, {}, err, "application/json"
         reply_body = data.get("reply_body", "")
-        router.confirm_suggestion(message_id, decision, reply_body=reply_body)
+        event_start = data.get("event_start", "")
+        event_end = data.get("event_end", "")
+        router.confirm_suggestion(message_id, decision, reply_body=reply_body,
+                                   event_start=event_start, event_end=event_end)
         return 200, {}, json.dumps({"ok": True}).encode("utf-8"), "application/json"
 
     if method == "POST" and path == "/api/override":
@@ -169,10 +172,13 @@ def handle_request(method: str, path: str, body: bytes, router: InboxRouter, ori
         message_id, new_decision = data["message_id"], data["new_decision"]
         reason = data.get("reason", "")
         reply_body = data.get("reply_body", "")
+        event_start = data.get("event_start", "")
+        event_end = data.get("event_end", "")
         if not any(e["message_id"] == message_id for e in router.pending_entries()):
             err = json.dumps({"error": f"Unknown or already-handled message_id: {message_id}"}).encode("utf-8")
             return 400, {}, err, "application/json"
-        router.override_decision(message_id, new_decision, reason, reply_body=reply_body)
+        router.override_decision(message_id, new_decision, reason, reply_body=reply_body,
+                                  event_start=event_start, event_end=event_end)
         return 200, {}, json.dumps({"ok": True}).encode("utf-8"), "application/json"
 
     if method == "GET" and path == "/practice/api/inbox":

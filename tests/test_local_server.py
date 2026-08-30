@@ -37,7 +37,20 @@ def _msg(mid, sender_email, subject, body="body text"):
     }
 
 
-def _build_router(tmp_path, inbox=None):
+class FakeCalendarClient:
+    def __init__(self):
+        self.events = []
+
+    def create_event(self, summary, description, start_iso, end_iso):
+        event_id = f"fake-event-{len(self.events) + 1}"
+        self.events.append({
+            "summary": summary, "description": description,
+            "start": start_iso, "end": end_iso, "event_id": event_id,
+        })
+        return event_id
+
+
+def _build_router(tmp_path, inbox=None, calendar_client=None):
     data_dir = tmp_path / "data"
     _write_fixture(str(data_dir), inbox=inbox or [])
     client = MockGmailClient(data_dir=str(data_dir))
@@ -51,7 +64,8 @@ def _build_router(tmp_path, inbox=None):
                         inbox_checkpoint_path=str(tmp_path / "no_such_checkpoint.pt"),
                         examples_path=str(tmp_path / "training_examples.jsonl"),
                         reply_examples_path=str(tmp_path / "reply_examples.jsonl"),
-                        schedule_log_path=str(tmp_path / "schedule.txt"))
+                        schedule_log_path=str(tmp_path / "schedule.txt"),
+                        calendar_client=calendar_client)
 
 
 class TestHandleRequestInbox:
@@ -181,6 +195,35 @@ class TestHandleRequestConfirm:
         status, _headers, _body, _ct = ls.handle_request(
             "POST", "/api/confirm", body, router, origin="http://127.0.0.1:54321")
         assert status == 200
+
+    def test_post_api_confirm_schedule_with_dates_creates_calendar_event(self, tmp_path):
+        calendar = FakeCalendarClient()
+        router = _build_router(tmp_path, inbox=[_msg("i1", "stranger@x.com", "vendor call")],
+                                calendar_client=calendar)
+        router.poll_once()
+        body = json.dumps({
+            "message_id": "i1", "decision": "schedule",
+            "reply_body": "Vendor call Sept 3rd.",
+            "event_start": "2026-09-03T14:00:00-07:00",
+            "event_end": "2026-09-03T14:30:00-07:00",
+        }).encode("utf-8")
+        status, _headers, resp_body, _ct = ls.handle_request("POST", "/api/confirm", body, router)
+
+        assert status == 200
+        assert json.loads(resp_body) == {"ok": True}
+        assert len(calendar.events) == 1
+        assert calendar.events[0]["start"] == "2026-09-03T14:00:00-07:00"
+
+    def test_post_api_confirm_schedule_without_dates_creates_no_event(self, tmp_path):
+        calendar = FakeCalendarClient()
+        router = _build_router(tmp_path, inbox=[_msg("i1", "stranger@x.com", "vendor call")],
+                                calendar_client=calendar)
+        router.poll_once()
+        body = json.dumps({"message_id": "i1", "decision": "schedule", "reply_body": "note"}).encode("utf-8")
+        status, _headers, _resp_body, _ct = ls.handle_request("POST", "/api/confirm", body, router)
+
+        assert status == 200
+        assert calendar.events == []
 
 
 class TestHandleRequestOverride:
