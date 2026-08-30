@@ -32,6 +32,9 @@ const snackbar = document.getElementById("snackbar");
 const overrideSelect = document.getElementById("overrideSelect");
 const replyBoxWrap = document.getElementById("replyBoxWrap");
 const replyBody = document.getElementById("replyBody");
+const scheduleDatesWrap = document.getElementById("scheduleDatesWrap");
+const eventStart = document.getElementById("eventStart");
+const eventEnd = document.getElementById("eventEnd");
 
 const STAR_FILLED = '<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>';
 const STAR_OUTLINE = '<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M12 15.4l3.76 2.27-1-4.28 3.32-2.88-4.38-.38L12 6l-1.71 4.04-4.38.38 3.32 2.88-1 4.28L12 15.4M12 2l2.81 6.63L22 9.24l-5.46 4.73L18.18 21 12 17.27 5.82 21l1.64-7.03L2 9.24l7.19-.61L12 2z"/></svg>';
@@ -163,6 +166,8 @@ function openMessage(messageId) {
   document.getElementById("detailBody").textContent = email.body_text || "(no body available)";
   document.getElementById("detailDecision").textContent = email.decision || "";
   replyBody.value = "";
+  eventStart.value = "";
+  eventEnd.value = "";
   replyBody.name = email.message_id;
   overrideSelect.value = "flag";
   refreshReplyBoxVisibility();
@@ -185,6 +190,7 @@ function refreshReplyBoxVisibility() {
   const email = pendingEmails.find((e) => e.message_id === openMessageId);
   const suggested = email ? email.decision : "";
   replyBoxWrap.hidden = !(isReplyLike(suggested) || isReplyLike(overrideSelect.value));
+  scheduleDatesWrap.hidden = !(suggested === "schedule" || overrideSelect.value === "schedule");
 }
 
 async function submitDecision(newDecision, reason, successMessage) {
@@ -194,6 +200,8 @@ async function submitDecision(newDecision, reason, successMessage) {
     body: JSON.stringify({
       message_id: openMessageId, new_decision: newDecision, reason,
       reply_body: isReplyLike(newDecision) ? replyBody.value : "",
+      event_start: newDecision === "schedule" ? eventStart.value : "",
+      event_end: newDecision === "schedule" ? eventEnd.value : "",
     }),
   });
   if (!resp.ok) {
@@ -215,6 +223,8 @@ async function confirmCurrent() {
     body: JSON.stringify({
       message_id: openMessageId, decision: email.decision,
       reply_body: isReplyLike(email.decision) ? replyBody.value : "",
+      event_start: email.decision === "schedule" ? eventStart.value : "",
+      event_end: email.decision === "schedule" ? eventEnd.value : "",
     }),
   });
   if (!resp.ok) {

@@ -173,6 +173,14 @@
             </div>
             <div id="replyBoxWrap" class="reply-box-wrap" hidden>
               <textarea id="replyBody" class="reply-textarea" placeholder="Type your reply -- this exact text is what gets sent, nothing is written for you."></textarea>
+              <div id="scheduleDatesWrap" class="schedule-dates-wrap" hidden>
+                <label class="schedule-date-label">Starts
+                  <input type="datetime-local" id="eventStart" class="schedule-date-input">
+                </label>
+                <label class="schedule-date-label">Ends
+                  <input type="datetime-local" id="eventEnd" class="schedule-date-input">
+                </label>
+              </div>
             </div>
           </div>
           <p id="detailStatus" class="status-line"></p>

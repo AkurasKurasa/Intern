@@ -178,6 +178,14 @@ body {
   box-sizing: border-box;
 }
 .reply-textarea:focus { outline: none; border-color: #1a73e8; }
+.schedule-dates-wrap { margin-top: 8px; display: flex; gap: 16px; }
+.schedule-dates-wrap[hidden] { display: none; }
+.schedule-date-label { font-size: 13px; color: #5f6368; display: flex; flex-direction: column; gap: 4px; }
+.schedule-date-input {
+  font-family: inherit; font-size: 14px; color: #202124;
+  border: 1px solid #dadce0; border-radius: 4px; padding: 6px 8px;
+}
+.schedule-date-input:focus { outline: none; border-color: #1a73e8; }
 .status-line { color: #188038; font-size: 13px; min-height: 18px; padding: 0 24px; }
 
 /* Snackbar -- Gmail's real feedback pattern: a dark pill that slides up
