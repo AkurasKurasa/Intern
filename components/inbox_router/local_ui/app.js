@@ -30,12 +30,10 @@ const toolbarCount = document.getElementById("toolbarCount");
 const searchInput = document.getElementById("searchInput");
 const navInbox = document.getElementById("navInbox");
 const navStarred = document.getElementById("navStarred");
-const navColdEmail = document.getElementById("navColdEmail");
 const coldEmailListView = document.getElementById("coldEmailListView");
 const coldEmailDetailView = document.getElementById("coldEmailDetailView");
 const coldEmailRowList = document.getElementById("coldEmailRowList");
 const coldEmailEmptyState = document.getElementById("coldEmailEmptyState");
-const coldEmailCount = document.getElementById("coldEmailCount");
 const coldEmailToolbarCount = document.getElementById("coldEmailToolbarCount");
 const coldEmailTargetName = document.getElementById("coldEmailTargetName");
 const coldEmailTargetEmail = document.getElementById("coldEmailTargetEmail");
@@ -125,8 +123,6 @@ function setView(view) {
   navInbox.classList.toggle("nav-item-muted", view !== "inbox");
   navStarred.classList.toggle("nav-item-active", view === "starred");
   navStarred.classList.toggle("nav-item-muted", view !== "starred");
-  navColdEmail.classList.toggle("nav-item-active", view === "cold_email");
-  navColdEmail.classList.toggle("nav-item-muted", view !== "cold_email");
 
   // Switching sidebar sections always lands back on that section's list,
   // same as real Gmail -- never leaves a detail view open underneath a
@@ -254,7 +250,6 @@ async function loadColdEmailTargets() {
   } catch (e) {
     coldEmailTargets = [];
     coldEmailRowList.innerHTML = "";
-    coldEmailCount.textContent = "";
     coldEmailEmptyState.hidden = false;
     coldEmailEmptyState.textContent = "Can't reach the local server -- is it running? Try refreshing in a few seconds.";
   }
@@ -262,7 +257,6 @@ async function loadColdEmailTargets() {
 
 function renderColdEmailList() {
   coldEmailRowList.innerHTML = "";
-  coldEmailCount.textContent = coldEmailTargets.length > 0 ? String(coldEmailTargets.length) : "";
   coldEmailToolbarCount.textContent = coldEmailTargets.length > 0 ? `1-${coldEmailTargets.length} of ${coldEmailTargets.length}` : "";
   coldEmailEmptyState.hidden = coldEmailTargets.length > 0;
   if (coldEmailTargets.length === 0) {
@@ -442,7 +436,6 @@ document.getElementById("forwardPillBtn").addEventListener("click", () => select
 document.getElementById("sendBtn").addEventListener("click", sendPending);
 navInbox.addEventListener("click", () => setView("inbox"));
 navStarred.addEventListener("click", () => setView("starred"));
-navColdEmail.addEventListener("click", () => setView("cold_email"));
 document.getElementById("coldEmailRefreshBtn").addEventListener("click", loadColdEmailTargets);
 document.getElementById("coldEmailBackBtn").addEventListener("click", closeColdEmailTarget);
 coldEmailSendBtn.addEventListener("click", sendColdEmailPending);

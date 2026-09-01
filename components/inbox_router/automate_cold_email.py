@@ -122,15 +122,15 @@ def main():
         browser = p.chromium.launch(headless=args.headless)
         page = browser.new_page()
         page.goto(SERVER_URL)
-        # #navColdEmail is deliberately hidden from a human (direct
-        # instruction: "Remove it from the sidebar entirely... the Agent
-        # will find it itself") -- state="attached" instead of the
-        # default "visible" so this doesn't hang forever waiting for
-        # something that's never meant to become visible, and force=True
-        # on the click bypasses Playwright's own visibility/actionability
-        # check for the exact same reason.
-        page.wait_for_selector("#navColdEmail", state="attached")
-        page.click("#navColdEmail", force=True)
+        # There's no button or tab for Cold Email anywhere in this page's
+        # markup at all -- direct instruction: "if it's a cold email I
+        # want the Agent to reply on its own without a need for the Cold
+        # Email tab or label thing." A human never sees or clicks
+        # anything to reach this section, so neither does this script --
+        # it calls the page's own setView("cold_email") function
+        # directly, the exact same function a (removed) nav click used
+        # to call, just invoked as real JS instead of a DOM interaction.
+        page.evaluate("setView('cold_email')")
         page.wait_for_timeout(600)
 
         banner(1, "Working through the boss' task list")

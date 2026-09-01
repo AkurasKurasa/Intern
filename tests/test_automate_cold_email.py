@@ -85,12 +85,10 @@ def real_page_with_task_list(tmp_path):
             browser = p.chromium.launch(headless=True)
             page = browser.new_page()
             page.goto(f"http://127.0.0.1:{port}/")
-            # #navColdEmail is deliberately hidden from a human -- see
-            # index.html's own comment on the element. state="attached"
-            # + force=True are what a script (not a person) uses to reach
-            # it, matching how automate_cold_email.py itself does this.
-            page.wait_for_selector("#navColdEmail", state="attached")
-            page.click("#navColdEmail", force=True)
+            # No button or tab reaches Cold Email in this page's markup --
+            # matching automate_cold_email.py itself, this calls the
+            # page's own setView("cold_email") JS function directly.
+            page.evaluate("setView('cold_email')")
             page.wait_for_timeout(500)
             yield page, gmail
             browser.close()
@@ -186,6 +184,7 @@ class _FakePage:
     def wait_for_selector(self, sel, **kwargs): pass
     def click(self, sel, **kwargs): pass
     def wait_for_timeout(self, ms): pass
+    def evaluate(self, script): pass
 
 
 class _FakeBrowser:
