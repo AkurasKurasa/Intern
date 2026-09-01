@@ -4,6 +4,7 @@ const path = require("path");
 const fs = require("fs");
 const os = require("os");
 const readline = require("readline");
+const http = require("http");
 
 const REPO_ROOT = path.join(__dirname, "..");
 const BRIDGE_SCRIPT = path.join(REPO_ROOT, "app", "recorder_bridge.py");
@@ -113,9 +114,33 @@ let recorderIsRecording = false;
 
 let localServerProcess = null;
 
-function ensureLocalServerRunning(scriptPath) {
+// Real liveness check before spawning, not just "does THIS process think
+// it already started one." A stale local_server.py from a manual terminal
+// start, an earlier Electron session that didn't get cleaned up, or
+// anything else already bound to the port answers fine (SO_REUSEADDR lets
+// a second process bind the same port with no error at all) -- checking
+// only this process's own in-memory handle missed every one of those and
+// spawned a genuine duplicate every time, the exact bug that's repeatedly
+// caused two local_server.py processes to silently split traffic between
+// them. Mirrors automate_inbox.py's own ensure_server_running() -- same
+// real check, JS side.
+function isServerReachable(url) {
+  return new Promise((resolve) => {
+    const req = http.get(url, { timeout: 1000 }, (res) => {
+      res.resume();
+      resolve(true);
+    });
+    req.on("error", () => resolve(false));
+    req.on("timeout", () => { req.destroy(); resolve(false); });
+  });
+}
+
+async function ensureLocalServerRunning(scriptPath, url) {
   if (localServerProcess && localServerProcess.exitCode === null) {
-    return; // already running
+    return; // already running, spawned by this process
+  }
+  if (url && await isServerReachable(url)) {
+    return; // something else is already answering here -- leave it alone
   }
   const pythonExe = resolvePython();
   const fullPath = path.join(REPO_ROOT, scriptPath);
@@ -668,7 +693,7 @@ ipcMain.handle("capsules-set-emoji", (_evt, capsuleName, emoji) =>
 ipcMain.handle("capsules-create", (_evt, name, description) => createTask(name, description));
 ipcMain.handle("capsules-update", (_evt, name, updates) => updateCapsule(name, updates));
 ipcMain.handle("capsules-delete", (_evt, name) => deleteCapsule(name));
-ipcMain.handle("capsule-run", (_evt, capsuleName) => {
+ipcMain.handle("capsule-run", async (_evt, capsuleName) => {
   // kind="url" isn't a subprocess at all -- there's nothing for
   // recorder_bridge.py/Python to run, so this short-circuits before ever
   // reaching queueOrSend(). Scope #3's Inbox Dispatch page is deliberately
@@ -677,7 +702,7 @@ ipcMain.handle("capsule-run", (_evt, capsuleName) => {
   // running first, when the capsule declares one.
   const capsule = listCapsules().find((c) => c.name === capsuleName);
   if (capsule && capsule.kind === "url") {
-    if (capsule.local_server) ensureLocalServerRunning(capsule.local_server);
+    if (capsule.local_server) await ensureLocalServerRunning(capsule.local_server, capsule.url);
     if (capsule.url) shell.openExternal(capsule.url);
     return { opened: true };
   }
@@ -719,7 +744,7 @@ const TEST_MOCKUPS = {
 // launch-cold-email) per direct request -- one button now opens everything
 // relevant to the loaded task at once, instead of needing three separate
 // clicks to know about and press.
-ipcMain.handle("launch-test-tools", (_evt, capsuleName) => {
+ipcMain.handle("launch-test-tools", async (_evt, capsuleName) => {
   // Inbox Dispatch gets its own set: Practice Inbox and the real
   // schedule.txt log, on the SAME local server Play's own
   // automate_inbox.py run already starts (see ensureLocalServerRunning).
@@ -731,7 +756,7 @@ ipcMain.handle("launch-test-tools", (_evt, capsuleName) => {
   // now), but it still carries `url`/`local_server` purely for this button.
   const capsule = listCapsules().find((c) => c.name === capsuleName);
   if (capsule && capsule.local_server && capsule.url) {
-    ensureLocalServerRunning(capsule.local_server);
+    await ensureLocalServerRunning(capsule.local_server, capsule.url);
     const opened = [];
 
     shell.openExternal(`${capsule.url}practice/`);
@@ -915,11 +940,11 @@ ipcMain.handle("settings-save-api-key", (_evt, provider, apiKey) => {
 // The mini Play/Stop widget has no capsule-picker UI of its own -- Play
 // always means "run whatever's currently loaded in the main window's
 // Play panel," tracked via capsule-set-current above.
-ipcMain.handle("capsule-run-current", () => {
+ipcMain.handle("capsule-run-current", async () => {
   if (!currentCapsuleName) return;
   const capsule = listCapsules().find((c) => c.name === currentCapsuleName);
   if (capsule && capsule.kind === "url") {
-    if (capsule.local_server) ensureLocalServerRunning(capsule.local_server);
+    if (capsule.local_server) await ensureLocalServerRunning(capsule.local_server, capsule.url);
     if (capsule.url) shell.openExternal(capsule.url);
     return;
   }

@@ -336,20 +336,40 @@ class InboxRouter:
         self._save_history(history)
 
     def _update_history_entry(self, entry: dict) -> None:
+        """Updates the LATEST history row for this message_id -- matching
+        pending_entries()'s own "latest wins" dedup exactly. A message can
+        end up with more than one history row for the same id (routed,
+        never confirmed, then re-polled and routed again on a later
+        restart); updating only the FIRST match (the old behavior) meant
+        confirming/overriding silently patched a stale, possibly
+        already-confirmed row while the actually-current one -- the one
+        pending_entries() reports -- never changed, so a message could
+        never actually be confirmed once duplicate rows existed. Found
+        live: confirming mock-001 kept "succeeding" while it stayed
+        pending forever, traced to 6 history rows for that one id."""
         history = self._load_history()
+        last_match_index = None
         for i, existing in enumerate(history):
             if existing.get("message_id") == entry.get("message_id"):
-                history[i] = entry
-                self._save_history(history)
-                return
+                last_match_index = i
+        if last_match_index is not None:
+            history[last_match_index] = entry
+            self._save_history(history)
+            return
         history.append(entry)
         self._save_history(history)
 
     def _find_history_entry(self, message_id: str) -> Optional[dict]:
+        """Returns the LATEST history row for this message_id, same
+        "latest wins" rule as _update_history_entry()/pending_entries() --
+        see _update_history_entry()'s docstring for why returning the
+        first match (the old behavior) was wrong whenever duplicate rows
+        exist for one message."""
+        match = None
         for entry in self._load_history():
             if entry.get("message_id") == message_id:
-                return entry
-        return None
+                match = entry
+        return match
 
     def pending_entries(self) -> list:
         """Every history entry still awaiting a Confirm/Override -- exposed

@@ -218,6 +218,36 @@ class TestInboxRouterPollOnce:
         assert len(history) == 1
         assert history[0]["message_id"] == "i1"
 
+    def test_confirming_a_message_with_duplicate_stale_history_rows_actually_removes_it_from_pending(self, tmp_path):
+        """Live-found regression: a message polled and routed across
+        several separate server restarts can accumulate more than one
+        "pending" row in routed_history.json for the same message_id (one
+        real confirmed row from an earlier session, plus later stale
+        "pending" duplicates from re-polling). confirm_suggestion() used
+        to update only the FIRST matching row -- so confirming silently
+        patched an old, already-resolved row while the newest "pending"
+        duplicate (the one pending_entries() actually reports, "latest
+        wins") never changed, and the message could never actually be
+        confirmed. Found live: mock-001 had 6 history rows and stayed
+        "pending" no matter how many times it was confirmed."""
+        router = self._build(tmp_path, inbox=[_msg("i1", "stranger@x.com", "vendor call")])
+        router.poll_once()  # writes the one real, current history row
+
+        # Simulate the corrupted real-world state directly: several older
+        # "pending" duplicates for the same id, sitting BEFORE the real
+        # current row that poll_once() just wrote.
+        history_path = Path(router._history_path)
+        history = json.loads(history_path.read_text())["messages"]
+        current_row = history[-1]
+        assert current_row["message_id"] == "i1"
+        stale_duplicate = dict(current_row)
+        stale_duplicate["routed_at"] = "2026-08-01T00:00:00+00:00"
+        history_path.write_text(json.dumps({"messages": [stale_duplicate, stale_duplicate, current_row]}), encoding="utf-8")
+
+        assert any(e["message_id"] == "i1" for e in router.pending_entries())
+        router.confirm_suggestion("i1", "flag")
+        assert not any(e["message_id"] == "i1" for e in router.pending_entries())
+
     def test_confirm_reply_with_real_text_creates_one_draft_with_that_text(self, tmp_path):
         # No LLM involved: the draft's body is exactly the real text
         # passed in, nothing generated.
