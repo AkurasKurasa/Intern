@@ -100,9 +100,9 @@ class LLMClassifier:
         self.provider = provider
         self._llm_model = model_id or _DEFAULT_MODELS.get(provider, "")
         self._llm_client = None
-        self._init_provider(api_key, lmstudio_url)
+        self._init_provider(api_key, lmstudio_url, model_id)
 
-    def _init_provider(self, api_key: str, lmstudio_url: str) -> None:
+    def _init_provider(self, api_key: str, lmstudio_url: str, model_id: str = "") -> None:
         p = self.provider
         if p == "anthropic":
             if not _ANTHROPIC_OK:
@@ -125,7 +125,30 @@ class LLMClassifier:
         elif p == "lmstudio":
             if not _OPENAI_OK:
                 return
-            self._llm_client = _OpenAI(base_url=lmstudio_url, api_key="lm-studio")
+            # _DEFAULT_MODELS["lmstudio"] ("local-model") is a fixed
+            # placeholder that matches no real LM Studio model -- every
+            # classify() call was failing closed to "flag" even with a
+            # real model genuinely loaded, found live running the real
+            # classifier against a real, loaded model. LM Studio's own
+            # API needs the exact id of whatever's actually loaded right
+            # now, never a fixed name -- same fix already proven correct
+            # in cold_email_llm.py: ask LM Studio itself. Only done when
+            # no model_id was explicitly requested, so a caller who
+            # deliberately wants a specific one of several
+            # simultaneously-loaded models still gets exactly that one.
+            # Client construction and the dynamic lookup are one
+            # fail-closed unit, same as cold_email_llm.py: if LM Studio
+            # is unreachable at either step, stay on the placeholder
+            # rather than let __init__ raise.
+            try:
+                client = _OpenAI(base_url=lmstudio_url, api_key="lm-studio")
+                self._llm_client = client
+                if not model_id:
+                    models = client.models.list()
+                    if models.data:
+                        self._llm_model = models.data[0].id
+            except Exception:
+                pass  # stays the placeholder -- classify() still fails closed the same way
         # "none" or unknown provider -> self._llm_client stays None
 
     @property
