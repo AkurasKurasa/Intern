@@ -111,6 +111,7 @@ components/inbox_router/data/mock_state.json
 components/inbox_router/data/mock_drafts.json
 components/inbox_router/data/mock_calendar_events.json
 components/inbox_router/data/schedule.txt
+components/inbox_router/data/cold_email_state.json
 
 # Exported Electron build (electron-builder --dir output, copied to root
 # on request) — local build artifacts, never something to commit.
