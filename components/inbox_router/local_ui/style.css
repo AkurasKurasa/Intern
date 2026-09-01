@@ -76,6 +76,19 @@ body {
 .nav-item-active:not(:disabled):hover { background: #fce8e6; }
 .nav-item:disabled { cursor: not-allowed; }
 
+/* Custom labels (e.g. Cold Email) -- real Gmail has no built-in tab for
+   these, only user-created labels, shown below a "Labels" divider with a
+   small colored square swatch instead of the pill-shaped system icons
+   above, never mixed in among Inbox/Starred/Snoozed/Sent/Drafts. */
+.nav-section-label {
+  padding: 12px 20px 4px 24px; font-size: 11px; font-weight: 700;
+  letter-spacing: 0.4px; text-transform: uppercase; color: #80868b;
+}
+.nav-label-swatch {
+  width: 12px; height: 12px; border-radius: 2px; background: #1a73e8; flex-shrink: 0;
+}
+.nav-item-label.nav-item-active .nav-label-swatch { background: #d93025; }
+
 /* Main pane */
 .main-pane { flex: 1; min-width: 0; overflow-y: auto; }
 
