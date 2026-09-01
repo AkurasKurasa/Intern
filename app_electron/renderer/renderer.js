@@ -902,9 +902,30 @@ btnOpenLog.addEventListener("click", async () => {
    not a raw scan of data/demos/. Direct correction: "edit Save to to the
    specific workflows not some random data/demos/x" -- a folder that
    doesn't belong to any actual task is exactly what this used to allow.
-   Script-kind tasks (e.g. Scope #2) don't record via the Recorder at all,
-   so they're excluded here the same way findCapsuleForGroup() already
-   excludes them elsewhere. ─────────────────────────────────────────────── */
+   Script-kind tasks that don't record via the Recorder at all (e.g. Scope
+   #2's Sheet-to-Portal Matcher, which trains its own matcher in-process)
+   are excluded, the same pattern findCapsuleForGroup() already uses
+   elsewhere in this file -- but a script-kind capsule that DOES carry a
+   url (Inbox Dispatch) is exactly the web-recording case this dropdown
+   also needs to offer, so it's included alongside the agent-shaped ones.
+
+   Direct report after testing: "The only recording pathway is still
+   form_filling" -- traced to two real problems, not one. First, this
+   dropdown never listed Inbox Dispatch at all (fixed by the kind check
+   below). Second, and more load-bearing: selecting an option here only
+   ever set outDirInput's value (an output-folder string) -- it never
+   touched currentCapsuleName, the actual thing main.js's "recorder-start"
+   handler reads to decide trace_type="web" vs "form_filling". Whether a
+   web recording happens has always depended on a capsule being loaded
+   into the Play panel first, on a completely different tab, with nothing
+   in the Recorder panel showing or controlling that. Selecting an option
+   here now also loads that capsule into the Play panel for real (same
+   loadCapsuleIntoSlot() a Tasks-page click uses), which is what actually
+   keeps currentCapsuleName in sync -- so this dropdown is now the true,
+   visible control for "what am I recording," not just where it's saved.
+   ─────────────────────────────────────────────────────────────────────── */
+let recordableCapsulesCache = [];
+
 async function populateOutDirOptions() {
   let capsules = [];
   try {
@@ -916,17 +937,19 @@ async function populateOutDirOptions() {
   // (the Python-side WorkflowCapsule dataclass defaults kind="agent", but
   // this JS-side listCapsules() is a raw JSON read with no such default --
   // an entry with no "kind" key comes back as kind:undefined, never the
-  // literal string "agent"). Excluding the two real special kinds, the
-  // same pattern findCapsuleForGroup() already uses elsewhere in this
-  // file, is what correctly includes an undefined kind as agent-shaped.
-  const recordable = capsules.filter((c) => c.kind !== "script" && c.kind !== "url");
+  // literal string "agent"). Excluding "url"-kind (a pure external link,
+  // nothing to record) and plain script-kind capsules with no url is what
+  // correctly includes both an undefined (agent) kind and a script-kind
+  // capsule that also carries a url (a real web-recording target).
+  const recordable = capsules.filter((c) => c.kind !== "url" && (c.kind !== "script" || !!c.url));
+  recordableCapsulesCache = recordable;
   if (!recordable.length) return;
   const current = outDirInput.value;
   outDirInput.innerHTML = "";
   recordable.forEach((c) => {
     const opt = document.createElement("option");
     opt.value = `data/demos/${c.name}`;
-    opt.textContent = c.name;
+    opt.textContent = c.url ? `${c.name} (real page)` : c.name;
     outDirInput.appendChild(opt);
   });
   if (Array.from(outDirInput.options).some((o) => o.value === current)) {
@@ -934,6 +957,12 @@ async function populateOutDirOptions() {
   }
 }
 populateOutDirOptions();
+
+outDirInput.addEventListener("change", () => {
+  const idx = outDirInput.selectedIndex;
+  const capsule = recordableCapsulesCache[idx];
+  if (capsule) loadCapsuleIntoSlot(capsule);
+});
 
 // Tasks are shown as a grid of compact chips -- one per registered
 // capsule (agent-kind and script-kind alike), each a direct, clickable
