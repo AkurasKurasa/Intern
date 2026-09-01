@@ -45,6 +45,7 @@ DEFAULT_PORT = 8765
 _ALLOWED_ORIGIN_HOSTS = {"localhost", "127.0.0.1"}
 _UI_DIR = os.path.join(_THIS_DIR, "local_ui")
 _PRACTICE_UI_DIR = os.path.join(_THIS_DIR, "practice_inbox")
+_COLD_EMAIL_UI_DIR = os.path.join(_THIS_DIR, "cold_email")
 
 _STATIC_FILES = {
     "/": (_UI_DIR, "index.html", "text/html"),
@@ -53,6 +54,9 @@ _STATIC_FILES = {
     "/practice/": (_PRACTICE_UI_DIR, "index.html", "text/html"),
     "/practice/style.css": (_PRACTICE_UI_DIR, "style.css", "text/css"),
     "/practice/app.js": (_PRACTICE_UI_DIR, "app.js", "application/javascript"),
+    "/cold-email/": (_COLD_EMAIL_UI_DIR, "index.html", "text/html"),
+    "/cold-email/style.css": (_COLD_EMAIL_UI_DIR, "style.css", "text/css"),
+    "/cold-email/app.js": (_COLD_EMAIL_UI_DIR, "app.js", "application/javascript"),
 }
 
 
@@ -78,7 +82,7 @@ def _pick_provider() -> Tuple[str, str]:
     return "lmstudio", ""
 
 
-def build_router() -> InboxRouter:
+def build_router(gmail_client=None) -> InboxRouter:
     # Imported here, not at module level: router.py pulls in inbox_agent.py,
     # which does `import torch` at its own module level. That import alone
     # takes several seconds, so keeping it out of local_server.py's module
@@ -90,12 +94,21 @@ def build_router() -> InboxRouter:
     from routing_rules import RuleLayer
     from router import InboxRouter
 
-    gmail_client = get_gmail_client()
+    if gmail_client is None:
+        gmail_client = get_gmail_client()
     profile = PatternProfile()
     rule_layer = RuleLayer(profile)
     provider, api_key = _pick_provider()
     classifier = LLMClassifier(provider=provider, api_key=api_key)
     return InboxRouter(gmail_client, profile, rule_layer, classifier)
+
+
+def build_cold_email_sender(gmail_client=None):
+    from cold_email_sender import ColdEmailSender
+
+    if gmail_client is None:
+        gmail_client = get_gmail_client()
+    return ColdEmailSender(gmail_client)
 
 
 def _parse_action_body(body: bytes, required_keys) -> Tuple[dict, tuple]:
@@ -113,7 +126,8 @@ def _parse_action_body(body: bytes, required_keys) -> Tuple[dict, tuple]:
     return data, None
 
 
-def handle_request(method: str, path: str, body: bytes, router: InboxRouter, origin: str = None) -> Tuple[int, dict, bytes, str]:
+def handle_request(method: str, path: str, body: bytes, router: InboxRouter, origin: str = None,
+                    cold_email_sender=None) -> Tuple[int, dict, bytes, str]:
     """Pure request handler, separated from BaseHTTPRequestHandler so it's
     testable without opening a real socket. Returns
     (status_code, extra_headers, response_body_bytes, content_type)."""
@@ -204,10 +218,28 @@ def handle_request(method: str, path: str, body: bytes, router: InboxRouter, ori
             return 400, {}, err, "application/json"
         return 200, {}, json.dumps({"ok": True}).encode("utf-8"), "application/json"
 
+    if method == "GET" and path == "/cold-email/api/targets":
+        targets = cold_email_sender.list_pending_targets()
+        payload = json.dumps({"targets": [
+            {"name": t.name, "email": t.email, "context_line": t.context_line}
+            for t in targets
+        ]}).encode("utf-8")
+        return 200, {}, payload, "application/json"
+
+    if method == "POST" and path == "/cold-email/api/send":
+        data, error = _parse_action_body(body, ("email", "subject", "body"))
+        if error:
+            return error
+        draft_id = cold_email_sender.send_cold_email(data["email"], data["subject"], data["body"])
+        if not draft_id:
+            err = json.dumps({"error": "Type a subject and a message before sending."}).encode("utf-8")
+            return 400, {}, err, "application/json"
+        return 200, {}, json.dumps({"ok": True}).encode("utf-8"), "application/json"
+
     return 404, {}, json.dumps({"error": "Not found"}).encode("utf-8"), "application/json"
 
 
-def make_handler(router: InboxRouter):
+def make_handler(router: InboxRouter, cold_email_sender=None):
     class Handler(BaseHTTPRequestHandler):
         def log_message(self, format, *args):
             pass  # keep stdout quiet -- this is a background helper process
@@ -221,7 +253,8 @@ def make_handler(router: InboxRouter):
             self._respond("POST", self.path, body, self.headers.get("Origin"))
 
         def _respond(self, method, path, body, origin=None):
-            status, headers, payload, content_type = handle_request(method, path, body, router, origin=origin)
+            status, headers, payload, content_type = handle_request(
+                method, path, body, router, origin=origin, cold_email_sender=cold_email_sender)
             self.send_response(status)
             self.send_header("Content-Type", content_type)
             for k, v in headers.items():
@@ -245,8 +278,10 @@ def serve(port: int = DEFAULT_PORT) -> None:
         print(f"Could not start local server on port {port} (already running?): {exc}")
         return
     print(f"Inbox Dispatch local server listening on http://localhost:{port}/")
-    router = build_router()
-    httpd.RequestHandlerClass = make_handler(router)
+    gmail_client = get_gmail_client()
+    router = build_router(gmail_client)
+    cold_email_sender = build_cold_email_sender(gmail_client)
+    httpd.RequestHandlerClass = make_handler(router, cold_email_sender)
     httpd.serve_forever()
 
 

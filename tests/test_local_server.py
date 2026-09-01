@@ -22,6 +22,31 @@ from routing_rules import RuleLayer
 from router import InboxRouter
 import local_server as ls
 import reply_recorder
+from cold_email_sender import ColdEmailSender
+
+
+class _FakeGmailClientForColdEmail:
+    def __init__(self):
+        self.drafts = []
+
+    def create_draft(self, to, subject, body, thread_id=""):
+        draft_id = f"fake-cold-draft-{len(self.drafts) + 1}"
+        self.drafts.append({"to": to, "subject": subject, "body": body, "thread_id": thread_id})
+        return draft_id
+
+
+def _write_task_list(tmp_path, content):
+    path = tmp_path / "task_list.txt"
+    path.write_text(content, encoding="utf-8")
+    return str(path)
+
+
+def _build_cold_email_sender(tmp_path, content="Cold email: Q3 outreach\nDana Whitfield <dana@x.example.com>\n",
+                              gmail=None):
+    task_list_path = _write_task_list(tmp_path, content)
+    state_path = str(tmp_path / "cold_email_state.json")
+    return ColdEmailSender(gmail or _FakeGmailClientForColdEmail(), task_list_path=task_list_path,
+                            state_path=state_path)
 
 
 def _write_fixture(data_dir, inbox=None, sent=None):
@@ -291,6 +316,134 @@ class TestHandleRequestOverride:
 
         assert status == 200
         assert calendar.events == []
+
+
+class TestColdEmailRoutes:
+    def test_get_targets_lists_everyone_not_contacted(self, tmp_path):
+        router = _build_router(tmp_path)
+        sender = _build_cold_email_sender(tmp_path)
+        status, _headers, resp_body, _ct = ls.handle_request(
+            "GET", "/cold-email/api/targets", b"", router, cold_email_sender=sender)
+        assert status == 200
+        assert json.loads(resp_body) == {"targets": [
+            {"name": "Dana Whitfield", "email": "dana@x.example.com", "context_line": "Q3 outreach"},
+        ]}
+
+    def test_post_send_creates_draft_and_removes_target_from_pending_list(self, tmp_path):
+        router = _build_router(tmp_path)
+        gmail = _FakeGmailClientForColdEmail()
+        sender = _build_cold_email_sender(tmp_path, gmail=gmail)
+        body = json.dumps({"email": "dana@x.example.com", "subject": "Hi Dana",
+                            "body": "Reaching out about a partnership."}).encode("utf-8")
+        status, _headers, resp_body, _ct = ls.handle_request(
+            "POST", "/cold-email/api/send", body, router, cold_email_sender=sender)
+        assert status == 200
+        assert json.loads(resp_body) == {"ok": True}
+        assert gmail.drafts == [{"to": "dana@x.example.com", "subject": "Hi Dana",
+                                  "body": "Reaching out about a partnership.", "thread_id": ""}]
+
+        status2, _headers2, resp_body2, _ct2 = ls.handle_request(
+            "GET", "/cold-email/api/targets", b"", router, cold_email_sender=sender)
+        assert json.loads(resp_body2) == {"targets": []}
+
+    def test_post_send_with_blank_body_returns_400_and_creates_no_draft(self, tmp_path):
+        router = _build_router(tmp_path)
+        gmail = _FakeGmailClientForColdEmail()
+        sender = _build_cold_email_sender(tmp_path, gmail=gmail)
+        body = json.dumps({"email": "dana@x.example.com", "subject": "Hi Dana", "body": "   "}).encode("utf-8")
+        status, _headers, resp_body, _ct = ls.handle_request(
+            "POST", "/cold-email/api/send", body, router, cold_email_sender=sender)
+        assert status == 400
+        assert gmail.drafts == []
+
+    def test_cold_email_index_html_is_served(self, tmp_path):
+        router = _build_router(tmp_path)
+        status, _headers, body, content_type = ls.handle_request("GET", "/cold-email/", b"", router)
+        assert status == 200
+        assert content_type == "text/html"
+        assert b"<html" in body.lower()
+
+    def test_cold_email_style_css_is_served(self, tmp_path):
+        router = _build_router(tmp_path)
+        status, _headers, _body, content_type = ls.handle_request("GET", "/cold-email/style.css", b"", router)
+        assert status == 200
+        assert content_type == "text/css"
+
+    def test_cold_email_app_js_is_served(self, tmp_path):
+        router = _build_router(tmp_path)
+        status, _headers, body, content_type = ls.handle_request("GET", "/cold-email/app.js", b"", router)
+        assert status == 200
+        assert content_type == "application/javascript"
+        assert b"/cold-email/api" in body
+
+
+class TestColdEmailPageRealBrowser:
+    """Real-browser regression, matching TestScheduleSingleWhenField's own
+    pattern: proves the actual served page really talks to the actual
+    routes above, not just that the routes work in isolation."""
+
+    def test_sending_a_cold_email_creates_a_real_draft_through_the_real_page(self, tmp_path):
+        pytest.importorskip("playwright.sync_api")
+        from playwright.sync_api import sync_playwright
+
+        router = _build_router(tmp_path)
+        gmail = _FakeGmailClientForColdEmail()
+        sender = _build_cold_email_sender(tmp_path, gmail=gmail)
+        handler_cls = ls.make_handler(router, cold_email_sender=sender)
+        httpd = HTTPServer(("127.0.0.1", 0), handler_cls)
+        port = httpd.server_address[1]
+        thread = threading.Thread(target=httpd.serve_forever, daemon=True)
+        thread.start()
+        try:
+            with sync_playwright() as p:
+                browser = p.chromium.launch()
+                page = browser.new_page()
+                page.goto(f"http://127.0.0.1:{port}/cold-email/")
+                page.wait_for_selector("#rowList .row-item")
+                page.locator(".row-item").first.click()
+                page.wait_for_selector("#detailView:not([hidden])")
+                assert page.input_value("#subjectInput") == "Q3 outreach"
+                page.fill("#bodyInput", "Reaching out about a partnership.")
+                page.click("#sendBtn")
+                page.wait_for_timeout(300)
+                assert page.locator("#rowList .row-item").count() == 0
+                browser.close()
+        finally:
+            httpd.shutdown()
+            thread.join(timeout=5)
+
+        assert gmail.drafts == [{"to": "dana@x.example.com", "subject": "Q3 outreach",
+                                  "body": "Reaching out about a partnership.", "thread_id": ""}]
+
+    def test_sending_with_no_message_typed_is_refused_client_side(self, tmp_path):
+        pytest.importorskip("playwright.sync_api")
+        from playwright.sync_api import sync_playwright
+
+        router = _build_router(tmp_path)
+        gmail = _FakeGmailClientForColdEmail()
+        sender = _build_cold_email_sender(tmp_path, gmail=gmail)
+        handler_cls = ls.make_handler(router, cold_email_sender=sender)
+        httpd = HTTPServer(("127.0.0.1", 0), handler_cls)
+        port = httpd.server_address[1]
+        thread = threading.Thread(target=httpd.serve_forever, daemon=True)
+        thread.start()
+        try:
+            with sync_playwright() as p:
+                browser = p.chromium.launch()
+                page = browser.new_page()
+                page.goto(f"http://127.0.0.1:{port}/cold-email/")
+                page.wait_for_selector("#rowList .row-item")
+                page.locator(".row-item").first.click()
+                page.wait_for_selector("#detailView:not([hidden])")
+                page.click("#sendBtn")
+                page.wait_for_timeout(200)
+                assert "type a message" in page.eval_on_selector("#detailStatus", "el => el.textContent").lower()
+                browser.close()
+        finally:
+            httpd.shutdown()
+            thread.join(timeout=5)
+
+        assert gmail.drafts == []
 
 
 class TestBuildRouter:
