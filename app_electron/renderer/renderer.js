@@ -901,14 +901,21 @@ async function populateOutDirOptions() {
   } catch (e) {
     return;
   }
-  const recordable = capsules.filter((c) => c.kind === "agent");
+  // Registry entries omit "kind" entirely for the original agent shape
+  // (the Python-side WorkflowCapsule dataclass defaults kind="agent", but
+  // this JS-side listCapsules() is a raw JSON read with no such default --
+  // an entry with no "kind" key comes back as kind:undefined, never the
+  // literal string "agent"). Excluding the two real special kinds, the
+  // same pattern findCapsuleForGroup() already uses elsewhere in this
+  // file, is what correctly includes an undefined kind as agent-shaped.
+  const recordable = capsules.filter((c) => c.kind !== "script" && c.kind !== "url");
   if (!recordable.length) return;
   const current = outDirInput.value;
   outDirInput.innerHTML = "";
   recordable.forEach((c) => {
     const opt = document.createElement("option");
     opt.value = `data/demos/${c.name}`;
-    opt.textContent = `data/demos/${c.name}`;
+    opt.textContent = c.name;
     outDirInput.appendChild(opt);
   });
   if (Array.from(outDirInput.options).some((o) => o.value === current)) {
