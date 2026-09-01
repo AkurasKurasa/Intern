@@ -82,6 +82,15 @@ def test_send_cold_email_with_blank_body_is_a_no_op(tmp_path):
     assert not os.path.exists(state_path)
 
 
+def test_send_cold_email_to_someone_not_on_the_task_list_is_a_no_op(tmp_path):
+    gmail = _FakeGmailClient()
+    sender, state_path = _sender(tmp_path, _ONE_TARGET, gmail=gmail)
+    draft_id = sender.send_cold_email("nobody@not-on-the-list.example.com", "Hi", "A real message.")
+    assert draft_id == ""
+    assert gmail.drafts == []
+    assert not os.path.exists(state_path)
+
+
 def test_contacted_email_matching_is_case_insensitive(tmp_path):
     sender, state_path = _sender(tmp_path, _ONE_TARGET)
     with open(state_path, "w", encoding="utf-8") as f:

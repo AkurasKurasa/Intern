@@ -247,7 +247,7 @@ class InboxRouter:
                 except Exception as exc:
                     emit("inbox_log", line=f"Failed to create calendar event: {exc}", level="err")
         elif decision == "cold_email":
-            emit("inbox_log", line="Cold Email isn't implemented yet -- no action taken.", level="info")
+            emit("inbox_log", line="Cold Email is handled on its own page -- no action taken here.", level="info")
         elif decision == "flag" and message is not None:
             try:
                 self._gmail.apply_flag_label(message_id)
@@ -308,7 +308,7 @@ class InboxRouter:
                 except Exception as exc:
                     emit("inbox_log", line=f"Failed to create calendar event: {exc}", level="err")
         elif new_decision == "cold_email":
-            emit("inbox_log", line="Cold Email isn't implemented yet -- no action taken.", level="info")
+            emit("inbox_log", line="Cold Email is handled on its own page -- no action taken here.", level="info")
         elif new_decision == "flag" and message is not None:
             try:
                 self._gmail.apply_flag_label(message_id)

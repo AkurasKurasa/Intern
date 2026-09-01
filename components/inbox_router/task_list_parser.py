@@ -17,9 +17,11 @@ File format:
 
 A "Cold email:" heading starts a new section; every following
 "Name <email>" line until a blank line or a different heading belongs to
-that heading's context_line. A line inside a section that isn't a valid
-"Name <email>" line is skipped, not guessed at -- it does not end the
-section.
+that heading's context_line. A malformed line inside a section that does
+NOT end in a colon is skipped, not guessed at, and the section stays open.
+A malformed line that DOES end in a colon (e.g. a stray note) is treated
+as a different heading and ends the section -- it is never added as a
+target either way.
 """
 from __future__ import annotations
 

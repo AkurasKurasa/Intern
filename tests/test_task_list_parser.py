@@ -16,13 +16,29 @@ def _write(tmp_path, content):
     return str(path)
 
 
-def test_parses_the_committed_example_task_list():
-    targets = parse_cold_email_targets(DEFAULT_TASK_LIST_PATH)
+def test_parses_three_targets_from_the_standard_format(tmp_path):
+    path = _write(tmp_path,
+        "Cold email:\n"
+        "Dana Whitfield <dana.whitfield@northline.example.com>\n"
+        "Marcus Oyelaran <m.oyelaran@delridge.example.com>\n"
+        "Priya Ramaswami <priya@ramaswami-consulting.example.com>\n")
+    targets = parse_cold_email_targets(path)
     assert targets == [
         ColdEmailTarget(name="Dana Whitfield", email="dana.whitfield@northline.example.com", context_line=""),
         ColdEmailTarget(name="Marcus Oyelaran", email="m.oyelaran@delridge.example.com", context_line=""),
         ColdEmailTarget(name="Priya Ramaswami", email="priya@ramaswami-consulting.example.com", context_line=""),
     ]
+
+
+def test_the_committed_task_list_parses_to_well_formed_targets():
+    # Deliberately structural, not an exact-match: the real task_list.txt is
+    # meant to be edited by whoever uses this feature (the empty state on
+    # the Cold Email page tells them to), so this test must survive real edits.
+    targets = parse_cold_email_targets(DEFAULT_TASK_LIST_PATH)
+    assert len(targets) > 0
+    for t in targets:
+        assert t.name.strip() != ""
+        assert "@" in t.email
 
 
 def test_heading_with_context_text_becomes_the_pre_filled_subject(tmp_path):
@@ -46,6 +62,12 @@ def test_blank_line_ends_the_section(tmp_path):
 
 def test_a_different_heading_ends_the_section(tmp_path):
     path = _write(tmp_path, "Cold email:\nDana Whitfield <dana@x.example.com>\nOther section:\nMarcus Oyelaran <m@x.example.com>\n")
+    targets = parse_cold_email_targets(path)
+    assert targets == [ColdEmailTarget(name="Dana Whitfield", email="dana@x.example.com", context_line="")]
+
+
+def test_a_malformed_colon_terminated_line_also_ends_the_section(tmp_path):
+    path = _write(tmp_path, "Cold email:\nDana Whitfield <dana@x.example.com>\nFollow up soon:\nMarcus Oyelaran <m@x.example.com>\n")
     targets = parse_cold_email_targets(path)
     assert targets == [ColdEmailTarget(name="Dana Whitfield", email="dana@x.example.com", context_line="")]
 

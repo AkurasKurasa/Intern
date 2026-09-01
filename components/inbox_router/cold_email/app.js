@@ -12,6 +12,12 @@ const targetCount = document.getElementById("targetCount");
 const snackbar = document.getElementById("snackbar");
 const subjectInput = document.getElementById("subjectInput");
 const bodyInput = document.getElementById("bodyInput");
+const sendBtn = document.getElementById("sendBtn");
+
+function setStatus(message) {
+  detailStatus.textContent = message;
+  detailStatus.classList.toggle("is-error", message.startsWith("Error"));
+}
 
 function showSnackbar(message) {
   clearTimeout(snackbarTimer);
@@ -21,7 +27,7 @@ function showSnackbar(message) {
 }
 
 async function loadTargets() {
-  detailStatus.textContent = "";
+  setStatus("");
   try {
     const resp = await fetch("/cold-email/api/targets");
     if (!resp.ok) throw new Error(`Server returned ${resp.status}`);
@@ -31,6 +37,7 @@ async function loadTargets() {
   } catch (e) {
     targets = [];
     rowList.innerHTML = "";
+    targetCount.textContent = "";
     emptyState.hidden = false;
     emptyState.textContent = "Can't reach the local server -- is it running? Try refreshing in a few seconds.";
   }
@@ -66,7 +73,7 @@ function openTarget(email) {
   document.getElementById("detailTargetEmail").textContent = target.email;
   subjectInput.value = target.context_line || "";
   bodyInput.value = "";
-  detailStatus.textContent = "";
+  setStatus("");
   listView.hidden = true;
   detailView.hidden = false;
 }
@@ -80,27 +87,34 @@ function closeTarget() {
 async function sendPending() {
   if (!openEmail) return;
   if (!subjectInput.value.trim()) {
-    detailStatus.textContent = "Error: type a subject.";
+    setStatus("Error: type a subject.");
     subjectInput.focus();
     return;
   }
   if (!bodyInput.value.trim()) {
-    detailStatus.textContent = "Error: type a message.";
+    setStatus("Error: type a message.");
     bodyInput.focus();
     return;
   }
-  const resp = await fetch("/cold-email/api/send", {
-    method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email: openEmail, subject: subjectInput.value, body: bodyInput.value }),
-  });
-  if (!resp.ok) {
-    const err = await resp.json().catch(() => ({}));
-    detailStatus.textContent = `Error: ${err.error || "request failed"}`;
-    return;
+  sendBtn.disabled = true;
+  try {
+    const resp = await fetch("/cold-email/api/send", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: openEmail, subject: subjectInput.value, body: bodyInput.value }),
+    });
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({}));
+      setStatus(`Error: ${err.error || "request failed"}`);
+      return;
+    }
+    showSnackbar("Sent.");
+    await loadTargets();
+    closeTarget();
+  } catch (e) {
+    setStatus("Error: could not reach the server.");
+  } finally {
+    sendBtn.disabled = false;
   }
-  showSnackbar("Sent.");
-  await loadTargets();
-  closeTarget();
 }
 
 function escapeHtml(str) {

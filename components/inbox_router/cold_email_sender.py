@@ -39,6 +39,9 @@ class ColdEmailSender:
         body = (body or "").strip()
         if not subject or not body:
             return ""  # never draft empty/invented content
+        pending_emails = {t.email.strip().lower() for t in self.list_pending_targets()}
+        if email.strip().lower() not in pending_emails:
+            return ""  # not a known, still-pending target -- refuse silently, same no-op contract as blank content
         draft_id = self._gmail.create_draft(to=email, subject=subject, body=body, thread_id="")
         state = self._load_state()
         contacted = set(state.get("contacted_emails", []))
@@ -57,6 +60,6 @@ class ColdEmailSender:
             return {}
 
     def _save_state(self, state: dict) -> None:
-        os.makedirs(os.path.dirname(self._state_path), exist_ok=True)
+        os.makedirs(os.path.dirname(self._state_path) or ".", exist_ok=True)
         with open(self._state_path, "w", encoding="utf-8") as f:
             json.dump(state, f, indent=2)

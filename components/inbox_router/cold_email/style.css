@@ -95,6 +95,7 @@ body {
 .btn-primary { background: #d93025; color: #fff; }
 .btn-primary:hover { background: #b3261e; }
 .status-line { color: #188038; font-size: 13px; min-height: 18px; padding: 4px 0 0; }
+.status-line.is-error { color: #d93025; }
 
 .snackbar {
   position: fixed; left: 24px; bottom: 24px; z-index: 100;

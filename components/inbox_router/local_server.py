@@ -219,6 +219,9 @@ def handle_request(method: str, path: str, body: bytes, router: InboxRouter, ori
         return 200, {}, json.dumps({"ok": True}).encode("utf-8"), "application/json"
 
     if method == "GET" and path == "/cold-email/api/targets":
+        if cold_email_sender is None:
+            err = json.dumps({"error": "Cold Email is not available on this server."}).encode("utf-8")
+            return 503, {}, err, "application/json"
         targets = cold_email_sender.list_pending_targets()
         payload = json.dumps({"targets": [
             {"name": t.name, "email": t.email, "context_line": t.context_line}
@@ -227,10 +230,17 @@ def handle_request(method: str, path: str, body: bytes, router: InboxRouter, ori
         return 200, {}, payload, "application/json"
 
     if method == "POST" and path == "/cold-email/api/send":
+        if cold_email_sender is None:
+            err = json.dumps({"error": "Cold Email is not available on this server."}).encode("utf-8")
+            return 503, {}, err, "application/json"
         data, error = _parse_action_body(body, ("email", "subject", "body"))
         if error:
             return error
-        draft_id = cold_email_sender.send_cold_email(data["email"], data["subject"], data["body"])
+        try:
+            draft_id = cold_email_sender.send_cold_email(data["email"], data["subject"], data["body"])
+        except Exception as exc:
+            err = json.dumps({"error": f"Failed to send: {exc}"}).encode("utf-8")
+            return 500, {}, err, "application/json"
         if not draft_id:
             err = json.dumps({"error": "Type a subject and a message before sending."}).encode("utf-8")
             return 400, {}, err, "application/json"

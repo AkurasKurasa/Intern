@@ -356,6 +356,27 @@ class TestColdEmailRoutes:
         assert status == 400
         assert gmail.drafts == []
 
+    def test_post_send_twice_to_the_same_target_only_creates_one_draft(self, tmp_path):
+        router = _build_router(tmp_path)
+        gmail = _FakeGmailClientForColdEmail()
+        sender = _build_cold_email_sender(tmp_path, gmail=gmail)
+        body = json.dumps({"email": "dana@x.example.com", "subject": "Hi Dana",
+                            "body": "Reaching out about a partnership."}).encode("utf-8")
+        status1, _h1, _b1, _c1 = ls.handle_request(
+            "POST", "/cold-email/api/send", body, router, cold_email_sender=sender)
+        status2, _h2, _b2, _c2 = ls.handle_request(
+            "POST", "/cold-email/api/send", body, router, cold_email_sender=sender)
+        assert status1 == 200
+        assert status2 == 400  # dana is no longer pending after the first send
+        assert len(gmail.drafts) == 1
+
+    def test_get_targets_with_no_cold_email_sender_returns_503_not_a_crash(self, tmp_path):
+        router = _build_router(tmp_path)
+        status, _headers, resp_body, _ct = ls.handle_request(
+            "GET", "/cold-email/api/targets", b"", router)  # no cold_email_sender= passed
+        assert status == 503
+        assert json.loads(resp_body)["error"]
+
     def test_cold_email_index_html_is_served(self, tmp_path):
         router = _build_router(tmp_path)
         status, _headers, body, content_type = ls.handle_request("GET", "/cold-email/", b"", router)
