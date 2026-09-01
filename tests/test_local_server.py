@@ -377,31 +377,16 @@ class TestColdEmailRoutes:
         assert status == 503
         assert json.loads(resp_body)["error"]
 
-    def test_cold_email_index_html_is_served(self, tmp_path):
-        router = _build_router(tmp_path)
-        status, _headers, body, content_type = ls.handle_request("GET", "/cold-email/", b"", router)
-        assert status == 200
-        assert content_type == "text/html"
-        assert b"<html" in body.lower()
 
-    def test_cold_email_style_css_is_served(self, tmp_path):
-        router = _build_router(tmp_path)
-        status, _headers, _body, content_type = ls.handle_request("GET", "/cold-email/style.css", b"", router)
-        assert status == 200
-        assert content_type == "text/css"
-
-    def test_cold_email_app_js_is_served(self, tmp_path):
-        router = _build_router(tmp_path)
-        status, _headers, body, content_type = ls.handle_request("GET", "/cold-email/app.js", b"", router)
-        assert status == 200
-        assert content_type == "application/javascript"
-        assert b"/cold-email/api" in body
-
-
-class TestColdEmailPageRealBrowser:
+class TestColdEmailMergedIntoInboxDispatchRealBrowser:
     """Real-browser regression, matching TestScheduleSingleWhenField's own
     pattern: proves the actual served page really talks to the actual
-    routes above, not just that the routes work in isolation."""
+    /cold-email/api routes above, not just that the routes work in
+    isolation. Cold Email used to be its own page (/cold-email/) -- it's
+    now a real Gmail-style sidebar section merged directly into the main
+    Inbox Dispatch page ("/"), per direct request ("I'm trying to unify
+    the Email webpage"), so these tests navigate the nav item instead of a
+    separate URL."""
 
     def test_sending_a_cold_email_creates_a_real_draft_through_the_real_page(self, tmp_path):
         pytest.importorskip("playwright.sync_api")
@@ -419,15 +404,17 @@ class TestColdEmailPageRealBrowser:
             with sync_playwright() as p:
                 browser = p.chromium.launch()
                 page = browser.new_page()
-                page.goto(f"http://127.0.0.1:{port}/cold-email/")
-                page.wait_for_selector("#rowList .row-item")
-                page.locator(".row-item").first.click()
-                page.wait_for_selector("#detailView:not([hidden])")
-                assert page.input_value("#subjectInput") == "Q3 outreach"
-                page.fill("#bodyInput", "Reaching out about a partnership.")
-                page.click("#sendBtn")
+                page.goto(f"http://127.0.0.1:{port}/")
+                page.wait_for_selector("#navColdEmail")
+                page.click("#navColdEmail")
+                page.wait_for_selector("#coldEmailRowList .row-item")
+                page.locator("#coldEmailRowList .row-item").first.click()
+                page.wait_for_selector("#coldEmailDetailView:not([hidden])")
+                assert page.input_value("#coldEmailSubjectInput") == "Q3 outreach"
+                page.fill("#coldEmailBodyInput", "Reaching out about a partnership.")
+                page.click("#coldEmailSendBtn")
                 page.wait_for_timeout(300)
-                assert page.locator("#rowList .row-item").count() == 0
+                assert page.locator("#coldEmailRowList .row-item").count() == 0
                 browser.close()
         finally:
             httpd.shutdown()
@@ -452,19 +439,58 @@ class TestColdEmailPageRealBrowser:
             with sync_playwright() as p:
                 browser = p.chromium.launch()
                 page = browser.new_page()
-                page.goto(f"http://127.0.0.1:{port}/cold-email/")
-                page.wait_for_selector("#rowList .row-item")
-                page.locator(".row-item").first.click()
-                page.wait_for_selector("#detailView:not([hidden])")
-                page.click("#sendBtn")
+                page.goto(f"http://127.0.0.1:{port}/")
+                page.wait_for_selector("#navColdEmail")
+                page.click("#navColdEmail")
+                page.wait_for_selector("#coldEmailRowList .row-item")
+                page.locator("#coldEmailRowList .row-item").first.click()
+                page.wait_for_selector("#coldEmailDetailView:not([hidden])")
+                page.click("#coldEmailSendBtn")
                 page.wait_for_timeout(200)
-                assert "type a message" in page.eval_on_selector("#detailStatus", "el => el.textContent").lower()
+                assert "type a message" in page.eval_on_selector("#coldEmailStatus", "el => el.textContent").lower()
                 browser.close()
         finally:
             httpd.shutdown()
             thread.join(timeout=5)
 
         assert gmail.drafts == []
+
+    def test_switching_to_cold_email_and_back_to_inbox_shows_each_list_correctly(self, tmp_path):
+        """The merge's real point: one page, one sidebar, switching sections
+        never leaves the wrong list/detail view showing underneath."""
+        pytest.importorskip("playwright.sync_api")
+        from playwright.sync_api import sync_playwright
+
+        router = _build_router(tmp_path, inbox=[_msg("i1", "stranger@x.com", "vendor call")])
+        gmail = _FakeGmailClientForColdEmail()
+        sender = _build_cold_email_sender(tmp_path, gmail=gmail)
+        handler_cls = ls.make_handler(router, cold_email_sender=sender)
+        httpd = HTTPServer(("127.0.0.1", 0), handler_cls)
+        port = httpd.server_address[1]
+        thread = threading.Thread(target=httpd.serve_forever, daemon=True)
+        thread.start()
+        try:
+            with sync_playwright() as p:
+                browser = p.chromium.launch()
+                page = browser.new_page()
+                page.goto(f"http://127.0.0.1:{port}/")
+                page.wait_for_selector("#rowList .row-item")
+                assert page.is_visible("#listView")
+                assert not page.is_visible("#coldEmailListView")
+
+                page.click("#navColdEmail")
+                page.wait_for_selector("#coldEmailRowList .row-item")
+                assert not page.is_visible("#listView")
+                assert page.is_visible("#coldEmailListView")
+
+                page.click("#navInbox")
+                page.wait_for_selector("#rowList .row-item")
+                assert page.is_visible("#listView")
+                assert not page.is_visible("#coldEmailListView")
+                browser.close()
+        finally:
+            httpd.shutdown()
+            thread.join(timeout=5)
 
 
 class TestBuildRouter:

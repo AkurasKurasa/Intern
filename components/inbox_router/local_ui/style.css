@@ -197,6 +197,17 @@ body {
 .schedule-date-input:focus { outline: none; border-color: #1a73e8; }
 .schedule-date-hint { font-size: 12px; color: #80868b; padding-bottom: 8px; }
 .status-line { color: #188038; font-size: 13px; min-height: 18px; padding: 0 24px; }
+.status-line.is-error { color: #d93025; }
+
+/* Cold Email compose form (target's own detail view, merged into this page) */
+.detail-target-email { color: #5f6368; font-size: 13px; margin: 0 0 20px; }
+.compose-form { display: flex; flex-direction: column; gap: 12px; }
+.compose-label { font-size: 13px; color: #5f6368; display: flex; flex-direction: column; gap: 4px; }
+.compose-input {
+  font-family: inherit; font-size: 14px; color: #202124;
+  border: 1px solid #dadce0; border-radius: 4px; padding: 8px 10px;
+}
+.compose-input:focus { outline: none; border-color: #1a73e8; }
 
 /* Snackbar -- Gmail's real feedback pattern: a dark pill that slides up
    from the bottom-left after an action, instead of a persistent status

@@ -45,8 +45,12 @@ DEFAULT_PORT = 8765
 _ALLOWED_ORIGIN_HOSTS = {"localhost", "127.0.0.1"}
 _UI_DIR = os.path.join(_THIS_DIR, "local_ui")
 _PRACTICE_UI_DIR = os.path.join(_THIS_DIR, "practice_inbox")
-_COLD_EMAIL_UI_DIR = os.path.join(_THIS_DIR, "cold_email")
 
+# Cold Email used to be its own page (/cold-email/) -- merged directly into
+# local_ui/ as a real Gmail-style sidebar section instead, per direct
+# request ("I'm trying to unify the Email webpage"). Its two API routes
+# below are unchanged and still power that merged view; only the standalone
+# page's own static files are gone.
 _STATIC_FILES = {
     "/": (_UI_DIR, "index.html", "text/html"),
     "/style.css": (_UI_DIR, "style.css", "text/css"),
@@ -54,9 +58,6 @@ _STATIC_FILES = {
     "/practice/": (_PRACTICE_UI_DIR, "index.html", "text/html"),
     "/practice/style.css": (_PRACTICE_UI_DIR, "style.css", "text/css"),
     "/practice/app.js": (_PRACTICE_UI_DIR, "app.js", "application/javascript"),
-    "/cold-email/": (_COLD_EMAIL_UI_DIR, "index.html", "text/html"),
-    "/cold-email/style.css": (_COLD_EMAIL_UI_DIR, "style.css", "text/css"),
-    "/cold-email/app.js": (_COLD_EMAIL_UI_DIR, "app.js", "application/javascript"),
 }
 
 

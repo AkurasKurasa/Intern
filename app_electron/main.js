@@ -720,13 +720,15 @@ const TEST_MOCKUPS = {
 // relevant to the loaded task at once, instead of needing three separate
 // clicks to know about and press.
 ipcMain.handle("launch-test-tools", (_evt, capsuleName) => {
-  // Inbox Dispatch gets its own full set: Practice Inbox, the real
-  // schedule.txt log, and the Cold Email page, all on the SAME local
-  // server Play's own automate_inbox.py run already starts (see
-  // ensureLocalServerRunning). Checked by `local_server` alone, not
-  // `kind === "url"` -- Inbox Dispatch's kind is "script" (Play actually
-  // clicks through the page now), but it still carries `url`/`local_server`
-  // purely for this button.
+  // Inbox Dispatch gets its own set: Practice Inbox and the real
+  // schedule.txt log, on the SAME local server Play's own
+  // automate_inbox.py run already starts (see ensureLocalServerRunning).
+  // Cold Email used to be a third destination here (its own page) -- it's
+  // now merged directly into the main Inbox Dispatch page itself as a
+  // sidebar section, so there's no separate URL to open for it anymore.
+  // Checked by `local_server` alone, not `kind === "url"` -- Inbox
+  // Dispatch's kind is "script" (Play actually clicks through the page
+  // now), but it still carries `url`/`local_server` purely for this button.
   const capsule = listCapsules().find((c) => c.name === capsuleName);
   if (capsule && capsule.local_server && capsule.url) {
     ensureLocalServerRunning(capsule.local_server);
@@ -744,9 +746,6 @@ ipcMain.handle("launch-test-tools", (_evt, capsuleName) => {
     const scheduleChild = spawn("notepad.exe", [schedulePath], { detached: true, stdio: "ignore" });
     scheduleChild.unref();
     opened.push("schedule.txt");
-
-    shell.openExternal(`${capsule.url}cold-email/`);
-    opened.push("cold email");
 
     return { ok: true, opened };
   }

@@ -2,10 +2,16 @@
 let pendingEmails = [];
 let openMessageId = null;
 let searchQuery = "";
-let currentView = "inbox"; // "inbox" | "starred"
+let currentView = "inbox"; // "inbox" | "starred" | "cold_email"
 let selectedIds = new Set();
 let lastVisibleIds = [];
 let snackbarTimer = null;
+
+// Cold Email -- merged into this page as its own sidebar section (real
+// Gmail-style, like Inbox/Starred) instead of living on a separate page,
+// per direct request ("I'm trying to unify the Email webpage").
+let coldEmailTargets = [];
+let openColdEmailTarget = null;
 
 let starredIds = new Set();
 try {
@@ -24,6 +30,19 @@ const toolbarCount = document.getElementById("toolbarCount");
 const searchInput = document.getElementById("searchInput");
 const navInbox = document.getElementById("navInbox");
 const navStarred = document.getElementById("navStarred");
+const navColdEmail = document.getElementById("navColdEmail");
+const coldEmailListView = document.getElementById("coldEmailListView");
+const coldEmailDetailView = document.getElementById("coldEmailDetailView");
+const coldEmailRowList = document.getElementById("coldEmailRowList");
+const coldEmailEmptyState = document.getElementById("coldEmailEmptyState");
+const coldEmailCount = document.getElementById("coldEmailCount");
+const coldEmailToolbarCount = document.getElementById("coldEmailToolbarCount");
+const coldEmailTargetName = document.getElementById("coldEmailTargetName");
+const coldEmailTargetEmail = document.getElementById("coldEmailTargetEmail");
+const coldEmailSubjectInput = document.getElementById("coldEmailSubjectInput");
+const coldEmailBodyInput = document.getElementById("coldEmailBodyInput");
+const coldEmailStatus = document.getElementById("coldEmailStatus");
+const coldEmailSendBtn = document.getElementById("coldEmailSendBtn");
 const selectAllCheckbox = document.getElementById("selectAllCheckbox");
 const bulkBar = document.getElementById("bulkBar");
 const bulkCount = document.getElementById("bulkCount");
@@ -106,7 +125,24 @@ function setView(view) {
   navInbox.classList.toggle("nav-item-muted", view !== "inbox");
   navStarred.classList.toggle("nav-item-active", view === "starred");
   navStarred.classList.toggle("nav-item-muted", view !== "starred");
-  renderList();
+  navColdEmail.classList.toggle("nav-item-active", view === "cold_email");
+  navColdEmail.classList.toggle("nav-item-muted", view !== "cold_email");
+
+  // Switching sidebar sections always lands back on that section's list,
+  // same as real Gmail -- never leaves a detail view open underneath a
+  // different section.
+  closeMessage();
+  closeColdEmailTarget();
+
+  if (view === "cold_email") {
+    listView.hidden = true;
+    coldEmailListView.hidden = false;
+    loadColdEmailTargets();
+  } else {
+    listView.hidden = false;
+    coldEmailListView.hidden = true;
+    renderList();
+  }
 }
 
 function renderList() {
@@ -198,6 +234,105 @@ function closeMessage() {
   replyBody.value = "";
   detailView.hidden = true;
   listView.hidden = false;
+}
+
+// ── Cold Email (merged into this page's own sidebar section) ────────────
+
+function setColdEmailStatus(message) {
+  coldEmailStatus.textContent = message;
+  coldEmailStatus.classList.toggle("is-error", message.startsWith("Error"));
+}
+
+async function loadColdEmailTargets() {
+  setColdEmailStatus("");
+  try {
+    const resp = await fetch("/cold-email/api/targets");
+    if (!resp.ok) throw new Error(`Server returned ${resp.status}`);
+    const data = await resp.json();
+    coldEmailTargets = data.targets || [];
+    renderColdEmailList();
+  } catch (e) {
+    coldEmailTargets = [];
+    coldEmailRowList.innerHTML = "";
+    coldEmailCount.textContent = "";
+    coldEmailEmptyState.hidden = false;
+    coldEmailEmptyState.textContent = "Can't reach the local server -- is it running? Try refreshing in a few seconds.";
+  }
+}
+
+function renderColdEmailList() {
+  coldEmailRowList.innerHTML = "";
+  coldEmailCount.textContent = coldEmailTargets.length > 0 ? String(coldEmailTargets.length) : "";
+  coldEmailToolbarCount.textContent = coldEmailTargets.length > 0 ? `1-${coldEmailTargets.length} of ${coldEmailTargets.length}` : "";
+  coldEmailEmptyState.hidden = coldEmailTargets.length > 0;
+  if (coldEmailTargets.length === 0) {
+    coldEmailEmptyState.textContent = "Nobody left on the task list. Add names to data/task_list.txt.";
+  }
+  coldEmailTargets.forEach((target) => {
+    const li = document.createElement("li");
+    li.className = "row-item";
+    li.innerHTML = `
+      <span class="row-sender">${escapeHtml(target.name)}</span>
+      <span class="row-snippet">
+        <span class="row-subject">${escapeHtml(target.email)}</span>
+        <span class="row-preview"> - ${escapeHtml(target.context_line || "")}</span>
+      </span>
+    `;
+    li.addEventListener("click", () => openColdEmailDetail(target.email));
+    coldEmailRowList.appendChild(li);
+  });
+}
+
+function openColdEmailDetail(email) {
+  const target = coldEmailTargets.find((t) => t.email === email);
+  if (!target) return;
+  openColdEmailTarget = email;
+  coldEmailTargetName.textContent = target.name;
+  coldEmailTargetEmail.textContent = target.email;
+  coldEmailSubjectInput.value = target.context_line || "";
+  coldEmailBodyInput.value = "";
+  setColdEmailStatus("");
+  coldEmailListView.hidden = true;
+  coldEmailDetailView.hidden = false;
+}
+
+function closeColdEmailTarget() {
+  openColdEmailTarget = null;
+  coldEmailListView.hidden = false;
+  coldEmailDetailView.hidden = true;
+}
+
+async function sendColdEmailPending() {
+  if (!openColdEmailTarget) return;
+  if (!coldEmailSubjectInput.value.trim()) {
+    setColdEmailStatus("Error: type a subject.");
+    coldEmailSubjectInput.focus();
+    return;
+  }
+  if (!coldEmailBodyInput.value.trim()) {
+    setColdEmailStatus("Error: type a message.");
+    coldEmailBodyInput.focus();
+    return;
+  }
+  coldEmailSendBtn.disabled = true;
+  try {
+    const resp = await fetch("/cold-email/api/send", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: openColdEmailTarget, subject: coldEmailSubjectInput.value, body: coldEmailBodyInput.value }),
+    });
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({}));
+      setColdEmailStatus(`Error: ${err.error || "request failed"}`);
+      return;
+    }
+    showSnackbar("Sent.");
+    await loadColdEmailTargets();
+    closeColdEmailTarget();
+  } catch (e) {
+    setColdEmailStatus("Error: could not reach the server.");
+  } finally {
+    coldEmailSendBtn.disabled = false;
+  }
 }
 
 // Reply/Forward/Schedule need real typed content first -- clicking the
@@ -294,7 +429,9 @@ function escapeHtml(str) {
   return div.innerHTML;
 }
 
-document.getElementById("refreshBtn").addEventListener("click", loadInbox);
+document.getElementById("refreshBtn").addEventListener("click", () => {
+  if (currentView === "cold_email") loadColdEmailTargets(); else loadInbox();
+});
 document.getElementById("toolbarRefreshBtn").addEventListener("click", loadInbox);
 document.getElementById("backBtn").addEventListener("click", closeMessage);
 document.getElementById("archiveBtn").addEventListener("click", () => performDecision("leave_alone"));
@@ -305,6 +442,10 @@ document.getElementById("forwardPillBtn").addEventListener("click", () => select
 document.getElementById("sendBtn").addEventListener("click", sendPending);
 navInbox.addEventListener("click", () => setView("inbox"));
 navStarred.addEventListener("click", () => setView("starred"));
+navColdEmail.addEventListener("click", () => setView("cold_email"));
+document.getElementById("coldEmailRefreshBtn").addEventListener("click", loadColdEmailTargets);
+document.getElementById("coldEmailBackBtn").addEventListener("click", closeColdEmailTarget);
+coldEmailSendBtn.addEventListener("click", sendColdEmailPending);
 selectAllCheckbox.addEventListener("change", () => {
   if (selectAllCheckbox.checked) {
     lastVisibleIds.forEach((id) => selectedIds.add(id));
