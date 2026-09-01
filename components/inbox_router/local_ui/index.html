@@ -89,15 +89,15 @@
           <span class="nav-label">More</span>
         </button>
 
-        <!-- Real Gmail has no built-in "Cold Email" tab -- this is a
-             custom LABEL, the same mechanism a real Gmail user would use
-             to make their own category, styled the way Gmail actually
-             shows custom labels: a "Labels" divider, then a small colored
-             square swatch instead of the pill-shaped icons above, not
-             mixed in among the built-in system views. -->
-        <div class="nav-section-label">Labels</div>
-        <button id="navColdEmail" class="nav-item nav-item-muted nav-item-label">
-          <span class="nav-icon nav-label-swatch" aria-hidden="true"></span>
+        <!-- Real Gmail has no built-in "Cold Email" tab, and it isn't a
+             human-clickable label either -- direct instruction: "Remove
+             it from the sidebar entirely... the Agent will find it
+             itself." A human never sees or clicks this; it exists purely
+             so automate_cold_email.py can navigate to the real Cold
+             Email section itself (via a forced click, since a hidden
+             element isn't normally actionable), the same way that
+             script already drives every other part of this page. -->
+        <button id="navColdEmail" class="nav-item nav-item-muted" hidden>
           <span class="nav-label">Cold Email</span>
           <span class="nav-count" id="coldEmailCount"></span>
         </button>

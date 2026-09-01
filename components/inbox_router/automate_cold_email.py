@@ -122,8 +122,15 @@ def main():
         browser = p.chromium.launch(headless=args.headless)
         page = browser.new_page()
         page.goto(SERVER_URL)
-        page.wait_for_selector("#navColdEmail")
-        page.click("#navColdEmail")
+        # #navColdEmail is deliberately hidden from a human (direct
+        # instruction: "Remove it from the sidebar entirely... the Agent
+        # will find it itself") -- state="attached" instead of the
+        # default "visible" so this doesn't hang forever waiting for
+        # something that's never meant to become visible, and force=True
+        # on the click bypasses Playwright's own visibility/actionability
+        # check for the exact same reason.
+        page.wait_for_selector("#navColdEmail", state="attached")
+        page.click("#navColdEmail", force=True)
         page.wait_for_timeout(600)
 
         banner(1, "Working through the boss' task list")
