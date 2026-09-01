@@ -56,9 +56,10 @@ def _flush_safe_print(text: str) -> None:
         pass
 
 
-def print_countdown(seconds: int = 5) -> None:
+def print_countdown(seconds: int = 5,
+                     message: str = "Starting Inbox Dispatch -- opening a real browser to click through it.") -> None:
     _flush_safe_print("COUNTDOWN_BEGIN")
-    _flush_safe_print("Starting Inbox Dispatch -- opening a real browser to click through it.")
+    _flush_safe_print(message)
     for i in range(seconds, 0, -1):
         _flush_safe_print(f"COUNTDOWN {i}")
         time.sleep(1)
