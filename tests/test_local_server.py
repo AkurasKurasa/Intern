@@ -512,3 +512,86 @@ class TestModuleImportStaysLight:
             f"importing local_server pulled in torch -- "
             f"stdout={result.stdout!r} stderr={result.stderr!r}"
         )
+
+
+class TestScheduleSingleWhenField:
+    """Regression + coverage for collapsing Schedule's two datetime-local
+    fields (Starts/Ends) into one. A human deciding to schedule something
+    only ever picks one moment ("schedule this for 4pm") -- asking for a
+    second, separate end time made the UI ask a question nobody actually
+    has an answer to when they're reading an email. The end time is now
+    computed client-side (app.js's addMinutes()) as start + 30 minutes,
+    never typed by the human."""
+
+    def test_picking_one_when_value_creates_a_30_minute_calendar_event(self, tmp_path):
+        pytest.importorskip("playwright.sync_api")
+        from playwright.sync_api import sync_playwright
+
+        calendar = FakeCalendarClient()
+        router = _build_router(tmp_path, inbox=[_msg("i1", "boss@x.com", "Kickoff call")],
+                                calendar_client=calendar)
+        handler_cls = ls.make_handler(router)
+        httpd = HTTPServer(("127.0.0.1", 0), handler_cls)
+        port = httpd.server_address[1]
+        thread = threading.Thread(target=httpd.serve_forever, daemon=True)
+        thread.start()
+        try:
+            with sync_playwright() as p:
+                browser = p.chromium.launch()
+                page = browser.new_page()
+                page.goto(f"http://127.0.0.1:{port}/")
+                page.wait_for_selector("#rowList .row-item")
+                page.locator(".row-item").first.click()
+                page.wait_for_selector("#scheduleBtn")
+                page.click("#scheduleBtn")
+                page.wait_for_selector("#scheduleDatesWrap:not([hidden])")
+                # Exactly one datetime field is shown now -- confirms the old
+                # two-field Starts/Ends form is actually gone, not just that
+                # a new field happens to also work.
+                assert page.locator("#scheduleDatesWrap input[type=datetime-local]").count() == 1
+                page.fill("#eventWhen", "2026-09-03T14:00")
+                page.fill("#replyBody", "Kickoff call with the client")
+                page.click("#sendBtn")
+                page.wait_for_timeout(300)
+                browser.close()
+        finally:
+            httpd.shutdown()
+            thread.join(timeout=5)
+
+        assert len(calendar.events) == 1
+        event = calendar.events[0]
+        assert event["start"] == "2026-09-03T14:00"
+        assert event["end"] == "2026-09-03T14:30"
+
+    def test_leaving_when_empty_refuses_to_send(self, tmp_path):
+        pytest.importorskip("playwright.sync_api")
+        from playwright.sync_api import sync_playwright
+
+        calendar = FakeCalendarClient()
+        router = _build_router(tmp_path, inbox=[_msg("i1", "boss@x.com", "Kickoff call")],
+                                calendar_client=calendar)
+        handler_cls = ls.make_handler(router)
+        httpd = HTTPServer(("127.0.0.1", 0), handler_cls)
+        port = httpd.server_address[1]
+        thread = threading.Thread(target=httpd.serve_forever, daemon=True)
+        thread.start()
+        try:
+            with sync_playwright() as p:
+                browser = p.chromium.launch()
+                page = browser.new_page()
+                page.goto(f"http://127.0.0.1:{port}/")
+                page.wait_for_selector("#rowList .row-item")
+                page.locator(".row-item").first.click()
+                page.wait_for_selector("#scheduleBtn")
+                page.click("#scheduleBtn")
+                page.wait_for_selector("#scheduleDatesWrap:not([hidden])")
+                page.fill("#replyBody", "Kickoff call with the client")
+                page.click("#sendBtn")
+                page.wait_for_timeout(200)
+                assert "pick when" in page.eval_on_selector("#detailStatus", "el => el.textContent").lower()
+                browser.close()
+        finally:
+            httpd.shutdown()
+            thread.join(timeout=5)
+
+        assert calendar.events == []

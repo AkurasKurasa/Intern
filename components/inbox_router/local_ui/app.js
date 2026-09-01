@@ -32,8 +32,8 @@ const snackbar = document.getElementById("snackbar");
 const replyBoxWrap = document.getElementById("replyBoxWrap");
 const replyBody = document.getElementById("replyBody");
 const scheduleDatesWrap = document.getElementById("scheduleDatesWrap");
-const eventStart = document.getElementById("eventStart");
-const eventEnd = document.getElementById("eventEnd");
+const eventWhen = document.getElementById("eventWhen");
+const EVENT_DEFAULT_DURATION_MINUTES = 30;
 const forwardToWrap = document.getElementById("forwardToWrap");
 const forwardTo = document.getElementById("forwardTo");
 
@@ -183,8 +183,7 @@ function openMessage(messageId) {
   document.getElementById("detailDecision").textContent = email.decision || "";
   replyBody.value = "";
   replyBody.name = email.message_id;
-  eventStart.value = "";
-  eventEnd.value = "";
+  eventWhen.value = "";
   forwardTo.value = "";
   replyBoxWrap.hidden = true;
   scheduleDatesWrap.hidden = true;
@@ -243,6 +242,18 @@ async function performDecision(decision, replyBodyText = "", startVal = "", endV
   closeMessage();
 }
 
+// The human only ever picks one moment -- a start time and a duration is
+// two decisions for something that's really one ("schedule this for 4pm").
+// The end time Intern's own Calendar event needs is derived here, not
+// asked for, same as how Reply/Forward ask for exactly one thing each.
+function addMinutes(datetimeLocalValue, minutes) {
+  if (!datetimeLocalValue) return "";
+  const d = new Date(datetimeLocalValue);
+  d.setMinutes(d.getMinutes() + minutes);
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
 function sendPending() {
   if (!pendingDecision) return;
   if (pendingDecision === "forward" && !forwardTo.value.trim()) {
@@ -250,7 +261,14 @@ function sendPending() {
     forwardTo.focus();
     return;
   }
-  performDecision(pendingDecision, replyBody.value, eventStart.value, eventEnd.value, forwardTo.value);
+  if (pendingDecision === "schedule" && !eventWhen.value) {
+    detailStatus.textContent = "Error: pick when this should happen.";
+    eventWhen.focus();
+    return;
+  }
+  const startVal = pendingDecision === "schedule" ? eventWhen.value : "";
+  const endVal = pendingDecision === "schedule" ? addMinutes(eventWhen.value, EVENT_DEFAULT_DURATION_MINUTES) : "";
+  performDecision(pendingDecision, replyBody.value, startVal, endVal, forwardTo.value);
 }
 
 async function confirmSelected() {

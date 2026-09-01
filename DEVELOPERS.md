@@ -823,6 +823,8 @@ waiting on them.
 
   Full suite: 1555 passed, 9 skipped, 0 failed. Commit `74120019` on this branch.
 
+  **Extended 2026-09-01 — Schedule's two-field form collapsed to one.** Direct user feedback: "when we schedule we manually do these things by hand: 'I should schedule this person for 4am on X'" — a human deciding to schedule something makes exactly one decision, a moment in time, never a separate duration. Asking for Starts *and* Ends (`#eventStart`/`#eventEnd`) made the form ask a question nobody reading an email actually has an answer to. Replaced with one `#eventWhen` field; the end time is now computed client-side in `app.js` (`addMinutes(value, 30)`) as start + 30 minutes and sent to the existing, unchanged `/api/confirm`/`/api/override` backend — `event_start`/`event_end` still travel over the wire exactly as before, so no backend or `router.py`/`calendar_client.py` change was needed. `sendPending()` now also refuses to send with no time picked, mirroring the existing Forward-needs-a-recipient guard. Two new real-browser Playwright tests (`tests/test_local_server.py::TestScheduleSingleWhenField`) confirm exactly one datetime field renders and that a picked "when" produces a real 30-minute Calendar event. Full suite: 1560 passed, 9 skipped, 0 failed.
+
 - [ ] `scope3_email_triage` *(superseded framing — predates the concrete
   shape above)*: the very original bare stub, a GUI-demonstration-based
   triage system (watch UIA/screen state the way Scope #1/#2 do). Still a
