@@ -90,9 +90,23 @@ def ensure_server_running(timeout_s: float = 20.0) -> subprocess.Popen | None:
     raise SystemExit(f"local_server.py didn't come up within {timeout_s:.0f}s")
 
 
+# Decisions that need real human-typed content (a reply, a forward, a
+# schedule note) can never be auto-confirmed here -- this script has no
+# real text to type, and confirming with none would either create an
+# empty Gmail draft or an empty schedule note, defeating the whole point
+# of the text box a human types into on the real page. cold_email has no
+# control on this page at all -- it's not a reaction to an existing
+# email, it lives on its own separate page. Only leave_alone/flag can be
+# confirmed with a single real click, since neither needs typed content --
+# clicking the same real icon a human would click for each.
+NEEDS_HUMAN_TEXT = {"reply", "forward", "schedule", "cold_email"}
+IMMEDIATE_ICON = {"leave_alone": "#archiveBtn", "flag": "#flagBtn"}
+
+
 def process_one(page, commit: bool, index: int, skipped: int = 0):
     """Reads one pending row off the real DOM, opens it, prints the real
-    decision + rationale, then clicks Confirm for real if --commit.
+    decision + rationale, then clicks the real icon for that decision
+    (Archive for leave_alone, the flag star for flag) if --commit.
     Returns a result dict, or None once the inbox is empty.
 
     Confirming removes a row from the list, so committed runs read row
@@ -102,13 +116,10 @@ def process_one(page, commit: bool, index: int, skipped: int = 0):
     removes or skips anything, so it reads row `index` instead, advancing
     through the list without ever changing it.
 
-    A "reply"/"forward" decision is never auto-confirmed here, commit or
-    not -- this script has no real reply text to type, and confirming
-    with none would silently create an empty Gmail draft and skip
-    recording a training example, defeating the whole point of the
-    reply textbox a human types into on the real page. Those are left
-    pending -- in place, not removed -- for a human to actually open and
-    answer themselves."""
+    Reply/forward/schedule/cold_email are never auto-confirmed here,
+    commit or not -- see NEEDS_HUMAN_TEXT above. Those are left pending --
+    in place, not removed -- for a human to actually open and answer
+    themselves."""
     row_index = skipped if commit else index
     row = page.locator(".row-item").nth(row_index)
     if row.count() == 0:
@@ -127,11 +138,12 @@ def process_one(page, commit: bool, index: int, skipped: int = 0):
     print(f"    decided: {decision}")
     print(f"    because: {rationale}")
 
-    if decision in ("reply", "forward"):
+    if decision in NEEDS_HUMAN_TEXT:
         page.click("#backBtn")
-        outcome = "left pending -- needs a real reply typed by a human"
+        outcome = ("left pending -- needs a real reply typed by a human" if decision in ("reply", "forward")
+                    else "left pending -- needs real content typed by a human")
     elif commit:
-        page.click("#confirmBtn")
+        page.click(IMMEDIATE_ICON[decision])
         page.wait_for_selector("#listView:not([hidden])")
         outcome = "confirmed"
     else:

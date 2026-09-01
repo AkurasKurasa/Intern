@@ -161,16 +161,17 @@ body {
   white-space: pre-wrap; font-family: inherit; font-size: 14px;
   background: #fff; padding: 0 4px 16px;
 }
-.reply-bar {
-  margin-top: 16px; padding-top: 16px; border-top: 1px solid #f1f1f1;
+.decision-hint { margin-top: 16px; font-size: 14px; color: #5f6368; }
+.reply-forward-bar { display: flex; gap: 8px; margin-top: 12px; }
+.btn-pill {
+  background: #fff; border: 1px solid #dadce0; border-radius: 18px;
+  padding: 8px 20px; font-size: 14px; color: #202124; cursor: pointer;
+  display: inline-flex; align-items: center; gap: 8px; font-family: inherit;
 }
-.decision-bar, .override-bar {
-  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
-}
-.decision-bar { margin-bottom: 12px; }
-.decision-label { font-size: 14px; color: #5f6368; }
+.btn-pill:hover { background: #f1f3f4; box-shadow: 0 1px 2px 0 rgba(60,64,67,.3); }
 .reply-box-wrap { margin-top: 12px; }
 .reply-box-wrap[hidden] { display: none; }
+.send-btn { margin-top: 12px; }
 .reply-textarea {
   width: 100%; min-height: 120px; resize: vertical;
   font-family: inherit; font-size: 14px; color: #202124;

@@ -25,11 +25,11 @@ const navStarred = document.getElementById("navStarred");
 const snackbar = document.getElementById("snackbar");
 const replyBoxWrap = document.getElementById("replyBoxWrap");
 const replyBody = document.getElementById("replyBody");
-const submitReplyBtn = document.getElementById("submitReplyBtn");
+const sendBtn = document.getElementById("sendBtn");
 
-// Decisions where what you'd actually type is the whole point -- these
-// select-then-type instead of recording immediately on click.
-const NEEDS_TEXT = new Set(["reply", "forward", "schedule"]);
+// Reply/Forward/Schedule need real typed content first -- clicking the
+// pill or the Snooze icon just reveals the box and remembers which one
+// is pending. Archive/Flag need nothing typed, so they record immediately.
 let pendingDecision = null;
 
 const STAR_FILLED = '<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>';
@@ -134,7 +134,6 @@ function clearPendingSelection() {
   pendingDecision = null;
   replyBoxWrap.hidden = true;
   replyBody.value = "";
-  document.querySelectorAll(".btn-action.selected").forEach((b) => b.classList.remove("selected"));
 }
 
 function openMessage(messageId) {
@@ -158,14 +157,12 @@ function closeMessage() {
   listView.hidden = false;
 }
 
-// Reply/forward/schedule select first (show the box, wait for real typed
-// text); cold_email/flag/leave_alone record immediately -- there's
-// nothing to type for those.
-function selectDecision(decision, btn) {
+function selectDecision(decision) {
   pendingDecision = decision;
-  document.querySelectorAll(".btn-action.selected").forEach((b) => b.classList.remove("selected"));
-  if (btn) btn.classList.add("selected");
   replyBoxWrap.hidden = false;
+  replyBody.placeholder = decision === "schedule"
+    ? "Type your note -- this exact text is what gets recorded, nothing is written for you."
+    : "Type your reply -- this exact text is what gets recorded, nothing is written for you.";
   replyBody.focus();
 }
 
@@ -198,23 +195,14 @@ function escapeHtml(str) {
 document.getElementById("refreshBtn").addEventListener("click", loadInbox);
 document.getElementById("toolbarRefreshBtn").addEventListener("click", loadInbox);
 document.getElementById("backBtn").addEventListener("click", closeMessage);
-document.querySelectorAll(".btn-action").forEach((btn) => {
-  btn.addEventListener("click", () => {
-    const decision = btn.dataset.decision;
-    if (NEEDS_TEXT.has(decision)) {
-      selectDecision(decision, btn);
-    } else {
-      recordDecision(decision);
-    }
-  });
-});
-submitReplyBtn.addEventListener("click", () => {
+document.getElementById("archiveBtn").addEventListener("click", () => recordDecision("leave_alone"));
+document.getElementById("flagBtn").addEventListener("click", () => recordDecision("flag"));
+document.getElementById("scheduleBtn").addEventListener("click", () => selectDecision("schedule"));
+document.getElementById("replyPillBtn").addEventListener("click", () => selectDecision("reply"));
+document.getElementById("forwardPillBtn").addEventListener("click", () => selectDecision("forward"));
+sendBtn.addEventListener("click", () => {
   if (!pendingDecision) return;
   recordDecision(pendingDecision, replyBody.value);
-});
-document.getElementById("replyIconBtn").addEventListener("click", () => {
-  const replyBtn = document.querySelector('.btn-action[data-decision="reply"]');
-  selectDecision("reply", replyBtn);
 });
 navInbox.addEventListener("click", () => setView("inbox"));
 navStarred.addEventListener("click", () => setView("starred"));
