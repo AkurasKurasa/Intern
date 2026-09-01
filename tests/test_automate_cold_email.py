@@ -159,3 +159,125 @@ class TestProcessOneCommit:
 
         assert result["outcome"] == "left pending -- LM Studio unavailable"
         assert gmail.drafts == []
+
+
+# ── main()'s recovery when the browser closes mid-run ───────────────────────
+# Live-found: after 3 real sends completed, the 4th call (checking for more
+# targets) hit TargetClosedError -- the browser/page had closed out from
+# under the loop for reasons entirely outside this script's own control
+# (nothing in the JS or Python ever closes it itself). main() used to let
+# that propagate as a raw, uncaught traceback, discarding the summary of
+# real work already done. Fakes stand in for Playwright here -- the crash
+# is a control-flow property of main(), not something that needs a real
+# browser to prove.
+
+class _FakePlaywrightError(Exception):
+    """Stands in for playwright.sync_api.Error in these tests -- main()
+    catches the real one by class identity, so the fixture below installs
+    this exact class as the module's Error for the duration of the test."""
+
+
+class _FakePage:
+    def goto(self, url): pass
+    def wait_for_selector(self, sel): pass
+    def click(self, sel): pass
+    def wait_for_timeout(self, ms): pass
+
+
+class _FakeBrowser:
+    def __init__(self):
+        self.closed = False
+
+    def new_page(self):
+        return _FakePage()
+
+    def close(self):
+        self.closed = True
+
+
+class _FakeChromium:
+    def __init__(self, browser):
+        self._browser = browser
+
+    def launch(self, headless=False):
+        return self._browser
+
+
+class _FakePlaywrightContext:
+    def __init__(self, browser):
+        self.chromium = _FakeChromium(browser)
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc_info):
+        return False
+
+
+@pytest.fixture
+def fake_playwright(monkeypatch):
+    """Patches playwright.sync_api's own sync_playwright/Error, which is
+    what main()'s local `from playwright.sync_api import ...` actually
+    re-resolves on every call -- same reasoning as cold_email_llm's own
+    test fixtures for its local `from openai import OpenAI`."""
+    import playwright.sync_api as psa
+    fake_browser = _FakeBrowser()
+    monkeypatch.setattr(psa, "sync_playwright", lambda: _FakePlaywrightContext(fake_browser))
+    monkeypatch.setattr(psa, "Error", _FakePlaywrightError)
+    return fake_browser
+
+
+class TestMainRecoversFromMidRunBrowserClosure:
+    def test_two_real_results_survive_a_crash_on_the_third_call(self, tmp_path, monkeypatch, fake_playwright, capsys):
+        # main()'s own final print (log_path.relative_to(REPO)) assumes the
+        # log path is under REPO -- true for its own default, not for an
+        # arbitrary tmp_path passed via --log, so REPO is repointed at
+        # tmp_path here too rather than writing a real log into the actual
+        # repo tree during a test.
+        monkeypatch.setattr(automate_cold_email, "REPO", tmp_path)
+        monkeypatch.setattr(automate_cold_email, "ensure_server_running", lambda: None)
+
+        calls = []
+
+        def _fake_process_one(page, commit, index):
+            calls.append(index)
+            if len(calls) <= 2:
+                return {"name": f"Target {len(calls)}", "email": f"t{len(calls)}@x.example.com",
+                        "subject": "s", "body": "b", "outcome": "sent"}
+            raise _FakePlaywrightError("Target page, context or browser has been closed")
+
+        monkeypatch.setattr(automate_cold_email, "process_one", _fake_process_one)
+
+        log_path = tmp_path / "run.json"
+        monkeypatch.setattr(sys, "argv", ["automate_cold_email.py", "--commit", "--pace", "0",
+                                           "--headless", "--log", str(log_path)])
+
+        result = automate_cold_email.main()  # must not raise
+
+        assert result == 0
+        assert "Browser closed unexpectedly" in capsys.readouterr().out
+        saved = json.loads(log_path.read_text(encoding="utf-8"))
+        assert len(saved["results"]) == 2  # the 2 real sends survive; the crash doesn't erase them
+        assert saved["results"][0]["outcome"] == "sent"
+        assert saved["results"][1]["outcome"] == "sent"
+
+    def test_a_second_closure_error_from_browser_close_itself_is_also_swallowed(self, tmp_path, monkeypatch, fake_playwright):
+        """The browser already died once (mid-loop); calling close() on an
+        already-dead browser can raise the exact same error a second time.
+        That second error must not escape either -- there's nothing left
+        to clean up, and main() has already reported the crash once."""
+        monkeypatch.setattr(automate_cold_email, "REPO", tmp_path)
+        monkeypatch.setattr(automate_cold_email, "ensure_server_running", lambda: None)
+        monkeypatch.setattr(automate_cold_email, "process_one",
+                             lambda page, commit, index: (_ for _ in ()).throw(_FakePlaywrightError("closed")))
+
+        def _close_raises_again():
+            raise _FakePlaywrightError("Target page, context or browser has been closed")
+        fake_playwright.close = _close_raises_again
+
+        monkeypatch.setattr(sys, "argv", ["automate_cold_email.py", "--commit", "--pace", "0",
+                                           "--headless", "--log", str(tmp_path / "run.json")])
+
+        result = automate_cold_email.main()  # must not raise even though close() itself also fails
+
+        assert result == 0

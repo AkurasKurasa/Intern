@@ -171,7 +171,7 @@ def main():
                     help="where to write the run log (default: data/runs/)")
     args = ap.parse_args()
 
-    from playwright.sync_api import sync_playwright
+    from playwright.sync_api import sync_playwright, Error as PlaywrightError
 
     print(f"\n  mode  {'COMMIT' if args.commit else 'dry run'}")
     print_countdown()
@@ -188,18 +188,32 @@ def main():
 
         banner(1, "Working through the inbox")
         skipped = 0
-        while args.limit is None or len(results) < args.limit:
-            result = process_one(page, args.commit, len(results), skipped)
-            if result is None:
-                break
-            results.append(result)
-            if result["outcome"] != "confirmed":
-                skipped += 1
-            time.sleep(args.pace)
+        try:
+            while args.limit is None or len(results) < args.limit:
+                result = process_one(page, args.commit, len(results), skipped)
+                if result is None:
+                    break
+                results.append(result)
+                if result["outcome"] != "confirmed":
+                    skipped += 1
+                time.sleep(args.pace)
+        except PlaywrightError as exc:
+            # The browser/page can close out from under this loop for
+            # reasons entirely outside this script's own control (the OS
+            # reclaiming it, another heavy process crowding it out) --
+            # nothing here ever closes it itself. Whatever was already
+            # confirmed before that point is real and already recorded in
+            # `results`; report that honestly instead of dying with a raw
+            # traceback and losing the summary of real work already done.
+            print(f"\n  Browser closed unexpectedly mid-run ({exc.__class__.__name__}) -- "
+                  f"stopping here with what was already completed.")
 
-        if not args.headless:
-            page.wait_for_timeout(1500)
-        browser.close()
+        try:
+            if not args.headless:
+                page.wait_for_timeout(1500)
+            browser.close()
+        except PlaywrightError:
+            pass  # already gone -- nothing left to close
 
     if started_server is not None:
         started_server.terminate()

@@ -203,3 +203,82 @@ class TestReplyTextareaCarriesMessageId:
         name_attr = real_page.locator("#replyBody").get_attribute("name")
 
         assert name_attr == "i1"  # real_page's fixture opens messages i1/i2/i3 in order
+
+
+# ── main()'s recovery when the browser closes mid-run ───────────────────────
+# Same live-found issue and same fix as automate_cold_email.py's own
+# main(): the browser/page can close out from under the loop for reasons
+# entirely outside this script's own control, and it used to let that
+# propagate as a raw, uncaught traceback, discarding the summary of real
+# work already confirmed. Fakes stand in for Playwright -- this is a
+# control-flow property of main(), not something that needs a real
+# browser to prove. See test_automate_cold_email.py for the sibling tests.
+
+class _FakeInboxPlaywrightError(Exception):
+    pass
+
+
+class _FakeInboxPage:
+    def goto(self, url): pass
+    def click(self, sel): pass
+    def wait_for_timeout(self, ms): pass
+
+
+class _FakeInboxBrowser:
+    def new_page(self):
+        return _FakeInboxPage()
+
+    def close(self):
+        pass
+
+
+class _FakeInboxChromium:
+    def __init__(self, browser):
+        self._browser = browser
+
+    def launch(self, headless=False):
+        return self._browser
+
+
+class _FakeInboxPlaywrightContext:
+    def __init__(self, browser):
+        self.chromium = _FakeInboxChromium(browser)
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc_info):
+        return False
+
+
+class TestMainRecoversFromMidRunBrowserClosure:
+    def test_two_real_results_survive_a_crash_on_the_third_call(self, tmp_path, monkeypatch, capsys):
+        import playwright.sync_api as psa
+        fake_browser = _FakeInboxBrowser()
+        monkeypatch.setattr(psa, "sync_playwright", lambda: _FakeInboxPlaywrightContext(fake_browser))
+        monkeypatch.setattr(psa, "Error", _FakeInboxPlaywrightError)
+        monkeypatch.setattr(automate_inbox, "REPO", tmp_path)
+        monkeypatch.setattr(automate_inbox, "ensure_server_running", lambda: None)
+
+        calls = []
+
+        def _fake_process_one(page, commit, index, skipped):
+            calls.append((index, skipped))
+            if len(calls) <= 2:
+                return {"sender": "s", "subject": f"m{len(calls)}", "decision": "flag",
+                        "rationale": "r", "outcome": "confirmed"}
+            raise _FakeInboxPlaywrightError("Target page, context or browser has been closed")
+
+        monkeypatch.setattr(automate_inbox, "process_one", _fake_process_one)
+
+        log_path = tmp_path / "run.json"
+        monkeypatch.setattr(sys, "argv", ["automate_inbox.py", "--commit", "--pace", "0",
+                                           "--headless", "--log", str(log_path)])
+
+        result = automate_inbox.main()  # must not raise
+
+        assert result == 0
+        assert "Browser closed unexpectedly" in capsys.readouterr().out
+        saved = json.loads(log_path.read_text(encoding="utf-8"))
+        assert len(saved["results"]) == 2
+        assert saved["results"][0]["outcome"] == "confirmed"
