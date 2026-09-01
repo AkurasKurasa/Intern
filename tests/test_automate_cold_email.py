@@ -95,10 +95,10 @@ def real_page_with_task_list(tmp_path):
         thread.join(timeout=5)
 
 
-class TestProcessOne:
+class TestProcessOneDryRun:
     def test_reads_the_real_target_off_the_dom_and_never_sends(self, real_page_with_task_list):
         page, gmail = real_page_with_task_list
-        result = automate_cold_email.process_one(page, 0)
+        result = automate_cold_email.process_one(page, False, 0)
         assert result["name"] == "Dana Whitfield"
         assert result["email"] == "dana@x.example.com"
         assert result["subject"] == "Q3 outreach"
@@ -107,12 +107,55 @@ class TestProcessOne:
 
     def test_walking_past_the_last_target_returns_none(self, real_page_with_task_list):
         page, _gmail = real_page_with_task_list
-        assert automate_cold_email.process_one(page, 2) is None  # only 2 targets, index 2 is out of range
+        assert automate_cold_email.process_one(page, False, 2) is None  # only 2 targets, index 2 is out of range
 
     def test_going_back_leaves_the_list_visible_for_the_next_target(self, real_page_with_task_list):
         page, _gmail = real_page_with_task_list
-        automate_cold_email.process_one(page, 0)
+        automate_cold_email.process_one(page, False, 0)
         assert page.is_visible("#coldEmailListView")
         assert not page.is_visible("#coldEmailDetailView")
-        second = automate_cold_email.process_one(page, 1)
+        second = automate_cold_email.process_one(page, False, 1)
         assert second["name"] == "Marcus Oyelaran"
+
+
+class TestProcessOneCommit:
+    """--commit is the one deliberate exception to "never invent text" in
+    this whole project (direct instruction: "Break that rule for Scope
+    #3") -- generate_cold_email() is monkeypatched here rather than
+    hitting a real LM Studio, same test-isolation discipline every other
+    test in this suite already holds; cold_email_llm.py has its own
+    dedicated tests for the real LM Studio call."""
+
+    def test_commit_types_the_generated_text_and_actually_sends(self, real_page_with_task_list, monkeypatch):
+        page, gmail = real_page_with_task_list
+        monkeypatch.setattr(automate_cold_email, "generate_cold_email",
+                             lambda name, context: ("Real subject", "Real body text."))
+
+        result = automate_cold_email.process_one(page, True, 0)
+
+        assert result["outcome"] == "sent"
+        assert result["subject"] == "Real subject"
+        assert result["body"] == "Real body text."
+        assert gmail.drafts == [{"to": "dana@x.example.com", "subject": "Real subject",
+                                  "body": "Real body text.", "thread_id": ""}]
+
+    def test_commit_sending_removes_the_target_so_the_next_call_reads_the_next_one(self, real_page_with_task_list, monkeypatch):
+        page, gmail = real_page_with_task_list
+        monkeypatch.setattr(automate_cold_email, "generate_cold_email",
+                             lambda name, context: ("Real subject", "Real body text."))
+
+        first = automate_cold_email.process_one(page, True, 0)
+        assert first["name"] == "Dana Whitfield"
+        # Dana is gone now -- re-reading index 0 lands on Marcus, not Dana again.
+        second = automate_cold_email.process_one(page, True, 0)
+        assert second["name"] == "Marcus Oyelaran"
+        assert len(gmail.drafts) == 2
+
+    def test_commit_with_no_llm_available_leaves_the_target_pending_and_sends_nothing(self, real_page_with_task_list, monkeypatch):
+        page, gmail = real_page_with_task_list
+        monkeypatch.setattr(automate_cold_email, "generate_cold_email", lambda name, context: ("", ""))
+
+        result = automate_cold_email.process_one(page, True, 0)
+
+        assert result["outcome"] == "left pending -- LM Studio unavailable"
+        assert gmail.drafts == []

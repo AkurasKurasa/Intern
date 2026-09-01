@@ -5,15 +5,24 @@ Scope #3's own version of Scope #1's data-entry list, played the same
 way automate_inbox.py plays the regular inbox: opens the real merged
 page, drives the real Cold Email sidebar section, and walks through
 each real target from the boss' task list (data/task_list.txt) one at
-a time -- who they are, what the pre-filled subject would be. It
-never sends anything on its own -- Cold Email always needs a real,
-human-typed message (the same "never invent text" rule this project
-holds everywhere else), so every target is read and shown on the real
-page, then left exactly as it was for a human to actually write and
-send.
+a time -- who they are, what the pre-filled subject would be.
 
-    python automate_cold_email.py                # walks the real task list
-    python automate_cold_email.py --limit 2
+Dry run (default) never sends anything -- Cold Email normally needs a
+real, human-typed message (the same "never invent text" rule this
+project holds everywhere else for Reply/Forward/Schedule), so every
+target is just read and shown, then left exactly as it was.
+
+--commit is the one deliberate, explicit exception in this whole
+project: direct instruction, "Break that rule for Scope #3." With
+--commit, cold_email_llm.generate_cold_email() asks LM Studio for a
+real subject/body for each target, types it into the real page, and
+clicks Send for real -- an actual Gmail draft gets created. Every
+other decision type (Reply, Forward, Schedule) is untouched by this;
+this flag only ever affects Cold Email.
+
+    python automate_cold_email.py                # dry run -- reads and shows, sends nothing
+    python automate_cold_email.py --commit        # asks LM Studio for real text and actually sends
+    python automate_cold_email.py --commit --limit 2
 """
 import argparse
 import json
@@ -27,17 +36,26 @@ if str(REPO) not in sys.path:
     sys.path.insert(0, str(REPO))
 
 from automate_inbox import ensure_server_running, print_countdown, banner, SERVER_URL
+from cold_email_llm import generate_cold_email
 
 
-def process_one(page, index: int):
+def process_one(page, commit: bool, index: int):
     """Reads one target row off the real DOM, opens it, prints the real
-    name/email and the pre-filled subject, then goes back without
-    sending. Cold Email always needs a human-typed message, so nothing
-    here is ever confirmed or removed -- the same row is read every
-    time until a human actually sends it themselves, which is why this
-    walks by a plain index rather than automate_inbox.py's
-    confirm-then-advance shape. Returns a result dict, or None once the
-    task list is exhausted."""
+    name/email and the pre-filled subject.
+
+    Dry run: goes back without sending -- nothing is ever confirmed or
+    removed, so the same row is read every time until a human actually
+    sends it themselves.
+
+    --commit: asks LM Studio for a real subject/body, types it into the
+    real page's own fields, and clicks Send for real. A successful send
+    removes the target from the list (same as the human flow), so the
+    caller must re-read row `index` on the NEXT call rather than
+    advancing past it -- mirrors automate_inbox.py's own
+    confirm-then-re-read-the-same-slot shape, for the same reason: the
+    list just got shorter.
+
+    Returns a result dict, or None once the task list is exhausted."""
     row = page.locator("#coldEmailRowList .row-item").nth(index)
     if row.count() == 0:
         return None
@@ -47,21 +65,41 @@ def process_one(page, index: int):
 
     name = page.locator("#coldEmailTargetName").inner_text()
     email = page.locator("#coldEmailTargetEmail").inner_text()
-    subject = page.input_value("#coldEmailSubjectInput")
+    prefilled_subject = page.input_value("#coldEmailSubjectInput")
 
     print(f"\n  {name} <{email}>")
-    print(f"    pre-filled subject: {subject!r}")
-    print("    -> left pending -- needs a real message typed by a human")
 
-    page.click("#coldEmailBackBtn")
+    if not commit:
+        print(f"    pre-filled subject: {prefilled_subject!r}")
+        print("    -> left pending -- needs a real message typed by a human")
+        page.click("#coldEmailBackBtn")
+        return {"name": name, "email": email, "subject": prefilled_subject, "body": "",
+                "outcome": "left pending -- needs a real message typed by a human"}
 
-    return {"name": name, "email": email, "subject": subject,
-            "outcome": "left pending -- needs a real message typed by a human"}
+    subject, body = generate_cold_email(name, prefilled_subject)
+    if not subject or not body:
+        print("    -> LM Studio unavailable (or gave an empty response) -- left pending")
+        page.click("#coldEmailBackBtn")
+        return {"name": name, "email": email, "subject": prefilled_subject, "body": "",
+                "outcome": "left pending -- LM Studio unavailable"}
+
+    print(f"    LM Studio subject: {subject!r}")
+    print(f"    LM Studio body: {body!r}")
+
+    page.fill("#coldEmailSubjectInput", subject)
+    page.fill("#coldEmailBodyInput", body)
+    page.click("#coldEmailSendBtn")
+    page.wait_for_selector("#coldEmailListView:not([hidden])")
+    print("    -> sent")
+
+    return {"name": name, "email": email, "subject": subject, "body": body, "outcome": "sent"}
 
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("--commit", action="store_true",
+                    help="ask LM Studio for real text and actually click Send; the default is a dry run")
     ap.add_argument("--limit", type=int, default=None,
                     help="only walk the first N targets on the task list")
     ap.add_argument("--pace", type=float, default=1.5,
@@ -74,6 +112,7 @@ def main():
 
     from playwright.sync_api import sync_playwright
 
+    print(f"\n  mode  {'COMMIT (LM Studio writes, real send)' if args.commit else 'dry run'}")
     print_countdown(message="Starting Cold Email -- opening a real browser to walk the boss' task list.")
 
     started_server = ensure_server_running()
@@ -88,11 +127,15 @@ def main():
         page.wait_for_timeout(600)
 
         banner(1, "Working through the boss' task list")
+        skipped = 0
         while args.limit is None or len(results) < args.limit:
-            result = process_one(page, len(results))
+            row_index = skipped if args.commit else len(results)
+            result = process_one(page, args.commit, row_index)
             if result is None:
                 break
             results.append(result)
+            if result["outcome"] != "sent":
+                skipped += 1
             time.sleep(args.pace)
 
         if not args.headless:
@@ -105,12 +148,15 @@ def main():
     banner(2, "Result")
     print(f"  targets walked  {len(results)}")
     for r in results:
-        print(f"    {r['name']:<25} {r['email']}")
-    if results:
-        print(f"\n  {len(results)} target(s) need a real message typed by a human -- "
+        print(f"    {r['outcome']:<12} {r['name']:<25} {r['email']}")
+    needing_human = [r for r in results if r["outcome"] != "sent"]
+    if needing_human:
+        print(f"\n  {len(needing_human)} target(s) still need a real message -- "
               f"open {SERVER_URL} yourself (Cold Email section) to write and send them.")
-    else:
+    if not results:
         print("\n  Nobody left on the task list. Add names to data/task_list.txt.")
+    if not args.commit:
+        print("\n  Nothing was sent for real. Re-run with --commit to actually send (via LM Studio).")
 
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     log_path = args.log or (REPO / "data" / "runs" / f"automate_cold_email_{stamp}.json")
@@ -118,7 +164,7 @@ def main():
         log_path = REPO / log_path
     log_path.parent.mkdir(parents=True, exist_ok=True)
     log_path.write_text(json.dumps({
-        "processed_at": datetime.now(timezone.utc).isoformat(),
+        "commit": args.commit, "processed_at": datetime.now(timezone.utc).isoformat(),
         "results": results,
     }, indent=2), encoding="utf-8")
     print(f"  run log         {log_path.relative_to(REPO)}")
