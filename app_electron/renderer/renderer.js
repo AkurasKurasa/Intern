@@ -203,7 +203,18 @@ window.recorderAPI.onEvent((event) => {
       statSessions.textContent = String(sessions);
       statFrames.textContent = String(event.steps);
       statPending.hidden = true;
-      log(`Saved — ${event.steps} frames. Now click Replay ×N to repeat it.`, "ok");
+      if (event.trace_type === "web") {
+        // Web recordings (Inbox Dispatch) don't replay -- there's no
+        // pyautogui-style playback for a page, the "Play" for this task IS
+        // automate_inbox.py driving the real page directly. What matters
+        // here is whether any real training examples actually came out of
+        // the session just recorded.
+        log(event.examples_written > 0
+          ? `Saved — ${event.steps} frames, ${event.examples_written} real example(s) captured for training.`
+          : `Saved — ${event.steps} frames, but no submitted replies or schedule notes were found in this recording.`, "ok");
+      } else {
+        log(`Saved — ${event.steps} frames. Now click Replay ×N to repeat it.`, "ok");
+      }
       break;
     case "replay_progress":
       statStatus.textContent = `Replaying ${event.current}/${event.total}`;

@@ -7,6 +7,7 @@ test_recorder_bridge_capsule_run.py.
 """
 import sys
 import threading
+import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "app"))
@@ -24,6 +25,22 @@ class _FakeRecorder:
 
     def run(self):
         pass
+
+
+def _wait_until_not_running(bridge, timeout=2.0):
+    """start() runs the recorder on a background thread; poll for its
+    finally block (which flips _running back to False) to finish instead
+    of racing it, same spirit as the pending-indicator tests' own
+    thread-join helper."""
+    deadline = time.time() + timeout
+    while bridge._running and time.time() < deadline:
+        time.sleep(0.02)
+
+
+class _FakeRecorderWithSteps(_FakeRecorder):
+    def __init__(self, output_dir="", trace_type="form_filling", url="", n_steps=1):
+        super().__init__(output_dir, trace_type, url)
+        self._steps = [{} for _ in range(n_steps)]
 
 
 def test_start_passes_trace_type_and_url_to_demo_recorder(monkeypatch):
@@ -194,3 +211,92 @@ def test_server_is_cleaned_up_when_the_recorder_fails_to_construct(monkeypatch):
 
     assert proc.terminated is True
     assert bridge._local_server_proc is None
+
+
+# ── Auto-translation on stop ─────────────────────────────────────────────────
+# A web recording captures a real session on disk, but that's just a raw
+# trace -- nothing used to turn it into actual training data on its own,
+# leaving Stop Recording as a dead end for Inbox Dispatch. Direct
+# instruction: "we need to utilize the Recorder because that's what we
+# actually use" -- so the finished session now gets translated into real
+# training examples automatically, the moment recording stops.
+
+def _events(monkeypatch):
+    captured = []
+    monkeypatch.setattr(rb, "emit", lambda event, **fields: captured.append({"event": event, **fields}))
+    return captured
+
+
+class TestWebRecordingAutoTranslatesOnStop:
+    def test_web_recording_with_steps_calls_translate_session(self, monkeypatch):
+        events = _events(monkeypatch)
+        monkeypatch.setattr(rb, "ensure_server_running", lambda: None)
+        monkeypatch.setattr(rb, "DemoRecorder",
+            lambda output_dir="", trace_type="form_filling", url="":
+                _FakeRecorderWithSteps(output_dir, trace_type, url, n_steps=3))
+        calls = []
+        monkeypatch.setattr(rb, "translate_session",
+            lambda session_dir, gmail_client: (calls.append((session_dir, gmail_client)), 2)[1])
+        monkeypatch.setattr(rb, "get_gmail_client", lambda: "fake-gmail-client")
+
+        bridge = rb.Bridge()
+        bridge.start(trace_type="web", url="http://localhost:8765/")
+        _wait_until_not_running(bridge)
+
+        assert calls == [(bridge._out_dir, "fake-gmail-client")]
+        saved = [e for e in events if e["event"] == "saved"][0]
+        assert saved["examples_written"] == 2
+        assert saved["trace_type"] == "web"
+
+    def test_form_filling_recording_never_calls_translate_session(self, monkeypatch):
+        events = _events(monkeypatch)
+        monkeypatch.setattr(rb, "DemoRecorder",
+            lambda output_dir="", trace_type="form_filling", url="":
+                _FakeRecorderWithSteps(output_dir, trace_type, url, n_steps=3))
+        calls = []
+        monkeypatch.setattr(rb, "translate_session", lambda session_dir, gmail_client: calls.append(session_dir) or 5)
+
+        bridge = rb.Bridge()
+        bridge.start()  # defaults to trace_type="form_filling"
+        _wait_until_not_running(bridge)
+
+        assert calls == []
+        saved = [e for e in events if e["event"] == "saved"][0]
+        assert saved["examples_written"] == 0
+        assert saved["trace_type"] == "form_filling"
+
+    def test_web_recording_with_zero_steps_skips_translation(self, monkeypatch):
+        events = _events(monkeypatch)
+        monkeypatch.setattr(rb, "ensure_server_running", lambda: None)
+        monkeypatch.setattr(rb, "DemoRecorder",
+            lambda output_dir="", trace_type="form_filling", url="":
+                _FakeRecorderWithSteps(output_dir, trace_type, url, n_steps=0))
+        calls = []
+        monkeypatch.setattr(rb, "translate_session", lambda session_dir, gmail_client: calls.append(session_dir) or 9)
+
+        bridge = rb.Bridge()
+        bridge.start(trace_type="web", url="http://localhost:8765/")
+        _wait_until_not_running(bridge)
+
+        assert calls == []
+
+    def test_translate_session_failure_does_not_crash_the_bridge(self, monkeypatch):
+        events = _events(monkeypatch)
+        monkeypatch.setattr(rb, "ensure_server_running", lambda: None)
+        monkeypatch.setattr(rb, "DemoRecorder",
+            lambda output_dir="", trace_type="form_filling", url="":
+                _FakeRecorderWithSteps(output_dir, trace_type, url, n_steps=2))
+
+        def _boom(session_dir, gmail_client):
+            raise RuntimeError("gmail auth expired")
+        monkeypatch.setattr(rb, "translate_session", _boom)
+        monkeypatch.setattr(rb, "get_gmail_client", lambda: "fake-gmail-client")
+
+        bridge = rb.Bridge()
+        bridge.start(trace_type="web", url="http://localhost:8765/")
+        _wait_until_not_running(bridge)
+
+        error_logs = [e for e in events if e["event"] == "log" and e.get("level") == "err"]
+        assert any("Couldn't extract training examples" in e["message"] for e in error_logs)
+        saved = [e for e in events if e["event"] == "saved"][0]
+        assert saved["examples_written"] == 0  # failed translation -> 0, not a crash

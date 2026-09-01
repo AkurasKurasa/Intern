@@ -69,6 +69,8 @@ for _p in (_ROOT, _COMP):
 from recorder.recorder import DemoRecorder
 from agent.capsule import CapsuleRegistry
 from inbox_router.automate_inbox import ensure_server_running
+from inbox_router.reply_trace_translator import translate_session
+from inbox_router.gmail_client import get_gmail_client
 
 # Full, persisted transcript of everything the Play panel's Activity log
 # receives -- direct user request ("add a log feature... so you could
@@ -183,9 +185,24 @@ class Bridge:
             finally:
                 steps = len(self._recorder._steps) if self._recorder else 0
                 session_dir = getattr(self._recorder, "output_dir", "")
+                recorded_trace_type = getattr(self._recorder, "trace_type", "")
                 self._running = False
                 self._poll_stop.set()
-                emit("saved", steps=steps, session_dir=session_dir)
+                # A web recording (Inbox Dispatch) captures a real session on
+                # disk, but that's just a raw trace -- nothing turns it into
+                # actual training data on its own. Direct instruction: "we
+                # need to utilize the Recorder because that's what we
+                # actually use" -- Stop must finish the job itself, not leave
+                # a session sitting there needing a separate manual command
+                # someone has to remember to run later.
+                examples_written = 0
+                if recorded_trace_type == "web" and steps > 0 and session_dir:
+                    try:
+                        examples_written = translate_session(session_dir, get_gmail_client())
+                    except Exception as exc:
+                        emit("log", message=f"Couldn't extract training examples from this recording: {exc}", level="err")
+                emit("saved", steps=steps, session_dir=session_dir,
+                     trace_type=recorded_trace_type, examples_written=examples_written)
 
         threading.Thread(target=_run, daemon=True).start()
         self._poll_thread = threading.Thread(target=self._poll, daemon=True)
