@@ -103,6 +103,7 @@ components/inbox_router/credentials/client_secret.json
 components/inbox_router/credentials/token.json
 components/inbox_router/data/pattern_profile.json
 components/inbox_router/data/training_examples.jsonl
+components/inbox_router/data/reply_examples.jsonl
 components/inbox_router/data/routed_history.json
 # Mock-fixture generated state — mock_inbox.json itself IS committed
 # (synthetic test data), only what it generates at runtime is ignored.

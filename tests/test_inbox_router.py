@@ -253,6 +253,41 @@ class TestInboxRouterPollOnce:
         assert len(drafts) == 1
         assert drafts[0]["body"] == "Sure, sounds good."
 
+    def test_override_to_forward_with_a_typed_recipient_addresses_the_draft(self, tmp_path):
+        # Regression: forward drafts used to be created with "to" pulled
+        # only from entry["forward_to"] (the AI pipeline's own guess from
+        # a sender-pattern match) -- which is blank whenever the AI's own
+        # suggestion wasn't "forward" in the first place, silently
+        # creating an unaddressed, useless draft. A human typing a real
+        # recipient must actually reach the draft.
+        router = self._build(tmp_path, inbox=[_msg("i1", "stranger@x.com", "unrelated")])
+        router.poll_once()  # -> flag (no LLM configured), forward_to stays blank on the entry
+        router.override_decision("i1", "forward", reply_body="FYI, please review.",
+                                  forward_to="colleague@example.com")
+
+        drafts = json.loads((tmp_path / "data" / "mock_drafts.json").read_text())["drafts"]
+        assert len(drafts) == 1
+        assert drafts[0]["to"] == "colleague@example.com"
+        assert drafts[0]["body"] == "FYI, please review."
+
+    def test_confirm_forward_with_no_typed_recipient_falls_back_to_the_ai_guess(self, tmp_path):
+        # When the human doesn't type a recipient (e.g. confirming an
+        # AI-suggested forward as-is), the AI pipeline's own guess on the
+        # entry is still used -- unchanged behavior for that path.
+        router = self._build(tmp_path, inbox=[_msg("i1", "stranger@x.com", "unrelated")])
+        router.poll_once()
+        # confirm_suggestion() reads self._pending first (the in-memory
+        # cache poll_once() populated) -- mutate that directly, not the
+        # on-disk history, to simulate "the AI pipeline itself found a
+        # forward target" for this same-process entry.
+        router._pending["i1"]["forward_to"] = "ai-guessed@example.com"
+
+        router.confirm_suggestion("i1", "forward", reply_body="Passing this along.")
+
+        drafts = json.loads((tmp_path / "data" / "mock_drafts.json").read_text())["drafts"]
+        assert len(drafts) == 1
+        assert drafts[0]["to"] == "ai-guessed@example.com"
+
     def test_confirm_reply_with_real_text_records_a_real_reply_example(self, tmp_path):
         router = self._build(tmp_path, inbox=[_msg("i1", "stranger@x.com", "unrelated", body="Can you help?")])
         router.poll_once()

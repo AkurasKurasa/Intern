@@ -172,6 +172,14 @@ body {
 .reply-box-wrap { margin-top: 12px; }
 .reply-box-wrap[hidden] { display: none; }
 .send-btn { margin-top: 12px; }
+.forward-to-wrap { margin-bottom: 8px; }
+.forward-to-wrap[hidden] { display: none; }
+.forward-to-label { font-size: 13px; color: #5f6368; display: flex; align-items: center; gap: 8px; }
+.forward-to-input {
+  flex: 1; font-family: inherit; font-size: 14px; color: #202124;
+  border: 1px solid #dadce0; border-radius: 4px; padding: 6px 8px;
+}
+.forward-to-input:focus { outline: none; border-color: #1a73e8; }
 .reply-textarea {
   width: 100%; min-height: 120px; resize: vertical;
   font-family: inherit; font-size: 14px; color: #202124;

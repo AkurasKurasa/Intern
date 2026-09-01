@@ -143,6 +143,17 @@ class TestHandleRequestConfirm:
         examples = reply_recorder.load_reply_examples(path=router._reply_examples_path)
         assert examples[0]["reply_body"] == "Thanks, I'll get back to you."
 
+    def test_post_override_forward_with_typed_recipient_addresses_the_draft(self, tmp_path):
+        router = _build_router(tmp_path, inbox=[_msg("i1", "stranger@x.com", "unrelated")])
+        router.poll_once()
+        body = json.dumps({"message_id": "i1", "new_decision": "forward",
+                            "reply_body": "FYI.", "forward_to": "colleague@example.com"}).encode("utf-8")
+        status, _headers, resp_body, _ct = ls.handle_request("POST", "/api/override", body, router)
+        assert status == 200
+        assert json.loads(resp_body) == {"ok": True}
+        drafts = json.loads((tmp_path / "data" / "mock_drafts.json").read_text())["drafts"]
+        assert drafts[0]["to"] == "colleague@example.com"
+
     def test_post_confirm_malformed_json_returns_400(self, tmp_path):
         router = _build_router(tmp_path)
         status, _headers, _body, _ct = ls.handle_request("POST", "/api/confirm", b"not json", router)

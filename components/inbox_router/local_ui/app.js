@@ -34,6 +34,8 @@ const replyBody = document.getElementById("replyBody");
 const scheduleDatesWrap = document.getElementById("scheduleDatesWrap");
 const eventStart = document.getElementById("eventStart");
 const eventEnd = document.getElementById("eventEnd");
+const forwardToWrap = document.getElementById("forwardToWrap");
+const forwardTo = document.getElementById("forwardTo");
 
 // The real-Gmail-style icons/pills below set this directly -- there's no
 // separate "pick from a list, then click Override" step anymore. Clicking
@@ -183,8 +185,10 @@ function openMessage(messageId) {
   replyBody.name = email.message_id;
   eventStart.value = "";
   eventEnd.value = "";
+  forwardTo.value = "";
   replyBoxWrap.hidden = true;
   scheduleDatesWrap.hidden = true;
+  forwardToWrap.hidden = true;
   listView.hidden = true;
   detailView.hidden = false;
 }
@@ -204,10 +208,11 @@ function selectPendingDecision(decision) {
   pendingDecision = decision;
   replyBoxWrap.hidden = false;
   scheduleDatesWrap.hidden = decision !== "schedule";
+  forwardToWrap.hidden = decision !== "forward";
   replyBody.placeholder = decision === "schedule"
     ? "Type your note -- this exact text is what gets recorded, nothing is written for you."
     : "Type your reply -- this exact text is what gets sent, nothing is written for you.";
-  replyBody.focus();
+  if (decision === "forward") forwardTo.focus(); else replyBody.focus();
 }
 
 // The one real submit path for all six decisions. Whether this counts as
@@ -215,15 +220,16 @@ function selectPendingDecision(decision) {
 // invisibly to the person clicking -- they just clicked the real thing
 // they wanted, the same as in real Gmail, but the project still needs
 // that distinction recorded for its own accuracy metrics.
-async function performDecision(decision, replyBodyText = "", startVal = "", endVal = "") {
+async function performDecision(decision, replyBodyText = "", startVal = "", endVal = "", forwardToVal = "") {
   const email = pendingEmails.find((e) => e.message_id === openMessageId);
   if (!email) return;
   const isConfirm = decision === email.decision;
   const url = isConfirm ? "/api/confirm" : "/api/override";
   const body = isConfirm
-    ? { message_id: openMessageId, decision, reply_body: replyBodyText, event_start: startVal, event_end: endVal }
+    ? { message_id: openMessageId, decision, reply_body: replyBodyText,
+        event_start: startVal, event_end: endVal, forward_to: forwardToVal }
     : { message_id: openMessageId, new_decision: decision, reason: "user action",
-        reply_body: replyBodyText, event_start: startVal, event_end: endVal };
+        reply_body: replyBodyText, event_start: startVal, event_end: endVal, forward_to: forwardToVal };
   const resp = await fetch(url, {
     method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
   });
@@ -239,7 +245,12 @@ async function performDecision(decision, replyBodyText = "", startVal = "", endV
 
 function sendPending() {
   if (!pendingDecision) return;
-  performDecision(pendingDecision, replyBody.value, eventStart.value, eventEnd.value);
+  if (pendingDecision === "forward" && !forwardTo.value.trim()) {
+    detailStatus.textContent = "Error: type who you're forwarding this to.";
+    forwardTo.focus();
+    return;
+  }
+  performDecision(pendingDecision, replyBody.value, eventStart.value, eventEnd.value, forwardTo.value);
 }
 
 async function confirmSelected() {
