@@ -307,6 +307,7 @@ const ppCheckpoint   = document.getElementById("ppCheckpoint");
 const ppTestGroup    = document.getElementById("ppTestGroup");
 const btnLaunchMockups = document.getElementById("btnLaunchMockups");
 const btnViewSchedule = document.getElementById("btnViewSchedule");
+const btnLaunchColdEmail = document.getElementById("btnLaunchColdEmail");
 const btnPlay        = document.getElementById("btnPlay");
 const btnStopCapsule = document.getElementById("btnStopCapsule");
 const btnDeploy      = document.getElementById("btnDeploy");
@@ -598,6 +599,7 @@ async function loadCapsuleIntoSlot(capsule) {
   // automate_inbox.py), but still carries url+local_server so this Test
   // button can open its practice page on the same local server.
   ppTestGroup.hidden = capsule.kind === "url" && !capsule.local_server;
+  btnLaunchColdEmail.hidden = !(capsule.local_server && capsule.url);
 
   // A script-kind capsule (e.g. Scope #2) may or may not have a real,
   // swappable checkpoint -- Scope #2's matcher.pt is a genuine trained
@@ -660,6 +662,7 @@ function clearPlaySlot() {
   ppSlot.classList.remove("filled");
   ppCheckpointGroup.hidden = true;
   ppTestGroup.hidden = true;
+  btnLaunchColdEmail.hidden = true;
   workflowsListEl.querySelectorAll(".task-chip.capsule-selected")
     .forEach((el) => el.classList.remove("capsule-selected"));
   setCapsuleRunning(false);
@@ -712,6 +715,16 @@ btnViewSchedule.addEventListener("click", async () => {
     await window.capsulesAPI.viewSchedule();
   } catch (e) {
     capsuleLog(`Couldn't open schedule: ${e.message || e}`, "err");
+  }
+});
+
+btnLaunchColdEmail.addEventListener("click", async () => {
+  if (!currentCapsule) return;
+  try {
+    const result = await window.capsulesAPI.launchColdEmail(currentCapsule.name);
+    if (!result.ok) capsuleLog(result.error, "err");
+  } catch (e) {
+    capsuleLog(`Couldn't open Cold Email: ${e.message || e}`, "err");
   }
 });
 

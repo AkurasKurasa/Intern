@@ -776,6 +776,20 @@ ipcMain.handle("view-schedule", () => {
   return { ok: true };
 });
 
+ipcMain.handle("launch-cold-email", (_evt, capsuleName) => {
+  // Same mechanism as test-launch-mockups above, just a different page on
+  // the same local server -- Cold Email is its own page, not a Test-section
+  // mockup, but it needs the exact same "make sure the server's running,
+  // then open a browser tab" two steps.
+  const capsule = listCapsules().find((c) => c.name === capsuleName);
+  if (capsule && capsule.local_server && capsule.url) {
+    ensureLocalServerRunning(capsule.local_server);
+    shell.openExternal(`${capsule.url}cold-email/`);
+    return { ok: true };
+  }
+  return { ok: false, error: "This task has no Cold Email page." };
+});
+
 // ── Settings tab -- LM Studio control via its own CLI (lms.exe), not a
 // new HTTP client of our own -- the exact same local server run_task.py's
 // LLMAgent already talks to at http://localhost:1234/v1 once it's running
