@@ -316,9 +316,7 @@ const ppDetailSave      = document.getElementById("ppDetailSave");
 const ppCheckpointGroup = document.getElementById("ppCheckpointGroup");
 const ppCheckpoint   = document.getElementById("ppCheckpoint");
 const ppTestGroup    = document.getElementById("ppTestGroup");
-const btnLaunchMockups = document.getElementById("btnLaunchMockups");
-const btnViewSchedule = document.getElementById("btnViewSchedule");
-const btnLaunchColdEmail = document.getElementById("btnLaunchColdEmail");
+const btnLaunchTestTools = document.getElementById("btnLaunchTestTools");
 const btnPlay        = document.getElementById("btnPlay");
 const btnStopCapsule = document.getElementById("btnStopCapsule");
 const btnDeploy      = document.getElementById("btnDeploy");
@@ -576,7 +574,7 @@ function setCapsuleRunning(isRunning) {
   btnStopCapsule.disabled = !isRunning;
   // Disabled while a run is live -- popping more windows while the agent
   // is actively driving the mouse/keyboard (Scope #1) would be disruptive.
-  btnLaunchMockups.disabled = isRunning;
+  btnLaunchTestTools.disabled = isRunning;
   // The mini Play/Stop widget has no capsule-picker UI of its own, so it
   // needs to know which capsule name "Play" should mean -- this is the one
   // place that's called both right after a capsule loads/deploys AND on
@@ -610,7 +608,6 @@ async function loadCapsuleIntoSlot(capsule) {
   // automate_inbox.py), but still carries url+local_server so this Test
   // button can open its practice page on the same local server.
   ppTestGroup.hidden = capsule.kind === "url" && !capsule.local_server;
-  btnLaunchColdEmail.hidden = !(capsule.local_server && capsule.url);
 
   // A script-kind capsule (e.g. Scope #2) may or may not have a real,
   // swappable checkpoint -- Scope #2's matcher.pt is a genuine trained
@@ -673,7 +670,6 @@ function clearPlaySlot() {
   ppSlot.classList.remove("filled");
   ppCheckpointGroup.hidden = true;
   ppTestGroup.hidden = true;
-  btnLaunchColdEmail.hidden = true;
   workflowsListEl.querySelectorAll(".task-chip.capsule-selected")
     .forEach((el) => el.classList.remove("capsule-selected"));
   setCapsuleRunning(false);
@@ -704,38 +700,24 @@ btnDeploy.addEventListener("click", async () => {
   }
 });
 
-btnLaunchMockups.addEventListener("click", async () => {
+// Unified from three separate handlers (Launch mockups / View Schedule /
+// Launch Cold Email) per direct request -- one click now opens everything
+// relevant to the loaded task at once, via the single launch-test-tools
+// IPC channel that already branches per task on the main-process side.
+btnLaunchTestTools.addEventListener("click", async () => {
   if (!currentCapsule) return;
-  btnLaunchMockups.disabled = true;
+  btnLaunchTestTools.disabled = true;
   try {
-    const result = await window.capsulesAPI.launchTestMockups(currentCapsule.name);
+    const result = await window.capsulesAPI.launchTestTools(currentCapsule.name);
     if (result.ok) {
       capsuleLog(`Opened: ${result.opened.join(", ")}`, "ok");
     } else {
       capsuleLog(result.error, "err");
     }
   } catch (e) {
-    capsuleLog(`Couldn't launch mockups: ${e.message || e}`, "err");
+    capsuleLog(`Couldn't launch test tools: ${e.message || e}`, "err");
   } finally {
-    btnLaunchMockups.disabled = false;
-  }
-});
-
-btnViewSchedule.addEventListener("click", async () => {
-  try {
-    await window.capsulesAPI.viewSchedule();
-  } catch (e) {
-    capsuleLog(`Couldn't open schedule: ${e.message || e}`, "err");
-  }
-});
-
-btnLaunchColdEmail.addEventListener("click", async () => {
-  if (!currentCapsule) return;
-  try {
-    const result = await window.capsulesAPI.launchColdEmail(currentCapsule.name);
-    if (!result.ok) capsuleLog(result.error, "err");
-  } catch (e) {
-    capsuleLog(`Couldn't open Cold Email: ${e.message || e}`, "err");
+    btnLaunchTestTools.disabled = false;
   }
 });
 

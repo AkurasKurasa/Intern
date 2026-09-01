@@ -57,12 +57,12 @@ contextBridge.exposeInMainWorld("capsulesAPI", {
   // capsule changes); runCurrent() is what the widget's Play circle calls.
   setCurrent: (capsuleName) => ipcRenderer.invoke("capsule-set-current", capsuleName),
   runCurrent: () => ipcRenderer.invoke("capsule-run-current"),
-  // "Test" section -- opens the real target apps for a workflow so the
-  // user can get the environment ready (or just look around) before
-  // pressing Play.
-  launchTestMockups: (capsuleName) => ipcRenderer.invoke("test-launch-mockups", capsuleName),
-  launchColdEmail: (capsuleName) => ipcRenderer.invoke("launch-cold-email", capsuleName),
-  viewSchedule: () => ipcRenderer.invoke("view-schedule"),
+  // "Test" section -- opens everything relevant to a loaded workflow at
+  // once (real target apps, and for Inbox Dispatch also its schedule log
+  // + Cold Email page) so the user can get the environment ready, or just
+  // look around, before pressing Play. Unified from three separate calls
+  // per direct request.
+  launchTestTools: (capsuleName) => ipcRenderer.invoke("launch-test-tools", capsuleName),
 });
 
 contextBridge.exposeInMainWorld("inboxAPI", {

@@ -715,25 +715,45 @@ const TEST_MOCKUPS = {
   ],
 };
 
-ipcMain.handle("test-launch-mockups", (_evt, capsuleName) => {
-  // Inbox Dispatch's practice target isn't a {type, script/target} pair
-  // like form_filling/Sheet-to-Portal Matcher's real, separate apps below
-  // -- it's a page on the SAME local server Play's own automate_inbox.py
-  // run already starts (see ensureLocalServerRunning), just a different
-  // URL path. Checked by `local_server` alone, not `kind === "url"` --
-  // Inbox Dispatch's kind is "script" (Play actually clicks through the
-  // page now), but it still carries `url`/`local_server` purely for this
-  // button.
+// Unified from three separate handlers (test-launch-mockups, view-schedule,
+// launch-cold-email) per direct request -- one button now opens everything
+// relevant to the loaded task at once, instead of needing three separate
+// clicks to know about and press.
+ipcMain.handle("launch-test-tools", (_evt, capsuleName) => {
+  // Inbox Dispatch gets its own full set: Practice Inbox, the real
+  // schedule.txt log, and the Cold Email page, all on the SAME local
+  // server Play's own automate_inbox.py run already starts (see
+  // ensureLocalServerRunning). Checked by `local_server` alone, not
+  // `kind === "url"` -- Inbox Dispatch's kind is "script" (Play actually
+  // clicks through the page now), but it still carries `url`/`local_server`
+  // purely for this button.
   const capsule = listCapsules().find((c) => c.name === capsuleName);
   if (capsule && capsule.local_server && capsule.url) {
     ensureLocalServerRunning(capsule.local_server);
+    const opened = [];
+
     shell.openExternal(`${capsule.url}practice/`);
-    return { ok: true, opened: ["practice inbox"] };
+    opened.push("practice inbox");
+
+    const scheduleDir = path.join(REPO_ROOT, "components", "inbox_router", "data");
+    const schedulePath = path.join(scheduleDir, "schedule.txt");
+    if (!fs.existsSync(schedulePath)) {
+      fs.mkdirSync(scheduleDir, { recursive: true });
+      fs.writeFileSync(schedulePath, "");
+    }
+    const scheduleChild = spawn("notepad.exe", [schedulePath], { detached: true, stdio: "ignore" });
+    scheduleChild.unref();
+    opened.push("schedule.txt");
+
+    shell.openExternal(`${capsule.url}cold-email/`);
+    opened.push("cold email");
+
+    return { ok: true, opened };
   }
 
   const targets = TEST_MOCKUPS[capsuleName];
   if (!targets) {
-    return { ok: false, error: `No test mockups defined for '${capsuleName}'.` };
+    return { ok: false, error: `No test tools defined for '${capsuleName}'.` };
   }
   const opened = [];
   try {
@@ -759,35 +779,9 @@ ipcMain.handle("test-launch-mockups", (_evt, capsuleName) => {
       }
     }
   } catch (e) {
-    return { ok: false, error: `Failed to launch mockups: ${e.message}` };
+    return { ok: false, error: `Failed to launch test tools: ${e.message}` };
   }
   return { ok: true, opened };
-});
-
-ipcMain.handle("view-schedule", () => {
-  const scheduleDir = path.join(REPO_ROOT, "components", "inbox_router", "data");
-  const schedulePath = path.join(scheduleDir, "schedule.txt");
-  if (!fs.existsSync(schedulePath)) {
-    fs.mkdirSync(scheduleDir, { recursive: true });
-    fs.writeFileSync(schedulePath, "");
-  }
-  const child = spawn("notepad.exe", [schedulePath], { detached: true, stdio: "ignore" });
-  child.unref();
-  return { ok: true };
-});
-
-ipcMain.handle("launch-cold-email", (_evt, capsuleName) => {
-  // Same mechanism as test-launch-mockups above, just a different page on
-  // the same local server -- Cold Email is its own page, not a Test-section
-  // mockup, but it needs the exact same "make sure the server's running,
-  // then open a browser tab" two steps.
-  const capsule = listCapsules().find((c) => c.name === capsuleName);
-  if (capsule && capsule.local_server && capsule.url) {
-    ensureLocalServerRunning(capsule.local_server);
-    shell.openExternal(`${capsule.url}cold-email/`);
-    return { ok: true };
-  }
-  return { ok: false, error: "This task has no Cold Email page." };
 });
 
 // ── Settings tab -- LM Studio control via its own CLI (lms.exe), not a
