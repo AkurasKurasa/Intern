@@ -152,6 +152,56 @@ class TestProcessOneSkipsReplyForward:
         assert real_page_with_reply.locator(".row-item").count() == 1
 
 
+class TestAutoDraftReply:
+    # auto_draft_reply=True: a deliberate, explicitly authorized exception
+    # for "reply" only ("Break it goddamnit, I literally need to see it
+    # full functioning before I can deem this as complete") -- scoped
+    # exactly like automate_cold_email.py's own --commit exception, and
+    # only inside this script; router.py's real confirm_suggestion() path
+    # a person uses by hand is completely untouched.
+    def test_a_real_ai_drafted_reply_is_typed_and_sent(self, real_page_with_reply, monkeypatch):
+        import inbox_reply_llm
+        monkeypatch.setattr(inbox_reply_llm, "generate_reply",
+                             lambda sender, subject, body: "Thanks, I'll take care of it.")
+
+        assert real_page_with_reply.locator(".row-item").count() == 2
+
+        result = automate_inbox.process_one(real_page_with_reply, commit=True, index=0, skipped=0,
+                                             auto_draft_reply=True)
+
+        assert result["decision"] == "reply"
+        assert result["outcome"] == "confirmed (AI-drafted reply sent)"
+        # The row is really gone -- a real send happened, not a preview.
+        assert real_page_with_reply.locator(".row-item").count() == 1
+
+    def test_falls_back_to_left_pending_when_lm_studio_returns_nothing(self, real_page_with_reply, monkeypatch):
+        import inbox_reply_llm
+        monkeypatch.setattr(inbox_reply_llm, "generate_reply", lambda sender, subject, body: "")
+
+        result = automate_inbox.process_one(real_page_with_reply, commit=True, index=0, skipped=0,
+                                             auto_draft_reply=True)
+
+        assert result["outcome"] == "left pending -- LM Studio unavailable for auto-draft"
+        # Nothing was sent -- the row must still be there.
+        assert real_page_with_reply.locator(".row-item").count() == 2
+
+    def test_only_a_real_reply_decision_triggers_auto_draft(self, real_page_with_reply, monkeypatch):
+        # index 1 in this fixture is the generic email, which the LLM
+        # fallback (provider="none") decides "flag" for -- not "reply".
+        # Guards the exact-decision check: auto_draft_reply=True must
+        # never fire for forward/schedule/flag/leave_alone, only "reply".
+        import inbox_reply_llm
+        called = []
+        monkeypatch.setattr(inbox_reply_llm, "generate_reply",
+                             lambda sender, subject, body: called.append(1) or "should never be used")
+
+        result = automate_inbox.process_one(real_page_with_reply, commit=True, index=1, skipped=1,
+                                             auto_draft_reply=True)
+
+        assert result["decision"] != "reply"
+        assert not called, "generate_reply must only ever be called for a real 'reply' decision"
+
+
 class TestProcessOneDryRun:
     def test_dry_run_advances_through_distinct_emails_without_reprocessing(self, real_page):
         # Regression: process_one() used to always read row 0. A dry run
@@ -205,6 +255,54 @@ class TestReplyTextareaCarriesMessageId:
         assert name_attr == "i1"  # real_page's fixture opens messages i1/i2/i3 in order
 
 
+class TestMainWaitsForSlowFirstPoll:
+    def test_main_reads_real_rows_even_when_the_first_api_inbox_call_is_slow(self, tmp_path, monkeypatch):
+        # Regression, found live 2026-09-02: main() used to click Refresh
+        # then wait a fixed 600ms before reading rows off the page. That
+        # was only ever enough while /api/inbox read already-cached
+        # decisions -- a real LLM classify() call (the whole point of the
+        # llm_classifier.py model-id fix) takes real seconds, and the
+        # fixed wait raced ahead of the response, reading 0 rows and
+        # reporting "emails processed 0" even with real pending mail
+        # waiting. Fixed by waiting for the actual /api/inbox response
+        # instead of guessing how long it takes.
+        pytest.importorskip("playwright.sync_api")
+        import time
+        import playwright.sync_api as psa
+
+        router = _build_router(tmp_path, inbox=[
+            _msg("s1", "one@x.com", "slow-poll test email"),
+        ])
+        base_handler_cls = ls.make_handler(router)
+
+        class _SlowHandler(base_handler_cls):
+            def do_GET(self):
+                if self.path == "/api/inbox":
+                    time.sleep(1.5)  # longer than the old fixed 600ms wait
+                super().do_GET()
+
+        httpd = HTTPServer(("127.0.0.1", 0), _SlowHandler)
+        port = httpd.server_address[1]
+        thread = threading.Thread(target=httpd.serve_forever, daemon=True)
+        thread.start()
+        try:
+            monkeypatch.setattr(automate_inbox, "SERVER_URL", f"http://127.0.0.1:{port}/")
+            monkeypatch.setattr(automate_inbox, "ensure_server_running", lambda: None)
+            monkeypatch.setattr(automate_inbox, "REPO", tmp_path)
+            log_path = tmp_path / "run.json"
+            monkeypatch.setattr(sys, "argv", ["automate_inbox.py", "--commit", "--pace", "0",
+                                               "--headless", "--log", str(log_path)])
+
+            automate_inbox.main()
+
+            saved = json.loads(log_path.read_text(encoding="utf-8"))
+            assert saved["results"], "main() read 0 rows -- it raced ahead of the slow /api/inbox response"
+            assert saved["results"][0]["subject"] == "slow-poll test email"
+        finally:
+            httpd.shutdown()
+            thread.join(timeout=5)
+
+
 # ── main()'s recovery when the browser closes mid-run ───────────────────────
 # Same live-found issue and same fix as automate_cold_email.py's own
 # main(): the browser/page can close out from under the loop for reasons
@@ -218,10 +316,16 @@ class _FakeInboxPlaywrightError(Exception):
     pass
 
 
+class _FakeInboxExpectResponseCtx:
+    def __enter__(self): return self
+    def __exit__(self, *exc_info): return False
+
+
 class _FakeInboxPage:
     def goto(self, url): pass
     def click(self, sel): pass
     def wait_for_timeout(self, ms): pass
+    def expect_response(self, predicate, timeout=None): return _FakeInboxExpectResponseCtx()
 
 
 class _FakeInboxBrowser:
@@ -262,7 +366,7 @@ class TestMainRecoversFromMidRunBrowserClosure:
 
         calls = []
 
-        def _fake_process_one(page, commit, index, skipped):
+        def _fake_process_one(page, commit, index, skipped, dwell_ms=0, auto_draft_reply=False):
             calls.append((index, skipped))
             if len(calls) <= 2:
                 return {"sender": "s", "subject": f"m{len(calls)}", "decision": "flag",

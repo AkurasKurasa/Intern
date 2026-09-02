@@ -104,11 +104,19 @@ NEEDS_HUMAN_TEXT = {"reply", "forward", "schedule", "cold_email"}
 IMMEDIATE_ICON = {"leave_alone": "#archiveBtn", "flag": "#flagBtn"}
 
 
-def process_one(page, commit: bool, index: int, skipped: int = 0):
+def process_one(page, commit: bool, index: int, skipped: int = 0, dwell_ms: int = 0,
+                 auto_draft_reply: bool = False):
     """Reads one pending row off the real DOM, opens it, prints the real
     decision + rationale, then clicks the real icon for that decision
     (Archive for leave_alone, the flag star for flag) if --commit.
     Returns a result dict, or None once the inbox is empty.
+
+    dwell_ms: how long to leave the opened email visible on screen before
+    acting on it. Found live: with dwell_ms=0, main()'s own --pace only
+    delayed BETWEEN emails, so a person watching the real browser window
+    saw each email open and close in the same instant -- a flash, not
+    something followable. Real emails need to actually stay on screen
+    long enough to read before the next action happens.
 
     Confirming removes a row from the list, so committed runs read row
     `skipped` -- every row already skipped-in-place (see below) still
@@ -117,10 +125,17 @@ def process_one(page, commit: bool, index: int, skipped: int = 0):
     removes or skips anything, so it reads row `index` instead, advancing
     through the list without ever changing it.
 
-    Reply/forward/schedule/cold_email are never auto-confirmed here,
-    commit or not -- see NEEDS_HUMAN_TEXT above. Those are left pending --
-    in place, not removed -- for a human to actually open and answer
-    themselves."""
+    Forward/schedule/cold_email are never auto-confirmed here, commit or
+    not -- see NEEDS_HUMAN_TEXT above. Those are left pending, in place,
+    for a human to actually open and answer themselves.
+
+    auto_draft_reply=True is a deliberate, explicitly authorized
+    exception (see inbox_reply_llm.py's own docstring) for "reply"
+    specifically: a real AI-generated reply is typed and sent for real,
+    same shape as automate_cold_email.py's existing --commit exception.
+    Forward/schedule are untouched by this flag -- forward would need a
+    fabricated recipient address, schedule a fabricated date, both
+    actively wrong rather than just unreviewed."""
     row_index = skipped if commit else index
     row = page.locator(".row-item").nth(row_index)
     if row.count() == 0:
@@ -131,7 +146,12 @@ def process_one(page, commit: bool, index: int, skipped: int = 0):
 
     subject = page.locator("#detailSubject").inner_text()
     sender = page.locator("#detailSender").inner_text()
-    decision = page.locator("#detailDecision").inner_text()
+    # text_content(), not inner_text() -- #detailDecision is now a hidden
+    # element (the "Suggested: ..." text was removed from what a human
+    # sees), and inner_text() reads rendered text, returning "" for
+    # anything hidden. text_content() reads the raw DOM text regardless
+    # of visibility, which is what this script actually needs here.
+    decision = page.locator("#detailDecision").text_content()
     rationale = page.locator("#detailRationale").inner_text()
 
     print(f"\n  {sender}")
@@ -139,7 +159,25 @@ def process_one(page, commit: bool, index: int, skipped: int = 0):
     print(f"    decided: {decision}")
     print(f"    because: {rationale}")
 
-    if decision in NEEDS_HUMAN_TEXT:
+    if dwell_ms:
+        page.wait_for_timeout(dwell_ms)
+
+    if decision == "reply" and commit and auto_draft_reply:
+        body_text = page.locator("#detailBody").inner_text()
+        from inbox_reply_llm import generate_reply
+        reply_text = generate_reply(sender, subject, body_text)
+        if reply_text:
+            page.click("#replyPillBtn")
+            page.wait_for_selector("#replyBoxWrap:not([hidden])")
+            page.fill("#replyBody", reply_text)
+            print(f"    AI-drafted reply: {reply_text!r}")
+            page.click("#sendBtn")
+            page.wait_for_selector("#listView:not([hidden])")
+            outcome = "confirmed (AI-drafted reply sent)"
+        else:
+            page.click("#backBtn")
+            outcome = "left pending -- LM Studio unavailable for auto-draft"
+    elif decision in NEEDS_HUMAN_TEXT:
         page.click("#backBtn")
         outcome = ("left pending -- needs a real reply typed by a human" if decision in ("reply", "forward")
                     else "left pending -- needs real content typed by a human")
@@ -169,6 +207,10 @@ def main():
                     help="run without a visible browser window (default: visible)")
     ap.add_argument("--log", type=Path, default=None,
                     help="where to write the run log (default: data/runs/)")
+    ap.add_argument("--auto-draft-reply", action="store_true",
+                    help="explicit, deliberate exception: for 'reply' decisions only, generate a real "
+                         "reply via LM Studio and send it for real, instead of leaving it pending for "
+                         "a human to type -- requires --commit, has no effect otherwise")
     args = ap.parse_args()
 
     from playwright.sync_api import sync_playwright, Error as PlaywrightError
@@ -183,18 +225,35 @@ def main():
         browser = p.chromium.launch(headless=args.headless)
         page = browser.new_page()
         page.goto(SERVER_URL)
-        page.click("#toolbarRefreshBtn")
-        page.wait_for_timeout(600)
+        # A fixed short wait here used to be enough when /api/inbox only
+        # ever read already-cached decisions, but a real LLM classify()
+        # call can take a couple of seconds per email and this endpoint
+        # can be classifying many at once on first poll -- a fixed 600ms
+        # wait raced ahead of the real response and read an empty list.
+        # Wait for the actual response the click causes instead of
+        # guessing how long it takes.
+        with page.expect_response(lambda r: "/api/inbox" in r.url and r.request.method == "GET",
+                                   timeout=60_000):
+            page.click("#toolbarRefreshBtn")
+        page.wait_for_timeout(200)  # let the synchronous DOM render after the fetch settle
 
         banner(1, "Working through the inbox")
         skipped = 0
         try:
             while args.limit is None or len(results) < args.limit:
-                result = process_one(page, args.commit, len(results), skipped)
+                result = process_one(page, args.commit, len(results), skipped,
+                                      dwell_ms=int(args.pace * 1000),
+                                      auto_draft_reply=args.auto_draft_reply)
                 if result is None:
                     break
                 results.append(result)
-                if result["outcome"] != "confirmed":
+                # startswith(), not ==: a real AI-drafted-reply send also
+                # removes the row, same as a plain confirm, but reports a
+                # more specific outcome string ("confirmed (AI-drafted
+                # reply sent)") -- an exact-match check here would wrongly
+                # treat that row as still-pending and skip past whatever
+                # row replaces it next.
+                if not result["outcome"].startswith("confirmed"):
                     skipped += 1
                 time.sleep(args.pace)
         except PlaywrightError as exc:
@@ -222,7 +281,8 @@ def main():
     print(f"  emails processed  {len(results)}")
     for r in results:
         print(f"    {r['decision']:<14} {r['subject']}")
-    needing_reply = [r for r in results if r["decision"] in ("reply", "forward")]
+    needing_reply = [r for r in results
+                      if r["decision"] in ("reply", "forward") and not r["outcome"].startswith("confirmed")]
     if needing_reply:
         print(f"\n  {len(needing_reply)} email(s) need a real reply typed by a human -- "
               f"open http://localhost:8765/ yourself to answer them.")

@@ -172,7 +172,6 @@ function renderList() {
         <span class="row-subject">${escapeHtml(email.subject || "")}</span>
         <span class="row-preview"> - ${escapeHtml(snippetOf(email.body_text))}</span>
       </span>
-      <span class="row-badge">${escapeHtml(email.decision || "")}</span>
     `;
     li.querySelector(".row-checkbox").addEventListener("click", (e) => {
       e.stopPropagation();

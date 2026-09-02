@@ -130,10 +130,6 @@ body {
 .row-snippet { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .row-subject { font-weight: 700; }
 .row-preview { color: #5f6368; font-weight: 400; }
-.row-badge {
-  font-size: 11px; padding: 2px 8px; border-radius: 10px;
-  background: #e8eaed; color: #444; flex-shrink: 0;
-}
 .empty-state { color: #70757a; padding: 24px; }
 
 /* Detail (opened email) view */
@@ -161,7 +157,6 @@ body {
   white-space: pre-wrap; font-family: inherit; font-size: 14px;
   background: #fff; padding: 0 4px 16px;
 }
-.decision-hint { margin-top: 16px; font-size: 14px; color: #5f6368; }
 .reply-forward-bar { display: flex; gap: 8px; margin-top: 12px; }
 .btn-pill {
   background: #fff; border: 1px solid #dadce0; border-radius: 18px;
