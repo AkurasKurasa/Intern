@@ -193,7 +193,12 @@ def process_one(page, commit: bool, index: int, skipped: int = 0, dwell_ms: int 
         if reply_text:
             page.click("#replyPillBtn")
             page.wait_for_selector("#replyBoxWrap:not([hidden])")
-            page.fill("#replyBody", reply_text)
+            # press_sequentially(), not fill() -- fill() sets the value in
+            # one instant DOM write, nothing visible actually happens on
+            # screen. press_sequentially() sends one real keystroke at a
+            # time with a delay between each, so a person watching the
+            # real browser window actually sees it being typed.
+            page.locator("#replyBody").press_sequentially(reply_text, delay=35)
             print(f"    AI-drafted reply: {reply_text!r}")
             page.click("#sendBtn")
             page.wait_for_selector("#listView:not([hidden])")
@@ -213,8 +218,11 @@ def process_one(page, commit: bool, index: int, skipped: int = 0, dwell_ms: int 
         if note:
             page.click("#forwardPillBtn")
             page.wait_for_selector("#replyBoxWrap:not([hidden])")
-            page.fill("#forwardTo", recipient)
-            page.fill("#replyBody", note)
+            # press_sequentially(), not fill() -- see the reply branch
+            # above for why: a person watching the real browser window
+            # needs to actually see this get typed, not just appear.
+            page.locator("#forwardTo").press_sequentially(recipient, delay=35)
+            page.locator("#replyBody").press_sequentially(note, delay=35)
             print(f"    AI-drafted forward to {recipient!r}: {note!r}")
             page.click("#sendBtn")
             page.wait_for_selector("#listView:not([hidden])")

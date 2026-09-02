@@ -939,6 +939,14 @@ waiting on them.
 
   Verified in two passes: a targeted run of the 7 directly-affected test files (159 passed) confirmed the real fix before the full suite finished, then the full suite: 1620 passed, 9 skipped, 0 failed.
 
+- [x] `scope3_visible_typing_and_rationale_cjk_guard` — **2026-09-02, direct feedback watching a live run**: "I said I want to see it actually typing in a Reply, please." `page.fill()` sets a textarea's value in one instant DOM write -- nothing visible actually happens on screen, which is why the auto-drafted reply/forward demos never looked like anything was being typed even though a real draft really was created. Switched both to `locator.press_sequentially(text, delay=35)` in `automate_inbox.py`, which sends one real keystroke at a time -- a person watching the real browser window now genuinely sees it being typed.
+
+  **Second real bug, found live in that same run**: the classifier's own rationale text ("because: ...") leaked CJK meta-commentary mid-sentence -- the same failure mode the CJK guard in `inbox_reply_llm.py` already catches, but that guard only covers reply/forward generation, not `llm_classifier.py`'s own `classify()` call. Added the identical guard to `classify()`'s rationale field specifically: unlike the reply/forward case (where the generated text IS the whole point, so a malformed response fails the call closed), a garbled rationale doesn't invalidate the real decision/confidence the same response carries -- so this replaces just the rationale text with a generic fallback rather than discarding the whole classification. New test `test_classify_sanitizes_a_malformed_cjk_rationale` confirms the real decision/confidence survive while the garbled text is replaced.
+
+  Verified live immediately after: a fresh run showed 3 real replies visibly typed character-by-character and drafted, 1 leave_alone confirmed, 3 schedule items correctly left pending, and one reply correctly failed closed when LM Studio didn't respond usably (the existing fail-closed safety net, not a new bug). One transient test failure during that same run (`test_commit_processes_every_email_down_to_empty`, unrelated to either fix -- doesn't even reach the `auto_draft_reply` code path) confirmed as resource contention from running the live demo and the test suite at once, not a regression -- passes clean in isolation.
+
+  Full suite: 1621 passed, 9 skipped, 0 failed.
+
 - [ ] `scope3_email_triage` *(superseded framing — predates the concrete
   shape above)*: the very original bare stub, a GUI-demonstration-based
   triage system (watch UIA/screen state the way Scope #1/#2 do). Still a

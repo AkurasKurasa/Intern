@@ -54,6 +54,17 @@ _DEFAULT_MODELS = {
 }
 _GROQ_BASE_URL = "https://api.groq.com/openai/v1"
 
+# Found live: a small local model can leak its own meta-commentary into
+# a rationale (seen mixed into a real "because:" line during a live
+# run). Every rationale in this project is English, so any CJK
+# (Chinese/Japanese/Korean) character is itself proof something went
+# wrong -- same signal, same regex as inbox_reply_llm.py's own guard on
+# generated reply/forward text, applied here to the rationale field
+# specifically. The decision/confidence themselves are still usable
+# even when the rationale is garbled, so this replaces the text rather
+# than failing the whole classification closed.
+_CJK_RE = re.compile(r"[一-鿿぀-ヿ가-힯]")
+
 _SYSTEM_PROMPT = (
     "You triage a single email for a real person. Choose exactly one of these outcomes:\n"
     "  reply        - the user should reply directly\n"
@@ -180,10 +191,13 @@ class LLMClassifier:
         decision = parsed.get("decision", "leave_alone")
         if decision not in DECISIONS:
             decision = "leave_alone"
+        rationale = str(parsed.get("rationale", ""))
+        if _CJK_RE.search(rationale):
+            rationale = "Decision made (rationale text was malformed)."
         return ClassificationResult(
             decision=decision,
             confidence=float(parsed.get("confidence", 0.5) or 0.5),
-            rationale=str(parsed.get("rationale", "")),
+            rationale=rationale,
             capsule_name=str(parsed.get("capsule_name", "") or ""),
             forward_to=str(parsed.get("forward_to", "") or ""),
         )
