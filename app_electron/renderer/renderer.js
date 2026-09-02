@@ -982,7 +982,6 @@ async function loadWorkflows() {
 // decorative filler, mirroring how the reference's own kickers ("Data
 // Bus Width 64-bits") are real specs, not placeholder labels.
 function taskChipKicker(capsule) {
-  if (capsule.kind === "script") return "TASK · SCRIPT";
   if (capsule.kind === "url") return "TASK · LINK";
   return "TASK · AGENT";
 }

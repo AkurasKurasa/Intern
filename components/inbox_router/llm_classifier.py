@@ -62,8 +62,7 @@ _SYSTEM_PROMPT = (
     "deadline) that belongs on a calendar\n"
     "  cold_email   - unsolicited outreach from someone with no prior relationship "
     "to the user\n"
-    "  flag         - this needs a person's judgment, don't act automatically\n"
-    "  leave_alone  - no action needed\n"
+    "  leave_alone  - no action needed, or nothing confident enough to act on\n"
     "You are given the email and what's known about how this same sender has been "
     "handled before. Respond with ONLY a JSON object: "
     '{"decision": "...", "confidence": 0.0-1.0, "rationale": "one short sentence", '
@@ -74,7 +73,7 @@ _SYSTEM_PROMPT = (
 
 @dataclass
 class ClassificationResult:
-    decision: str = "flag"
+    decision: str = "leave_alone"
     confidence: float = 0.0
     rationale: str = ""
     capsule_name: str = ""
@@ -159,8 +158,8 @@ class LLMClassifier:
                  rule_hint: RuleDecision) -> ClassificationResult:
         if not self.available:
             return ClassificationResult(
-                decision="flag", confidence=0.0,
-                rationale="No LLM provider configured — flagged for a person to decide.",
+                decision="leave_alone", confidence=0.0,
+                rationale="No LLM provider configured — left alone, nothing confident to act on.",
             )
         user_msg = self._build_prompt(message, pattern)
         try:
@@ -175,12 +174,12 @@ class LLMClassifier:
             parsed = _parse_llm_response(raw)
         except Exception as exc:
             return ClassificationResult(
-                decision="flag", confidence=0.0,
-                rationale=f"LLM classification failed ({exc}) — flagged for a person to decide.",
+                decision="leave_alone", confidence=0.0,
+                rationale=f"LLM classification failed ({exc}) — left alone, nothing confident to act on.",
             )
-        decision = parsed.get("decision", "flag")
+        decision = parsed.get("decision", "leave_alone")
         if decision not in DECISIONS:
-            decision = "flag"
+            decision = "leave_alone"
         return ClassificationResult(
             decision=decision,
             confidence=float(parsed.get("confidence", 0.5) or 0.5),

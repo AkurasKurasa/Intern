@@ -36,7 +36,7 @@ from pattern_profile import PatternProfile
 _ROOT = os.path.dirname(os.path.dirname(_THIS_DIR))
 DEFAULT_REGISTRY_PATH = os.path.join(_ROOT, "tasks", "registry.json")
 
-DECISIONS = {"reply", "forward", "schedule", "cold_email", "flag", "leave_alone"}
+DECISIONS = {"reply", "forward", "schedule", "cold_email", "leave_alone"}
 
 
 @dataclass

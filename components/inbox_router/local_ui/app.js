@@ -57,15 +57,19 @@ const forwardTo = document.getElementById("forwardTo");
 // The real-Gmail-style icons/pills below set this directly -- there's no
 // separate "pick from a list, then click Override" step anymore. Clicking
 // the real thing you want (Reply, Forward, Schedule's snooze icon, the
-// flag star, the archive icon) IS the action, the same way it is in real
-// Gmail. Reply/Forward/Schedule need typed content first, so they only
-// set this and reveal the text box; Archive/Flag need nothing typed, so
-// they call performDecision() immediately.
+// archive icon) IS the action, the same way it is in real Gmail.
+// Reply/Forward/Schedule need typed content first, so they only set this
+// and reveal the text box; Archive needs nothing typed, so it calls
+// performDecision() immediately.
 let pendingDecision = null;
 
+// "Drafted", not "sent"/"forwarded" -- gmail_client.py deliberately has
+// no send()/send_message() method anywhere in this project. These
+// buttons really call create_draft(): a real draft gets created and
+// saved, but nothing here ever delivers an email anywhere.
 const SNACKBAR_TEXT = {
-  reply: "Reply sent.", forward: "Forwarded.", schedule: "Scheduled.",
-  flag: "Flagged.", leave_alone: "Archived.",
+  reply: "Reply drafted.", forward: "Forward drafted.", schedule: "Scheduled.",
+  leave_alone: "Archived.",
 };
 
 const STAR_FILLED = '<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>';
@@ -428,7 +432,6 @@ document.getElementById("refreshBtn").addEventListener("click", () => {
 document.getElementById("toolbarRefreshBtn").addEventListener("click", loadInbox);
 document.getElementById("backBtn").addEventListener("click", closeMessage);
 document.getElementById("archiveBtn").addEventListener("click", () => performDecision("leave_alone"));
-document.getElementById("flagBtn").addEventListener("click", () => performDecision("flag"));
 document.getElementById("scheduleBtn").addEventListener("click", () => selectPendingDecision("schedule"));
 document.getElementById("replyPillBtn").addEventListener("click", () => selectPendingDecision("reply"));
 document.getElementById("forwardPillBtn").addEventListener("click", () => selectPendingDecision("forward"));

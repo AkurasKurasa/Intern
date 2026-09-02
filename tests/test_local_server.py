@@ -135,7 +135,7 @@ class TestHandleRequestInboxUnprocessed:
         payload = json.loads(body)
         assert payload["done"] is False
         assert payload["entry"]["message_id"] == "i1"
-        assert payload["entry"]["decision"] == "flag"  # no LLM configured -> flag
+        assert payload["entry"]["decision"] == "leave_alone"  # no LLM configured -> leave_alone
         # The one message just processed no longer shows up as waiting.
         status, _headers, body, _ct = ls.handle_request("GET", "/api/inbox/unprocessed", b"", router)
         assert json.loads(body)["waiting"] == []
@@ -591,7 +591,7 @@ class TestPracticeInboxRoutes:
         # reply_body is optional -- omitting it entirely (not just sending
         # blank) must not break the existing decision-only flow.
         router = _build_router(tmp_path, inbox=[_msg("i1", "stranger@x.com", "hello")])
-        body = json.dumps({"message_id": "i1", "decision": "flag"}).encode("utf-8")
+        body = json.dumps({"message_id": "i1", "decision": "leave_alone"}).encode("utf-8")
         status, _headers, resp_body, _ct = ls.handle_request("POST", "/practice/api/record", body, router)
         assert status == 200
         assert json.loads(resp_body) == {"ok": True}

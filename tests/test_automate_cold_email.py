@@ -97,6 +97,55 @@ def real_page_with_task_list(tmp_path):
         thread.join(timeout=5)
 
 
+class TestMainWaitsForSlowFirstPoll:
+    def test_main_reads_real_targets_even_when_the_first_targets_call_is_slow(self, tmp_path, monkeypatch):
+        # Regression, found live 2026-09-02: main() called
+        # setView('cold_email') then waited a fixed 600ms before reading
+        # rows off the DOM. That raced ahead of the real
+        # /cold-email/api/targets fetch and read 0 rows even with real
+        # targets waiting -- "Nobody left on the task list" for a task
+        # list that genuinely had people on it. Fixed with
+        # page.expect_response() around the setView() call, same fix
+        # already proven for automate_inbox.py's own identical bug.
+        pytest.importorskip("playwright.sync_api")
+        import time
+
+        router = _build_router(tmp_path)
+        task_list_path = tmp_path / "task_list.txt"
+        task_list_path.write_text("Cold email:\nDana Whitfield <dana@x.example.com>\n", encoding="utf-8")
+        gmail = _FakeGmailClientForColdEmail()
+        sender = ColdEmailSender(gmail, task_list_path=str(task_list_path),
+                                  state_path=str(tmp_path / "cold_email_state.json"))
+        base_handler_cls = ls.make_handler(router, cold_email_sender=sender)
+
+        class _SlowHandler(base_handler_cls):
+            def do_GET(self):
+                if self.path == "/cold-email/api/targets":
+                    time.sleep(1.5)  # longer than the old fixed 600ms wait
+                super().do_GET()
+
+        httpd = HTTPServer(("127.0.0.1", 0), _SlowHandler)
+        port = httpd.server_address[1]
+        thread = threading.Thread(target=httpd.serve_forever, daemon=True)
+        thread.start()
+        try:
+            monkeypatch.setattr(automate_cold_email, "SERVER_URL", f"http://127.0.0.1:{port}/")
+            monkeypatch.setattr(automate_cold_email, "ensure_server_running", lambda: None)
+            monkeypatch.setattr(automate_cold_email, "REPO", tmp_path)
+            log_path = tmp_path / "run.json"
+            monkeypatch.setattr(sys, "argv", ["automate_cold_email.py", "--pace", "0",
+                                               "--headless", "--log", str(log_path)])
+
+            automate_cold_email.main()
+
+            saved = json.loads(log_path.read_text(encoding="utf-8"))
+            assert saved["results"], "main() read 0 targets -- it raced ahead of the slow targets response"
+            assert saved["results"][0]["name"] == "Dana Whitfield"
+        finally:
+            httpd.shutdown()
+            thread.join(timeout=5)
+
+
 class TestProcessOneDryRun:
     def test_reads_the_real_target_off_the_dom_and_never_sends(self, real_page_with_task_list):
         page, gmail = real_page_with_task_list
@@ -128,14 +177,14 @@ class TestProcessOneCommit:
     test in this suite already holds; cold_email_llm.py has its own
     dedicated tests for the real LM Studio call."""
 
-    def test_commit_types_the_generated_text_and_actually_sends(self, real_page_with_task_list, monkeypatch):
+    def test_commit_types_the_generated_text_and_actually_creates_a_draft(self, real_page_with_task_list, monkeypatch):
         page, gmail = real_page_with_task_list
         monkeypatch.setattr(automate_cold_email, "generate_cold_email",
                              lambda name, context: ("Real subject", "Real body text."))
 
         result = automate_cold_email.process_one(page, True, 0)
 
-        assert result["outcome"] == "sent"
+        assert result["outcome"] == "drafted"
         assert result["subject"] == "Real subject"
         assert result["body"] == "Real body text."
         assert gmail.drafts == [{"to": "dana@x.example.com", "subject": "Real subject",
@@ -179,12 +228,18 @@ class _FakePlaywrightError(Exception):
     this exact class as the module's Error for the duration of the test."""
 
 
+class _FakeExpectResponseCtx:
+    def __enter__(self): return self
+    def __exit__(self, *exc_info): return False
+
+
 class _FakePage:
     def goto(self, url): pass
     def wait_for_selector(self, sel, **kwargs): pass
     def click(self, sel, **kwargs): pass
     def wait_for_timeout(self, ms): pass
     def evaluate(self, script): pass
+    def expect_response(self, predicate, timeout=None): return _FakeExpectResponseCtx()
 
 
 class _FakeBrowser:
@@ -246,7 +301,7 @@ class TestMainRecoversFromMidRunBrowserClosure:
             calls.append(index)
             if len(calls) <= 2:
                 return {"name": f"Target {len(calls)}", "email": f"t{len(calls)}@x.example.com",
-                        "subject": "s", "body": "b", "outcome": "sent"}
+                        "subject": "s", "body": "b", "outcome": "drafted"}
             raise _FakePlaywrightError("Target page, context or browser has been closed")
 
         monkeypatch.setattr(automate_cold_email, "process_one", _fake_process_one)
@@ -260,9 +315,9 @@ class TestMainRecoversFromMidRunBrowserClosure:
         assert result == 0
         assert "Browser closed unexpectedly" in capsys.readouterr().out
         saved = json.loads(log_path.read_text(encoding="utf-8"))
-        assert len(saved["results"]) == 2  # the 2 real sends survive; the crash doesn't erase them
-        assert saved["results"][0]["outcome"] == "sent"
-        assert saved["results"][1]["outcome"] == "sent"
+        assert len(saved["results"]) == 2  # the 2 real drafts survive; the crash doesn't erase them
+        assert saved["results"][0]["outcome"] == "drafted"
+        assert saved["results"][1]["outcome"] == "drafted"
 
     def test_a_second_closure_error_from_browser_close_itself_is_also_swallowed(self, tmp_path, monkeypatch, fake_playwright):
         """The browser already died once (mid-loop); calling close() on an

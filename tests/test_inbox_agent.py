@@ -41,10 +41,10 @@ class TestColdStart:
         result = agent.decide(_msg())
         assert result.layer in ("rule", "llm")
 
-    def test_no_checkpoint_flags_unresolved_email(self, tmp_path):
+    def test_no_checkpoint_leaves_unresolved_email_alone(self, tmp_path):
         agent = _agent(tmp_path, checkpoint_path=str(tmp_path / "no_such_checkpoint.pt"))
         result = agent.decide(_msg(sender_email="stranger@nowhere.com", subject="totally unrelated"))
-        assert result.decision == "flag"
+        assert result.decision == "leave_alone"
         assert result.layer == "llm"
 
     def test_corrupt_checkpoint_falls_back_to_reasoning(self, tmp_path):
@@ -107,7 +107,7 @@ class TestFastFillWithTrainedCheckpoint:
     def test_confident_schedule_prediction_fast_fills_with_no_verification_gate(self, tmp_path):
         # Task 1's redefinition removed the old route_scope1/route_scope2
         # capsule-verification gate entirely -- "schedule" is just another
-        # decision now, fast-filled directly like reply/forward/flag, with
+        # decision now, fast-filled directly like reply/forward, with
         # nothing left to verify.
         examples_path = str(tmp_path / "examples.jsonl")
         for i in range(3):

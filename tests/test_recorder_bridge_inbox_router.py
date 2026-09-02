@@ -97,7 +97,7 @@ class TestStartInboxRouter:
     def test_stdout_lines_with_event_field_pass_through_verbatim(self, monkeypatch):
         events = _events(monkeypatch)
         lines = [
-            json.dumps({"event": "inbox_routed", "message_id": "m1", "decision": "flag"}) + "\n",
+            json.dumps({"event": "inbox_routed", "message_id": "m1", "decision": "leave_alone"}) + "\n",
             "",
         ]
         monkeypatch.setattr(rb.subprocess, "Popen", lambda *a, **k: _FakeInboxProc(lines=lines))
@@ -114,7 +114,7 @@ class TestStartInboxRouter:
         routed = [e for e in events if e["event"] == "inbox_routed"]
         assert len(routed) == 1
         assert routed[0]["message_id"] == "m1"
-        assert routed[0]["decision"] == "flag"
+        assert routed[0]["decision"] == "leave_alone"
 
     def test_non_json_stdout_line_becomes_inbox_log(self, monkeypatch):
         events = _events(monkeypatch)
@@ -249,9 +249,9 @@ class TestDispatchLoopWiring:
         fake_proc = _FakeInboxProc()
         bridge._inbox_proc = fake_proc
 
-        self._dispatch(bridge, {"cmd": "inbox_confirm_suggestion", "message_id": "m1", "decision": "flag"})
+        self._dispatch(bridge, {"cmd": "inbox_confirm_suggestion", "message_id": "m1", "decision": "leave_alone"})
 
-        assert json.loads(fake_proc.written[0].strip())["decision"] == "flag"
+        assert json.loads(fake_proc.written[0].strip())["decision"] == "leave_alone"
 
     def test_inbox_confirm_suggestion_command_carries_reply_body(self, monkeypatch):
         bridge = rb.Bridge()

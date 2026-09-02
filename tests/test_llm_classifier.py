@@ -64,7 +64,7 @@ def test_lmstudio_falls_back_to_placeholder_when_unreachable(monkeypatch):
         raise ConnectionError("LM Studio not running")
     monkeypatch.setattr(llm_classifier, "_OpenAI", _boom)
     # Constructing the classifier must not raise even if LM Studio is down --
-    # classify() itself fails closed to "flag" later, same as before this fix.
+    # classify() itself fails closed to "leave_alone" later.
     classifier = LLMClassifier(provider="lmstudio")
     assert classifier._llm_model == "local-model"
     assert not classifier.available

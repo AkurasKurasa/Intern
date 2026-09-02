@@ -171,11 +171,11 @@ class TestRuleLayer:
 
 
 class TestLLMClassifierOffline:
-    def test_no_provider_is_not_available_and_flags(self):
+    def test_no_provider_is_not_available_and_leaves_alone(self):
         classifier = LLMClassifier(provider="none")
         assert classifier.available is False
         result = classifier.classify(EmailMessage(**_msg("i1", "a@b.com", "x")), None, None)
-        assert result.decision == "flag"
+        assert result.decision == "leave_alone"
         assert result.confidence == 0.0
 
     def test_draft_message_returns_empty_when_unavailable(self):
@@ -191,7 +191,7 @@ class TestInboxRouterPollOnce:
         registry_path = tmp_path / "registry.json"
         registry_path.write_text(json.dumps({"capsules": capsules or []}), encoding="utf-8")
         rules = RuleLayer(profile, registry_path=str(registry_path))
-        classifier = LLMClassifier(provider="none")  # offline -> unresolved emails get "flag"
+        classifier = LLMClassifier(provider="none")  # offline -> unresolved emails get "leave_alone"
         history_path = str(tmp_path / "data" / "routed_history.json")
         return InboxRouter(client, profile, rules, classifier, history_path=history_path,
                             inbox_checkpoint_path=str(tmp_path / "no_such_checkpoint.pt"),
@@ -205,10 +205,10 @@ class TestInboxRouterPollOnce:
         # Second poll: the message was marked processed, must not reappear.
         assert router.poll_once() == []
 
-    def test_unresolved_email_falls_through_to_flag_with_no_llm(self, tmp_path):
+    def test_unresolved_email_falls_through_to_leave_alone_with_no_llm(self, tmp_path):
         router = self._build(tmp_path, inbox=[_msg("i1", "stranger@x.com", "totally unrelated")])
         routed = router.poll_once()
-        assert routed[0]["decision"] == "flag"
+        assert routed[0]["decision"] == "leave_alone"
         assert routed[0]["layer"] == "llm"
 
     def test_history_file_reflects_routed_entries(self, tmp_path):
@@ -245,14 +245,14 @@ class TestInboxRouterPollOnce:
         history_path.write_text(json.dumps({"messages": [stale_duplicate, stale_duplicate, current_row]}), encoding="utf-8")
 
         assert any(e["message_id"] == "i1" for e in router.pending_entries())
-        router.confirm_suggestion("i1", "flag")
+        router.confirm_suggestion("i1", "leave_alone")
         assert not any(e["message_id"] == "i1" for e in router.pending_entries())
 
     def test_confirm_reply_with_real_text_creates_one_draft_with_that_text(self, tmp_path):
         # No LLM involved: the draft's body is exactly the real text
         # passed in, nothing generated.
         router = self._build(tmp_path, inbox=[_msg("i1", "stranger@x.com", "unrelated")])
-        router.poll_once()  # -> flag (no LLM configured)
+        router.poll_once()  # -> leave_alone (no LLM configured)
         router.confirm_suggestion("i1", "reply", reply_body="Thanks, I'll take a look.")
 
         drafts = json.loads((tmp_path / "data" / "mock_drafts.json").read_text())["drafts"]
@@ -291,7 +291,7 @@ class TestInboxRouterPollOnce:
         # creating an unaddressed, useless draft. A human typing a real
         # recipient must actually reach the draft.
         router = self._build(tmp_path, inbox=[_msg("i1", "stranger@x.com", "unrelated")])
-        router.poll_once()  # -> flag (no LLM configured), forward_to stays blank on the entry
+        router.poll_once()  # -> leave_alone (no LLM configured), forward_to stays blank on the entry
         router.override_decision("i1", "forward", reply_body="FYI, please review.",
                                   forward_to="colleague@example.com")
 
@@ -336,45 +336,14 @@ class TestInboxRouterPollOnce:
 
         assert reply_recorder.load_reply_examples(path=router._reply_examples_path) == []
 
-    def test_confirm_flag_creates_no_draft(self, tmp_path):
-        router = self._build(tmp_path, inbox=[_msg("i1", "stranger@x.com", "unrelated")])
-        router.poll_once()
-        router.confirm_suggestion("i1", "flag")
-
-        assert not (tmp_path / "data" / "mock_drafts.json").exists()
-        history = json.loads(Path(router._history_path).read_text())["messages"]
-        assert history[0]["status"] == "confirmed"
-
-    def test_confirm_flag_applies_a_real_flag_label(self, tmp_path):
-        # Flag is meant to be a concrete action, not just a recorded
-        # decision -- confirming "flag" must actually flag the real
-        # message so it's findable, not just logged in this project's
-        # own history.
-        router = self._build(tmp_path, inbox=[_msg("i1", "stranger@x.com", "unrelated")])
-        router.poll_once()
-        router.confirm_suggestion("i1", "flag")
-
-        state = json.loads((tmp_path / "data" / "mock_state.json").read_text())
-        assert state.get("flagged_ids") == ["i1"]
-
-    def test_override_to_flag_applies_a_real_flag_label(self, tmp_path):
-        router = self._build(tmp_path, inbox=[_msg("i1", "stranger@x.com", "unrelated")])
-        router.poll_once()
-        router.override_decision("i1", "flag", reason="needs a person's judgment")
-
-        state = json.loads((tmp_path / "data" / "mock_state.json").read_text())
-        assert state.get("flagged_ids") == ["i1"]
-
-    def test_confirm_leave_alone_does_not_apply_flag_label(self, tmp_path):
-        # leave_alone is correctly a real no-op -- must not accidentally
-        # also flag the message.
+    def test_confirm_leave_alone_creates_no_draft(self, tmp_path):
         router = self._build(tmp_path, inbox=[_msg("i1", "stranger@x.com", "unrelated")])
         router.poll_once()
         router.confirm_suggestion("i1", "leave_alone")
 
-        state_path = tmp_path / "data" / "mock_state.json"
-        state = json.loads(state_path.read_text()) if state_path.exists() else {}
-        assert not state.get("flagged_ids")
+        assert not (tmp_path / "data" / "mock_drafts.json").exists()
+        history = json.loads(Path(router._history_path).read_text())["messages"]
+        assert history[0]["status"] == "confirmed"
 
     def test_override_updates_history_and_pattern_profile(self, tmp_path):
         router = self._build(tmp_path, inbox=[_msg("i1", "stranger@x.com", "unrelated")])
@@ -438,7 +407,7 @@ class TestInboxRouterPollOnce:
         router._append_history({
             "message_id": "i1", "thread_id": "t1", "subject": "totally unrelated",
             "sender": "Someone <stranger@x.com>", "sender_email": "stranger@x.com",
-            "received_at": "", "body_text": "", "decision": "flag",
+            "received_at": "", "body_text": "", "decision": "leave_alone",
             "capsule_name": "", "confidence": 0.0, "rationale": "", "layer": "rule",
             "forward_to": "", "status": "pending", "draft_id": "",
             "routed_at": "2099-01-01T00:00:00+00:00",
@@ -481,7 +450,7 @@ class TestInboxRouterPollOnce:
 
         first = router.process_next_unprocessed()
         assert first["message_id"] == "i1"
-        assert first["decision"] == "flag"
+        assert first["decision"] == "leave_alone"
         assert first["layer"] == "llm"
         # Only the one message was processed -- the other is still waiting.
         assert len(router.list_unprocessed_stubs()) == 1
@@ -601,7 +570,7 @@ class TestInboxRouterSessionMetrics:
 
         row = json.loads(metrics_path.read_text(encoding="utf-8").splitlines()[0])
         assert row["decisions"]["reply"] == 1
-        assert row["decisions"]["flag"] == 1
+        assert row["decisions"]["leave_alone"] == 1
 
     def test_record_session_metrics_counts_rule_vs_llm_layer(self, tmp_path):
         router = self._build(
@@ -611,7 +580,7 @@ class TestInboxRouterSessionMetrics:
         )
         pattern = router._profile._get_or_create("work.com")
         pattern.reply_count, pattern.forward_count, pattern.ignore_count = 9, 0, 1
-        router.poll_once()  # i1 -> rule (lopsided pattern), i2 -> llm (falls through, no LLM configured -> flag)
+        router.poll_once()  # i1 -> rule (lopsided pattern), i2 -> llm (falls through, no LLM configured -> leave_alone)
         metrics_path = tmp_path / "run_metrics.jsonl"
         router._record_session_metrics(path=str(metrics_path))
 
@@ -775,10 +744,10 @@ class TestPracticeInbox:
 
     def test_record_practice_decision_reply_body_ignored_for_non_text_decisions(self, tmp_path):
         router = self._build(tmp_path, inbox=[_msg("i1", "stranger@x.com", "hello")])
-        # A stray reply_body sent alongside flag/cold_email/leave_alone
-        # must never be written anywhere -- only reply/forward/schedule
-        # ever record typed content.
-        router.record_practice_decision("i1", "flag", reply_body="this should never be saved")
+        # A stray reply_body sent alongside cold_email/leave_alone must
+        # never be written anywhere -- only reply/forward/schedule ever
+        # record typed content.
+        router.record_practice_decision("i1", "leave_alone", reply_body="this should never be saved")
 
         assert not (tmp_path / "data" / "reply_examples.jsonl").exists()
         assert not (tmp_path / "data" / "schedule.txt").exists()
@@ -889,8 +858,7 @@ class TestScheduleRecording:
         router.poll_once()
         entry_id = router.pending_entries()[0]["message_id"]
         # Must not raise -- a calendar failure is logged, not fatal, same as
-        # every other real-action failure in this file (draft creation,
-        # flag labels).
+        # every other real-action failure in this file (draft creation).
         router.confirm_suggestion(entry_id, "schedule", reply_body="note",
                                    event_start="2026-09-03T14:00:00-07:00",
                                    event_end="2026-09-03T14:30:00-07:00")
@@ -956,7 +924,7 @@ class TestReadStdinCommandsCarryReplyBody:
         captured = {}
         monkeypatch.setattr(router, "confirm_suggestion",
                              lambda message_id, decision, reply_body="": captured.update(reply_body=reply_body))
-        line = json.dumps({"cmd": "confirm", "message_id": "m1", "decision": "flag"})
+        line = json.dumps({"cmd": "confirm", "message_id": "m1", "decision": "leave_alone"})
         monkeypatch.setattr(sys, "stdin", iter([line]))
 
         router._read_stdin_commands()

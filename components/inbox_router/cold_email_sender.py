@@ -4,7 +4,7 @@ components/inbox_router/cold_email_sender.py
 Output step for the "cold email" decision -- Reply/Forward's create_draft()
 call, reused as-is, for a brand-new contact sourced from a task list
 document instead of an existing inbox thread. Deliberately does NOT call
-decision_recorder.record_example(): unlike Reply/Forward/Schedule/Flag,
+decision_recorder.record_example(): unlike Reply/Forward/Schedule/Leave alone,
 there's no inbox-triage decision being learned here -- the task list
 already decided WHO, there's no ambiguous message being classified.
 """

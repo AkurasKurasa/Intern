@@ -80,7 +80,7 @@ class TestDecisionsOrder:
         # Task 1's whole point: route_scope1/route_scope2 are gone,
         # schedule/cold_email are the replacements. Every later task in
         # this plan assumes this exact list, in this exact order.
-        assert feats.DECISIONS_ORDER == ["reply", "forward", "schedule", "cold_email", "flag", "leave_alone"]
+        assert feats.DECISIONS_ORDER == ["reply", "forward", "schedule", "cold_email", "leave_alone"]
 
     def test_feature_names_has_no_rule_hit_scope_features(self):
         assert "rule_hit_scope1" not in feats.FEATURE_NAMES

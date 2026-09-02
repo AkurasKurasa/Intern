@@ -29,7 +29,7 @@ const sendBtn = document.getElementById("sendBtn");
 
 // Reply/Forward/Schedule need real typed content first -- clicking the
 // pill or the Snooze icon just reveals the box and remembers which one
-// is pending. Archive/Flag need nothing typed, so they record immediately.
+// is pending. Archive needs nothing typed, so it records immediately.
 let pendingDecision = null;
 
 const STAR_FILLED = '<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>';
@@ -196,7 +196,6 @@ document.getElementById("refreshBtn").addEventListener("click", loadInbox);
 document.getElementById("toolbarRefreshBtn").addEventListener("click", loadInbox);
 document.getElementById("backBtn").addEventListener("click", closeMessage);
 document.getElementById("archiveBtn").addEventListener("click", () => recordDecision("leave_alone"));
-document.getElementById("flagBtn").addEventListener("click", () => recordDecision("flag"));
 document.getElementById("scheduleBtn").addEventListener("click", () => selectDecision("schedule"));
 document.getElementById("replyPillBtn").addEventListener("click", () => selectDecision("reply"));
 document.getElementById("forwardPillBtn").addEventListener("click", () => selectDecision("forward"));

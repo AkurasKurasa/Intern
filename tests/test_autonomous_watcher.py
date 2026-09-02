@@ -92,7 +92,7 @@ class TestHandleEntry:
         # doesn't have reply_agent/gmail_client wiring for (which is all
         # of them here, since neither is supplied) falls to the one
         # remaining fallback outcome.
-        for decision in ("reply", "forward", "schedule", "cold_email", "flag", "leave_alone"):
+        for decision in ("reply", "forward", "schedule", "cold_email", "leave_alone"):
             outcome = watcher.handle_entry(_entry(decision))
             assert outcome["action"] == "left_pending"
 
@@ -185,7 +185,7 @@ class TestHandleEntryAutoDraft:
         # non-reply/forward decision to do anything Gmail-side.
         gmail_client = FakeGmailClient([_msg(mid="m1")])
         reply_agent = FakeReplyAgent(FakeReplySuggestion(reply_body="irrelevant", confidence=0.99))
-        entry = _entry("flag", message_id="m1")
+        entry = _entry("leave_alone", message_id="m1")
 
         outcome = watcher.handle_entry(entry,
                                         reply_agent=reply_agent, gmail_client=gmail_client)
@@ -197,7 +197,7 @@ class TestHandleEntryAutoDraft:
 class TestWatch:
     def test_stop_when_idle_exits_without_sleeping(self, tmp_path):
         router = FakeRouter([
-            _entry("flag", message_id="m1"),
+            _entry("leave_alone", message_id="m1"),
             _entry("schedule", message_id="m2"),
         ])
         slept = []
@@ -211,7 +211,7 @@ class TestWatch:
         assert slept == []
 
     def test_continuous_mode_sleeps_when_idle_then_keeps_watching(self, tmp_path):
-        router = FakeRouter([_entry("flag")])  # one entry, then None forever
+        router = FakeRouter([_entry("leave_alone")])  # one entry, then None forever
         slept = []
 
         def fake_sleep(seconds):
@@ -228,7 +228,7 @@ class TestWatch:
         assert slept == [5, 5, 5]
 
     def test_max_iterations_caps_even_with_more_pending(self, tmp_path):
-        router = FakeRouter([_entry("flag", message_id=f"m{i}") for i in range(5)])
+        router = FakeRouter([_entry("leave_alone", message_id=f"m{i}") for i in range(5)])
 
         outcomes = watcher.watch(router, stop_when_idle=True,
                                   max_iterations=2, sleep=lambda s: None)

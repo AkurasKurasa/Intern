@@ -29,12 +29,12 @@ def _msg(mid, sender_email, subject, body="body text"):
     }
 
 
-def _build_router(tmp_path, inbox, dominant_reply_sender_domain=None):
-    """dominant_reply_sender_domain: when given, seeds that sender's
-    pattern with a 100%-reply history before the router is built, so the
-    rule layer confidently decides "reply" for that sender without
-    needing a real LLM call -- the same seeding technique
-    test_inbox_features.py uses."""
+def _build_router(tmp_path, inbox, dominant_reply_sender_domain=None, dominant_forward_sender_domain=None):
+    """dominant_reply_sender_domain/dominant_forward_sender_domain: when
+    given, seeds that sender's pattern with a 100%-reply or 100%-forward
+    history before the router is built, so the rule layer confidently
+    decides "reply"/"forward" for that sender without needing a real LLM
+    call -- the same seeding technique test_inbox_features.py uses."""
     data_dir = tmp_path / "data"
     os.makedirs(data_dir, exist_ok=True)
     (data_dir / "mock_inbox.json").write_text(json.dumps({"inbox": inbox, "sent": []}), encoding="utf-8")
@@ -43,6 +43,10 @@ def _build_router(tmp_path, inbox, dominant_reply_sender_domain=None):
     if dominant_reply_sender_domain:
         pattern = profile._get_or_create(dominant_reply_sender_domain)
         pattern.reply_count, pattern.forward_count, pattern.ignore_count = 3, 0, 0
+        profile.save()
+    if dominant_forward_sender_domain:
+        pattern = profile._get_or_create(dominant_forward_sender_domain)
+        pattern.reply_count, pattern.forward_count, pattern.ignore_count = 0, 3, 0
         profile.save()
     registry_path = tmp_path / "registry.json"
     registry_path.write_text(json.dumps({"capsules": []}), encoding="utf-8")
@@ -92,7 +96,7 @@ def real_page(tmp_path):
 def real_page_with_reply(tmp_path):
     """Two real emails: one from a sender whose seeded pattern history
     makes the rule layer confidently decide "reply" (no LLM call
-    needed), one generic (decides "flag", same as real_page's
+    needed), one generic (decides "leave_alone", same as real_page's
     messages). Used to prove process_one() actually leaves a
     reply-decision row pending instead of blank-confirming it -- a real
     DOM/pipeline test, not a guess from reading the code."""
@@ -103,6 +107,37 @@ def real_page_with_reply(tmp_path):
         _msg("r1", "boss@work.com", "status update"),
         _msg("g1", "someone@else.com", "generic email"),
     ], dominant_reply_sender_domain="work.com")
+    handler_cls = ls.make_handler(router)
+    httpd = HTTPServer(("127.0.0.1", 0), handler_cls)
+    port = httpd.server_address[1]
+    thread = threading.Thread(target=httpd.serve_forever, daemon=True)
+    thread.start()
+    try:
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=True)
+            page = browser.new_page()
+            page.goto(f"http://127.0.0.1:{port}/")
+            page.click("#toolbarRefreshBtn")
+            page.wait_for_timeout(500)
+            yield page
+            browser.close()
+    finally:
+        httpd.shutdown()
+        thread.join(timeout=5)
+
+
+@pytest.fixture
+def real_page_with_forward(tmp_path):
+    """One real email from a sender whose seeded pattern history makes
+    the rule layer confidently decide "forward" (no LLM call needed).
+    Used to prove process_one()'s forward auto-draft branch against a
+    real DOM/pipeline, not a guess from reading the code."""
+    pytest.importorskip("playwright.sync_api")
+    from playwright.sync_api import sync_playwright
+
+    router = _build_router(tmp_path, inbox=[
+        _msg("f1", "ops@vendor.com", "grades to upload"),
+    ], dominant_forward_sender_domain="vendor.com")
     handler_cls = ls.make_handler(router)
     httpd = HTTPServer(("127.0.0.1", 0), handler_cls)
     port = httpd.server_address[1]
@@ -170,7 +205,7 @@ class TestAutoDraftReply:
                                              auto_draft_reply=True)
 
         assert result["decision"] == "reply"
-        assert result["outcome"] == "confirmed (AI-drafted reply sent)"
+        assert result["outcome"] == "confirmed (AI-drafted reply -- draft created, not sent)"
         # The row is really gone -- a real send happened, not a preview.
         assert real_page_with_reply.locator(".row-item").count() == 1
 
@@ -185,11 +220,12 @@ class TestAutoDraftReply:
         # Nothing was sent -- the row must still be there.
         assert real_page_with_reply.locator(".row-item").count() == 2
 
-    def test_only_a_real_reply_decision_triggers_auto_draft(self, real_page_with_reply, monkeypatch):
+    def test_only_a_real_reply_decision_triggers_reply_auto_draft(self, real_page_with_reply, monkeypatch):
         # index 1 in this fixture is the generic email, which the LLM
-        # fallback (provider="none") decides "flag" for -- not "reply".
-        # Guards the exact-decision check: auto_draft_reply=True must
-        # never fire for forward/schedule/flag/leave_alone, only "reply".
+        # fallback (provider="none") decides "leave_alone" for -- not "reply".
+        # Guards the exact-decision check: generate_reply() must never
+        # fire for schedule/leave_alone (forward gets its own
+        # separate auto-draft path, tested in TestAutoDraftForward).
         import inbox_reply_llm
         called = []
         monkeypatch.setattr(inbox_reply_llm, "generate_reply",
@@ -200,6 +236,56 @@ class TestAutoDraftReply:
 
         assert result["decision"] != "reply"
         assert not called, "generate_reply must only ever be called for a real 'reply' decision"
+
+
+class TestAutoDraftForward:
+    # Same shape as TestAutoDraftReply, for "forward": the recipient
+    # address is never LLM-invented (forward_recipient() derives it
+    # deterministically from the sender's own domain), only the note.
+    def test_a_real_ai_drafted_forward_is_typed_and_sent(self, real_page_with_forward, monkeypatch):
+        import inbox_reply_llm
+        monkeypatch.setattr(inbox_reply_llm, "generate_forward_note",
+                             lambda sender, subject, body: "Please take a look at this.")
+
+        assert real_page_with_forward.locator(".row-item").count() == 1
+
+        result = automate_inbox.process_one(real_page_with_forward, commit=True, index=0, skipped=0,
+                                             auto_draft_reply=True)
+
+        assert result["decision"] == "forward"
+        assert result["outcome"] == "confirmed (AI-drafted forward -- draft created, not sent)"
+        # The row is really gone -- a real send happened, not a preview.
+        assert real_page_with_forward.locator(".row-item").count() == 0
+
+    def test_falls_back_to_left_pending_when_lm_studio_returns_nothing(self, real_page_with_forward, monkeypatch):
+        import inbox_reply_llm
+        monkeypatch.setattr(inbox_reply_llm, "generate_forward_note", lambda sender, subject, body: "")
+
+        result = automate_inbox.process_one(real_page_with_forward, commit=True, index=0, skipped=0,
+                                             auto_draft_reply=True)
+
+        assert result["outcome"] == "left pending -- LM Studio unavailable for auto-draft"
+        assert real_page_with_forward.locator(".row-item").count() == 1
+
+    def test_recipient_is_derived_from_sender_domain_not_invented(self, real_page_with_forward, monkeypatch):
+        import inbox_reply_llm
+        captured = {}
+
+        def _fake_note(sender, subject, body):
+            return "Please take a look at this."
+        monkeypatch.setattr(inbox_reply_llm, "generate_forward_note", _fake_note)
+
+        real_forward_recipient = inbox_reply_llm.forward_recipient
+
+        def _capturing_recipient(sender_email):
+            captured["sender_email"] = sender_email
+            return real_forward_recipient(sender_email)
+        monkeypatch.setattr(inbox_reply_llm, "forward_recipient", _capturing_recipient)
+
+        automate_inbox.process_one(real_page_with_forward, commit=True, index=0, skipped=0,
+                                    auto_draft_reply=True)
+
+        assert captured["sender_email"] == "ops@vendor.com"
 
 
 class TestProcessOneDryRun:
@@ -369,7 +455,7 @@ class TestMainRecoversFromMidRunBrowserClosure:
         def _fake_process_one(page, commit, index, skipped, dwell_ms=0, auto_draft_reply=False):
             calls.append((index, skipped))
             if len(calls) <= 2:
-                return {"sender": "s", "subject": f"m{len(calls)}", "decision": "flag",
+                return {"sender": "s", "subject": f"m{len(calls)}", "decision": "leave_alone",
                         "rationale": "r", "outcome": "confirmed"}
             raise _FakeInboxPlaywrightError("Target page, context or browser has been closed")
 

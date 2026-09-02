@@ -30,22 +30,21 @@ from features import encoders  # noqa: E402
 from gmail_client import EmailMessage  # noqa: E402
 from pattern_profile import SenderPattern  # noqa: E402
 
-VERSION = "inbox-features-v2-11d"
+VERSION = "inbox-features-v3-10d"
 
-DECISIONS_ORDER = ["reply", "forward", "schedule", "cold_email", "flag", "leave_alone"]
+DECISIONS_ORDER = ["reply", "forward", "schedule", "cold_email", "leave_alone"]
 
 FEATURE_NAMES = [
     "sem_sim_reply",          # 1
     "sem_sim_forward",        # 2
     "sem_sim_schedule",       # 3
     "sem_sim_cold_email",     # 4
-    "sem_sim_flag",           # 5
-    "sem_sim_leave_alone",    # 6
-    "pattern_reply_ratio",    # 7
-    "pattern_forward_ratio",  # 8
-    "pattern_ignore_ratio",   # 9
-    "body_length_scaled",     # 10
-    "has_sender_history",     # 11
+    "sem_sim_leave_alone",    # 5
+    "pattern_reply_ratio",    # 6
+    "pattern_forward_ratio",  # 7
+    "pattern_ignore_ratio",   # 8
+    "body_length_scaled",     # 9
+    "has_sender_history",     # 10
 ]
 
 DIMS = len(FEATURE_NAMES)

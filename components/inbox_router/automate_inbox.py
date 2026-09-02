@@ -27,6 +27,7 @@ Stages:
 
 import argparse
 import json
+import re
 import subprocess
 import sys
 import time
@@ -117,19 +118,19 @@ def ensure_server_running(timeout_s: float = 20.0) -> subprocess.Popen | None:
 # empty Gmail draft or an empty schedule note, defeating the whole point
 # of the text box a human types into on the real page. cold_email has no
 # control on this page at all -- it's not a reaction to an existing
-# email, it lives on its own separate page. Only leave_alone/flag can be
-# confirmed with a single real click, since neither needs typed content --
-# clicking the same real icon a human would click for each.
+# email, it lives on its own separate page. Only leave_alone can be
+# confirmed with a single real click, since it needs no typed content --
+# clicking the same real icon a human would click for it.
 NEEDS_HUMAN_TEXT = {"reply", "forward", "schedule", "cold_email"}
-IMMEDIATE_ICON = {"leave_alone": "#archiveBtn", "flag": "#flagBtn"}
+IMMEDIATE_ICON = {"leave_alone": "#archiveBtn"}
 
 
 def process_one(page, commit: bool, index: int, skipped: int = 0, dwell_ms: int = 0,
                  auto_draft_reply: bool = False):
     """Reads one pending row off the real DOM, opens it, prints the real
     decision + rationale, then clicks the real icon for that decision
-    (Archive for leave_alone, the flag star for flag) if --commit.
-    Returns a result dict, or None once the inbox is empty.
+    (Archive for leave_alone) if --commit. Returns a result dict, or
+    None once the inbox is empty.
 
     dwell_ms: how long to leave the opened email visible on screen before
     acting on it. Found live: with dwell_ms=0, main()'s own --pace only
@@ -150,12 +151,15 @@ def process_one(page, commit: bool, index: int, skipped: int = 0, dwell_ms: int 
     for a human to actually open and answer themselves.
 
     auto_draft_reply=True is a deliberate, explicitly authorized
-    exception (see inbox_reply_llm.py's own docstring) for "reply"
-    specifically: a real AI-generated reply is typed and sent for real,
+    exception (see inbox_reply_llm.py's own docstring) for "reply" and
+    "forward": a real AI-generated body is typed and sent for real,
     same shape as automate_cold_email.py's existing --commit exception.
-    Forward/schedule are untouched by this flag -- forward would need a
-    fabricated recipient address, schedule a fabricated date, both
-    actively wrong rather than just unreviewed."""
+    Forward's recipient is never LLM-invented -- forward_recipient()
+    derives a synthetic team alias from the sender's own real domain,
+    so only the note text is AI-generated, not the address itself.
+    Schedule is still untouched by this flag -- a fabricated date would
+    create a genuinely wrong calendar event, a materially worse mistake
+    than an unreviewed forward note on mock data."""
     row_index = skipped if commit else index
     row = page.locator(".row-item").nth(row_index)
     if row.count() == 0:
@@ -193,7 +197,28 @@ def process_one(page, commit: bool, index: int, skipped: int = 0, dwell_ms: int 
             print(f"    AI-drafted reply: {reply_text!r}")
             page.click("#sendBtn")
             page.wait_for_selector("#listView:not([hidden])")
-            outcome = "confirmed (AI-drafted reply sent)"
+            outcome = "confirmed (AI-drafted reply -- draft created, not sent)"
+        else:
+            page.click("#backBtn")
+            outcome = "left pending -- LM Studio unavailable for auto-draft"
+    elif decision == "forward" and commit and auto_draft_reply:
+        body_text = page.locator("#detailBody").inner_text()
+        from inbox_reply_llm import generate_forward_note, forward_recipient
+        # sender is "Display Name <address@domain>" -- pull the address
+        # out for forward_recipient() rather than fabricating one.
+        match = re.search(r"<([^>]+)>", sender)
+        sender_email = match.group(1) if match else sender
+        note = generate_forward_note(sender, subject, body_text)
+        recipient = forward_recipient(sender_email)
+        if note:
+            page.click("#forwardPillBtn")
+            page.wait_for_selector("#replyBoxWrap:not([hidden])")
+            page.fill("#forwardTo", recipient)
+            page.fill("#replyBody", note)
+            print(f"    AI-drafted forward to {recipient!r}: {note!r}")
+            page.click("#sendBtn")
+            page.wait_for_selector("#listView:not([hidden])")
+            outcome = "confirmed (AI-drafted forward -- draft created, not sent)"
         else:
             page.click("#backBtn")
             outcome = "left pending -- LM Studio unavailable for auto-draft"
@@ -228,9 +253,10 @@ def main():
     ap.add_argument("--log", type=Path, default=None,
                     help="where to write the run log (default: data/runs/)")
     ap.add_argument("--auto-draft-reply", action="store_true",
-                    help="explicit, deliberate exception: for 'reply' decisions only, generate a real "
-                         "reply via LM Studio and send it for real, instead of leaving it pending for "
-                         "a human to type -- requires --commit, has no effect otherwise")
+                    help="explicit, deliberate exception: for 'reply' and 'forward' decisions, generate "
+                         "a real body via LM Studio and send it for real, instead of leaving it pending "
+                         "for a human to type -- requires --commit, has no effect otherwise. Schedule "
+                         "still always needs a real human-picked date.")
     args = ap.parse_args()
 
     from playwright.sync_api import sync_playwright, Error as PlaywrightError
@@ -267,10 +293,11 @@ def main():
                 if result is None:
                     break
                 results.append(result)
-                # startswith(), not ==: a real AI-drafted-reply send also
-                # removes the row, same as a plain confirm, but reports a
-                # more specific outcome string ("confirmed (AI-drafted
-                # reply sent)") -- an exact-match check here would wrongly
+                # startswith(), not ==: creating a real AI-drafted reply
+                # also removes the row, same as a plain confirm, but
+                # reports a more specific outcome string ("confirmed
+                # (AI-drafted reply -- draft created, not sent)") --
+                # an exact-match check here would wrongly
                 # treat that row as still-pending and skip past whatever
                 # row replaces it next.
                 if not result["outcome"].startswith("confirmed"):

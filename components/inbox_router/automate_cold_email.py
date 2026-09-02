@@ -20,8 +20,8 @@ clicks Send for real -- an actual Gmail draft gets created. Every
 other decision type (Reply, Forward, Schedule) is untouched by this;
 this flag only ever affects Cold Email.
 
-    python automate_cold_email.py                # dry run -- reads and shows, sends nothing
-    python automate_cold_email.py --commit        # asks LM Studio for real text and actually sends
+    python automate_cold_email.py                # dry run -- reads and shows, creates nothing
+    python automate_cold_email.py --commit        # asks LM Studio for real text and creates a real draft
     python automate_cold_email.py --commit --limit 2
 """
 import argparse
@@ -97,9 +97,14 @@ def process_one(page, commit: bool, index: int):
     page.fill("#coldEmailBodyInput", body)
     page.click("#coldEmailSendBtn")
     page.wait_for_selector("#coldEmailListView:not([hidden])")
-    print("    -> sent")
+    # "drafted", not "sent" -- gmail_client.py deliberately has no
+    # send()/send_message() method anywhere in this project. Clicking
+    # this button really calls create_draft(): a real draft is created
+    # and saved (verify in data/mock_drafts.json), but nothing here ever
+    # delivers an email anywhere.
+    print("    -> drafted")
 
-    return {"name": name, "email": email, "subject": subject, "body": body, "outcome": "sent"}
+    return {"name": name, "email": email, "subject": subject, "body": body, "outcome": "drafted"}
 
 
 def main():
@@ -119,7 +124,7 @@ def main():
 
     from playwright.sync_api import sync_playwright, Error as PlaywrightError
 
-    print(f"\n  mode  {'COMMIT (LM Studio writes, real send)' if args.commit else 'dry run'}")
+    print(f"\n  mode  {'COMMIT (LM Studio writes, real draft created)' if args.commit else 'dry run'}")
     print_countdown(message="Starting Cold Email -- opening a real browser to walk the boss' task list.")
 
     started_server = ensure_server_running()
@@ -137,8 +142,14 @@ def main():
         # it calls the page's own setView("cold_email") function
         # directly, the exact same function a (removed) nav click used
         # to call, just invoked as real JS instead of a DOM interaction.
-        page.evaluate("setView('cold_email')")
-        page.wait_for_timeout(600)
+        # Same real bug, same fix as automate_inbox.py's own slow-poll
+        # race: a fixed 600ms wait here can race ahead of the real
+        # /cold-email/api/targets fetch, reading 0 rows even with real
+        # targets waiting -- wait for the actual response instead.
+        with page.expect_response(lambda r: "/cold-email/api/targets" in r.url and r.request.method == "GET",
+                                   timeout=60_000):
+            page.evaluate("setView('cold_email')")
+        page.wait_for_timeout(200)
 
         banner(1, "Working through the boss' task list")
         skipped = 0
@@ -149,7 +160,7 @@ def main():
                 if result is None:
                     break
                 results.append(result)
-                if result["outcome"] != "sent":
+                if result["outcome"] != "drafted":
                     skipped += 1
                 time.sleep(args.pace)
         except PlaywrightError as exc:
@@ -177,10 +188,10 @@ def main():
     print(f"  targets walked  {len(results)}")
     for r in results:
         print(f"    {r['outcome']:<12} {r['name']:<25} {r['email']}")
-    needing_human = [r for r in results if r["outcome"] != "sent"]
+    needing_human = [r for r in results if r["outcome"] != "drafted"]
     if needing_human:
         print(f"\n  {len(needing_human)} target(s) still need a real message -- "
-              f"open {SERVER_URL} yourself (Cold Email section) to write and send them.")
+              f"open {SERVER_URL} yourself (Cold Email section) to write and save a draft for them.")
     if not results:
         print("\n  Nobody left on the task list. Add names to data/task_list.txt.")
     if not args.commit:

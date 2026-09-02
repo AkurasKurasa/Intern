@@ -100,8 +100,8 @@ def emit(event: str, **fields) -> None:
 def _pick_provider() -> tuple[str, str]:
     """Same preference order as this project's other entry points: prefer
     whichever real API key is actually set, else local LM Studio, else no
-    LLM at all (RuleLayer + "flag everything the rules can't resolve"
-    still works with zero LLM configured)."""
+    LLM at all (RuleLayer + "leave alone everything the rules can't
+    resolve" still works with zero LLM configured)."""
     if os.environ.get("ANTHROPIC_API_KEY"):
         return "anthropic", os.environ["ANTHROPIC_API_KEY"]
     if os.environ.get("GROQ_API_KEY"):
@@ -248,11 +248,6 @@ class InboxRouter:
                     emit("inbox_log", line=f"Failed to create calendar event: {exc}", level="err")
         elif decision == "cold_email":
             emit("inbox_log", line="Cold Email is handled on its own page -- no action taken here.", level="info")
-        elif decision == "flag" and message is not None:
-            try:
-                self._gmail.apply_flag_label(message_id)
-            except Exception as exc:
-                emit("inbox_log", line=f"Failed to apply flag label: {exc}", level="err")
         # leave_alone needs no Gmail-side action at all.
         entry["status"] = "confirmed"
         entry["decision"] = decision
@@ -309,11 +304,6 @@ class InboxRouter:
                     emit("inbox_log", line=f"Failed to create calendar event: {exc}", level="err")
         elif new_decision == "cold_email":
             emit("inbox_log", line="Cold Email is handled on its own page -- no action taken here.", level="info")
-        elif new_decision == "flag" and message is not None:
-            try:
-                self._gmail.apply_flag_label(message_id)
-            except Exception as exc:
-                emit("inbox_log", line=f"Failed to apply flag label: {exc}", level="err")
         entry["decision"] = new_decision
         entry["status"] = "overridden"
         entry["override_reason"] = reason

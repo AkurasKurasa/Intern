@@ -152,7 +152,7 @@ class PatternProfile:
             pattern.forward_count += 1
         elif decision == "leave_alone":
             pattern.ignore_count += 1
-        # schedule/cold_email/flag intentionally don't move these three
+        # schedule/cold_email intentionally don't move these three
         # counters -- they're not reply/forward/ignore outcomes.
         pattern.last_updated = datetime.now(timezone.utc).isoformat()
         self.save()

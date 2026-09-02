@@ -109,3 +109,44 @@ def test_generate_reply_fails_closed_on_a_malformed_cjk_response(monkeypatch):
     monkeypatch.setattr(openai, "OpenAI", lambda **kw: fake_client)
 
     assert inbox_reply_llm.generate_reply("Dana", "Subject", "body") == ""
+
+
+def test_generate_forward_note_returns_the_real_response_text(monkeypatch):
+    captured = []
+    fake_client = _FakeOpenAIClient(
+        content="Please take a look at this when you get a chance.",
+        captured_calls=captured,
+    )
+    import openai
+    monkeypatch.setattr(openai, "OpenAI", lambda **kw: fake_client)
+
+    note = inbox_reply_llm.generate_forward_note("Dana Whitfield", "Quick question", "Can you confirm this?")
+
+    assert "take a look" in note
+    assert captured[0]["model"] == "qwen2.5-7b-instruct"
+
+
+def test_generate_forward_note_fails_closed_when_no_model_is_loaded(monkeypatch):
+    fake_client = _FakeOpenAIClient(model_ids=(), content="")
+    import openai
+    monkeypatch.setattr(openai, "OpenAI", lambda **kw: fake_client)
+
+    assert inbox_reply_llm.generate_forward_note("Dana", "Subject", "body") == ""
+
+
+def test_generate_forward_note_fails_closed_on_a_malformed_cjk_response(monkeypatch):
+    fake_client = _FakeOpenAIClient(content="Please forward this along, 谢谢。")
+    import openai
+    monkeypatch.setattr(openai, "OpenAI", lambda **kw: fake_client)
+
+    assert inbox_reply_llm.generate_forward_note("Dana", "Subject", "body") == ""
+
+
+def test_forward_recipient_derives_a_synthetic_alias_from_the_real_domain():
+    # Not LLM-invented -- deterministic, so the same sender always
+    # produces the same, clearly-synthetic recipient.
+    assert inbox_reply_llm.forward_recipient("dana.whitfield@northline.example.com") == "team-lead@northline.example.com"
+
+
+def test_forward_recipient_falls_back_when_given_a_malformed_address():
+    assert inbox_reply_llm.forward_recipient("not-an-email") == "team-lead@example.com"

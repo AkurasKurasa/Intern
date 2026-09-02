@@ -43,13 +43,19 @@ _SYSTEM_PROMPT = (
     "like 'Dear', no signature block."
 )
 
+_FORWARD_SYSTEM_PROMPT = (
+    "You write a brief, one-sentence forwarding note on behalf of a "
+    "real person, to go along with an email they're forwarding to a "
+    "colleague. Reply with ONLY that one sentence, nothing else -- no "
+    "subject line, no greeting, no signature block."
+)
 
-def generate_reply(sender: str, subject: str, body_text: str) -> str:
-    """Returns the reply body text, or "" if LM Studio isn't reachable,
-    has no model loaded, returns nothing usable, or returns a malformed
-    response containing CJK text (see _CJK_RE above) -- fails closed,
-    same as every other LLM call in this project when nothing's
-    available."""
+
+def _call_lmstudio(system_prompt: str, user_msg: str, max_tokens: int) -> str:
+    """Shared LM Studio call for generate_reply()/generate_forward_note().
+    Returns "" on any failure (unreachable, no model loaded, malformed
+    CJK-leaking response) -- fails closed, same as every other LLM call
+    in this project when nothing usable is available."""
     try:
         from openai import OpenAI
     except ImportError:
@@ -62,17 +68,44 @@ def generate_reply(sender: str, subject: str, body_text: str) -> str:
         if not model_id:
             return ""
 
-        user_msg = f"From: {sender}\nSubject: {subject}\n\n{body_text[:2000]}"
         resp = client.chat.completions.create(
-            model=model_id, max_tokens=200,
+            model=model_id, max_tokens=max_tokens,
             messages=[
-                {"role": "system", "content": _SYSTEM_PROMPT},
+                {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_msg},
             ],
         )
-        reply = (resp.choices[0].message.content or "").strip()
-        if _CJK_RE.search(reply):
+        text = (resp.choices[0].message.content or "").strip()
+        if _CJK_RE.search(text):
             return ""
-        return reply
+        return text
     except Exception:
         return ""
+
+
+def generate_reply(sender: str, subject: str, body_text: str) -> str:
+    """Returns the reply body text, or "" on any failure -- see
+    _call_lmstudio()'s own docstring for the fail-closed conditions."""
+    user_msg = f"From: {sender}\nSubject: {subject}\n\n{body_text[:2000]}"
+    return _call_lmstudio(_SYSTEM_PROMPT, user_msg, max_tokens=200)
+
+
+def forward_recipient(sender_email: str) -> str:
+    """A synthetic, deterministic internal address to forward to -- NOT
+    LLM-invented. Forward genuinely needs a third-party recipient the
+    email itself never supplies, and inventing a specific real-looking
+    PERSON (unlike drafting reply text back to the sender who already
+    emailed you) is a materially different kind of guess. This derives
+    a clearly-synthetic team alias from the sender's own real domain
+    instead, so nothing about the address itself is invented content --
+    only the note that goes with it is."""
+    domain = sender_email.split("@")[-1] if "@" in sender_email else "example.com"
+    return f"team-lead@{domain}"
+
+
+def generate_forward_note(sender: str, subject: str, body_text: str) -> str:
+    """Returns a one-sentence forwarding note, or "" on any failure --
+    see _call_lmstudio()'s own docstring for the fail-closed
+    conditions."""
+    user_msg = f"Forwarding this email from: {sender}\nSubject: {subject}\n\n{body_text[:2000]}"
+    return _call_lmstudio(_FORWARD_SYSTEM_PROMPT, user_msg, max_tokens=80)
