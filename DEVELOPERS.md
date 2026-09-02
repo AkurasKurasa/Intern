@@ -919,6 +919,8 @@ waiting on them.
 
   Full suite after this batch: 1618 passed, 9 skipped, 0 failed.
 
+- [x] `scope3_real_gmail_deferred` — **2026-09-02, direct decision**: after everything above was proven working live and repeatedly, asked directly whether to wire up real Gmail (`RealGmailClient`) next. Direct answer: "No, just do it on the mock webpage, that would be better." Real Gmail requires the user's own Google OAuth login -- not something that can be done on their behalf -- and once live would send real email to real people, materially higher stakes than anything demonstrated so far. **Decision: Scope #3 stays on `MockGmailClient` deliberately, not as a limitation.** The full pipeline (classify → decide → draft/generate → type → send) is proven end to end against it. `get_gmail_client()`'s mock/real swap is already built and ready the moment real credentials exist -- explicitly deferred, not blocked on any remaining code. Task Tree hub note updated from "In progress" to "Working (mock)" to reflect this.
+
 - [ ] `scope3_email_triage` *(superseded framing — predates the concrete
   shape above)*: the very original bare stub, a GUI-demonstration-based
   triage system (watch UIA/screen state the way Scope #1/#2 do). Still a
@@ -2586,12 +2588,15 @@ one form."
    transfer (web source → Excel grid); 2D target; mixed perception. Excel
    perception swap **PROVEN** (`ExcelObserver` normalizes to canonical); remaining
    = web source, action on cells, demos, train.
-3. **Email / Ticket Triage** — *in progress ([Scope #3](#task-list)), Inbox
-   Router approach.* Based on a passively-learned per-sender pattern profile
-   (Gmail API + OAuth2, no manual labeling), an incoming email is replied to,
-   forwarded, scheduled (content extracted to a plain log plus a real Google
-   Calendar event as of 2026-08-30/31, no reuse model needed), sent as a
-   cold email (task-list-driven, not yet built), flagged
+3. **Email / Ticket Triage** — *working on mock data ([Scope #3](#task-list)),
+   Inbox Router approach; real Gmail deliberately deferred (2026-09-02).*
+   Based on a passively-learned per-sender pattern profile
+   (Gmail API + OAuth2, no manual labeling), an incoming email is replied to
+   (fast-fill matcher, or a scoped LLM-auto-draft-and-send exception in the
+   demo script), forwarded, scheduled (content extracted to a plain log plus
+   a real Google Calendar event as of 2026-08-30/31, no reuse model needed),
+   sent as a cold email (task-list-driven, real, LLM-generated and sent),
+   flagged
    for a person, or left alone — then the outcome is confirmed by reply.
    Redefined (2026-08-29) to the tasks a virtual assistant actually does on
    email, dropping the earlier Route-to-Scope-#1/#2 model entirely — Scope #3
