@@ -94,3 +94,18 @@ def test_generate_reply_fails_closed_when_lm_studio_is_unreachable(monkeypatch):
     monkeypatch.setattr(openai, "OpenAI", _boom)
 
     assert inbox_reply_llm.generate_reply("Dana", "Subject", "body") == ""
+
+
+def test_generate_reply_fails_closed_on_a_malformed_cjk_response(monkeypatch):
+    # Regression, found live: the local model occasionally leaks its own
+    # meta-commentary into the reply (one real response ended with a
+    # Chinese-language note telling itself not to use Chinese). Every
+    # reply in this project is English, so any CJK text is itself proof
+    # the generation is malformed -- must fail closed, not send garbage.
+    fake_client = _FakeOpenAIClient(
+        content="Sure, I'll get back to you shortly. Thanks for提醒我，请只用英文回复。",
+    )
+    import openai
+    monkeypatch.setattr(openai, "OpenAI", lambda **kw: fake_client)
+
+    assert inbox_reply_llm.generate_reply("Dana", "Subject", "body") == ""

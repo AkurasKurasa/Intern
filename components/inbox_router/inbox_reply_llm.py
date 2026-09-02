@@ -22,7 +22,18 @@ itself (client.models.list()), not hardcoded.
 """
 from __future__ import annotations
 
+import re
+
 _LMSTUDIO_URL = "http://localhost:1234/v1"
+
+# Found live: the small local model occasionally leaks its own
+# meta-commentary into the reply text instead of just answering (one
+# real response ended with a Chinese-language note telling itself not
+# to use Chinese) -- a malformed generation, not a real reply. Every
+# mock email and reply in this project is English, so any CJK
+# (Chinese/Japanese/Korean) character is itself the signal that
+# something went wrong, without needing to parse what the model said.
+_CJK_RE = re.compile(r"[一-鿿぀-ヿ가-힯]")
 
 _SYSTEM_PROMPT = (
     "You write brief, professional email replies on behalf of a real "
@@ -35,8 +46,10 @@ _SYSTEM_PROMPT = (
 
 def generate_reply(sender: str, subject: str, body_text: str) -> str:
     """Returns the reply body text, or "" if LM Studio isn't reachable,
-    has no model loaded, or returns nothing usable -- fails closed, same
-    as every other LLM call in this project when nothing's available."""
+    has no model loaded, returns nothing usable, or returns a malformed
+    response containing CJK text (see _CJK_RE above) -- fails closed,
+    same as every other LLM call in this project when nothing's
+    available."""
     try:
         from openai import OpenAI
     except ImportError:
@@ -57,6 +70,9 @@ def generate_reply(sender: str, subject: str, body_text: str) -> str:
                 {"role": "user", "content": user_msg},
             ],
         )
-        return (resp.choices[0].message.content or "").strip()
+        reply = (resp.choices[0].message.content or "").strip()
+        if _CJK_RE.search(reply):
+            return ""
+        return reply
     except Exception:
         return ""

@@ -907,6 +907,18 @@ waiting on them.
 
   Verified live: `automate_inbox.py --commit --auto-draft-reply --limit 3` against real pending mail produced two real AI-drafted-and-sent replies -- "Thank you for the submission. I will process the data entry for Mr. Delgado's new car insurance application as soon as possible." and "Sure, I can look into that. Please send over the invoice and let me know the specific details you need confirmed. Thanks!" -- both real, content-matching, both rows actually removed from the pending list, not just previewed. New tests: `tests/test_inbox_reply_llm.py` (3), `tests/test_automate_inbox.py::TestAutoDraftReply` (3: real send, fails-closed fallback, only "reply" ever triggers it).
 
+  **Three more real bugs found running this live, repeatedly, at the user's insistence ("Run it yourself, I'm watching.")**:
+
+  1. **Windows console encoding crash.** Printing an AI-drafted reply crashed `main()` with `UnicodeEncodeError` the moment this ran in a real (non-piped) console instead of a captured one -- the system codepage (cp1252) can't encode curly quotes/em dashes that a real LLM response routinely contains. Fixed with `sys.stdout.reconfigure(encoding="utf-8", errors="replace")` at the top of both `automate_inbox.py` and `automate_cold_email.py` -- only affects what gets printed, never the text that actually gets typed into the page.
+
+  2. **`localhost` vs `127.0.0.1` navigation race.** `local_server.py`'s `HTTPServer` binds only IPv4 (`127.0.0.1`), but `SERVER_URL` used `"localhost"` -- Chromium's own resolution of that hostname can try IPv6 (`::1`) first depending on the environment, which nothing is listening on, so `page.goto()` hung for the full 30s timeout and crashed, even though the server was genuinely up and `curl` reached it instantly. Fixed by pointing `SERVER_URL` at the literal IP, removing the resolution step -- and therefore the ambiguity -- entirely.
+
+  3. **Session-boundary root cause for "I never see the window."** Every run was provably correct server-side (screenshots, real state changes, real sends) but the user reported the browser window either never appeared or "appeared but did nothing," across many runs. Root-caused by direct comparison: a `PowerShell` `Start-Process` call earlier in the session DID visibly reach the user's real desktop (they interacted with that tab), while every `Bash`-launched Playwright browser did not -- strong evidence the two tools run in different Windows sessions in this environment. **Decision: use PowerShell, not Bash, for every live/visible automation run going forward** -- confirmed working the moment it was tried ("I did see the Window"). Not a code bug; a tooling-choice fix.
+
+  **Fourth issue, a real content-quality bug, not a script bug**: one live AI-drafted reply came back with the local model's own meta-commentary leaked into the output, in Chinese, telling itself not to use Chinese. Since every reply in this project is English, any CJK character in a response is itself proof the generation is malformed. Fixed in `inbox_reply_llm.py`: `generate_reply()` now rejects (fails closed to `""`, same as every other failure mode) any response containing a CJK character, before it can ever be typed into the page. New regression test `test_generate_reply_fails_closed_on_a_malformed_cjk_response`.
+
+  Full suite after this batch: 1618 passed, 9 skipped, 0 failed.
+
 - [ ] `scope3_email_triage` *(superseded framing — predates the concrete
   shape above)*: the very original bare stub, a GUI-demonstration-based
   triage system (watch UIA/screen state the way Scope #1/#2 do). Still a

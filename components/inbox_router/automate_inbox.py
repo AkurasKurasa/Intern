@@ -35,8 +35,28 @@ import urllib.error
 from datetime import datetime, timezone
 from pathlib import Path
 
+# A real Windows console (not a piped/redirected stream, which Python
+# already treats as UTF-8) defaults to the system codepage -- cp1252 on
+# most US/Windows setups -- which can't encode characters like curly
+# quotes or em dashes that a real LLM response routinely contains.
+# Found live: printing an AI-drafted reply crashed main() mid-run with
+# UnicodeEncodeError the moment this ran in a real console instead of a
+# captured one. errors="replace" only affects the rare unencodable
+# character (swapped for "?"), never the reply text that actually gets
+# typed into the page -- that's read straight from inbox_reply_llm, not
+# from anything printed here.
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+
 REPO = Path(__file__).resolve().parent
-SERVER_URL = "http://localhost:8765/"
+# 127.0.0.1, not "localhost" -- local_server.py's HTTPServer binds only
+# IPv4 (127.0.0.1). Found live: Chromium's own resolution of "localhost"
+# can try IPv6 (::1) first depending on the environment, which nothing
+# is listening on -- page.goto() then hangs until it times out (30s)
+# instead of falling back quickly, even though the server is genuinely
+# up and curl reaches it instantly. Using the literal IP removes the
+# resolution step, and therefore the ambiguity, entirely.
+SERVER_URL = "http://127.0.0.1:8765/"
 RULE = "-" * 74
 
 

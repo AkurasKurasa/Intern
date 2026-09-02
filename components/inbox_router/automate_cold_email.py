@@ -31,6 +31,13 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
+# Same fix as automate_inbox.py, same reason: a real Windows console
+# defaults to a codepage (cp1252) that can't encode characters a real
+# LLM response routinely contains (curly quotes, em dashes), and this
+# script prints LM Studio's generated subject/body the same way.
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+
 REPO = Path(__file__).resolve().parent
 if str(REPO) not in sys.path:
     sys.path.insert(0, str(REPO))
