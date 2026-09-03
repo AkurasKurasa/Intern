@@ -970,6 +970,19 @@ waiting on them.
   Verified live end to end, one browser window, the entire session: Cold Email walked all 3 targets and drafted all 3; the inbox walked the entire pending list (27 items) -- 13 real completions (replies/forward drafted, one leave_alone confirmed), the rest correctly left for a human (schedule always; the one reply where LM Studio didn't answer usably, shown in red, the existing fail-closed safety net working as designed, not a new bug).
 
   Full suite: 1626 passed, 9 skipped, 0 failed.
+
+- [x] `scope3_thinking_shimmer_and_action_burst` — **2026-09-03, direct feedback after the first flair round**: "Still not good enough, something more." Confirmed via `AskUserQuestion` -- concrete options, not more abstract description: a "thinking" beat before a decision reveals, and a felt completion moment on action. User picked both.
+
+  `local_ui/app.js`'s `openMessage()` now holds `#detailRationale`'s real text back behind a ~0.55s shimmer (a CSS class toggle, `.rationale-thinking` in `style.css` -- a moving gradient bar, not a text change) before revealing it -- reads as the Agent actually considering the email, not an instant pre-baked lookup. `performDecision()` (and Cold Email's own `sendColdEmailPending()`) now plays `_playActionBurst()` -- a green checkmark that scales up and fades over the detail view, positioned via a new `position: relative` on `.detail-view` -- right where the person was looking, before the view changes away, not just a toast in the corner.
+
+  **Real regression caught and fixed before it shipped**: `automate_inbox.py`'s `process_one()` used to read `#detailRationale` immediately after the detail view opened, with no wait -- now races against the new shimmer, which holds the real text back for ~0.55s. Fixed with a real condition wait, `page.wait_for_selector("#detailRationale:not(.rationale-thinking)")`, before reading it -- the same "wait for the actual state, not a guessed delay" discipline already used everywhere else in this project.
+
+  **Second real regression, this one caught by the test suite itself**: `test_local_server.py`'s Cold Email real-draft test used a fixed 300ms wait before asserting the target row was gone -- now races against the new 450ms completion-burst delay in `sendColdEmailPending()`. Fixed with `page.wait_for_function()` polling the real row count instead of guessing a longer fixed number.
+
+  **Verified directly, not assumed**: after the user twice reported "I did not see it" watching a live multi-step run, root-caused by driving the real page myself (headless, isolated) and capturing screenshots plus checking for JS console errors -- zero errors, `.rationale-thinking` class genuinely present mid-shimmer, `.action-burst` genuinely present and visually correct (a real green checkmark circle) mid-animation. The code was never broken; both effects are real but small/fast (~0.45-0.55s each) against a busy multi-step live demo with a lot else changing on screen at once -- not a code bug, a "which exact half-second to look at" problem. Followed up with an isolated single-email, 4-second-paced run specifically to let the user watch one instance closely.
+
+  Full suite: 1625 passed, 9 skipped, 0 failed (1 known-flaky, unrelated `test_ghost_overlay.py` failure during the concurrent run, confirmed transient in isolation immediately after -- same pattern documented earlier this session).
+
 - [ ] `scope3_email_triage` *(superseded framing — predates the concrete
   shape above)*: the very original bare stub, a GUI-demonstration-based
   triage system (watch UIA/screen state the way Scope #1/#2 do). Still a

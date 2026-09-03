@@ -220,6 +220,11 @@ def process_one(page, commit: bool, index: int, skipped: int = 0, dwell_ms: int 
 
     row.click()
     page.wait_for_selector("#detailView:not([hidden])")
+    # openMessage() holds the real rationale text back behind a ~0.5s
+    # "thinking" shimmer (a CSS class, not a text change) before
+    # revealing it -- reading #detailRationale before that class clears
+    # would capture the shimmer's placeholder state, not the real text.
+    page.wait_for_selector("#detailRationale:not(.rationale-thinking)")
 
     subject = page.locator("#detailSubject").inner_text()
     sender = page.locator("#detailSender").inner_text()

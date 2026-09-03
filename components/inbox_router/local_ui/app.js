@@ -6,6 +6,7 @@ let currentView = "inbox"; // "inbox" | "starred" | "cold_email"
 let selectedIds = new Set();
 let lastVisibleIds = [];
 let snackbarTimer = null;
+let _rationaleRevealTimer = null;
 
 // Cold Email -- merged into this page as its own sidebar section (real
 // Gmail-style, like Inbox/Starred) instead of living on a separate page,
@@ -93,6 +94,30 @@ function showSnackbar(message) {
   snackbar.textContent = message;
   snackbar.hidden = false;
   snackbarTimer = setTimeout(() => { snackbar.hidden = true; }, 4000);
+}
+
+// Restarts a CSS animation on an element that might already have the
+// class from a previous run -- just re-adding the same class name is a
+// no-op to the browser, so this forces a reflow in between (the same
+// void-offsetWidth trick app_electron/renderer.js already uses for its
+// own countdown tick animation) to make it actually replay every time.
+function _playViewTransition(el, className) {
+  el.classList.remove(className);
+  void el.offsetWidth;
+  el.classList.add(className);
+}
+
+// A real, felt moment of completion -- a green checkmark that scales up
+// and fades over the detail view right where the person was looking,
+// instead of the only feedback being a small toast in the corner.
+// Self-removing via animationend, so nothing here needs manual cleanup.
+function _playActionBurst(container) {
+  const burst = document.createElement("div");
+  burst.className = "action-burst";
+  burst.innerHTML = '<svg viewBox="0 0 24 24" width="56" height="56" fill="currentColor">' +
+    '<path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>';
+  container.appendChild(burst);
+  burst.addEventListener("animationend", () => burst.remove());
 }
 
 async function loadInbox() {
@@ -213,8 +238,20 @@ function openMessage(messageId) {
     (email.sender || email.sender_email || "?").charAt(0).toUpperCase();
   document.getElementById("detailSender").textContent = email.sender || email.sender_email || "";
   document.getElementById("detailSubject").textContent = email.subject || "";
-  document.getElementById("detailRationale").textContent = email.rationale || "";
   document.getElementById("detailBody").textContent = email.body_text || "(no body available)";
+  // A real "the Agent is thinking about this" beat -- the rationale is
+  // already decided (it came with the email data), but revealing it
+  // instantly reads as a lookup, not a decision. Shimmer briefly, then
+  // reveal the real text, same idea as a real assistant visibly
+  // considering something before answering.
+  const rationaleEl = document.getElementById("detailRationale");
+  rationaleEl.textContent = "";
+  _playViewTransition(rationaleEl, "rationale-thinking");
+  clearTimeout(_rationaleRevealTimer);
+  _rationaleRevealTimer = setTimeout(() => {
+    rationaleEl.classList.remove("rationale-thinking");
+    rationaleEl.textContent = email.rationale || "";
+  }, 550);
   document.getElementById("detailDecision").textContent = email.decision || "";
   replyBody.value = "";
   replyBody.name = email.message_id;
@@ -225,14 +262,17 @@ function openMessage(messageId) {
   forwardToWrap.hidden = true;
   listView.hidden = true;
   detailView.hidden = false;
+  _playViewTransition(detailView, "view-fade-in");
 }
 
 function closeMessage() {
+  clearTimeout(_rationaleRevealTimer);
   openMessageId = null;
   pendingDecision = null;
   replyBody.value = "";
   detailView.hidden = true;
   listView.hidden = false;
+  _playViewTransition(listView, "view-fade-in");
 }
 
 // ── Cold Email (merged into this page's own sidebar section) ────────────
@@ -322,7 +362,12 @@ async function sendColdEmailPending() {
       setColdEmailStatus(`Error: ${err.error || "request failed"}`);
       return;
     }
-    showSnackbar("Sent.");
+    // "Drafted", not "Sent" -- same terminology fix as SNACKBAR_TEXT
+    // above: send_cold_email() really calls create_draft(), the same
+    // send()-free contract every other action in this project has.
+    showSnackbar("Drafted.");
+    _playActionBurst(coldEmailDetailView);
+    await new Promise((resolve) => setTimeout(resolve, 450));
     await loadColdEmailTargets();
     closeColdEmailTarget();
   } catch (e) {
@@ -370,6 +415,10 @@ async function performDecision(decision, replyBodyText = "", startVal = "", endV
     return;
   }
   showSnackbar(SNACKBAR_TEXT[decision] || "Done.");
+  _playActionBurst(detailView);
+  // A real beat so the burst is actually seen before the view changes
+  // out from under it -- matches the animation's own 0.45s duration.
+  await new Promise((resolve) => setTimeout(resolve, 450));
   await loadInbox();
   closeMessage();
 }

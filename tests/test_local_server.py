@@ -412,8 +412,14 @@ class TestColdEmailMergedIntoInboxDispatchRealBrowser:
                 assert page.input_value("#coldEmailSubjectInput") == "Q3 outreach"
                 page.fill("#coldEmailBodyInput", "Reaching out about a partnership.")
                 page.click("#coldEmailSendBtn")
-                page.wait_for_timeout(300)
-                assert page.locator("#coldEmailRowList .row-item").count() == 0
+                # Condition-based, not a fixed timeout: sendColdEmailPending()
+                # now waits out the real completion-burst animation (~0.45s)
+                # before removing the row -- a fixed wait shorter than that
+                # would race ahead of the real removal.
+                page.wait_for_function(
+                    "document.querySelectorAll('#coldEmailRowList .row-item').length === 0",
+                    timeout=5000,
+                )
                 browser.close()
         finally:
             httpd.shutdown()
