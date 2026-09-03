@@ -947,6 +947,16 @@ waiting on them.
 
   Full suite: 1621 passed, 9 skipped, 0 failed.
 
+- [x] `scope3_server_startup_timeout_and_demo_flair` — **2026-09-02, two direct requests**. First, a real bug found live: `ensure_server_running()`'s 20s timeout failed a genuinely healthy startup twice in a row under heavy system load (torch's own import chain plus everything else running that night) -- the server came up and answered fine moments later, just past the deadline. Bumped to 45s; both `automate_inbox.py` and `automate_cold_email.py` share this function, so both are covered.
+
+  Second, direct feedback after watching several live runs: "I think it lacks flair and it feels too damn simple." Confirmed via `AskUserQuestion` the scope was both the demo experience and the mock Gmail page's own visual polish, and to build the demo experience first. Delivered: (1) colored terminal output -- green for a real completed action, yellow for correctly-left-pending, red for a real failure (LM Studio unavailable) -- applied to the per-email decision line, the outcome line, and the final summary list; (2) a shrinking block-character progress bar during the countdown, printed as an *additional* line alongside the exact `COUNTDOWN_BEGIN`/`COUNTDOWN N`/`COUNTDOWN_END` sentinel lines `app_electron/renderer/renderer.js`'s `handleCapsuleProgressLine()` already parses verbatim -- deliberately never altering those three lines, so Electron's own countdown widget stays unaffected; (3) a blue pulse animation (`local_ui/style.css`'s new `.row-agent-active`, matching Gmail's own `#1a73e8` accent) highlighting the exact row about to be opened, toggled via `page.evaluate()` right before the click with a 500ms beat -- so a person watching can see WHICH email the Agent is about to act on, not just the result after the fact. Windows console color support enabled via the standard `os.system("")` VT-processing trick, at zero cost on terminals that already support it.
+
+  A real formatting bug caught and fixed before it shipped: coloring the decision text in the summary list BEFORE padding it to a fixed column width would have padded the invisible ANSI escape bytes along with the visible text, under-filling the actual visible column -- fixed by padding the plain string first, then wrapping the already-padded result in color codes.
+
+  Mock Gmail page's own visual polish (row-slide-out on confirm, smoother open/close transitions, a bouncing toast) explicitly deferred to a following pass, per the user's own build-order choice.
+
+  Full suite: 1621 passed, 9 skipped, 0 failed (both this batch and the timeout fix verified together). Colors confirmed working in the real PowerShell window (direct user confirmation, after ruling out that captured/echoed terminal output showing literal escape codes was misleading -- it wasn't what actually rendered).
+
 - [ ] `scope3_email_triage` *(superseded framing — predates the concrete
   shape above)*: the very original bare stub, a GUI-demonstration-based
   triage system (watch UIA/screen state the way Scope #1/#2 do). Still a

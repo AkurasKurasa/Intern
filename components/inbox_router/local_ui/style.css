@@ -120,6 +120,17 @@ body {
   box-shadow: 0 1px 2px 0 rgba(60,64,67,.30), 0 1px 3px 1px rgba(60,64,67,.15);
   border-bottom-color: transparent; border-radius: 8px; z-index: 1; background: #fff;
 }
+/* Toggled by automate_inbox.py right before it clicks a row, so a person
+   watching can see WHICH row the Agent is about to act on, not just the
+   result after -- a beat of real feedback instead of an instant jump. */
+.row-item.row-agent-active {
+  animation: row-agent-pulse 1.1s ease-in-out infinite;
+  border-radius: 8px; border-bottom-color: transparent; z-index: 1;
+}
+@keyframes row-agent-pulse {
+  0%, 100% { background: #fff; box-shadow: 0 0 0 0 rgba(26,115,232,.35); }
+  50% { background: #e8f0fe; box-shadow: 0 0 0 4px rgba(26,115,232,.12); }
+}
 .row-star {
   color: #c4c7c5; width: 18px; flex-shrink: 0; cursor: pointer;
   display: flex; align-items: center; justify-content: center;

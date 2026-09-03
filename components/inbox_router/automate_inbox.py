@@ -27,6 +27,7 @@ Stages:
 
 import argparse
 import json
+import os
 import re
 import subprocess
 import sys
@@ -60,9 +61,37 @@ REPO = Path(__file__).resolve().parent
 SERVER_URL = "http://127.0.0.1:8765/"
 RULE = "-" * 74
 
+# os.system("") is a well-known, dependency-free trick that forces the
+# classic Windows console into ANSI/VT100 processing mode -- modern
+# Windows Terminal and PowerShell already support these codes directly,
+# but this makes color work even in an older conhost window, at zero
+# cost either way.
+if sys.platform == "win32":
+    os.system("")
+
+_GREEN, _YELLOW, _RED, _BLUE, _BOLD, _DIM, _RESET = (
+    "\033[32m", "\033[33m", "\033[31m", "\033[34m", "\033[1m", "\033[2m", "\033[0m",
+)
+
+
+def _color(text: str, code: str) -> str:
+    return f"{code}{text}{_RESET}"
+
+
+def _outcome_color(outcome: str) -> str:
+    """Green for a real completed action, yellow for correctly-left-
+    pending, red for a real failure (LM Studio unavailable) -- the same
+    three-way read a person gets from the plain text, just faster to
+    scan at a glance."""
+    if outcome.startswith("confirmed") or outcome == "drafted":
+        return _GREEN
+    if "unavailable" in outcome:
+        return _RED
+    return _YELLOW
+
 
 def banner(number, title):
-    print(f"\n{RULE}\n {number}. {title}\n{RULE}")
+    print(f"\n{_color(RULE, _DIM)}\n {_color(f'{number}. {title}', _BOLD)}\n{_color(RULE, _DIM)}")
 
 
 def _flush_safe_print(text: str) -> None:
@@ -79,16 +108,32 @@ def _flush_safe_print(text: str) -> None:
 
 def print_countdown(seconds: int = 5,
                      message: str = "Starting Inbox Dispatch -- opening a real browser to click through it.") -> None:
+    # COUNTDOWN_BEGIN / COUNTDOWN N / COUNTDOWN_END are a real, exact-match
+    # sentinel contract -- app_electron/renderer/renderer.js's
+    # handleCapsuleProgressLine() parses these precise lines to drive its
+    # own countdown widget. The progress-bar line below is purely
+    # additive -- a new line, never altering those three -- so it's
+    # invisible to that parser and just logs normally there, while a
+    # person watching a direct terminal (PowerShell) sees an actual bar
+    # shrink instead of a bare number.
     _flush_safe_print("COUNTDOWN_BEGIN")
     _flush_safe_print(message)
     for i in range(seconds, 0, -1):
         _flush_safe_print(f"COUNTDOWN {i}")
+        filled = "█" * i
+        empty = "░" * (seconds - i)
+        _flush_safe_print(f"  {_color(filled, _BLUE)}{_color(empty, _DIM)} {i}s")
         time.sleep(1)
     _flush_safe_print("COUNTDOWN_END")
 
 
-def ensure_server_running(timeout_s: float = 20.0) -> subprocess.Popen | None:
+def ensure_server_running(timeout_s: float = 45.0) -> subprocess.Popen | None:
     """Starts local_server.py if nothing is answering on SERVER_URL yet.
+    Was 20.0 -- found live, twice in a row: under heavy system load
+    (torch's own import chain plus everything else running at the same
+    time), the server can genuinely take longer than 20s to come up
+    even though it starts fine and answers moments later. Bumped to
+    give it real room instead of failing a healthy startup.
     Returns the Popen handle if this call started it (so main() can leave
     it running for --show, same as the Electron app already does), or
     None if a server was already up."""
@@ -165,6 +210,14 @@ def process_one(page, commit: bool, index: int, skipped: int = 0, dwell_ms: int 
     if row.count() == 0:
         return None
 
+    # A visible beat before acting -- highlights the exact row about to
+    # be opened, in Gmail's own blue, so a person watching can see WHICH
+    # email the Agent is about to act on, not just the result after the
+    # fact. Purely cosmetic: adds a CSS class local_ui/style.css already
+    # defines an animation for, no behavior change.
+    row.evaluate("el => el.classList.add('row-agent-active')")
+    page.wait_for_timeout(500)
+
     row.click()
     page.wait_for_selector("#detailView:not([hidden])")
 
@@ -178,10 +231,10 @@ def process_one(page, commit: bool, index: int, skipped: int = 0, dwell_ms: int 
     decision = page.locator("#detailDecision").text_content()
     rationale = page.locator("#detailRationale").inner_text()
 
-    print(f"\n  {sender}")
+    print(f"\n  {_color(sender, _BOLD)}")
     print(f"  {subject!r}")
-    print(f"    decided: {decision}")
-    print(f"    because: {rationale}")
+    print(f"    decided: {_color(decision, _BLUE)}")
+    print(f"    {_color('because:', _DIM)} {rationale}")
 
     if dwell_ms:
         page.wait_for_timeout(dwell_ms)
@@ -241,7 +294,7 @@ def process_one(page, commit: bool, index: int, skipped: int = 0, dwell_ms: int 
     else:
         page.click("#backBtn")
         outcome = "skipped (dry run)"
-    print(f"    -> {outcome}")
+    print(f"    -> {_color(outcome, _outcome_color(outcome))}")
 
     return {"sender": sender, "subject": subject, "decision": decision,
             "rationale": rationale, "outcome": outcome}
@@ -333,9 +386,13 @@ def main():
         started_server.terminate()
 
     banner(2, "Result")
-    print(f"  emails processed  {len(results)}")
+    print(f"  emails processed  {_color(str(len(results)), _BOLD)}")
     for r in results:
-        print(f"    {r['decision']:<14} {r['subject']}")
+        # Pad the plain text to a fixed width FIRST, then wrap it in color
+        # codes -- coloring first would pad the invisible ANSI bytes along
+        # with it, under-filling the visible column width.
+        padded_decision = f"{r['decision']:<14}"
+        print(f"    {_color(padded_decision, _outcome_color(r['outcome']))} {r['subject']}")
     needing_reply = [r for r in results
                       if r["decision"] in ("reply", "forward") and not r["outcome"].startswith("confirmed")]
     if needing_reply:
