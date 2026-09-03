@@ -957,6 +957,19 @@ waiting on them.
 
   Full suite: 1621 passed, 9 skipped, 0 failed (both this batch and the timeout fix verified together). Colors confirmed working in the real PowerShell window (direct user confirmation, after ruling out that captured/echoed terminal output showing literal escape codes was misleading -- it wasn't what actually rendered).
 
+- [x] `scope3_run_boss_task_list_unified_entry_point` — **2026-09-02/03, three direct requests, iterated live**. First: "I need the boss' task list to contain all we need to do: cold email, forward, reply, and everything else that's our main prime instruction." Real design ambiguity here -- turning Reply/Forward/Schedule into a literal instruction list would undo the actual thesis claim (the Agent *decides* those from how this user has really handled similar mail before, not a fixed script). Confirmed via `AskUserQuestion`: keep the decision logic exactly as it is, just make **one command** run both the boss' Cold Email task list and the whole regular inbox, back to back, instead of two separate commands a person has to remember to run.
+
+  First version (`run_boss_task_list.py` v1) launched each half as its own subprocess -- simple, but that meant its own separate browser window per half. Direct correction: "I want it to be one seamless thing, it can't open the web browser again and again." Rewritten to open exactly one Playwright browser/page and drive it through both phases directly: Cold Email first (`setView('cold_email')`, wait for the real `/cold-email/api/targets` response, walk with `automate_cold_email.py`'s own `process_one()`), then the same page switches view (`setView('inbox')` -- triggers no fetch on its own -- followed by an explicit Refresh click, waited on the real `/api/inbox` response) and walks the regular inbox with `automate_inbox.py`'s own `process_one()`. No decision logic duplicated or changed anywhere -- this file only reuses each module's existing `process_one()` against one shared page instead of running two separate scripts.
+
+  Second correction, same live session: "It didn't go through the whole inbox... It has to navigate all the mail in the inbox." The first single-window version still capped each phase at whatever `--limit` was passed for the demo. `--limit` now defaults to `None` in this script specifically -- walks every pending item in both phases by default, still available as an explicit override for a quick look.
+
+  A crash in one phase must not silently skip the other -- "everything the boss needs done" means the rest still happens even if Cold Email (or the inbox) hits a real `PlaywrightError` mid-walk; each phase's own try/except is independent, matching the crash-resilience pattern already proven in both underlying scripts.
+
+  5 new tests (real Playwright-fake-based, mirroring the existing crash-recovery test pattern): exactly one `browser.launch()`/`new_page()` for the whole run (not one pair per phase), both phases proven to share the literal same page object, no-limit-by-default walks past any small fixed count in both phases, an explicit `--limit` still caps both phases when given, and a crash in the Cold Email phase still lets the inbox phase run.
+
+  Verified live end to end, one browser window, the entire session: Cold Email walked all 3 targets and drafted all 3; the inbox walked the entire pending list (27 items) -- 13 real completions (replies/forward drafted, one leave_alone confirmed), the rest correctly left for a human (schedule always; the one reply where LM Studio didn't answer usably, shown in red, the existing fail-closed safety net working as designed, not a new bug).
+
+  Full suite: 1626 passed, 9 skipped, 0 failed.
 - [ ] `scope3_email_triage` *(superseded framing — predates the concrete
   shape above)*: the very original bare stub, a GUI-demonstration-based
   triage system (watch UIA/screen state the way Scope #1/#2 do). Still a
