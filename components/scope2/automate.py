@@ -25,6 +25,7 @@ Stages, matching the architecture:
 
 import argparse
 import json
+import os
 import sys
 import tempfile
 import time
@@ -54,9 +55,25 @@ FEATURE_MASK = {POSITION_FEATURE}
 
 RULE = "-" * 74
 
+# os.system("") forces the classic Windows console into ANSI/VT100 mode --
+# the same dependency-free trick automate_inbox.py already uses. Scope #1 and
+# Scope #3 both got colored output; this scope was still printing flat grey,
+# which made its most interesting lines (an abstention, an induced rule) read
+# exactly like its least interesting ones.
+if sys.platform == "win32":
+    os.system("")
+
+_GREEN, _YELLOW, _RED, _BLUE, _BOLD, _DIM, _RESET = (
+    "\033[32m", "\033[33m", "\033[31m", "\033[34m", "\033[1m", "\033[2m", "\033[0m",
+)
+
+
+def _color(text, code):
+    return f"{code}{text}{_RESET}"
+
 
 def banner(number, title):
-    print(f"\n{RULE}\n {number}. {title}\n{RULE}")
+    print(f"\n{_color(RULE, _DIM)}\n {_color(f'{number}. {title}', _BOLD)}\n{_color(RULE, _DIM)}")
 
 
 def _flush_safe_print(text: str) -> None:
@@ -153,9 +170,11 @@ def main():
     derived_labels = {entry["rule"].field for entry in rules}
 
     if not rules:
-        print("  none found")
+        print(_color("  none found", _DIM))
     for entry in rules:
-        print(f"  {entry['rule'].describe()}")
+        # The headline claim of the whole scope: the cutoff was read off the
+        # data, never configured. Worth being the one line that stands out.
+        print(f"  {_color(entry['rule'].describe(), _BLUE)}")
 
     # ---------------------------------------------------------------- 3
     banner(4, "Matching columns to fields")
@@ -174,16 +193,23 @@ def main():
     # ---------------------------------------------------------------- 4
     mapping = resolve(columns, scorable, matrix, derived_labels=derived_labels)
 
+    # Pad first, color second: an f-string width applies to the whole string
+    # including the invisible escape bytes, so coloring first pads the ANSI
+    # codes instead of the text and the columns stop lining up -- the same
+    # ordering automate_inbox.py's own summary had to fix.
     for assignment in mapping.auto:
-        print(f"  {assignment.source_header:<20} -> {assignment.target_label:<28} "
+        print(f"  {assignment.source_header:<20} -> "
+              f"{_color(f'{assignment.target_label:<28}', _GREEN)} "
               f"confidence {assignment.score:.2f}")
     for assignment in mapping.abstained:
-        print(f"  {assignment.source_header:<20} -> ABSTAINED "
+        # Yellow, not red: abstaining is the system working, not failing.
+        print(f"  {assignment.source_header:<20} -> {_color('ABSTAINED', _YELLOW)} "
               f"(score {assignment.score:.2f}, margin {assignment.margin:.2f})")
     if mapping.unmapped_fields:
-        print(f"  left empty: {', '.join(mapping.unmapped_fields)}")
+        print(_color(f"  left empty: {', '.join(mapping.unmapped_fields)}", _DIM))
     if mapping.partition.get(BUCKET_DERIVED):
-        print(f"  filled by rule: {', '.join(mapping.partition[BUCKET_DERIVED])}")
+        print(f"  filled by rule: "
+              f"{_color(', '.join(mapping.partition[BUCKET_DERIVED]), _BLUE)}")
 
     if not mapping.auto:
         raise SystemExit("\n  nothing could be mapped confidently - stopping "
@@ -197,6 +223,12 @@ def main():
         "sheet": {"path": str(args.sheet), "sheet_name": "SUMMARY",
                   "header_row": 11, "key_column": "STUDENT NUMBER"},
         "assignments": [a.to_dict() for a in mapping.auto],
+        # Abstentions were being dropped here, which meant the executor - and
+        # so the run log and the HUD - had no record that the Resolver had
+        # deliberately refused a column. Refusing a decoy is a result, not a
+        # gap, so it travels with the mapping. fill_order() reads only
+        # "assignments" and "derived_rules", so nothing downstream fills them.
+        "abstained": [a.to_dict() for a in mapping.abstained],
         "derived_rules": [e["rule"].to_dict() for e in rules],
         "unmapped_fields": mapping.unmapped_fields,
         "unmapped_columns": mapping.unmapped_columns,
@@ -217,9 +249,10 @@ def main():
     filled = [r for r in log.rows if r.status == "filled"]
     failed = [r for r in log.rows if r.status != "filled"]
 
-    print(f"  {len(filled)} rows filled and verified, {len(failed)} failed")
+    print(f"  {_color(str(len(filled)), _GREEN)} rows filled and verified, "
+          f"{_color(str(len(failed)), _RED if failed else _DIM)} failed")
     for row in failed[:5]:
-        print(f"    row {row.row} ({row.student_id}): {row.reason}")
+        print(f"    {_color(f'row {row.row} ({row.student_id})', _RED)}: {row.reason}")
     print(f"  {log.commit_status}")
 
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
@@ -230,13 +263,14 @@ def main():
     log.write(log_path)
 
     banner(6, "Result")
-    print(f"  columns mapped        {len(mapping.auto)}")
-    print(f"  abstained             {len(mapping.abstained)}")
-    print(f"  fields filled by rule {len(rules)}")
-    print(f"  rows verified         {len(filled)}/{len(log.rows)}")
+    print(f"  columns mapped        {_color(str(len(mapping.auto)), _BOLD)}")
+    print(f"  abstained             {_color(str(len(mapping.abstained)), _YELLOW)}")
+    print(f"  fields filled by rule {_color(str(len(rules)), _BLUE)}")
+    print(f"  rows verified         "
+          f"{_color(f'{len(filled)}/{len(log.rows)}', _GREEN if not failed else _YELLOW)}")
     print(f"  run log               {log_path.relative_to(REPO)}")
     if not args.commit:
-        print("\n  Nothing was saved. Re-run with --commit to write for real.")
+        print(_color("\n  Nothing was saved. Re-run with --commit to write for real.", _DIM))
 
     encoders.save_cache()
     return 0 if not failed else 1

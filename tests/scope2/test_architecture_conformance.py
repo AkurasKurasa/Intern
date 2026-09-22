@@ -77,10 +77,14 @@ def test_additions_to_the_layout_are_intentional():
         "executor/sheet_reader.py",
         # 3.5's anti-drift split: the browser half of the label cascade.
         "executor/extract_context.js",
+        # Presentation only: the live decision HUD, injected by the executor
+        # under --show so the Resolver's abstentions and its induced rule are
+        # visible on the page rather than only in the terminal. Deliberately
+        # outside the architecture's tree - it describes the run, it is not
+        # part of it, and a headless measurement run never loads it.
+        "executor/hud.js",
         # Milestone 3's hand-written mapping, in the 2.5 shape.
         "data/mappings",
-        # Embedding cache, so a rerun does not re-encode.
-        "data/cache",
         # 3.3's confirmation gate; the tree names no file for it.
         "coworker_recorder/confirm.py",
         # Event contracts 2.1/2.2 and their JSONL form.
@@ -92,6 +96,14 @@ def test_additions_to_the_layout_are_intentional():
     }
     for relative in additions:
         assert (REPO / relative).exists(), f"{relative} is documented but missing"
+
+    # data/cache (the embedding cache, so a rerun does not re-encode) belongs
+    # in this list conceptually but cannot be asserted the same way: it is
+    # gitignored and created on first use, so on a fresh clone - or any machine
+    # where nothing has run the encoder yet - it does not exist. Asserting its
+    # presence made this test fail on tree state that is entirely correct.
+    # What is actually worth pinning is that the code still points there.
+    assert 'CACHE' in (REPO / "features" / "encoders.py").read_text(encoding="utf-8")
 
 
 def test_no_rpa_figure_is_ever_invented():

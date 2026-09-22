@@ -247,6 +247,20 @@ python automate.py --session data/demos/<your session>.jsonl --show
 Six stages print as it goes. `--show` opens a visible browser so you can watch
 it fill, and holds the window open at the end so you can check the result.
 
+It also puts a **decision HUD** on the page itself — the learned mapping with
+its confidences, the columns it *refused* to map and why, and the induced rule
+written out as a sentence — so the reasoning is visible next to the thing it is
+reasoning about, instead of only in this terminal. It is display only:
+
+- it lives in a shadow root and adds no stylesheet, so `mocksite/`'s "styling
+  is held constant across variants" still holds
+- it contains no form control, so the Page Scanner cannot see it as a field
+- it is `pointer-events: none`, so it can never intercept a click meant for the
+  portal
+- it loads **only** under `--show`. A headless measurement run never sees it,
+  and `tests/test_hud.py` asserts `--show` and headless produce identical rows,
+  values and portal state
+
 ```
  4. Matching columns to fields
   YEAR LEVEL   -> Year 1-5       confidence 1.00
@@ -315,10 +329,11 @@ executor/                 Phase C
   scanner.py                live page -> field descriptors
   sheet_reader.py           the spreadsheet side
   runner.py                 fill, verify, commit, log
+  hud.js                    the live decision HUD - display only, --show only
 
 mocksite/                 the evaluation instrument - 8 portal variants
 eval/                     the accuracy table, ablations, HiTL loop
-tests/                    181 tests
+tests/                    189 tests
 data/sheets/make_sheets.py  builds the synthetic grade sheets
 ```
 
@@ -394,7 +409,7 @@ corrections — the rest confirmed what the system already proposed.
 ## Running the tests
 
 ```bash
-python -m pytest tests/ -q        # 181 tests
+python -m pytest tests/ -q        # 189 tests
 ```
 
 They drive real browsers and read the real spreadsheets; there are almost no
