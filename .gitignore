@@ -121,3 +121,7 @@ components/inbox_router/data/runs/
 /output/
 /Intern.zip
 /Intern.lnk
+
+# Synthetic sample data for all three scopes (scripts/generate_synthetic_data.py).
+# Regenerable and not evaluation data, so it stays out of git.
+data/synthetic/
