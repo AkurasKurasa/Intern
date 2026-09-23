@@ -66,6 +66,25 @@ import sys
 #
 # Presentation only: this must never change what a run does, so it is
 # wrapped whole and any failure is discarded.
+_DECISION_SEQ = [0]
+
+
+def _next_decision_step():
+    """Running counter for the batch fast-fill path, which has no step index.
+
+    Found live: a real Scope #1 run filled 15 fields and reported "Run ended --
+    0 steps". The batch fast-fill writes a whole form in one pass without
+    entering the per-step loop, so the HUD -- emitting only from that loop --
+    sat on "Waiting for the run to start" while the form visibly filled itself.
+    """
+    _DECISION_SEQ[0] += 1
+    return _DECISION_SEQ[0]
+
+
+def _reset_decision_seq():
+    _DECISION_SEQ[0] = 0
+
+
 def _emit_decision(step, decision_by, confidence, action_type):
     """Print one DECISION line. Best-effort and silent on failure."""
     try:
@@ -2543,6 +2562,12 @@ class LLMAgent:
                         # result costs no more than what the reactive path
                         # was already paying for the SAME field -- this
                         # just skips the transformer call in front of it.
+                        # Reset per field: it is only assigned inside the
+                        # escalation branch below, so without this it is either
+                        # undefined on the first field that resolves cleanly, or
+                        # stale from an earlier field -- which would credit the
+                        # LLM for a value the source lookup actually supplied.
+                        _bf_llm_action = None
                         _bf_val = self._resolve_field_value_with_escalation(state, _bf_label, section=_bf_sec)
                         if not _bf_val and self._llm_client:
                             # Real live bug + fix: "lookup found nothing"
@@ -2601,6 +2626,9 @@ class LLMAgent:
                             continue
                         logger.info("[OPT2] batch fast-fill '%s' → %r (no transformer, no LLM, no click)",
                                     _bf_label, _bf_val[:40])
+                        _emit_decision(_next_decision_step(),
+                                       "llm" if _bf_llm_action else "source",
+                                       None, "fill")
                         self._executor.execute({
                             "action_type": "keyboard", "text": _bf_val,
                             "key_count": len(_bf_val), "keystrokes": list(_bf_val),
@@ -2614,6 +2642,12 @@ class LLMAgent:
                         if (_bf_key in self._leave_blank_keys
                                 or _bf_key in self._typed_keys):
                             continue
+                        # Reset per field: it is only assigned inside the
+                        # escalation branch below, so without this it is either
+                        # undefined on the first field that resolves cleanly, or
+                        # stale from an earlier field -- which would credit the
+                        # LLM for a value the source lookup actually supplied.
+                        _bf_llm_action = None
                         _bf_val = self._resolve_field_value_with_escalation(state, _bf_label, section=_bf_sec)
                         if not _bf_val and self._llm_client:
                             # Real live bug + fix: "lookup found nothing"
@@ -2678,6 +2712,9 @@ class LLMAgent:
                             continue   # no matching option — leave for the click-based fallback
                         logger.info("[OPT2] batch fast-fill '%s' → %r (no transformer, no LLM, no click)",
                                     _bf_label, _bf_val[:40])
+                        _emit_decision(_next_decision_step(),
+                                       "llm" if _bf_llm_action else "source",
+                                       None, "fill")
                         self._mark_attempted(_bf_el, elements=state.get("elements", []), section=_bf_sec)
                         self._executor.execute({"action_type": "keyboard",
                                                 "key_count": 1, "keystrokes": ["tab"]})

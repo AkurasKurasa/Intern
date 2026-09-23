@@ -139,3 +139,65 @@ def test_the_agent_actually_calls_it_after_recording_a_step():
     appended = source.index('"step_time_sec":     round(_step_time_sec, 4),')
     called = source.index("_emit_decision(step_idx + 1")
     assert called > appended, "the emit must follow the result record, not precede it"
+
+# ------------------------------- the batch fast-fill path (found live)
+
+
+def test_the_batch_fast_fill_path_also_emits():
+    """Found live: a real Scope #1 run filled 15 fields and reported
+    "Run ended -- 0 steps". The batch fast-fill writes a whole form in one
+    pass without entering the per-step loop, so a HUD fed only from that loop
+    sat on "Waiting for the run to start" while the form visibly filled
+    itself. Both write sites must emit."""
+    source = AGENT_PY.read_text(encoding="utf-8")
+    assert source.count('_emit_decision(_next_decision_step(),') == 2
+
+
+def test_the_batch_path_credits_the_source_unless_it_escalated():
+    """`source` means the value came straight out of the intake data;
+    `llm` means plain matching found nothing and it asked the model."""
+    source = AGENT_PY.read_text(encoding="utf-8")
+    assert '"llm" if _bf_llm_action else "source"' in source
+
+
+def test_the_llm_flag_is_reset_for_every_field():
+    """_bf_llm_action is only assigned inside the escalation branch. Without
+    a per-field reset it is undefined on the first field that resolves
+    cleanly, and stale afterwards -- which would credit the LLM for values
+    the source lookup actually supplied."""
+    source = AGENT_PY.read_text(encoding="utf-8")
+    assert source.count("_bf_llm_action = None") == 2
+
+    reset_at = [i for i in range(len(source))
+                if source.startswith("_bf_llm_action = None", i)]
+    used_at = [i for i in range(len(source))
+               if source.startswith('"llm" if _bf_llm_action else "source"', i)]
+    for reset, used in zip(reset_at, used_at):
+        assert reset < used, "the reset must precede the read"
+
+
+def test_the_batch_counter_starts_at_one_and_increments(emit):
+    """The batch path has no step index of its own."""
+    import ast
+
+    tree = ast.parse(AGENT_PY.read_text(encoding="utf-8"))
+    wanted = {"_next_decision_step", "_reset_decision_seq"}
+    fns = [n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name in wanted]
+    assign = next(n for n in tree.body
+                  if isinstance(n, ast.Assign)
+                  and getattr(n.targets[0], "id", None) == "_DECISION_SEQ")
+    ns = {}
+    exec(compile(ast.Module(body=[assign] + fns, type_ignores=[]), str(AGENT_PY), "exec"), ns)
+
+    assert ns["_next_decision_step"]() == 1
+    assert ns["_next_decision_step"]() == 2
+    ns["_reset_decision_seq"]()
+    assert ns["_next_decision_step"]() == 1
+
+
+def test_a_none_confidence_is_emitted_as_zero(emit):
+    """The batch path has no confidence to report. It must still produce a
+    valid line -- the HUD decides not to show a number for those deciders."""
+    payload = json.loads(capture(emit, 3, "source", None, "fill")[9:])
+    assert payload["by"] == "source"
+    assert payload["conf"] == 0.0
