@@ -62,30 +62,26 @@
       "local_server": "components/inbox_router/local_server.py"
     },
     {
-      "name": "Form Filling \u2014 transformer",
-      "description": "Scope #1 with the batch fast-fill turned off, so every field is reached by a real click and the TRANSFORMER picks the target. The normal run batch-writes values directly and Tabs between them, which skips the model entirely -- this is what it looks like when the model actually drives.",
+      "name": "Form Filling - ordered source",
+      "description": "Scope #1 on the standard intake packet, whose own header says the fields are organized to match the exact sequence of the form. Because the data is already in form order, values are matched straight out of it and written field by field with Tab in between - no clicking, so no navigation to decide. Expect the HUD to read almost entirely Source.",
       "model_path": "tasks/form_filling/model.pt",
       "trigger_keywords": [],
       "trigger_apps": [],
       "trace_dir": "tasks/form_filling/traces",
       "created": "2026-05-17T17:52:45",
-      "emoji": "\ud83e\udde0",
-      "args": [
-        "--no_batch_fill"
-      ]
+      "emoji": "\ud83d\udccb",
+      "args": []
     },
     {
-      "name": "Form Filling \u2014 LLM values",
-      "description": "Scope #1 with the direct lookup turned off, so every value has to come from the LLM instead of being matched out of the intake file. Needs LM Studio running, and is slower by design.",
+      "name": "Form Filling - disordered source",
+      "description": "Scope #1 on the reordered intake packet: identical values, scrambled order. Tabbing straight down the form no longer lines up with the data, so the agent has to find each field rather than walk into it - which is where the transformer's learned navigation and the LLM's wording judgement are actually needed. Same correct output as the ordered run, so the two are directly comparable.",
       "model_path": "tasks/form_filling/model.pt",
       "trigger_keywords": [],
       "trigger_apps": [],
       "trace_dir": "tasks/form_filling/traces",
       "created": "2026-05-17T17:52:45",
-      "emoji": "\ud83d\udcac",
-      "args": [
-        "--force_llm_values"
-      ]
+      "emoji": "\ud83d\udd00",
+      "args": []
     }
   ]
 }

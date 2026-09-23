@@ -844,11 +844,28 @@ ipcMain.handle("capsule-set-current", (_evt, capsuleName) => {
 // playwright browser itself -- so this opens the source spreadsheet and
 // the mock portal's own landing page instead, purely for the user to look
 // at, same source+target pairing as Scope #1's just for inspection.
+// Scope #1 reads its values out of whatever Notepad has open (run_task.py's
+// SOURCE_WINDOW matches on the window title), so the intake file this button
+// opens IS the experiment. The two variants below differ in nothing else: same
+// capsule, same model, same form, same values -- only the order of the packet.
+const FORM_FILLING_TOOLS = (intakeFile) => [
+  { type: "python", script: path.join(REPO_ROOT, "practice_apps", "car_insurance_entry", "car_insurance_form_wx.py"), requires: ["wx"] },
+  { type: "notepad", target: path.join(REPO_ROOT, "data_entry_tasks", intakeFile) },
+];
+
 const TEST_MOCKUPS = {
-  form_filling: [
-    { type: "python", script: path.join(REPO_ROOT, "practice_apps", "car_insurance_entry", "car_insurance_form_wx.py"), requires: ["wx"] },
-    { type: "notepad", target: path.join(REPO_ROOT, "data_entry_tasks", "data_entry_intake.txt") },
-  ],
+  form_filling: FORM_FILLING_TOOLS("data_entry_intake.txt"),
+
+  // Ordered: the packet's own header says the fields "match the exact sequence
+  // of the form", so Tab alone is a perfect navigation policy and the learned
+  // model is never asked where to go.
+  "Form Filling - ordered source": FORM_FILLING_TOOLS("data_entry_intake.txt"),
+
+  // Disordered: identical values, scrambled order, so tabbing down the form no
+  // longer lines up with the packet and the agent has to find each field.
+  "Form Filling - disordered source":
+    FORM_FILLING_TOOLS("data_entry_intake_REORDERED_TEST.txt"),
+
   "Sheet-to-Portal Matcher": [
     { type: "open", target: path.join(REPO_ROOT, "components", "scope2", "data", "sheets", "grade_sheet.xlsx") },
     { type: "open", target: path.join(REPO_ROOT, "practice_apps", "mocksite", "index.html") },
