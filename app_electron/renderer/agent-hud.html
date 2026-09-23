@@ -17,6 +17,13 @@
    for the portal; this one could swallow the keystrokes the agent is typing.
    Nothing in here is interactive, for the same reason. */
 
+/* Type scale, four steps, each at least 1.25x the one below:
+     9px   micro labels (uppercase, tracked)
+     12px  body and notes
+     15px  the confidence figure
+     19px  the decider name and the tally counts
+   Sizes closer than that read as an accident rather than a hierarchy. */
+
 * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
 
 :root {
@@ -35,7 +42,7 @@
 html, body { height: 100%; background: transparent; overflow: hidden; }
 
 body {
-  font: 11px/1.5 "Segoe UI", system-ui, sans-serif;
+  font: 12px/1.5 "Segoe UI", system-ui, sans-serif;
   color: var(--text);
   padding: 6px;
   cursor: default;
@@ -85,13 +92,13 @@ body {
 .sec:last-child { border-bottom: 0; }
 
 h3 {
-  font-size: 9.5px; font-weight: 700; letter-spacing: .09em;
+  font-size: 9px; font-weight: 700; letter-spacing: .1em;
   text-transform: uppercase; color: var(--muted); margin-bottom: 10px;
 }
 
 .who { display: flex; align-items: baseline; gap: 8px; margin-bottom: 7px; }
 
-.who-name { font-size: 17px; font-weight: 650; letter-spacing: -.02em; }
+.who-name { font-size: 19px; font-weight: 650; letter-spacing: -.02em; }
 .who-name.transformer { color: var(--accent); }
 .who-name.llm { color: var(--llm); }
 .who-name.source { color: var(--source); }
@@ -100,7 +107,7 @@ h3 {
 .who-conf {
   margin-left: auto;
   font-variant-numeric: tabular-nums;
-  font-size: 14px; font-weight: 600;
+  font-size: 15px; font-weight: 600;
 }
 
 .bar { height: 4px; border-radius: 2px; background: var(--line); overflow: hidden; }
@@ -115,17 +122,17 @@ h3 {
 .bar i.llm { background: var(--llm); }
 .bar i.source { background: var(--source); }
 
-.note { margin-top: 9px; color: var(--muted); font-size: 11px; line-height: 1.45; }
+.note { margin-top: 9px; color: var(--muted); line-height: 1.45; }
 
 /* ---- the split so far ---- */
 
 .tally { display: flex; gap: 18px; font-variant-numeric: tabular-nums; }
 .tally div { display: flex; flex-direction: column; gap: 1px; }
-.tally b { font-size: 17px; font-weight: 700; }
+.tally b { font-size: 19px; font-weight: 700; }
 .tally .t-transformer b { color: var(--accent); }
 .tally .t-llm b { color: var(--llm); }
 .tally .t-source b { color: var(--source); }
-.tally span { color: var(--muted); font-size: 9.5px;
+.tally span { color: var(--muted); font-size: 9px;
               text-transform: uppercase; letter-spacing: .06em; }
 
 .split { margin-top: 12px; height: 4px; border-radius: 2px;

@@ -150,7 +150,7 @@ const AGENT_HUD_WIDTH = 268;
 // type scale was opened up (a design-hook finding: six font sizes inside a
 // 1.6x range read as no hierarchy at all) -- at the old 250 the split bar at
 // the foot of the tally was clipped clean off.
-const AGENT_HUD_HEIGHT = 293;
+const AGENT_HUD_HEIGHT = 301;
 
 function createAgentHudWindow() {
   if (agentHudWindow && !agentHudWindow.isDestroyed()) return agentHudWindow;
