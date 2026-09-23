@@ -201,3 +201,43 @@ def test_a_none_confidence_is_emitted_as_zero(emit):
     payload = json.loads(capture(emit, 3, "source", None, "fill")[9:])
     assert payload["by"] == "source"
     assert payload["conf"] == 0.0
+
+# ------------------------------------------- forcing a decider to appear
+
+
+def test_both_ablation_flags_default_to_off():
+    """Neither may change how a normal run behaves. They exist to measure a
+    component's contribution, and as a side effect to make a decider the
+    normal path skips actually appear."""
+    import inspect
+
+    source = AGENT_PY.read_text(encoding="utf-8")
+    assert "disable_batch_fill: bool          = False," in source
+    assert "disable_source_lookup: bool       = False," in source
+
+    run_task = (REPO / "run_task.py").read_text(encoding="utf-8")
+    assert '"--no_batch_fill", action="store_true"' in run_task
+    assert '"--force_llm_values", action="store_true"' in run_task
+
+
+def test_disabling_the_batch_fill_is_what_lets_the_transformer_decide():
+    """The batch path writes values directly and Tabs between them, so no
+    click happens and the transformer is never asked where to go. Turning it
+    off is the only thing that puts the transformer back in the loop -- not
+    noise, not a confidence threshold."""
+    source = AGENT_PY.read_text(encoding="utf-8")
+    assert "if self._no_autohandlers and not self._no_batch_fill:" in source
+
+
+def test_disabling_the_source_lookup_forces_the_llm_to_answer():
+    """With the lookup off, _bf_val starts empty, so every field falls into
+    the escalation branch and the LLM supplies the value."""
+    source = AGENT_PY.read_text(encoding="utf-8")
+    assert '_bf_val = ("" if self._no_source_lookup else' in source
+    assert source.count('"" if self._no_source_lookup else') == 2
+
+
+def test_the_flags_are_wired_from_run_task_to_the_agent():
+    run_task = (REPO / "run_task.py").read_text(encoding="utf-8")
+    assert "disable_batch_fill    = _args.no_batch_fill," in run_task
+    assert "disable_source_lookup = _args.force_llm_values," in run_task

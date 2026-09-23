@@ -1010,6 +1010,15 @@ class LLMAgent:
         task_plugin:       Optional[Any]  = None,   # TaskPlugin for task-specific logic
         pure_transformer:  bool           = False,  # skip all hardcoded handlers; transformer+LLM only
         disable_auto_handlers: bool       = False,  # skip legacy heuristics but KEEP LLM+transformer merge
+        # Two ablations, both off by default. They exist to answer "what does
+        # each component actually contribute", and as a side effect they make
+        # the decision HUD show a decider that the normal path skips.
+        #   disable_batch_fill    -- no batch fast-fill, so every field is
+        #     reached by a real click and the TRANSFORMER picks the target.
+        #   disable_source_lookup -- no direct lookup, so every value has to
+        #     be supplied by the LLM.
+        disable_batch_fill: bool          = False,
+        disable_source_lookup: bool       = False,
         disable_transformer: bool         = False,  # ablation test: skip the model, force the SAME
                                                      # low-confidence fallback it already uses when unsure
         start_tab_idx:     int            = 0,      # start agent at this tab index (drill testing)
@@ -1258,6 +1267,8 @@ class LLMAgent:
 
         self._pure_transformer: bool = pure_transformer
         self._no_autohandlers:  bool = disable_auto_handlers
+        self._no_batch_fill:    bool = disable_batch_fill
+        self._no_source_lookup: bool = disable_source_lookup
         # Ablation test flag, added 2026-08-14 ("I have to verify that if
         # we don't have the model we're using right now the performance
         # would drop"). See _predict() for the actual skip + fallback
@@ -2505,7 +2516,11 @@ class LLMAgent:
             # transformer fallback below on a later step, exactly as if
             # batch fast-fill had never run. filled_count starts at 0 and
             # only a nonzero count short-circuits the rest of this step.
-            if self._no_autohandlers:
+            # `and not self._no_batch_fill`: the batch path skips the
+            # transformer by design ("this just skips the transformer call in
+            # front of it"), so turning it off is what makes the transformer
+            # actually pick targets again.
+            if self._no_autohandlers and not self._no_batch_fill:
                 # Real live bug, direct report ("Still could not fill the
                 # Driver 2 First Name, Last Name, Date of Birth, etc."),
                 # finally root-caused via the narrow driver-field-scan
@@ -2568,7 +2583,9 @@ class LLMAgent:
                         # stale from an earlier field -- which would credit the
                         # LLM for a value the source lookup actually supplied.
                         _bf_llm_action = None
-                        _bf_val = self._resolve_field_value_with_escalation(state, _bf_label, section=_bf_sec)
+                        _bf_val = ("" if self._no_source_lookup else
+                                   self._resolve_field_value_with_escalation(
+                                       state, _bf_label, section=_bf_sec))
                         if not _bf_val and self._llm_client:
                             # Real live bug + fix: "lookup found nothing"
                             # and "genuinely blank" aren't the same thing --
@@ -2648,7 +2665,9 @@ class LLMAgent:
                         # stale from an earlier field -- which would credit the
                         # LLM for a value the source lookup actually supplied.
                         _bf_llm_action = None
-                        _bf_val = self._resolve_field_value_with_escalation(state, _bf_label, section=_bf_sec)
+                        _bf_val = ("" if self._no_source_lookup else
+                                   self._resolve_field_value_with_escalation(
+                                       state, _bf_label, section=_bf_sec))
                         if not _bf_val and self._llm_client:
                             # Real live bug + fix: "lookup found nothing"
                             # and "genuinely blank" aren't the same thing --
