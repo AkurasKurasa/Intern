@@ -861,10 +861,16 @@ const TEST_MOCKUPS = {
   // model is never asked where to go.
   "Form Filling - ordered source": FORM_FILLING_TOOLS("data_entry_intake.txt"),
 
-  // Disordered: identical values, scrambled order, so tabbing down the form no
-  // longer lines up with the packet and the agent has to find each field.
+  // Disordered: identical values, but every label renamed to a synonym plain
+  // matching cannot bridge, AND the order scrambled.
+  //
+  // Reordering alone was measured and did almost nothing -- 64 Source to 1 LLM,
+  // essentially the base packet's result -- because the fill loop iterates the
+  // FORM's fields and looks each label up in the record, and a dictionary
+  // lookup does not care what order it was built in. Wording is the thing the
+  // lookup actually depends on, so that is what this packet changes.
   "Form Filling - disordered source":
-    FORM_FILLING_TOOLS("data_entry_intake_REORDERED_TEST.txt"),
+    FORM_FILLING_TOOLS("data_entry_intake_DISORDERED_TEST.txt"),
 
   "Sheet-to-Portal Matcher": [
     { type: "open", target: path.join(REPO_ROOT, "components", "scope2", "data", "sheets", "grade_sheet.xlsx") },
