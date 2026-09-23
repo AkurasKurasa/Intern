@@ -67,6 +67,25 @@ function runLmsCli(args, timeoutMs = 15000) {
   });
 }
 
+// How long a spawned GUI script gets to prove it is alive. An ImportError
+// exits in well under this; a real wx window is still running long after it.
+// Only used to turn an instant crash into a visible error -- a script still
+// alive at this point is left completely alone.
+const EARLY_EXIT_MS = 1200;
+
+// One-shot python call, same shape and reasoning as runLmsCli above: a
+// bounded call whose output fits in memory, so execFile rather than a
+// streamed spawn. Used for scripts/check_env.py, which answers "is this
+// machine actually set up to run that script" before anything is launched.
+function runPython(args, timeoutMs = 20000) {
+  return new Promise((resolve) => {
+    execFile(resolvePython(), args, { cwd: REPO_ROOT, timeout: timeoutMs, windowsHide: true },
+      (error, stdout, stderr) => {
+        resolve({ ok: !error, stdout: (stdout || "").trim(), stderr: (stderr || "").trim(), error });
+      });
+  });
+}
+
 let mainWindow = null;
 let miniWindow = null;
 let miniWorkflowWindow = null;
@@ -731,7 +750,7 @@ ipcMain.handle("capsule-set-current", (_evt, capsuleName) => {
 // at, same source+target pairing as Scope #1's just for inspection.
 const TEST_MOCKUPS = {
   form_filling: [
-    { type: "python", script: path.join(REPO_ROOT, "practice_apps", "car_insurance_entry", "car_insurance_form_wx.py") },
+    { type: "python", script: path.join(REPO_ROOT, "practice_apps", "car_insurance_entry", "car_insurance_form_wx.py"), requires: ["wx"] },
     { type: "notepad", target: path.join(REPO_ROOT, "data_entry_tasks", "data_entry_intake.txt") },
   ],
   "Sheet-to-Portal Matcher": [
@@ -784,9 +803,59 @@ ipcMain.handle("launch-test-tools", async (_evt, capsuleName) => {
     for (const t of targets) {
       if (t.type === "python") {
         const pythonExe = resolvePython();
+
+        // Ask first whether the script CAN run. Found live: wxPython was
+        // declared in requirements.txt but never installed, so this spawn
+        // died on ImportError immediately -- and because it used
+        // stdio:"ignore" with detached:true, the error went nowhere and
+        // this handler still reported success. The user pressed the button
+        // and simply got nothing, with no way to find out why.
+        if (t.requires && t.requires.length) {
+          const probe = await runPython([
+            path.join(REPO_ROOT, "scripts", "check_env.py"),
+            "--json", "--only", ...t.requires,
+          ]);
+          let report = null;
+          try {
+            report = JSON.parse(probe.stdout);
+          } catch (e) {
+            report = null;
+          }
+          if (report && report.missing && report.missing.length) {
+            const names = report.missing.map((m) => m.package).join(", ");
+            return {
+              ok: false,
+              error: `${path.basename(t.script)} needs ${names}, which ${
+                report.missing.length === 1 ? "is" : "are"
+              } not installed.\n\nFix:  ${report.fix}`,
+            };
+          }
+        }
+
+        // stdio is piped rather than ignored so a crash has somewhere to go,
+        // and the process is still detached+unref'd so the window outlives
+        // this app. A script that dies within EARLY_EXIT_MS is reported as a
+        // failure; one that is still alive by then is treated as launched.
         const child = spawn(pythonExe, [t.script], {
-          cwd: REPO_ROOT, detached: true, stdio: "ignore", windowsHide: false,
+          cwd: REPO_ROOT, detached: true, stdio: ["ignore", "ignore", "pipe"],
+          windowsHide: false,
         });
+        let stderr = "";
+        if (child.stderr) child.stderr.on("data", (d) => { stderr += d.toString(); });
+
+        const failure = await new Promise((resolve) => {
+          const settle = setTimeout(() => resolve(null), EARLY_EXIT_MS);
+          child.on("error", (err) => { clearTimeout(settle); resolve(err.message); });
+          child.on("exit", (code) => {
+            clearTimeout(settle);
+            resolve(code === 0 ? null : (stderr.trim().split("\n").pop() || `exited with code ${code}`));
+          });
+        });
+
+        if (failure) {
+          return { ok: false, error: `${path.basename(t.script)} failed to start.\n\n${failure}` };
+        }
+        if (child.stderr) child.stderr.removeAllListeners("data");
         child.unref();
         opened.push(path.basename(t.script));
       } else if (t.type === "notepad") {
@@ -823,7 +892,16 @@ ipcMain.handle("settings-lmstudio-refresh", async () => {
   // sentence ("The server is running on port 1234." / a not-running
   // message), so this checks for the one substring that actually matters
   // rather than parsing free text further.
-  const serverRunning = status.ok && /running/i.test(status.stdout);
+  // `lms server status` prints to STDERR, not stdout -- verified directly:
+  //   exit 0 | stdout "" | stderr "The server is running on port 1234."
+  // Testing stdout alone therefore reported "Server not running" every time,
+  // even with the server up and http://localhost:1234/v1/models answering.
+  // The `not running` guard matters because the negative message contains the
+  // word "running" too, so a bare /running/ test would flip the bug the other
+  // way and claim a stopped server was up.
+  const statusText = `${status.stdout || ""} ${status.stderr || ""}`;
+  const serverRunning =
+    status.ok && /\brunning\b/i.test(statusText) && !/\bnot\s+running\b/i.test(statusText);
 
   let modelList = [];
   try {
