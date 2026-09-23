@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Agent</title>
+<style>
+/* Scope #1's live decision HUD.
+
+   Scope #2 renders its reasoning into the page it is automating, inside a
+   shadow root. Scope #1 has no page -- it drives a native wxPython window on
+   the real screen -- so the equivalent is this: a small frameless window that
+   floats beside the form and is never touched.
+
+   The safety property here is focusable:false on the BrowserWindow (see
+   createAgentHudWindow in main.js), which is the direct analogue of the Scope
+   #2 HUD's pointer-events:none. That panel could have swallowed a click meant
+   for the portal; this one could swallow the keystrokes the agent is typing.
+   Nothing in here is interactive, for the same reason. */
+
+/* Type scale, four steps, each at least 1.25x the one below:
+     9px   micro labels (uppercase, tracked)
+     12px  body and notes
+     15px  the confidence figure
+     19px  the decider name and the tally counts
+   Sizes closer than that read as an accident rather than a hierarchy. */
+
+* { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
+
+:root {
+  --bg: #11161d;
+  --panel: #1a212b;
+  --line: #2b3542;
+  --text: #e6edf5;
+  --muted: #8b9bb0;
+  --accent: #4da3ff;      /* transformer */
+  --llm: #bc8cff;         /* LLM */
+  --source: #3fb950;      /* matched straight from the intake data */
+  --ok: #3fb950;
+  --warn: #d29922;
+}
+
+html, body { height: 100%; background: transparent; overflow: hidden; }
+
+body {
+  font: 12px/1.5 "Segoe UI", system-ui, sans-serif;
+  color: var(--text);
+  padding: 6px;
+  cursor: default;
+}
+
+.hud {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 12px 34px rgba(0, 0, 0, .45);
+}
+
+/* ---- header ---- */
+
+.hd {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--line);
+  /* The one interactive affordance: the whole header is a drag handle, so the
+     panel can be moved off the form if it ever sits somewhere awkward. Drag
+     is not focus -- the window still never becomes the keyboard target. */
+  -webkit-app-region: drag;
+}
+
+.dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--accent); flex: none;
+  animation: pulse 1.4s ease-in-out infinite;
+}
+@keyframes pulse { 0%,100% { opacity: 1; transform: scale(1); }
+                   50% { opacity: .35; transform: scale(.72); } }
+.dot.done { animation: none; background: var(--ok); }
+.dot.idle { animation: none; background: var(--muted); }
+
+.ttl { font-weight: 700; letter-spacing: .02em; }
+.step { margin-left: auto; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+/* ---- who decided ---- */
+
+.sec { padding: 14px 13px; border-bottom: 1px solid var(--line); }
+.sec:last-child { border-bottom: 0; }
+
+h3 {
+  font-size: 9px; font-weight: 700; letter-spacing: .1em;
+  text-transform: uppercase; color: var(--muted); margin-bottom: 10px;
+}
+
+.who { display: flex; align-items: baseline; gap: 8px; margin-bottom: 7px; }
+
+.who-name { font-size: 19px; font-weight: 650; letter-spacing: -.02em; }
+.who-name.transformer { color: var(--accent); }
+.who-name.llm { color: var(--llm); }
+.who-name.source { color: var(--source); }
+.who-name.unknown { color: var(--muted); }
+
+.who-conf {
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+  font-size: 15px; font-weight: 600;
+}
+
+.bar { height: 4px; border-radius: 2px; background: var(--line); overflow: hidden; }
+.bar i {
+  display: block; height: 100%; width: 100%;
+  background: var(--accent);
+  transform: scaleX(0); transform-origin: left center;
+  /* transform, not width: width relayouts every frame. Same reason the Scope
+     #2 HUD's bars were changed over. */
+  transition: transform .3s cubic-bezier(.22, 1, .36, 1);
+}
+.bar i.llm { background: var(--llm); }
+.bar i.source { background: var(--source); }
+
+.note { margin-top: 9px; color: var(--muted); line-height: 1.45; }
+
+/* ---- the split so far ---- */
+
+.tally { display: flex; gap: 18px; font-variant-numeric: tabular-nums; }
+.tally div { display: flex; flex-direction: column; gap: 1px; }
+.tally b { font-size: 19px; font-weight: 700; }
+.tally .t-transformer b { color: var(--accent); }
+.tally .t-llm b { color: var(--llm); }
+.tally .t-source b { color: var(--source); }
+.tally span { color: var(--muted); font-size: 9px;
+              text-transform: uppercase; letter-spacing: .06em; }
+
+.split { margin-top: 12px; height: 4px; border-radius: 2px;
+         overflow: hidden; display: flex; background: var(--line); }
+/* Three segments now, so these are flex-basis rather than one scaled bar.
+   flex-basis is a layout property, but it changes only when a step lands (a
+   few times a second at most), not every frame of an animation -- which is
+   what the transform rule above exists to avoid. */
+.split span { display: block; height: 100%; transition: flex-basis .3s ease; }
+.split .s-transformer { background: var(--accent); }
+.split .s-llm { background: var(--llm); }
+.split .s-source { background: var(--source); }
+
+/* ---- waiting state ---- */
+
+.idle-msg { color: var(--muted); line-height: 1.5; }
+</style>
+</head>
+<body>
+  <div class="hud">
+    <header class="hd">
+      <span class="dot idle" id="dot"></span>
+      <span class="ttl">Agent</span>
+      <span class="step" id="step">—</span>
+    </header>
+
+    <section class="sec" id="whoSection" hidden>
+      <h3>Decided by</h3>
+      <div class="who">
+        <span class="who-name unknown" id="whoName">—</span>
+        <span class="who-conf" id="whoConf"></span>
+      </div>
+      <div class="bar"><i id="whoBar"></i></div>
+      <p class="note" id="whoNote"></p>
+    </section>
+
+    <section class="sec" id="tallySection" hidden>
+      <h3>This run</h3>
+      <div class="tally">
+        <div class="t-transformer"><b id="nTransformer">0</b><span>Transformer</span></div>
+        <div class="t-llm"><b id="nLlm">0</b><span>LLM</span></div>
+        <div class="t-source"><b id="nSource">0</b><span>Source</span></div>
+      </div>
+      <div class="split">
+        <span class="s-transformer" id="splitTransformer"></span>
+        <span class="s-llm" id="splitLlm"></span>
+        <span class="s-source" id="splitSource"></span>
+      </div>
+    </section>
+
+    <section class="sec" id="idleSection">
+      <p class="idle-msg">Waiting for the run to start.</p>
+    </section>
+  </div>
+
+<script>
+"use strict";
+
+const el = (id) => document.getElementById(id);
+
+// The transformer's confidence is a real score; the LLM path has no
+// comparable number, so the bar is only meaningful for transformer steps.
+// Showing a 0.00 bar for every LLM step would read as "the LLM was not
+// confident", which is not what an absent score means.
+const NOTES = {
+  transformer: "Learned pointer picked the target. Confidence is the model's own score.",
+  llm: "Plain matching found nothing, so it escalated to the language model.",
+  source: "Value matched straight out of the intake data. No model was asked.",
+  unknown: "",
+};
+
+const LABELS = { transformer: "Transformer", llm: "LLM", source: "Source", unknown: "—" };
+
+const counts = { transformer: 0, llm: 0, source: 0 };
+
+function render(d) {
+  const by = counts.hasOwnProperty(d.by) ? d.by : "unknown";
+
+  el("idleSection").hidden = true;
+  el("whoSection").hidden = false;
+  el("tallySection").hidden = false;
+  el("dot").className = "dot";
+
+  el("step").textContent = "step " + d.step;
+
+  el("whoName").className = "who-name " + by;
+  el("whoName").textContent = LABELS[by];
+
+  const bar = el("whoBar");
+  bar.className = by === "transformer" ? "" : by;
+
+  if (by === "transformer") {
+    const conf = Math.max(0, Math.min(1, Number(d.conf) || 0));
+    el("whoConf").textContent = conf.toFixed(2);
+    requestAnimationFrame(() => { bar.style.transform = "scaleX(" + conf + ")"; });
+  } else {
+    el("whoConf").textContent = "";
+    bar.style.transform = "scaleX(0)";
+  }
+
+  el("whoNote").textContent = NOTES[by];
+
+  if (by !== "unknown") counts[by] += 1;
+
+  el("nTransformer").textContent = String(counts.transformer);
+  el("nLlm").textContent = String(counts.llm);
+  el("nSource").textContent = String(counts.source);
+
+  const total = counts.transformer + counts.llm + counts.source;
+  const share = (n) => (total ? (n / total) * 100 : 0) + "%";
+  el("splitTransformer").style.flexBasis = share(counts.transformer);
+  el("splitLlm").style.flexBasis = share(counts.llm);
+  el("splitSource").style.flexBasis = share(counts.source);
+}
+
+function reset() {
+  counts.transformer = 0;
+  counts.llm = 0;
+  counts.source = 0;
+  el("idleSection").hidden = false;
+  el("whoSection").hidden = true;
+  el("tallySection").hidden = true;
+  el("dot").className = "dot idle";
+  el("step").textContent = "—";
+}
+
+function finish() {
+  el("dot").className = "dot done";
+  el("step").textContent = "done";
+}
+
+window.agentHud.onDecision(render);
+window.agentHud.onReset(reset);
+window.agentHud.onFinish(finish);
+</script>
+</body>
+</html>

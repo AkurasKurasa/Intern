@@ -48,6 +48,63 @@ import logging
 import os
 import re
 import sys
+
+# ── Scope #1 live decision feed ──────────────────────────────────────────
+# One machine-readable line per step, printed on stdout for the Electron
+# app's floating Agent HUD to render. Same convention run_task.py's own
+# COUNTDOWN_BEGIN / COUNTDOWN N / COUNTDOWN_END lines already use, because
+# the Play panel already reads this process's stdout line by line -- no new
+# IPC channel, no second transport.
+#
+# Scope #2 puts its reasoning on the page it is automating, inside a shadow
+# root. Scope #1 has no page: it drives a native wxPython window on the real
+# screen, so the equivalent has to be a separate always-on-top window that
+# NEVER takes focus -- see createAgentHudWindow() in main.js, where
+# focusable:false is the Scope #1 analogue of the HUD's pointer-events:none.
+# A panel that took focus would swallow the very keystrokes this agent is
+# trying to type.
+#
+# Presentation only: this must never change what a run does, so it is
+# wrapped whole and any failure is discarded.
+_DECISION_SEQ = [0]
+
+
+def _next_decision_step():
+    """Running counter for the batch fast-fill path, which has no step index.
+
+    Found live: a real Scope #1 run filled 15 fields and reported "Run ended --
+    0 steps". The batch fast-fill writes a whole form in one pass without
+    entering the per-step loop, so the HUD -- emitting only from that loop --
+    sat on "Waiting for the run to start" while the form visibly filled itself.
+    """
+    _DECISION_SEQ[0] += 1
+    return _DECISION_SEQ[0]
+
+
+def _reset_decision_seq():
+    _DECISION_SEQ[0] = 0
+
+
+def _emit_decision(step, decision_by, confidence, action_type):
+    """Print one DECISION line. Best-effort and silent on failure."""
+    try:
+        payload = {
+            "step": int(step),
+            "by": str(decision_by or "unknown"),
+            "conf": round(float(confidence or 0.0), 4),
+            "action": str(action_type or ""),
+        }
+        print("DECISION " + json.dumps(payload))
+        try:
+            sys.stdout.flush()
+        except OSError:
+            # Windows, spawned with no console (the Electron Play button uses
+            # windowsHide=True) -- the write already landed; the same guard
+            # run_task.py's print_countdown() needed for the same reason.
+            pass
+    except Exception:  # noqa: BLE001 - a HUD line must never break a run
+        pass
+
 import time
 from typing import Any, Dict, List, Optional, Set, Tuple
 
@@ -953,6 +1010,15 @@ class LLMAgent:
         task_plugin:       Optional[Any]  = None,   # TaskPlugin for task-specific logic
         pure_transformer:  bool           = False,  # skip all hardcoded handlers; transformer+LLM only
         disable_auto_handlers: bool       = False,  # skip legacy heuristics but KEEP LLM+transformer merge
+        # Two ablations, both off by default. They exist to answer "what does
+        # each component actually contribute", and as a side effect they make
+        # the decision HUD show a decider that the normal path skips.
+        #   disable_batch_fill    -- no batch fast-fill, so every field is
+        #     reached by a real click and the TRANSFORMER picks the target.
+        #   disable_source_lookup -- no direct lookup, so every value has to
+        #     be supplied by the LLM.
+        disable_batch_fill: bool          = False,
+        disable_source_lookup: bool       = False,
         disable_transformer: bool         = False,  # ablation test: skip the model, force the SAME
                                                      # low-confidence fallback it already uses when unsure
         start_tab_idx:     int            = 0,      # start agent at this tab index (drill testing)
@@ -1201,6 +1267,8 @@ class LLMAgent:
 
         self._pure_transformer: bool = pure_transformer
         self._no_autohandlers:  bool = disable_auto_handlers
+        self._no_batch_fill:    bool = disable_batch_fill
+        self._no_source_lookup: bool = disable_source_lookup
         # Ablation test flag, added 2026-08-14 ("I have to verify that if
         # we don't have the model we're using right now the performance
         # would drop"). See _predict() for the actual skip + fallback
@@ -2448,7 +2516,11 @@ class LLMAgent:
             # transformer fallback below on a later step, exactly as if
             # batch fast-fill had never run. filled_count starts at 0 and
             # only a nonzero count short-circuits the rest of this step.
-            if self._no_autohandlers:
+            # `and not self._no_batch_fill`: the batch path skips the
+            # transformer by design ("this just skips the transformer call in
+            # front of it"), so turning it off is what makes the transformer
+            # actually pick targets again.
+            if self._no_autohandlers and not self._no_batch_fill:
                 # Real live bug, direct report ("Still could not fill the
                 # Driver 2 First Name, Last Name, Date of Birth, etc."),
                 # finally root-caused via the narrow driver-field-scan
@@ -2505,7 +2577,15 @@ class LLMAgent:
                         # result costs no more than what the reactive path
                         # was already paying for the SAME field -- this
                         # just skips the transformer call in front of it.
-                        _bf_val = self._resolve_field_value_with_escalation(state, _bf_label, section=_bf_sec)
+                        # Reset per field: it is only assigned inside the
+                        # escalation branch below, so without this it is either
+                        # undefined on the first field that resolves cleanly, or
+                        # stale from an earlier field -- which would credit the
+                        # LLM for a value the source lookup actually supplied.
+                        _bf_llm_action = None
+                        _bf_val = ("" if self._no_source_lookup else
+                                   self._resolve_field_value_with_escalation(
+                                       state, _bf_label, section=_bf_sec))
                         if not _bf_val and self._llm_client:
                             # Real live bug + fix: "lookup found nothing"
                             # and "genuinely blank" aren't the same thing --
@@ -2563,6 +2643,9 @@ class LLMAgent:
                             continue
                         logger.info("[OPT2] batch fast-fill '%s' → %r (no transformer, no LLM, no click)",
                                     _bf_label, _bf_val[:40])
+                        _emit_decision(_next_decision_step(),
+                                       "llm" if _bf_llm_action else "source",
+                                       None, "fill")
                         self._executor.execute({
                             "action_type": "keyboard", "text": _bf_val,
                             "key_count": len(_bf_val), "keystrokes": list(_bf_val),
@@ -2576,7 +2659,15 @@ class LLMAgent:
                         if (_bf_key in self._leave_blank_keys
                                 or _bf_key in self._typed_keys):
                             continue
-                        _bf_val = self._resolve_field_value_with_escalation(state, _bf_label, section=_bf_sec)
+                        # Reset per field: it is only assigned inside the
+                        # escalation branch below, so without this it is either
+                        # undefined on the first field that resolves cleanly, or
+                        # stale from an earlier field -- which would credit the
+                        # LLM for a value the source lookup actually supplied.
+                        _bf_llm_action = None
+                        _bf_val = ("" if self._no_source_lookup else
+                                   self._resolve_field_value_with_escalation(
+                                       state, _bf_label, section=_bf_sec))
                         if not _bf_val and self._llm_client:
                             # Real live bug + fix: "lookup found nothing"
                             # and "genuinely blank" aren't the same thing --
@@ -2640,6 +2731,9 @@ class LLMAgent:
                             continue   # no matching option — leave for the click-based fallback
                         logger.info("[OPT2] batch fast-fill '%s' → %r (no transformer, no LLM, no click)",
                                     _bf_label, _bf_val[:40])
+                        _emit_decision(_next_decision_step(),
+                                       "llm" if _bf_llm_action else "source",
+                                       None, "fill")
                         self._mark_attempted(_bf_el, elements=state.get("elements", []), section=_bf_sec)
                         self._executor.execute({"action_type": "keyboard",
                                                 "key_count": 1, "keystrokes": ["tab"]})
@@ -5612,6 +5706,9 @@ class LLMAgent:
                 "execute_time_sec":  round(execute_time_sec, 4),
                 "step_time_sec":     round(_step_time_sec, 4),
             })
+
+            _emit_decision(step_idx + 1, _decision_maker, t_conf,
+                           prediction.get("action_type"))
 
             if not result.success:
                 # Skip-and-continue: one failed action shouldn't kill the whole
