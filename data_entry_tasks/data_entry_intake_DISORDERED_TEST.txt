@@ -24,17 +24,17 @@ All dates use MM/DD/YYYY format unless noted.
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 [ Policy Information ]
-Contract Length      : 6 Month
+Policy Term          : 6 Month
 Policy Reference #   : PAI-2026-00441
-Coverage Tier        : Full Coverage
-Coverage State       : Active
-Inception Day        : 04/01/2026
-Lapse Day            : 10/01/2026
+Policy Type          : Full Coverage
+Policy Status        : Active
+Effective Date       : 04/01/2026
+Expiration Date      : 10/01/2026
 
 [ Agent / Agency ]
 Producer Code        : AGT-0092
-Branch Office        : Pinnacle Auto — Riverside Branch
-Producer             : Sandra Whitfield
+Agency Name          : Pinnacle Auto — Riverside Branch
+Agent Name           : Sandra Whitfield
 Underwriter          : Marcus D. Chen
 
 [ Flags ]
@@ -48,34 +48,34 @@ Paperless / e-Delivery : YES (check)
 
 [ Personal Information ]
 Years Continuously Insured : 9
-Civil Standing       : Married
-Second Forename      : Arthur
+Marital Status       : Married
+Middle Name          : Arthur
 SSN                  : 512-88-4401  [VERIFY]
 Gender               : Male
 Education Level      : Bachelor's Degree
 Surname              : Delgado
-Risk Rating          : 724
-Born On              : 07/14/1978
+Credit Score         : 724
+Date of Birth        : 07/14/1978
 Given Name           : James
 Suffix               : (none)
 Job Title            : Employed Full-Time
 
 [ Contact Information ]
 Work Phone           : (951) 300-0044
-Mobile Contact       : (951) 882-5573
-Landline Contact     : (951) 440-2281
+Cell Phone           : (951) 882-5573
+Home Phone           : (951) 440-2281
 Email Address        : jdelgado78@gmail.com
 
 [ Address ]
 Street Address 1     : 4418 Creekstone Drive
 Municipality         : Riverside
-Mailing Line 2       : (none)
+Street Address 2     : (none)
 ZIP Code             : 92506
-District             : Riverside
+County               : Riverside
 Homeowner            : YES (check)
-Nation               : United States
+Country              : United States
 Years at Address     : 6
-Province             : California
+State                : California
 
 [ Driver's License ]
 DL Issuing State     : California
@@ -97,7 +97,7 @@ Year                 : 2020
 VIN                  : 1HGCV1F30LA081234
 Number of Doors      : 4
 Paint Finish         : Gray
-Chassis Style        : Sedan
+Body Type            : Sedan
 Trim / Sub-model     : Sport 2.0T
 Model                : Accord
 Make                 : Honda
@@ -107,7 +107,7 @@ Fuel Type            : Gasoline
 Transmission         : Automatic
 Displacement (L)     : 2.0
 Drive Type           : FWD
-Engine Count         : 4
+Cylinders            : 4
 
 [ Usage & Mileage ]
 Garaging Location    : Private Garage
@@ -195,7 +195,7 @@ Gender               : Female
 DL Issuing State     : California
 DL Expiration        : 03/22/2027
 SR-22 Required       : NO
-Born On              : 03/22/1980
+Date of Birth        : 03/22/1980
 DL Number            : F8821047
 Relationship         : Spouse
 Excluded Driver      : NO
@@ -206,7 +206,7 @@ Given Name           : Maria
 [ Driver 3 ]
 DL Expiration        : 09/05/2027
 Surname              : Delgado
-Born On              : 09/05/2006
+Date of Birth        : 09/05/2006
 DL Number            : D0012938
 SR-22 Required       : NO
 DL Issuing State     : California
@@ -239,15 +239,15 @@ SR-22 / FR-44 Filed      : NO
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 [ Claim Details ]
-Incident Category        : Comprehensive
+Claim Type               : Comprehensive
 Claim Amount ($)         : 1240.00
 Incident Reference       : CLM-2024-88341
 Resolution Date          : 08/19/2024
 Date of Loss             : 08/03/2024
-Incident State           : Closed
+Claim Status             : Closed
 Settlement Amount ($)    : 990.00
 Deductible ($)           : 250.00
-Incident Narrative       : Windshield cracked by falling tree branch during
+Claim Description        : Windshield cracked by falling tree branch during
 Assessor                 : Renee Harmon
                            storm. No collision involved. Vehicle was parked
                            in driveway at time of incident.
@@ -281,20 +281,20 @@ Auto-Pay Enrolled        : YES (check)
 Method                   : Credit Card
 
 [ Credit / Debit Card ]
-Instrument Holder        : James A. Delgado
+Cardholder Name          : James A. Delgado
 CVV                      : 341  [VERIFY — do not store]
-Payment Instrument #     : 4532 8812 0044 7761  [VERIFY before saving]
+Card Number              : 4532 8812 0044 7761  [VERIFY before saving]
 Expiration (MM/YY)       : 09/28
 
 [ Bank Account (ACH) ]
 Institution              : (leave blank)
-Deposit Category         : (leave blank)
+Account Type             : (leave blank)
 Routing Number           : (leave blank)
-Deposit Reference        : (leave blank)
+Account Number           : (leave blank)
 
 [ Billing Address ]
 ZIP Code                 : 92506
-Province                 : California
+State                    : California
 Mailing Line 1           : 4418 Creekstone Drive
 Municipality             : Riverside
 
@@ -308,17 +308,17 @@ Municipality             : Riverside
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 [ Policy Information ]
-Contract Length      : 12 Month  ← NOTE: Annual term, not 6-month
-Lapse Day            : 04/01/2027
-Coverage Tier        : Liability Only
-Coverage State       : Active
+Policy Term          : 12 Month  ← NOTE: Annual term, not 6-month
+Expiration Date      : 04/01/2027
+Policy Type          : Liability Only
+Policy Status        : Active
 Policy Reference #   : PAI-2026-00442
-Inception Day        : 04/01/2026
+Effective Date       : 04/01/2026
 
 [ Agent / Agency ]
 Underwriter          : Sylvia Okafor
-Producer             : Derrick P. Nguyen
-Branch Office        : Pinnacle Auto — Downtown Branch
+Agent Name           : Derrick P. Nguyen
+Agency Name          : Pinnacle Auto — Downtown Branch
 Producer Code        : AGT-0055
 
 [ Flags ]
@@ -332,34 +332,34 @@ Paperless / e-Delivery : NO  ← paper statements requested
 
 [ Personal Information ]
 Job Title            : Retired
-Risk Rating          : 651  [VERIFY — borderline; flag for underwriter review]
+Credit Score         : 651  [VERIFY — borderline; flag for underwriter review]
 Suffix               : (none)
 Gender               : Female
-Civil Standing       : Widowed
+Marital Status       : Widowed
 Education Level      : High School / GED
-Second Forename      : (none)
+Middle Name          : (none)
 Surname              : Tompkins
 Given Name           : Brenda
 SSN                  : 628-44-9201  [VERIFY]
-Born On              : 11/30/1962
+Date of Birth        : 11/30/1962
 Years Continuously Insured : 3
 
 [ Contact Information ]
-Mobile Contact       : (214) 771-3340
+Cell Phone           : (214) 771-3340
 Work Phone           : (none)
 Email Address        : brenda.tompkins62@yahoo.com
-Landline Contact     : (214) 552-9018
+Home Phone           : (214) 552-9018
 
 [ Address ]
 Homeowner            : NO  ← renter
 Street Address 1     : 8820 Magnolia Creek Ln
 ZIP Code             : 75218
 Years at Address     : 11
-Nation               : United States
-District             : Dallas
+Country              : United States
+County               : Dallas
 Municipality         : Dallas
-Mailing Line 2       : Apt 4B
-Province             : Texas
+Street Address 2     : Apt 4B
+State                : Texas
 
 [ Driver's License ]
 DL Number            : T4491028
@@ -377,7 +377,7 @@ Prior Expiry Date    : 03/31/2026
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 [ Vehicle Identification ]
-Chassis Style        : Sedan
+Body Type            : Sedan
 Number of Doors      : 4
 Make                 : Toyota
 VIN                  : 2T1BURHE0JC041872
@@ -390,7 +390,7 @@ Model                : Corolla
 Drive Type           : FWD
 Displacement (L)     : 1.8
 Fuel Type            : Gasoline
-Engine Count         : 4
+Cylinders            : 4
 Transmission         : Automatic
 
 [ Usage & Mileage ]
@@ -520,21 +520,21 @@ Payment Due Date         : 04/15/2026
 Method                   : Bank Transfer (ACH)
 
 [ Credit / Debit Card ]
-Payment Instrument #     : (leave blank)
+Card Number              : (leave blank)
 CVV                      : (leave blank)
 Expiration (MM/YY)       : (leave blank)
-Instrument Holder        : (leave blank)
+Cardholder Name          : (leave blank)
 
 [ Bank Account (ACH) ]
-Deposit Category         : Checking
+Account Type             : Checking
 Institution              : Frost Bank
 Routing Number           : 114900164  [VERIFY]
-Deposit Reference        : 007441928830  [VERIFY — do not store full number]
+Account Number           : 007441928830  [VERIFY — do not store full number]
 
 [ Billing Address ]
 Municipality             : Dallas
 ZIP Code                 : 75218
-Province                 : Texas
+State                    : Texas
 Mailing Line 1           : 8820 Magnolia Creek Ln, Apt 4B
 
 
@@ -547,18 +547,18 @@ Mailing Line 1           : 8820 Magnolia Creek Ln, Apt 4B
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 [ Policy Information ]
-Inception Day        : 04/01/2026
-Coverage Tier        : Full Coverage
-Coverage State       : Active
-Lapse Day            : 10/01/2026
+Effective Date       : 04/01/2026
+Policy Type          : Full Coverage
+Policy Status        : Active
+Expiration Date      : 10/01/2026
 Policy Reference #   : PAI-2026-00443
-Contract Length      : 6 Month
+Policy Term          : 6 Month
 
 [ Agent / Agency ]
 Producer Code        : AGT-0092
-Producer             : Sandra Whitfield
+Agent Name           : Sandra Whitfield
 Underwriter          : Marcus D. Chen
-Branch Office        : Pinnacle Auto — Riverside Branch
+Agency Name          : Pinnacle Auto — Riverside Branch
 
 [ Flags ]
 E-Signature Obtained : YES (check)
@@ -570,34 +570,34 @@ Renewal Policy       : NO
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 [ Personal Information ]
-Civil Standing       : Single
+Marital Status       : Single
 Education Level      : Some College
-Born On              : 05/08/1990
+Date of Birth        : 05/08/1990
 Job Title            : Self-Employed
 Suffix               : Jr.
 Years Continuously Insured : 1
 Surname              : Ostrowski
 SSN                  : 401-72-8810  [VERIFY]
-Risk Rating          : 598  [VERIFY — high risk tier; confirm with underwriter]
+Credit Score         : 598  [VERIFY — high risk tier; confirm with underwriter]
 Gender               : Male
 Given Name           : Kevin
-Second Forename      : T.
+Middle Name          : T.
 
 [ Contact Information ]
-Landline Contact     : (none)
+Home Phone           : (none)
 Email Address        : kostrowski90@protonmail.com
 Work Phone           : (909) 334-7820  ← same as cell
-Mobile Contact       : (909) 334-7820
+Cell Phone           : (909) 334-7820
 
 [ Address ]
-Nation               : United States
+Country              : United States
 Municipality         : San Dimas
-Province             : California
+State                : California
 Years at Address     : 2
 Street Address 1     : 201 W. Arrow Hwy
-Mailing Line 2       : Suite 7
+Street Address 2     : Suite 7
 ZIP Code             : 91773
-District             : Los Angeles
+County               : Los Angeles
 Homeowner            : NO
 
 [ Driver's License ]
@@ -619,14 +619,14 @@ Prior Policy No.     : (none)
 VIN                  : WBA8E9G58JNU21893
 Year                 : 2018
 Make                 : BMW
-Chassis Style        : Sedan
+Body Type            : Sedan
 Model                : 3 Series
 Number of Doors      : 4
 Paint Finish         : Black
 Trim / Sub-model     : 330i xDrive
 
 [ Engine & Drivetrain ]
-Engine Count         : 4
+Cylinders            : 4
 Drive Type           : AWD
 Displacement (L)     : 2.0 Turbo
 Fuel Type            : Gasoline
@@ -744,12 +744,12 @@ Claim Amount ($)         : 9450.00
 Incident Reference       : CLM-2023-55109
 Deductible ($)           : 500.00
 Settlement Amount ($)    : 8950.00
-Incident Narrative       : Policyholder rear-ended a stopped vehicle on the
+Claim Description        : Policyholder rear-ended a stopped vehicle on the
 Assessor                 : Thomas Reyes
 Date of Loss             : 07/21/2023
-Incident Category        : Collision
+Claim Type               : Collision
 Resolution Date          : 09/05/2023
-Incident State           : Closed
+Claim Status             : Closed
                            I-210 freeway during heavy traffic. Airbags deployed.
                            Front bumper and hood sustained significant damage.
                            Other party's vehicle sustained rear bumper damage.
@@ -784,19 +784,19 @@ Method                   : Credit Card
 
 [ Credit / Debit Card ]
 Expiration (MM/YY)       : 02/27
-Instrument Holder        : Kevin T. Ostrowski Jr.
-Payment Instrument #     : 5412 7531 9900 2241  [VERIFY before saving]
+Cardholder Name          : Kevin T. Ostrowski Jr.
+Card Number              : 5412 7531 9900 2241  [VERIFY before saving]
 CVV                      : 819  [VERIFY — do not store]
 
 [ Bank Account (ACH) ]
 Routing Number           : (leave blank)
-Deposit Reference        : (leave blank)
+Account Number           : (leave blank)
 Institution              : (leave blank)
-Deposit Category         : (leave blank)
+Account Type             : (leave blank)
 
 [ Billing Address ]
 Mailing Line 1           : 201 W. Arrow Hwy, Suite 7
-Province                 : California
+State                    : California
 ZIP Code                 : 91773
 Municipality             : San Dimas
 
@@ -810,18 +810,18 @@ Municipality             : San Dimas
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 [ Policy Information ]
-Lapse Day            : 10/01/2026
-Coverage Tier        : Full Coverage
-Contract Length      : 6 Month
-Coverage State       : Active
-Inception Day        : 04/01/2026
+Expiration Date      : 10/01/2026
+Policy Type          : Full Coverage
+Policy Term          : 6 Month
+Policy Status        : Active
+Effective Date       : 04/01/2026
 Policy Reference #   : PAI-2026-00444
 
 [ Agent / Agency ]
 Producer Code        : AGT-0031
-Producer             : Patricia Holloway
+Agent Name           : Patricia Holloway
 Underwriter          : Marcus D. Chen
-Branch Office        : Pinnacle Auto — Northside Branch
+Agency Name          : Pinnacle Auto — Northside Branch
 
 [ Flags ]
 Paperless / e-Delivery : YES (check)
@@ -836,32 +836,32 @@ E-Signature Obtained : YES (check)
 Job Title            : Employed Full-Time
 Years Continuously Insured : 7
 Given Name           : Natalie
-Second Forename      : Rose
+Middle Name          : Rose
 Gender               : Female
 Surname              : Chambers
-Civil Standing       : Single
-Risk Rating          : 788
+Marital Status       : Single
+Credit Score         : 788
 Suffix               : (none)
 SSN                  : 374-60-1142  [VERIFY]
 Education Level      : Master's Degree
-Born On              : 02/18/1985
+Date of Birth        : 02/18/1985
 
 [ Contact Information ]
 Email Address        : nchambers85@outlook.com
-Landline Contact     : (312) 774-0392
+Home Phone           : (312) 774-0392
 Work Phone           : (none)
-Mobile Contact       : (312) 449-8801
+Cell Phone           : (312) 449-8801
 
 [ Address ]
 ZIP Code             : 60642
-District             : Cook
+County               : Cook
 Homeowner            : NO
-Province             : Illinois
+State                : Illinois
 Municipality         : Chicago
-Nation               : United States
+Country              : United States
 Years at Address     : 4
 Street Address 1     : 1127 N. Halsted St
-Mailing Line 2       : Apt 3B
+Street Address 2     : Apt 3B
 
 [ Driver's License ]
 DL Expiration        : 02/18/2028
@@ -886,11 +886,11 @@ Number of Doors      : 4
 VIN                  : 5YJSA1E26MF481023
 Make                 : Tesla
 Year                 : 2021
-Chassis Style        : Sedan
+Body Type            : Sedan
 
 [ Engine & Drivetrain ]
 Fuel Type            : Electric
-Engine Count         : 0  (Electric)
+Cylinders            : 0  (Electric)
 Displacement (L)     : N/A
 Drive Type           : AWD
 Transmission         : Automatic (single-speed)
@@ -1003,14 +1003,14 @@ License Suspended or Revoked : NO
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 [ Claim Details ]
-Incident State           : (leave blank)
-Incident Category        : (leave blank)
+Claim Status             : (leave blank)
+Claim Type               : (leave blank)
 Assessor                 : (leave blank)
 Resolution Date          : (leave blank)
 Claim Amount ($)         : (leave blank)
 Settlement Amount ($)    : (leave blank)
 Incident Reference       : (none)
-Incident Narrative       : (leave blank)
+Claim Description        : (leave blank)
 Deductible ($)           : (leave blank)
 Date of Loss             : (leave blank)
 
@@ -1043,22 +1043,22 @@ Down Payment ($)         : 625.10  (first 2 months upfront)
 Method                   : Bank Transfer (ACH)
 
 [ Credit / Debit Card ]
-Payment Instrument #     : (leave blank)
-Instrument Holder        : (leave blank)
+Card Number              : (leave blank)
+Cardholder Name          : (leave blank)
 CVV                      : (leave blank)
 Expiration (MM/YY)       : (leave blank)
 
 [ Bank Account (ACH) ]
 Routing Number           : 021000021
-Deposit Reference        : 4400198827  [VERIFY before saving]
-Deposit Category         : Checking
+Account Number           : 4400198827  [VERIFY before saving]
+Account Type             : Checking
 Institution              : Chase Bank
 
 [ Billing Address ]
 Municipality             : Chicago
 ZIP Code                 : 60642
 Mailing Line 1           : 1127 N. Halsted St, Apt 3B
-Province                 : Illinois
+State                    : Illinois
 
 
 ================================================================================
@@ -1070,18 +1070,18 @@ Province                 : Illinois
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 [ Policy Information ]
-Coverage State       : Pending
+Policy Status        : Pending
 Policy Reference #   : PAI-2026-00445
-Contract Length      : 6 Month
-Lapse Day            : 10/15/2026
-Inception Day        : 04/15/2026
-Coverage Tier        : Liability Only
+Policy Term          : 6 Month
+Expiration Date      : 10/15/2026
+Effective Date       : 04/15/2026
+Policy Type          : Liability Only
 
 [ Agent / Agency ]
 Underwriter          : Sylvia Okafor
 Producer Code        : AGT-0055
-Producer             : Derrick P. Nguyen
-Branch Office        : Pinnacle Auto — Downtown Branch
+Agent Name           : Derrick P. Nguyen
+Agency Name          : Pinnacle Auto — Downtown Branch
 
 [ Flags ]
 Renewal Policy       : NO
@@ -1094,33 +1094,33 @@ Paperless / e-Delivery : NO
 
 [ Personal Information ]
 SSN                  : 291-55-8830  [VERIFY]
-Born On              : 09/03/1972
-Civil Standing       : Divorced
+Date of Birth        : 09/03/1972
+Marital Status       : Divorced
 Education Level      : Associate Degree
 Gender               : Male
 Job Title            : Employed Full-Time
 Given Name           : Marcus
-Risk Rating          : 690
+Credit Score         : 690
 Surname              : Webb
-Second Forename      : (none)
+Middle Name          : (none)
 Years Continuously Insured : 12
 Suffix               : (none)
 
 [ Contact Information ]
-Mobile Contact       : (602) 553-9927
+Cell Phone           : (602) 553-9927
 Email Address        : mwebb1972@gmail.com
-Landline Contact     : (602) 881-4410
+Home Phone           : (602) 881-4410
 Work Phone           : (none)
 
 [ Address ]
 Years at Address     : 8
-Nation               : United States
+Country              : United States
 Street Address 1     : 8842 E. Thomas Rd
-Mailing Line 2       : (none)
+Street Address 2     : (none)
 Municipality         : Scottsdale
-Province             : Arizona
+State                : Arizona
 Homeowner            : YES (check)
-District             : Maricopa
+County               : Maricopa
 ZIP Code             : 85251
 
 [ Driver's License ]
@@ -1139,7 +1139,7 @@ Prior Policy No.     : PRG-AZ-2025-098712
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 [ Vehicle Identification ]
-Chassis Style        : Pickup Truck
+Body Type            : Pickup Truck
 Make                 : Ford
 Year                 : 2013
 Paint Finish         : Red
@@ -1150,7 +1150,7 @@ Model                : F-150
 
 [ Engine & Drivetrain ]
 Displacement (L)     : 5.0
-Engine Count         : 8
+Cylinders            : 8
 Drive Type           : 4WD
 Transmission         : Automatic
 Fuel Type            : Gasoline
@@ -1266,9 +1266,9 @@ DUI / DWI on Record      : NO
 Claim Amount ($)         : (leave blank)
 Resolution Date          : (leave blank)
 Date of Loss             : (leave blank)
-Incident Category        : (leave blank)
-Incident State           : (leave blank)
-Incident Narrative       : (leave blank)
+Claim Type               : (leave blank)
+Claim Status             : (leave blank)
+Claim Description        : (leave blank)
 Assessor                 : (leave blank)
 Incident Reference       : (none)
 Settlement Amount ($)    : (leave blank)
@@ -1304,18 +1304,18 @@ Method                   : Check
 
 [ Credit / Debit Card ]
 CVV                      : (leave blank)
-Payment Instrument #     : (leave blank)
-Instrument Holder        : (leave blank)
+Card Number              : (leave blank)
+Cardholder Name          : (leave blank)
 Expiration (MM/YY)       : (leave blank)
 
 [ Bank Account (ACH) ]
-Deposit Category         : (leave blank)
+Account Type             : (leave blank)
 Routing Number           : (leave blank)
-Deposit Reference        : (leave blank)
+Account Number           : (leave blank)
 Institution              : (leave blank)
 
 [ Billing Address ]
-Province                 : Arizona
+State                    : Arizona
 Mailing Line 1           : 8842 E. Thomas Rd
 Municipality             : Scottsdale
 ZIP Code                 : 85251
@@ -1330,18 +1330,18 @@ ZIP Code                 : 85251
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 [ Policy Information ]
-Coverage Tier        : Full Coverage
-Lapse Day            : 03/01/2027
-Coverage State       : Active
-Inception Day        : 03/01/2026
-Contract Length      : 12 Month
+Policy Type          : Full Coverage
+Expiration Date      : 03/01/2027
+Policy Status        : Active
+Effective Date       : 03/01/2026
+Policy Term          : 12 Month
 Policy Reference #   : PAI-2026-00446
 
 [ Agent / Agency ]
 Underwriter          : Marcus D. Chen
 Producer Code        : AGT-0092
-Producer             : Sandra Whitfield
-Branch Office        : Pinnacle Auto — Riverside Branch
+Agent Name           : Sandra Whitfield
+Agency Name          : Pinnacle Auto — Riverside Branch
 
 [ Flags ]
 E-Signature Obtained : YES (check)
@@ -1356,29 +1356,29 @@ Renewal Policy       : YES (check)
 Given Name           : Linda
 Education Level      : Bachelor's Degree
 Surname              : Parrish
-Risk Rating          : 752
+Credit Score         : 752
 Suffix               : (none)
 Years Continuously Insured : 15
-Second Forename      : Ann
+Middle Name          : Ann
 Gender               : Female
 SSN                  : 459-31-7740  [VERIFY]
-Civil Standing       : Married
-Born On              : 06/01/1968
+Marital Status       : Married
+Date of Birth        : 06/01/1968
 Job Title            : Employed Full-Time
 
 [ Contact Information ]
 Work Phone           : (404) 700-0050
-Landline Contact     : (404) 228-8813
-Mobile Contact       : (404) 592-1120
+Home Phone           : (404) 228-8813
+Cell Phone           : (404) 592-1120
 Email Address        : linda.parrish68@gmail.com
 
 [ Address ]
-Province             : Georgia
-Mailing Line 2       : Unit 12C
+State                : Georgia
+Street Address 2     : Unit 12C
 Municipality         : Atlanta
 ZIP Code             : 30326
-Nation               : United States
-District             : Fulton
+Country              : United States
+County               : Fulton
 Homeowner            : NO
 Street Address 1     : 3301 Peachtree Rd NE
 Years at Address     : 3
@@ -1405,11 +1405,11 @@ Number of Doors      : 4
 Make                 : Nissan
 Year                 : 2018
 VIN                  : KNMAT2MT8JP551840
-Chassis Style        : SUV
+Body Type            : SUV
 Trim / Sub-model     : SV
 
 [ Engine & Drivetrain ]
-Engine Count         : 4
+Cylinders            : 4
 Drive Type           : AWD
 Fuel Type            : Gasoline
 Displacement (L)     : 2.5
@@ -1496,7 +1496,7 @@ Total Premium ($)        : 162.88
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 [ Driver 2 ]
-Born On              : 01/14/1966
+Date of Birth        : 01/14/1966
 Surname              : Parrish
 Accidents (3 yr)     : 0
 Given Name           : Robert
@@ -1534,13 +1534,13 @@ SR-22 / FR-44 Filed      : NO
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 [ Claim Details ]
-Incident Narrative       : (leave blank)
+Claim Description        : (leave blank)
 Settlement Amount ($)    : (leave blank)
 Claim Amount ($)         : (leave blank)
 Assessor                 : (leave blank)
-Incident Category        : (leave blank)
+Claim Type               : (leave blank)
 Incident Reference       : (none)
-Incident State           : (leave blank)
+Claim Status             : (leave blank)
 Deductible ($)           : (leave blank)
 Resolution Date          : (leave blank)
 Date of Loss             : (leave blank)
@@ -1574,19 +1574,19 @@ Auto-Pay Enrolled        : YES (check)
 Method                   : Bank Transfer (ACH)
 
 [ Credit / Debit Card ]
-Instrument Holder        : (leave blank)
+Cardholder Name          : (leave blank)
 Expiration (MM/YY)       : (leave blank)
-Payment Instrument #     : (leave blank)
+Card Number              : (leave blank)
 CVV                      : (leave blank)
 
 [ Bank Account (ACH) ]
-Deposit Category         : Checking
+Account Type             : Checking
 Institution              : Wells Fargo
 Routing Number           : 121000248
-Deposit Reference        : 7712003345  [VERIFY before saving]
+Account Number           : 7712003345  [VERIFY before saving]
 
 [ Billing Address ]
-Province                 : Georgia
+State                    : Georgia
 ZIP Code                 : 30326
 Mailing Line 1           : 3301 Peachtree Rd NE, Unit 12C
 Municipality             : Atlanta
@@ -1602,16 +1602,16 @@ Municipality             : Atlanta
 
 [ Policy Information ]
 Policy Reference #   : PAI-2026-00447
-Lapse Day            : 10/01/2026
-Coverage Tier        : Full Coverage
-Inception Day        : 04/01/2026
-Coverage State       : Active
-Contract Length      : 6 Month
+Expiration Date      : 10/01/2026
+Policy Type          : Full Coverage
+Effective Date       : 04/01/2026
+Policy Status        : Active
+Policy Term          : 6 Month
 
 [ Agent / Agency ]
-Branch Office        : Pinnacle Auto — Eastside Branch
+Agency Name          : Pinnacle Auto — Eastside Branch
 Underwriter          : Sylvia Okafor
-Producer             : Cynthia Ramos
+Agent Name           : Cynthia Ramos
 Producer Code        : AGT-0012
 
 [ Flags ]
@@ -1627,32 +1627,32 @@ Renewal Policy       : NO
 Suffix               : III
 Job Title            : Employed Full-Time
 Given Name           : Derek
-Civil Standing       : Single
+Marital Status       : Single
 Education Level      : Bachelor's Degree
-Risk Rating          : 731
+Credit Score         : 731
 Years Continuously Insured : 3
 SSN                  : 541-29-0087  [VERIFY]
-Born On              : 03/17/1994
+Date of Birth        : 03/17/1994
 Surname              : Fontaine
 Gender               : Male
-Second Forename      : (none)
+Middle Name          : (none)
 
 [ Contact Information ]
 Work Phone           : (none)
 Email Address        : derekfontaine94@icloud.com
-Mobile Contact       : (504) 448-2290
-Landline Contact     : (none)
+Cell Phone           : (504) 448-2290
+Home Phone           : (none)
 
 [ Address ]
-District             : Orleans
-Province             : Louisiana
+County               : Orleans
+State                : Louisiana
 ZIP Code             : 70130
 Municipality         : New Orleans
 Homeowner            : NO
 Street Address 1     : 2200 Magazine St
-Nation               : United States
+Country              : United States
 Years at Address     : 2
-Mailing Line 2       : Apt 5
+Street Address 2     : Apt 5
 
 [ Driver's License ]
 DL Issuing State     : Louisiana
@@ -1676,12 +1676,12 @@ Number of Doors      : 4
 Model                : Corolla
 Paint Finish         : Blue
 Trim / Sub-model     : LE
-Chassis Style        : Sedan
+Body Type            : Sedan
 Year                 : 2018
 
 [ Engine & Drivetrain ]
 Fuel Type            : Gasoline
-Engine Count         : 4
+Cylinders            : 4
 Displacement (L)     : 1.8
 Drive Type           : FWD
 Transmission         : CVT
@@ -1799,10 +1799,10 @@ Date of Loss             : 01/14/2025
 Claim Amount ($)         : 3100.00
 Assessor                 : Patricia Kim
 Incident Reference       : CLM-2025-22018
-Incident Narrative       : Vehicle flooded during Hurricane Ida remnant heavy rain
-Incident Category        : Comprehensive
+Claim Description        : Vehicle flooded during Hurricane Ida remnant heavy rain
+Claim Type               : Comprehensive
 Resolution Date          : 02/03/2025
-Incident State           : Closed
+Claim Status             : Closed
 Settlement Amount ($)    : 2850.00
 Deductible ($)           : 250.00
                            event. Interior water damage to seat cushions and
@@ -1839,19 +1839,19 @@ Method                   : Credit Card
 [ Credit / Debit Card ]
 CVV                      : 227  [VERIFY — do not store]
 Expiration (MM/YY)       : 11/28
-Instrument Holder        : Derek Fontaine III
-Payment Instrument #     : 4111 2233 5566 8877  [VERIFY before saving]
+Cardholder Name          : Derek Fontaine III
+Card Number              : 4111 2233 5566 8877  [VERIFY before saving]
 
 [ Bank Account (ACH) ]
 Routing Number           : (leave blank)
 Institution              : (leave blank)
-Deposit Category         : (leave blank)
-Deposit Reference        : (leave blank)
+Account Type             : (leave blank)
+Account Number           : (leave blank)
 
 [ Billing Address ]
 Municipality             : New Orleans
 ZIP Code                 : 70130
-Province                 : Louisiana
+State                    : Louisiana
 Mailing Line 1           : 2200 Magazine St, Apt 5
 
 
@@ -1864,17 +1864,17 @@ Mailing Line 1           : 2200 Magazine St, Apt 5
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 [ Policy Information ]
-Contract Length      : 6 Month
-Coverage State       : Active
-Coverage Tier        : Full Coverage
+Policy Term          : 6 Month
+Policy Status        : Active
+Policy Type          : Full Coverage
 Policy Reference #   : PAI-2026-00448
-Lapse Day            : 10/01/2026
-Inception Day        : 04/01/2026
+Expiration Date      : 10/01/2026
+Effective Date       : 04/01/2026
 
 [ Agent / Agency ]
 Underwriter          : Marcus D. Chen
-Branch Office        : Pinnacle Auto — Northside Branch
-Producer             : Patricia Holloway
+Agency Name          : Pinnacle Auto — Northside Branch
+Agent Name           : Patricia Holloway
 Producer Code        : AGT-0031
 
 [ Flags ]
@@ -1889,30 +1889,30 @@ Paperless / e-Delivery : NO
 [ Personal Information ]
 SSN                  : 388-12-6654  [VERIFY]
 Surname              : Jefferson
-Risk Rating          : 711
-Civil Standing       : Married
+Credit Score         : 711
+Marital Status       : Married
 Gender               : Female
 Suffix               : (none)
 Job Title            : Employed Full-Time
 Education Level      : Bachelor's Degree
-Born On              : 10/25/1979
+Date of Birth        : 10/25/1979
 Years Continuously Insured : 10
-Second Forename      : Mae
+Middle Name          : Mae
 Given Name           : Yolanda
 
 [ Contact Information ]
-Landline Contact     : (713) 882-5510
-Mobile Contact       : (713) 441-3309
+Home Phone           : (713) 882-5510
+Cell Phone           : (713) 441-3309
 Work Phone           : (713) 600-1200
 Email Address        : yolanda.jefferson@hotmail.com
 
 [ Address ]
-Mailing Line 2       : Apt 204
-Province             : Texas
+Street Address 2     : Apt 204
+State                : Texas
 Homeowner            : NO
 Municipality         : Houston
-Nation               : United States
-District             : Harris
+Country              : United States
+County               : Harris
 Years at Address     : 5
 ZIP Code             : 77056
 Street Address 1     : 5520 Westheimer Rd
@@ -1936,7 +1936,7 @@ Prior Insurer        : Nationwide
 Paint Finish         : White
 Make                 : Honda
 Model                : Pilot
-Chassis Style        : SUV
+Body Type            : SUV
 Year                 : 2017
 Number of Doors      : 4
 VIN                  : 5FNYF6H51HB022447
@@ -1944,7 +1944,7 @@ Trim / Sub-model     : EX-L
 
 [ Engine & Drivetrain ]
 Transmission         : Automatic
-Engine Count         : 6
+Cylinders            : 6
 Drive Type           : AWD
 Fuel Type            : Gasoline
 Displacement (L)     : 3.5
@@ -2032,7 +2032,7 @@ Total Premium ($)        : 158.40
 [ Driver 2 ]
 DL Issuing State     : Texas
 Relationship         : Spouse
-Born On              : 07/18/1977
+Date of Birth        : 07/18/1977
 SR-22 Required       : NO
 Violations (3 yr)    : 0
 Excluded Driver      : NO
@@ -2068,16 +2068,16 @@ SR-22 / FR-44 Filed      : NO
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 [ Claim Details ]
-Incident Narrative       : Hailstorm caused dents to hood, roof, and trunk lid.
+Claim Description        : Hailstorm caused dents to hood, roof, and trunk lid.
 Assessor                 : Gloria Esteban
-Incident Category        : Comprehensive
+Claim Type               : Comprehensive
 Claim Amount ($)         : 2200.00
 Date of Loss             : 05/28/2024
 Deductible ($)           : 500.00
 Incident Reference       : CLM-2024-40019
 Settlement Amount ($)    : 1700.00
 Resolution Date          : 06/10/2024
-Incident State           : Closed
+Claim Status             : Closed
                            No mechanical damage. Vehicle was parked in open
                            parking lot during storm event.
 
@@ -2110,21 +2110,21 @@ Payment Frequency        : Monthly
 Method                   : Credit Card
 
 [ Credit / Debit Card ]
-Payment Instrument #     : 4916 7700 3311 5540  [VERIFY before saving]
-Instrument Holder        : Yolanda M. Jefferson
+Card Number              : 4916 7700 3311 5540  [VERIFY before saving]
+Cardholder Name          : Yolanda M. Jefferson
 Expiration (MM/YY)       : 06/29
 CVV                      : 512  [VERIFY — do not store]
 
 [ Bank Account (ACH) ]
 Routing Number           : (leave blank)
 Institution              : (leave blank)
-Deposit Reference        : (leave blank)
-Deposit Category         : (leave blank)
+Account Number           : (leave blank)
+Account Type             : (leave blank)
 
 [ Billing Address ]
 ZIP Code                 : 77056
 Municipality             : Houston
-Province                 : Texas
+State                    : Texas
 Mailing Line 1           : 5520 Westheimer Rd, Apt 204
 
 
@@ -2137,18 +2137,18 @@ Mailing Line 1           : 5520 Westheimer Rd, Apt 204
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 [ Policy Information ]
-Inception Day        : 04/01/2026
-Coverage State       : Active
-Contract Length      : 12 Month
-Coverage Tier        : Liability Only
-Lapse Day            : 04/01/2027
+Effective Date       : 04/01/2026
+Policy Status        : Active
+Policy Term          : 12 Month
+Policy Type          : Liability Only
+Expiration Date      : 04/01/2027
 Policy Reference #   : PAI-2026-00449
 
 [ Agent / Agency ]
-Branch Office        : Pinnacle Auto — Eastside Branch
+Agency Name          : Pinnacle Auto — Eastside Branch
 Producer Code        : AGT-0012
 Underwriter          : Sylvia Okafor
-Producer             : Cynthia Ramos
+Agent Name           : Cynthia Ramos
 
 [ Flags ]
 Paperless / e-Delivery : YES (check)
@@ -2160,35 +2160,35 @@ Renewal Policy       : NO
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 [ Personal Information ]
-Risk Rating          : 622  [VERIFY — young driver / limited credit history]
+Credit Score         : 622  [VERIFY — young driver / limited credit history]
 Given Name           : Samuel
 SSN                  : 617-83-4402  [VERIFY]
 Surname              : Brennan
 Job Title            : Student
 Suffix               : (none)
-Civil Standing       : Single
-Second Forename      : Lee
+Marital Status       : Single
+Middle Name          : Lee
 Years Continuously Insured : 1
-Born On              : 07/30/2000
+Date of Birth        : 07/30/2000
 Education Level      : Some College
 Gender               : Male
 
 [ Contact Information ]
 Work Phone           : (none)
 Email Address        : sbrennan2000@student.edu
-Landline Contact     : (none)
-Mobile Contact       : (614) 774-0019
+Home Phone           : (none)
+Cell Phone           : (614) 774-0019
 
 [ Address ]
-Mailing Line 2       : Dorm 204
+Street Address 2     : Dorm 204
 Homeowner            : NO
 Years at Address     : 1
 Street Address 1     : 390 W. 8th Ave
 ZIP Code             : 43201
-Nation               : United States
-District             : Franklin
+Country              : United States
+County               : Franklin
 Municipality         : Columbus
-Province             : Ohio
+State                : Ohio
 
 [ Driver's License ]
 DL Number            : B3310907
@@ -2208,7 +2208,7 @@ Prior Expiry Date    : (none)
 [ Vehicle Identification ]
 Trim / Sub-model     : LT
 Year                 : 2013
-Chassis Style        : Hatchback
+Body Type            : Hatchback
 VIN                  : 1G1PA5SH5D7149822
 Make                 : Chevrolet
 Model                : Sonic
@@ -2220,7 +2220,7 @@ Drive Type           : FWD
 Fuel Type            : Gasoline
 Displacement (L)     : 1.4 Turbo
 Transmission         : Manual
-Engine Count         : 4
+Cylinders            : 4
 
 [ Usage & Mileage ]
 Garaging Location    : Street
@@ -2333,13 +2333,13 @@ DUI / DWI on Record      : NO
 Assessor                 : (leave blank)
 Date of Loss             : (leave blank)
 Claim Amount ($)         : (leave blank)
-Incident Category        : (leave blank)
+Claim Type               : (leave blank)
 Incident Reference       : (none)
 Resolution Date          : (leave blank)
 Deductible ($)           : (leave blank)
-Incident Narrative       : (leave blank)
+Claim Description        : (leave blank)
 Settlement Amount ($)    : (leave blank)
-Incident State           : (leave blank)
+Claim Status             : (leave blank)
 
 [ Circumstances ]
 Injury Involved          : NO
@@ -2371,20 +2371,20 @@ Method                   : Debit Card
 
 [ Credit / Debit Card ]
 Expiration (MM/YY)       : 05/27
-Instrument Holder        : Samuel L. Brennan
+Cardholder Name          : Samuel L. Brennan
 CVV                      : 901  [VERIFY — do not store]
-Payment Instrument #     : 4000 1122 3344 5566  [VERIFY before saving]
+Card Number              : 4000 1122 3344 5566  [VERIFY before saving]
 
 [ Bank Account (ACH) ]
 Institution              : (leave blank)
-Deposit Category         : (leave blank)
+Account Type             : (leave blank)
 Routing Number           : (leave blank)
-Deposit Reference        : (leave blank)
+Account Number           : (leave blank)
 
 [ Billing Address ]
 Mailing Line 1           : 390 W. 8th Ave, Dorm 204
 ZIP Code                 : 43201
-Province                 : Ohio
+State                    : Ohio
 Municipality             : Columbus
 
 
@@ -2398,16 +2398,16 @@ Municipality             : Columbus
 
 [ Policy Information ]
 Policy Reference #   : PAI-2026-00450
-Contract Length      : 12 Month
-Coverage State       : Active
-Lapse Day            : 04/01/2027
-Coverage Tier        : Full Coverage
-Inception Day        : 04/01/2026
+Policy Term          : 12 Month
+Policy Status        : Active
+Expiration Date      : 04/01/2027
+Policy Type          : Full Coverage
+Effective Date       : 04/01/2026
 
 [ Agent / Agency ]
-Producer             : Sandra Whitfield
+Agent Name           : Sandra Whitfield
 Underwriter          : Marcus D. Chen
-Branch Office        : Pinnacle Auto — Riverside Branch
+Agency Name          : Pinnacle Auto — Riverside Branch
 Producer Code        : AGT-0092
 
 [ Flags ]
@@ -2420,32 +2420,32 @@ Renewal Policy       : YES (check)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 [ Personal Information ]
-Civil Standing       : Married
+Marital Status       : Married
 Suffix               : (none)
-Born On              : 04/11/1981
+Date of Birth        : 04/11/1981
 Given Name           : Raj
 Gender               : Male
-Risk Rating          : 801
+Credit Score         : 801
 SSN                  : 502-67-3318  [VERIFY]
 Job Title            : Self-Employed
 Surname              : Patel
 Education Level      : Master's Degree
 Years Continuously Insured : 14
-Second Forename      : (none)
+Middle Name          : (none)
 
 [ Contact Information ]
-Mobile Contact       : (408) 591-0044
+Cell Phone           : (408) 591-0044
 Work Phone           : (408) 330-7712  ← same as home
-Landline Contact     : (408) 330-7712
+Home Phone           : (408) 330-7712
 Email Address        : raj.patel81@gmail.com
 
 [ Address ]
 Street Address 1     : 1440 Saratoga Ave
 Homeowner            : YES (check)
-Province             : California
-Mailing Line 2       : (none)
-District             : Santa Clara
-Nation               : United States
+State                : California
+Street Address 2     : (none)
+County               : Santa Clara
+Country              : United States
 Municipality         : San Jose
 Years at Address     : 7
 ZIP Code             : 95129
@@ -2466,7 +2466,7 @@ Prior Insurer        : AAA Insurance
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 [ Vehicle Identification ]
-Chassis Style        : Sedan
+Body Type            : Sedan
 Paint Finish         : Midnight Black
 VIN                  : 19XFC2F83LE203977
 Model                : Civic
@@ -2479,7 +2479,7 @@ Trim / Sub-model     : Touring
 Displacement (L)     : 1.5 Turbo
 Drive Type           : FWD
 Transmission         : CVT
-Engine Count         : 4
+Cylinders            : 4
 Fuel Type            : Gasoline
 
 [ Usage & Mileage ]
@@ -2566,7 +2566,7 @@ Total Premium ($)        : 171.60
 SR-22 Required       : NO
 DL Issuing State     : California
 Excluded Driver      : NO
-Born On              : 08/22/1983
+Date of Birth        : 08/22/1983
 Gender               : Female
 Violations (3 yr)    : 0
 Accidents (3 yr)     : 0
@@ -2605,11 +2605,11 @@ Claim Amount ($)         : (leave blank)
 Assessor                 : (leave blank)
 Date of Loss             : (leave blank)
 Resolution Date          : (leave blank)
-Incident Narrative       : (leave blank)
+Claim Description        : (leave blank)
 Deductible ($)           : (leave blank)
-Incident State           : (leave blank)
+Claim Status             : (leave blank)
 Incident Reference       : (none)
-Incident Category        : (leave blank)
+Claim Type               : (leave blank)
 Settlement Amount ($)    : (leave blank)
 
 [ Circumstances ]
@@ -2642,21 +2642,21 @@ Method                   : Bank Transfer (ACH)
 
 [ Credit / Debit Card ]
 CVV                      : (leave blank)
-Instrument Holder        : (leave blank)
+Cardholder Name          : (leave blank)
 Expiration (MM/YY)       : (leave blank)
-Payment Instrument #     : (leave blank)
+Card Number              : (leave blank)
 
 [ Bank Account (ACH) ]
 Routing Number           : 121000358
-Deposit Reference        : 9900448812  [VERIFY before saving]
-Deposit Category         : Checking
+Account Number           : 9900448812  [VERIFY before saving]
+Account Type             : Checking
 Institution              : Bank of America
 
 [ Billing Address ]
 ZIP Code                 : 95129
 Mailing Line 1           : 1440 Saratoga Ave
 Municipality             : San Jose
-Province                 : California
+State                    : California
 
 
 ================================================================================

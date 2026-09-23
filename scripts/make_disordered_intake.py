@@ -16,15 +16,23 @@ It iterates the FORM's fields and looks each label up in the record. A
 dictionary lookup does not care what order the dictionary was built in, so
 shuffling the packet was never going to change the outcome.
 
-Wording is what the lookup actually depends on. So this packet applies both:
-every label renamed to a synonym plain matching cannot bridge, AND the order
-scrambled. Relabeling is what should move the numbers; the reordering is kept
+Wording is what the lookup actually depends on. So this packet applies both: a
+SUBSET of labels renamed to synonyms plain matching cannot bridge, AND the
+order scrambled. Relabeling is what moves the numbers; the reordering is kept
 so the packet is not merely a renamed copy, and so a navigation effect (if
 there is one) is not excluded by construction.
 
+A subset, not all of them, and that is a measured decision. Renaming all 41
+made the run unusable: every miss pays the full three-step escalation --
+refresh the record cache, scroll Notepad hunting for the field (_peek_notepad,
+which is the window visibly rocking back and forth), then ask the LLM -- at
+roughly three seconds a field. With every field missing, nothing lands and the
+run looks frozen rather than slow. Twelve renames across 161 fields per record
+keeps it moving while still exercising the escalation throughout.
+
 WHAT IS AND IS NOT CHANGED
 --------------------------
-Changed:   the LABEL on each line, and the ORDER of lines within a section.
+Changed:   the LABEL on 12 of the fields, and the ORDER of lines in a section.
 Unchanged: every VALUE, every tab, every section, and which section a field
            belongs to.
 
@@ -61,9 +69,19 @@ NEW_HEADER = (
 
 
 def build(text: str) -> str:
-    """Relabel, then reorder. Order matters: relabel keys off the ORIGINAL
-    label names, so it has to run before anything moves the lines around."""
-    return reo.reorder(rel.relabel(text))
+    """Relabel a subset, then reorder.
+
+    Order matters: relabel keys off the ORIGINAL label names, so it has to run
+    before anything moves the lines around.
+
+    PARTIAL_RENAMES, not the full set. Renaming all 41 was measured and is
+    unusable -- every miss pays the full three-step escalation (refresh cache,
+    scroll Notepad, ask the LLM) at roughly three seconds a field, so a run
+    where every field misses looks frozen and nothing lands. Twelve renames
+    across 161 fields per record keeps the run moving while still exercising
+    the escalation throughout it.
+    """
+    return reo.reorder(rel.relabel(text, rel.PARTIAL_RENAMES))
 
 
 def main() -> int:
@@ -81,7 +99,7 @@ def main() -> int:
     if sorted(rel.values_in(base)) != sorted(rel.values_in(result)):
         raise SystemExit("disordering changed a value - refusing to write")
 
-    relabeled_only = rel.relabel(base)
+    relabeled_only = rel.relabel(base, rel.PARTIAL_RENAMES)
     if reo.fields_in(relabeled_only) != reo.fields_in(result):
         raise SystemExit("disordering lost or altered a field - refusing to write")
 
@@ -94,7 +112,7 @@ def main() -> int:
 
     moved = sum(1 for a, b in zip(base.split("\n"), result.split("\n")) if a != b)
     print(f"wrote {TARGET.relative_to(REPO)}")
-    print(f"  {len(rel.RENAMES)} labels renamed AND field order scrambled")
+    print(f"  {len(rel.PARTIAL_RENAMES)} of {len(rel.RENAMES)} labels renamed, AND field order scrambled")
     print(f"  {len(rel.values_in(base))} values, all identical to the base packet")
     print(f"  {moved} lines differ from the base packet")
     return 0

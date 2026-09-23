@@ -104,6 +104,27 @@ RENAMES = {
 }
 
 
+# A realistic subset, used by the DISORDERED packet.
+#
+# Renaming all 41 was measured and is unusable: every miss costs the full
+# three-step escalation -- refresh the record cache, scroll Notepad looking for
+# the field (_peek_notepad, which is the window visibly rocking back and
+# forth), then ask the LLM -- at roughly three seconds a field. A run where
+# EVERY field pays that looks frozen rather than slow, and nothing lands.
+#
+# Renaming a slice is also the more honest fixture. A real department packet
+# uses its own wording for some fields, not a thesaurus pass over all of them.
+# These twelve are spread across tabs so the escalation is exercised
+# throughout the run rather than bunched at the start.
+SUBSET = [
+    "Policy Number", "Agent ID", "First Name", "Last Name",
+    "Street Address", "City", "Occupation", "Bank Name",
+    "Color", "Current Mileage", "Claim Number", "Adjuster Name",
+]
+
+PARTIAL_RENAMES = {k: v for k, v in RENAMES.items() if k in SUBSET}
+
+
 def relabel(text: str, renames: dict[str, str] | None = None) -> str:
     """Rewrite the label on each `Label : Value` line, keeping the column.
 
