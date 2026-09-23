@@ -48,6 +48,44 @@ import logging
 import os
 import re
 import sys
+
+# ── Scope #1 live decision feed ──────────────────────────────────────────
+# One machine-readable line per step, printed on stdout for the Electron
+# app's floating Agent HUD to render. Same convention run_task.py's own
+# COUNTDOWN_BEGIN / COUNTDOWN N / COUNTDOWN_END lines already use, because
+# the Play panel already reads this process's stdout line by line -- no new
+# IPC channel, no second transport.
+#
+# Scope #2 puts its reasoning on the page it is automating, inside a shadow
+# root. Scope #1 has no page: it drives a native wxPython window on the real
+# screen, so the equivalent has to be a separate always-on-top window that
+# NEVER takes focus -- see createAgentHudWindow() in main.js, where
+# focusable:false is the Scope #1 analogue of the HUD's pointer-events:none.
+# A panel that took focus would swallow the very keystrokes this agent is
+# trying to type.
+#
+# Presentation only: this must never change what a run does, so it is
+# wrapped whole and any failure is discarded.
+def _emit_decision(step, decision_by, confidence, action_type):
+    """Print one DECISION line. Best-effort and silent on failure."""
+    try:
+        payload = {
+            "step": int(step),
+            "by": str(decision_by or "unknown"),
+            "conf": round(float(confidence or 0.0), 4),
+            "action": str(action_type or ""),
+        }
+        print("DECISION " + json.dumps(payload))
+        try:
+            sys.stdout.flush()
+        except OSError:
+            # Windows, spawned with no console (the Electron Play button uses
+            # windowsHide=True) -- the write already landed; the same guard
+            # run_task.py's print_countdown() needed for the same reason.
+            pass
+    except Exception:  # noqa: BLE001 - a HUD line must never break a run
+        pass
+
 import time
 from typing import Any, Dict, List, Optional, Set, Tuple
 
@@ -5612,6 +5650,9 @@ class LLMAgent:
                 "execute_time_sec":  round(execute_time_sec, 4),
                 "step_time_sec":     round(_step_time_sec, 4),
             })
+
+            _emit_decision(step_idx + 1, _decision_maker, t_conf,
+                           prediction.get("action_type"))
 
             if not result.success:
                 # Skip-and-continue: one failed action shouldn't kill the whole

@@ -1,5 +1,14 @@
 const { contextBridge, ipcRenderer } = require("electron");
 
+// Scope #1's floating decision HUD. Its own tiny bridge rather than another
+// key on recorderAPI, because agent-hud.html is a separate, non-focusable
+// window that needs nothing else -- it only ever receives, never invokes.
+contextBridge.exposeInMainWorld("agentHud", {
+  onDecision: (cb) => ipcRenderer.on("agent-decision", (_e, d) => cb(d)),
+  onReset: (cb) => ipcRenderer.on("agent-hud-reset", () => cb()),
+  onFinish: (cb) => ipcRenderer.on("agent-hud-finish", () => cb()),
+});
+
 contextBridge.exposeInMainWorld("recorderAPI", {
   start: (outputDir) => ipcRenderer.invoke("recorder-start", outputDir),
   // trace_type/url are never passed by the renderer directly -- main.js

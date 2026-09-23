@@ -131,6 +131,76 @@ let capsuleIsRunning = false;
 // next live event.
 let recorderIsRecording = false;
 
+// ── Scope #1's floating decision HUD ─────────────────────────────────────
+// Scope #2 renders its reasoning into the page it is automating, inside a
+// shadow root. Scope #1 has no page -- it drives a native wxPython window on
+// the real screen -- so the equivalent is a small always-on-top window that
+// floats beside the form.
+//
+// focusable:false is the load-bearing option here, and the direct analogue of
+// the Scope #2 HUD's pointer-events:none. That panel could have swallowed a
+// click meant for the portal; this one would swallow the keystrokes the agent
+// is trying to type into the form. Everything else (frameless, skipTaskbar,
+// no menu) follows from it being a display rather than a window you use.
+let agentHudWindow = null;
+
+const AGENT_HUD_WIDTH = 268;
+// Measured in the browser, not guessed: header + "decided by" + tally, plus
+// the 6px body padding each side and the 1px border. Re-measured after the
+// type scale was opened up (a design-hook finding: six font sizes inside a
+// 1.6x range read as no hierarchy at all) -- at the old 250 the split bar at
+// the foot of the tally was clipped clean off.
+const AGENT_HUD_HEIGHT = 293;
+
+function createAgentHudWindow() {
+  if (agentHudWindow && !agentHudWindow.isDestroyed()) return agentHudWindow;
+
+  const { width: sw } = require("electron").screen.getPrimaryDisplay().workAreaSize;
+  agentHudWindow = new BrowserWindow({
+    width: AGENT_HUD_WIDTH,
+    height: AGENT_HUD_HEIGHT,
+    x: sw - AGENT_HUD_WIDTH - MINI_MARGIN,
+    y: MINI_MARGIN,
+    frame: false,
+    transparent: true,
+    resizable: false,
+    movable: true,
+    minimizable: false,
+    maximizable: false,
+    skipTaskbar: true,
+    alwaysOnTop: true,
+    // Never the keyboard target. Without this the agent's own typing could
+    // land here instead of in the form it is filling.
+    focusable: false,
+    show: false,
+    webPreferences: { preload: path.join(__dirname, "preload.js") },
+  });
+  agentHudWindow.loadFile(path.join(__dirname, "renderer", "agent-hud.html"));
+  // "screen-saver" keeps it above a fullscreen target window, which a plain
+  // alwaysOnTop does not on Windows.
+  agentHudWindow.setAlwaysOnTop(true, "screen-saver");
+  agentHudWindow.on("closed", () => { agentHudWindow = null; });
+  return agentHudWindow;
+}
+
+function showAgentHud() {
+  const win = createAgentHudWindow();
+  // showInactive, not show: show() would focus it even with focusable:false
+  // on some Windows builds, and this window must never take focus.
+  win.showInactive();
+  win.webContents.send("agent-hud-reset");
+}
+
+function sendToAgentHud(channel, payload) {
+  if (agentHudWindow && !agentHudWindow.isDestroyed()) {
+    agentHudWindow.webContents.send(channel, payload);
+  }
+}
+
+function hideAgentHud() {
+  if (agentHudWindow && !agentHudWindow.isDestroyed()) agentHudWindow.hide();
+}
+
 let localServerProcess = null;
 
 // Real liveness check before spawning, not just "does THIS process think
@@ -218,9 +288,35 @@ function broadcast(channel, payload) {
   if (miniWorkflowWindow && !miniWorkflowWindow.isDestroyed()) {
     miniWorkflowWindow.webContents.send(channel, payload);
   }
-  if (payload && (payload.event === "capsule_started")) capsuleIsRunning = true;
+  if (payload && (payload.event === "capsule_started")) {
+    capsuleIsRunning = true;
+    // The floating decision HUD opens with the run and closes with it. Opened
+    // here rather than on COUNTDOWN_BEGIN so it is already on screen during
+    // the 5-second handover, which is exactly when a viewer is looking at the
+    // target window waiting for something to happen.
+    showAgentHud();
+  }
   if (payload && (payload.event === "capsule_done" || payload.event === "capsule_stopped")) {
     capsuleIsRunning = false;
+    sendToAgentHud("agent-hud-finish");
+    // Left on screen briefly so the final split is readable, then dismissed --
+    // an always-on-top panel that outlives its run is just clutter over
+    // whatever the user does next.
+    setTimeout(hideAgentHud, 6000);
+  }
+
+  // DECISION {json} -- one line per step from components/agent/agent.py's
+  // _emit_decision(). Parsed here rather than in the renderer because the HUD
+  // is its own window: the main window's Play panel never sees these.
+  if (payload && payload.event === "capsule_progress" && typeof payload.line === "string") {
+    const raw = payload.line.trim();
+    if (raw.startsWith("DECISION ")) {
+      try {
+        sendToAgentHud("agent-decision", JSON.parse(raw.slice(9)));
+      } catch (e) {
+        // A malformed line is a display problem, never a run problem.
+      }
+    }
   }
   if (payload && payload.event === "started") recorderIsRecording = true;
   if (payload && (payload.event === "saved" || payload.event === "error")) {
