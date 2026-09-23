@@ -106,7 +106,14 @@ class WorkflowCapsule:
         if not os.path.isfile(abs_model):
             raise FileNotFoundError(f"Checkpoint not found: {abs_model}")
         run_task_script = os.path.join(repo_root, "run_task.py")
-        argv = [sys.executable, "-u", run_task_script, "--model", abs_model]
+        # `self.args` is honoured here as well as in the custom-entrypoint
+        # branch above, so a capsule can pin run_task.py flags in
+        # registry.json. That is what makes the ablations reachable from the
+        # Play button rather than only from a terminal: a capsule carrying
+        # ["--no_batch_fill"] runs the transformer-driven path, one carrying
+        # ["--force_llm_values"] makes the LLM supply every value.
+        argv = ([sys.executable, "-u", run_task_script, "--model", abs_model]
+                + list(self.args))
         return argv, repo_root
 
 
