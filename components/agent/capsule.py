@@ -63,7 +63,8 @@ class WorkflowCapsule:
     # Claude-hosted mockup, which could never reach the local backend).
     local_server:     str = ""
 
-    def launch_command(self, repo_root: str) -> tuple[list[str], str]:
+    def launch_command(self, repo_root: str,
+                       extra_args: list[str] | None = None) -> tuple[list[str], str]:
         """Return (argv, cwd) to Popen for this capsule.
 
         Raises FileNotFoundError if the target script/checkpoint doesn't
@@ -112,8 +113,10 @@ class WorkflowCapsule:
         # Play button rather than only from a terminal: a capsule carrying
         # ["--no_batch_fill"] runs the transformer-driven path, one carrying
         # ["--force_llm_values"] makes the LLM supply every value.
+        # extra_args are chosen at Play time (the fill-mode modal), so they
+        # come after the capsule's own pinned args and can add to them.
         argv = ([sys.executable, "-u", run_task_script, "--model", abs_model]
-                + list(self.args))
+                + list(self.args) + list(extra_args or []))
         return argv, repo_root
 
 

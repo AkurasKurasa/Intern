@@ -453,7 +453,9 @@ btnHandoverCancel.addEventListener("click", stopIfRunning);
 btnBackToTasks.addEventListener("click", () => showTasksSubview("list"));
 btnRunAgain.addEventListener("click", () => {
   if (!currentCapsule) return;
-  window.capsulesAPI.run(currentCapsule.name);
+  // Asks again rather than repeating the last mode: "run again" after a run
+  // that answered a question is usually the moment you want the other answer.
+  runCapsuleWithFillMode(currentCapsule.name);
 });
 
 // ── Home hero / Tasks header live counts ─────────────────────────────────
@@ -836,12 +838,63 @@ function refreshChipEmojis() {
   });
 }
 
+// ── Fill-mode chooser ────────────────────────────────────────────────────
+// Scope #1 can fill the form two genuinely different ways over the same data:
+// writing each value straight into the control and tabbing on, or turning that
+// path off so every field is reached by a real click and the trained pointer
+// picks the target. That is a per-run choice, not a property of the task, so it
+// is asked here rather than by keeping a near-duplicate capsule per mode.
+//
+// Resolves to the extra argv for run_task.py, or null if cancelled.
+const FILL_MODE_CAPSULES = new Set(["form_filling"]);
+
+const fillModeBackdrop = document.getElementById("fillModeBackdrop");
+const fillModeDirect = document.getElementById("fillModeDirect");
+const fillModeTransformer = document.getElementById("fillModeTransformer");
+const fillModeCancel = document.getElementById("fillModeCancel");
+
+let fillModeResolve = null;
+
+function closeFillMode(value) {
+  fillModeBackdrop.hidden = true;
+  const resolve = fillModeResolve;
+  fillModeResolve = null;
+  if (resolve) resolve(value);
+}
+
+fillModeDirect.addEventListener("click", () => closeFillMode([]));
+fillModeTransformer.addEventListener("click", () => closeFillMode(["--no_batch_fill"]));
+fillModeCancel.addEventListener("click", () => closeFillMode(null));
+fillModeBackdrop.addEventListener("click", (e) => {
+  if (e.target === fillModeBackdrop) closeFillMode(null);
+});
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && !fillModeBackdrop.hidden) closeFillMode(null);
+});
+
+function askFillMode(capsuleName) {
+  if (!FILL_MODE_CAPSULES.has(capsuleName)) return Promise.resolve([]);
+  fillModeBackdrop.hidden = false;
+  fillModeDirect.focus();
+  return new Promise((resolve) => { fillModeResolve = resolve; });
+}
+
+// Asks the mode first, then runs. Returns whatever capsulesAPI.run returns, or
+// null when the chooser was dismissed -- callers must treat null as "no run
+// happened" rather than as a failed one.
+async function runCapsuleWithFillMode(capsuleName) {
+  const extraArgs = await askFillMode(capsuleName);
+  if (extraArgs === null) return null;
+  return window.capsulesAPI.run(capsuleName, extraArgs);
+}
+
 btnPlay.addEventListener("click", async () => {
   if (!currentCapsule) return;
   // kind="url" never enters the running state (no subprocess, no
   // capsule_started event will ever arrive for it) -- log it directly
   // instead of leaving the button looking like it did nothing.
-  const result = await window.capsulesAPI.run(currentCapsule.name);
+  const result = await runCapsuleWithFillMode(currentCapsule.name);
+  if (result === null) return;   // chooser dismissed
   if (result && result.opened) {
     capsuleLog(`Opened ${currentCapsule.name} in your browser.`, "ok");
   }

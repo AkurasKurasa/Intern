@@ -392,6 +392,38 @@
   </div>
 
   <!-- ── Handover overlay — covers the whole window, incl. titlebar ────── -->
+  <!-- Fill-mode chooser. Scope #1 can fill a form two genuinely different
+       ways and the choice is per-run, not a property of the task, so it is
+       asked at Play rather than split into separate capsules. -->
+  <div class="fillmode-backdrop" id="fillModeBackdrop" hidden>
+    <div class="fillmode-panel" role="dialog" aria-modal="true"
+         aria-labelledby="fillModeTitle">
+      <h2 class="fillmode-title" id="fillModeTitle">How should it fill the form?</h2>
+      <p class="fillmode-sub">Same task and same data either way. This only changes
+         how the agent reaches each field.</p>
+
+      <button class="fillmode-option" id="fillModeDirect" type="button">
+        <span class="fillmode-dot fm-source"></span>
+        <span class="fillmode-body">
+          <strong>Direct write</strong>
+          <span>Writes each value straight into the field and presses Tab. No mouse,
+                no clicking &mdash; so the transformer is never asked anything. Fast.</span>
+        </span>
+      </button>
+
+      <button class="fillmode-option" id="fillModeTransformer" type="button">
+        <span class="fillmode-dot fm-transformer"></span>
+        <span class="fillmode-body">
+          <strong>Transformer</strong>
+          <span>Turns the direct-write path off, so every field has to be reached by a
+                real click and the learned pointer picks the target. Slower.</span>
+        </span>
+      </button>
+
+      <button class="fillmode-cancel" id="fillModeCancel" type="button">Cancel</button>
+    </div>
+  </div>
+
   <div class="handover-overlay" id="handoverOverlay" hidden>
     <p class="handover-eyebrow">HANDING OVER CONTROL</p>
     <div class="handover-countdown" id="handoverCountdown">5</div>

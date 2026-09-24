@@ -808,7 +808,7 @@ ipcMain.handle("capsules-set-emoji", (_evt, capsuleName, emoji) =>
 ipcMain.handle("capsules-create", (_evt, name, description) => createTask(name, description));
 ipcMain.handle("capsules-update", (_evt, name, updates) => updateCapsule(name, updates));
 ipcMain.handle("capsules-delete", (_evt, name) => deleteCapsule(name));
-ipcMain.handle("capsule-run", async (_evt, capsuleName) => {
+ipcMain.handle("capsule-run", async (_evt, capsuleName, extraArgs) => {
   // kind="url" isn't a subprocess at all -- there's nothing for
   // recorder_bridge.py/Python to run, so this short-circuits before ever
   // reaching queueOrSend(). Scope #3's Inbox Dispatch page is deliberately
@@ -821,7 +821,11 @@ ipcMain.handle("capsule-run", async (_evt, capsuleName) => {
     if (capsule.url) shell.openExternal(capsule.url);
     return { opened: true };
   }
-  queueOrSend({ cmd: "run_capsule", capsule_name: capsuleName });
+  // extraArgs is the fill-mode chosen in the Play modal (currently
+  // ["--no_batch_fill"] or nothing). Passed per-run rather than pinned in
+  // registry.json so one capsule covers both modes.
+  queueOrSend({ cmd: "run_capsule", capsule_name: capsuleName,
+                extra_args: Array.isArray(extraArgs) ? extraArgs : [] });
   return { opened: false };
 });
 ipcMain.handle("capsule-stop", () => {
@@ -856,33 +860,12 @@ const FORM_FILLING_TOOLS = (intakeFile) => [
 const TEST_MOCKUPS = {
   form_filling: FORM_FILLING_TOOLS("data_entry_intake.txt"),
 
-  // Ordered: the packet's own header says the fields "match the exact sequence
-  // of the form", so Tab alone is a perfect navigation policy and the learned
-  // model is never asked where to go.
-  "Form Filling - ordered source": FORM_FILLING_TOOLS("data_entry_intake.txt"),
-
-  // Disordered: identical values, but every label renamed to a synonym plain
-  // matching cannot bridge, AND the order scrambled.
-  //
-  // Reordering alone was measured and did almost nothing -- 64 Source to 1 LLM,
-  // essentially the base packet's result -- because the fill loop iterates the
-  // FORM's fields and looks each label up in the record, and a dictionary
-  // lookup does not care what order it was built in. Wording is the thing the
-  // lookup actually depends on, so that is what this packet changes.
-  "Form Filling - disordered source":
-    FORM_FILLING_TOOLS("data_entry_intake_DISORDERED_TEST.txt"),
-
-  // Transformer: the ORDERED packet, same as the first entry. The variable
-  // here is not the data at all -- it is the capsule's --no_batch_fill flag,
-  // which turns off the direct-write path so every field is reached by a real
-  // click and the learned pointer has to pick the target.
-  "Form Filling - transformer": FORM_FILLING_TOOLS("data_entry_intake.txt"),
-
   "Sheet-to-Portal Matcher": [
     { type: "open", target: path.join(REPO_ROOT, "components", "scope2", "data", "sheets", "grade_sheet.xlsx") },
     { type: "open", target: path.join(REPO_ROOT, "practice_apps", "mocksite", "index.html") },
   ],
 };
+
 
 // Unified from three separate handlers (test-launch-mockups, view-schedule,
 // launch-cold-email) per direct request -- one button now opens everything

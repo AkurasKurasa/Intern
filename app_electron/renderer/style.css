@@ -774,3 +774,73 @@ textarea.field { resize: vertical; font-family: var(--font-ui); }
   .step-feed-item.current::after, .dot.recording { animation: none; }
   .handover-countdown.pp-countdown-tick { animation: none; }
 }
+
+/* ── Fill-mode chooser ─────────────────────────────────────────────────────
+   Shown when Play is pressed on a capsule that can run more than one way.
+   Scope #1 can fill the form by writing values directly and tabbing, or by
+   clicking into each field with the trained pointer -- genuinely different
+   runs over the same task and the same data, so the choice belongs at Play
+   rather than split across separate capsules in the task list. ──────────── */
+
+.fillmode-backdrop {
+  position: fixed; inset: 0; z-index: 900;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(20, 19, 15, .55);
+  -webkit-app-region: no-drag;
+}
+.fillmode-backdrop[hidden] { display: none; }
+
+.fillmode-panel {
+  width: min(440px, calc(100vw - 48px));
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 22px;
+  box-shadow: 0 18px 50px -12px rgba(20, 19, 15, .45);
+}
+
+.fillmode-title {
+  font-size: 17px; font-weight: 650; color: var(--ink);
+  margin: 0 0 6px; letter-spacing: -.01em;
+}
+.fillmode-sub {
+  font-size: 13px; line-height: 1.5; color: var(--text-secondary);
+  margin: 0 0 16px;
+}
+
+.fillmode-option {
+  display: flex; gap: 12px; align-items: flex-start; text-align: left;
+  width: 100%; padding: 13px 14px; margin-bottom: 9px;
+  background: var(--app-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  cursor: pointer; font: inherit;
+  transition: border-color .12s ease, background .12s ease;
+}
+.fillmode-option:hover {
+  border-color: var(--accent-blue);
+  background: var(--accent-blue-tint-bg);
+}
+.fillmode-option:focus-visible {
+  outline: none; border-color: var(--accent-blue);
+  box-shadow: 0 0 0 3px var(--accent-blue-tint-border);
+}
+
+/* Same two colours the decision HUD uses for these deciders, so the choice
+   made here and the panel that reports it read as one thing. */
+.fillmode-dot {
+  width: 9px; height: 9px; border-radius: 50%; flex: none; margin-top: 5px;
+}
+.fillmode-dot.fm-source { background: #3fb950; }
+.fillmode-dot.fm-transformer { background: #4da3ff; }
+
+.fillmode-body { display: flex; flex-direction: column; gap: 3px; }
+.fillmode-body strong { font-size: 14px; font-weight: 650; color: var(--ink); }
+.fillmode-body span { font-size: 12.5px; line-height: 1.45; color: var(--text-secondary); }
+
+.fillmode-cancel {
+  display: block; margin: 12px auto 0; padding: 7px 16px;
+  background: none; border: none; cursor: pointer; font: inherit;
+  font-size: 13px; color: var(--text-muted); border-radius: var(--radius-sm);
+}
+.fillmode-cancel:hover { color: var(--ink); background: var(--sunk); }

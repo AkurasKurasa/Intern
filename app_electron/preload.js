@@ -54,7 +54,8 @@ contextBridge.exposeInMainWorld("capsulesAPI", {
   create: (name, description) => ipcRenderer.invoke("capsules-create", name, description),
   update: (name, updates) => ipcRenderer.invoke("capsules-update", name, updates),
   delete: (name) => ipcRenderer.invoke("capsules-delete", name),
-  run: (capsuleName) => ipcRenderer.invoke("capsule-run", capsuleName),
+  run: (capsuleName, extraArgs) =>
+    ipcRenderer.invoke("capsule-run", capsuleName, extraArgs),
   stop: () => ipcRenderer.invoke("capsule-stop"),
   openLog: () => ipcRenderer.invoke("capsule-open-log"),
   readLog: () => ipcRenderer.invoke("capsule-read-log"),

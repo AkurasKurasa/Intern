@@ -5707,7 +5707,18 @@ class LLMAgent:
                 "step_time_sec":     round(_step_time_sec, 4),
             })
 
-            _emit_decision(step_idx + 1, _decision_maker, t_conf,
+            # _decision_maker only ever says "transformer" or "llm", but "llm"
+            # overstates it: _ask_llm has a fast path that returns the record
+            # lookup's own answer WITHOUT calling the model at all, tagged
+            # _fast_path="lookup" ("LLM call skipped -- direct lookup already
+            # answered"). Reporting those as LLM would credit the model for
+            # values plain matching supplied, and the whole point of the tally
+            # is to show which component actually did the work.
+            _by = _decision_maker
+            if (_by == "llm" and isinstance(llm_action, dict)
+                    and llm_action.get("_fast_path") == "lookup"):
+                _by = "source"
+            _emit_decision(step_idx + 1, _by, t_conf,
                            prediction.get("action_type"))
 
             if not result.success:

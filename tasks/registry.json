@@ -2,7 +2,7 @@
   "capsules": [
     {
       "name": "form_filling",
-      "description": "Fill GUI forms from a structured data source",
+      "description": "Fill the car insurance form from the intake packet open in Notepad. Pressing Play asks which fill mode to use: direct write, where each value is written straight into the control and Tab moves on, or transformer, where the direct-write path is off so every field has to be reached by a real click and the learned pointer picks the target.",
       "model_path": "tasks/form_filling/model.pt",
       "trigger_keywords": [
         "form",
@@ -17,7 +17,8 @@
       ],
       "trace_dir": "tasks/form_filling/traces",
       "created": "2026-05-17T17:52:45",
-      "emoji": "\ud83d\udccb"
+      "emoji": "\ud83d\udccb",
+      "args": []
     },
     {
       "name": "Sheet-to-Portal Matcher",
@@ -60,41 +61,6 @@
       "cwd": "",
       "url": "http://localhost:8765/",
       "local_server": "components/inbox_router/local_server.py"
-    },
-    {
-      "name": "Form Filling - ordered source",
-      "description": "Scope #1 on the standard intake packet, whose own header says the fields are organized to match the exact sequence of the form. Because the data is already in form order, values are matched straight out of it and written field by field with Tab in between - no clicking, so no navigation to decide. Expect the HUD to read almost entirely Source.",
-      "model_path": "tasks/form_filling/model.pt",
-      "trigger_keywords": [],
-      "trigger_apps": [],
-      "trace_dir": "tasks/form_filling/traces",
-      "created": "2026-05-17T17:52:45",
-      "emoji": "\ud83d\udccb",
-      "args": []
-    },
-    {
-      "name": "Form Filling - disordered source",
-      "description": "Scope #1 on the reordered intake packet: identical values, scrambled order. Tabbing straight down the form no longer lines up with the data, so the agent has to find each field rather than walk into it - which is where the transformer's learned navigation and the LLM's wording judgement are actually needed. Same correct output as the ordered run, so the two are directly comparable.",
-      "model_path": "tasks/form_filling/model.pt",
-      "trigger_keywords": [],
-      "trigger_apps": [],
-      "trace_dir": "tasks/form_filling/traces",
-      "created": "2026-05-17T17:52:45",
-      "emoji": "\ud83d\udd00",
-      "args": []
-    },
-    {
-      "name": "Form Filling - transformer",
-      "description": "The ORDERED packet with the batch fast-fill turned off. Same data as 'ordered source', so the only variable is the fill path. Normally the agent writes each value straight into the control and Tabs on, which never needs a click - so the transformer is never asked where to go and [TRANSFORMER] is zero in the log. With the fast path off, every field is reached by a real click and the learned pointer picks the target. Slower by design; this is the counterfactual for 'what does the transformer contribute', not a demo mode.",
-      "model_path": "tasks/form_filling/model.pt",
-      "trigger_keywords": [],
-      "trigger_apps": [],
-      "trace_dir": "tasks/form_filling/traces",
-      "created": "2026-05-17T17:52:45",
-      "emoji": "\ud83e\udde0",
-      "args": [
-        "--no_batch_fill"
-      ]
     }
   ]
 }

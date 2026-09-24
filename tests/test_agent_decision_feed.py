@@ -135,10 +135,28 @@ def test_the_agent_actually_calls_it_after_recording_a_step():
     """The emit has to sit where decision_by and t_conf are both known -- the
     same place the run's own result record is appended."""
     source = AGENT_PY.read_text(encoding="utf-8")
-    assert "_emit_decision(step_idx + 1, _decision_maker, t_conf," in source
+    assert "_emit_decision(step_idx + 1, _by, t_conf," in source
     appended = source.index('"step_time_sec":     round(_step_time_sec, 4),')
     called = source.index("_emit_decision(step_idx + 1")
     assert called > appended, "the emit must follow the result record, not precede it"
+
+
+def test_a_skipped_llm_call_is_reported_as_source_not_llm():
+    """_decision_maker only says "transformer" or "llm", and "llm" overstates
+    it: _ask_llm returns the record lookup's own answer WITHOUT calling the
+    model when the lookup is confident, tagged _fast_path="lookup" ("LLM call
+    skipped -- direct lookup already answered"). Reporting those as LLM would
+    credit the model for values plain matching supplied, which is exactly the
+    thing the tally exists to tell apart."""
+    source = AGENT_PY.read_text(encoding="utf-8")
+    assert 'llm_action.get("_fast_path") == "lookup"' in source
+    assert '_by = "source"' in source
+
+    # and the tag it keys off has to still be produced
+    assert '"_fast_path": "lookup"' in source
+
+    # the re-label must happen before the emit reads it
+    assert source.index('_by = "source"') < source.index("_emit_decision(step_idx + 1")
 
 # ------------------------------- the batch fast-fill path (found live)
 
