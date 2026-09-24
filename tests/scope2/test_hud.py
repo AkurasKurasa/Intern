@@ -284,15 +284,27 @@ def test_the_hud_reserves_its_width_rather_than_covering_the_page(hud_page):
     The panel now reserves a gutter on <html> and the centred portal slides
     clear. Asserted geometrically: no part of the roster may end up underneath
     the panel.
+
+    Measured against .table-scroll, the element that is actually on screen,
+    rather than against the table inside it. Since the portal's sheet now
+    carries min-width:max-content so wide variants keep their column widths
+    instead of compressing, the inner table is deliberately wider than its
+    container and clipped by it - measuring the table would report an overlap
+    that no one can see.
     """
-    overlap = hud_page.evaluate(
+    box = hud_page.evaluate(
         "() => {"
         "  const hud = document.querySelector('[data-agent-hud]')"
         "    .shadowRoot.querySelector('.hud').getBoundingClientRect();"
-        "  const tbl = document.querySelector('#records-body').getBoundingClientRect();"
-        "  return tbl.right - hud.left;"
+        "  const vis = document.querySelector('.table-scroll');"
+        "  const r = vis.getBoundingClientRect();"
+        "  return {overlap: r.right - hud.left,"
+        "          clipped: vis.scrollWidth > vis.clientWidth"
+        "                   || Math.round(r.right) <= Math.round(hud.left)};"
         "}")
-    assert overlap <= 0, f"the roster runs {overlap:.0f}px under the HUD panel"
+    assert box["overlap"] <= 0, (
+        f"the roster is {box['overlap']:.0f}px under the HUD panel")
+    assert box["clipped"], "the sheet is neither clipped nor clear of the panel"
 
 
 def test_the_gutter_is_given_back_on_destroy(hud_page):
