@@ -117,10 +117,27 @@ RENAMES = {
 # These twelve are spread across tabs so the escalation is exercised
 # throughout the run rather than bunched at the start.
 SUBSET = [
-    "Policy Number", "Agent ID", "First Name", "Last Name",
-    "Street Address", "City", "Occupation", "Bank Name",
-    "Color", "Current Mileage", "Claim Number", "Adjuster Name",
+    "Policy Number", "City", "Color", "Claim Number",
 ]
+
+# Why these four, and why not the name fields.
+#
+# Twelve renames was still too many: each miss costs about three seconds
+# (refresh cache, scroll Notepad, ask the LLM) and they add up across 10
+# records. Four keeps the run brisk while still putting the LLM on screen
+# several times per record.
+#
+# They are also chosen to sit AWAY from similar neighbours. Measured on the
+# 12-rename packet: with 'First Name' renamed, the model was asked for a value
+# it could not look up, read the screen, saw 'Middle Name : Arthur' sitting
+# next to it and answered 'Arthur' -- the wrong person's name, written
+# confidently. 'Street Address 2' got 'Arthur' the same way. A field whose
+# neighbours are near-synonyms is a trap for a 4B model reading screen text,
+# so the renamed set avoids clustered look-alikes.
+#
+# That failure is a real property of the LLM fallback and worth keeping a
+# fixture for -- data_entry_intake_RELABELED_TEST.txt renames all 41 and
+# reproduces it -- but it does not belong behind a demo button.
 
 PARTIAL_RENAMES = {k: v for k, v in RENAMES.items() if k in SUBSET}
 
