@@ -126,23 +126,26 @@ h3 {
 
 /* ---- the split so far ---- */
 
-.tally { display: flex; gap: 18px; font-variant-numeric: tabular-nums; }
-.tally div { display: flex; flex-direction: column; gap: 1px; }
-.tally b { font-size: 19px; font-weight: 700; }
-.tally .t-transformer b { color: var(--accent); }
-.tally .t-llm b { color: var(--llm); }
-.tally .t-source b { color: var(--source); }
-.tally span { color: var(--muted); font-size: 9px;
-              text-transform: uppercase; letter-spacing: .06em; }
+.grp + .grp { margin-top: 14px; }
+.grp h3 { display: flex; align-items: baseline; gap: 6px; margin-bottom: 7px; }
+.grp-q { font-size: 9px; font-weight: 500; letter-spacing: 0;
+         text-transform: none; color: var(--muted); opacity: .8; }
 
-.split { margin-top: 12px; height: 4px; border-radius: 2px;
+.row { display: flex; gap: 14px; align-items: baseline; flex-wrap: wrap; }
+.ct { font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.ct b { font-size: 17px; font-weight: 700; margin-right: 3px; }
+.ct-transformer b { color: var(--accent); }
+.ct-source b { color: var(--source); }
+.ct-llm b { color: var(--llm); }
+.ct-none { font-size: 10px; opacity: .7; }
+
+.split { margin-top: 8px; height: 4px; border-radius: 2px;
          overflow: hidden; display: flex; background: var(--line); }
 /* Three segments now, so these are flex-basis rather than one scaled bar.
    flex-basis is a layout property, but it changes only when a step lands (a
    few times a second at most), not every frame of an animation -- which is
    what the transform rule above exists to avoid. */
 .split span { display: block; height: 100%; transition: flex-basis .3s ease; }
-.split .s-transformer { background: var(--accent); }
 .split .s-llm { background: var(--llm); }
 .split .s-source { background: var(--source); }
 
@@ -169,17 +172,30 @@ h3 {
       <p class="note" id="whoNote"></p>
     </section>
 
+    <!-- Two rows, not one. The transformer answers "where do I go next"; the
+         other two answer "what do I type". Counting them in a single row made
+         the numbers look like rivals when they are tallies of different
+         things, which is exactly what confused a reader of the first
+         version. -->
     <section class="sec" id="tallySection" hidden>
-      <h3>This run</h3>
-      <div class="tally">
-        <div class="t-transformer"><b id="nTransformer">0</b><span>Transformer</span></div>
-        <div class="t-llm"><b id="nLlm">0</b><span>LLM</span></div>
-        <div class="t-source"><b id="nSource">0</b><span>Source</span></div>
+      <div class="grp">
+        <h3>Moves <span class="grp-q">where to go</span></h3>
+        <div class="row">
+          <span class="ct ct-transformer"><b id="nTransformer">0</b> Transformer</span>
+          <span class="ct ct-none" id="moveNote">Tab &mdash; no decision needed</span>
+        </div>
       </div>
-      <div class="split">
-        <span class="s-transformer" id="splitTransformer"></span>
-        <span class="s-llm" id="splitLlm"></span>
-        <span class="s-source" id="splitSource"></span>
+
+      <div class="grp">
+        <h3>Values <span class="grp-q">what to type</span></h3>
+        <div class="row">
+          <span class="ct ct-source"><b id="nSource">0</b> Source</span>
+          <span class="ct ct-llm"><b id="nLlm">0</b> LLM</span>
+        </div>
+        <div class="split">
+          <span class="s-source" id="splitSource"></span>
+          <span class="s-llm" id="splitLlm"></span>
+        </div>
       </div>
     </section>
 
@@ -197,10 +213,13 @@ const el = (id) => document.getElementById(id);
 // comparable number, so the bar is only meaningful for transformer steps.
 // Showing a 0.00 bar for every LLM step would read as "the LLM was not
 // confident", which is not what an absent score means.
+// Each note names WHICH question the step answered, because that is the thing
+// a reader has to hold onto: the transformer never competes with the other
+// two, it is answering something else entirely.
 const NOTES = {
-  transformer: "Learned pointer picked the target. Confidence is the model's own score.",
-  llm: "Plain matching found nothing, so it escalated to the language model.",
-  source: "Value matched straight out of the intake data. No model was asked.",
+  transformer: "Where to go — the learned pointer picked which field to click.",
+  llm: "What to type — no match on the sheet, so the model worked it out.",
+  source: "What to type — matched straight off the sheet. No model asked.",
   unknown: "",
 };
 
@@ -241,11 +260,19 @@ function render(d) {
   el("nLlm").textContent = String(counts.llm);
   el("nSource").textContent = String(counts.source);
 
-  const total = counts.transformer + counts.llm + counts.source;
-  const share = (n) => (total ? (n / total) * 100 : 0) + "%";
-  el("splitTransformer").style.flexBasis = share(counts.transformer);
-  el("splitLlm").style.flexBasis = share(counts.llm);
+  // Once the transformer has moved even once, the "Tab" note is no longer
+  // what is happening, so it goes.
+  el("moveNote").textContent = counts.transformer
+    ? "clicked into each field"
+    : "Tab — no decision needed";
+
+  // The bar covers VALUES only. Mixing a move count into it was the thing
+  // that made the numbers look like rivals: they tally different questions,
+  // so there is no shared total to take a share of.
+  const values = counts.source + counts.llm;
+  const share = (n) => (values ? (n / values) * 100 : 0) + "%";
   el("splitSource").style.flexBasis = share(counts.source);
+  el("splitLlm").style.flexBasis = share(counts.llm);
 }
 
 function reset() {

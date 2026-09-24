@@ -294,7 +294,8 @@ class Bridge:
     # apart. kind="script" capsules (e.g. Scope #2) get the same treatment:
     # WorkflowCapsule.launch_command() is the one place that decides the
     # actual argv, so both kinds share this exact Popen call.
-    def run_capsule(self, capsule_name: str) -> None:
+    def run_capsule(self, capsule_name: str,
+                    extra_args: list | None = None) -> None:
         if self._running:
             emit("error", message="Stop recording before running a capsule.")
             return
@@ -307,7 +308,7 @@ class Bridge:
             emit("error", message=f"Capsule not found: {capsule_name}")
             return
         try:
-            argv, cwd = capsule.launch_command(_ROOT)
+            argv, cwd = capsule.launch_command(_ROOT, extra_args)
         except FileNotFoundError as exc:
             emit("error", message=str(exc))
             return
@@ -416,6 +417,48 @@ class Bridge:
         emit("capsule_started", label=label)
         emit("log", message=f"Capsule run started — {label}", level="ok")
 
+    # How long a clean stop is allowed to take before it stops being clean.
+    # CTRL_BREAK_EVENT raises KeyboardInterrupt in run_task.py, which is the
+    # right way to stop it: its run() catches that to save partial results and
+    # write metrics. But the signal only lands when Python next executes
+    # bytecode, and a step blocked in a live LLM request sits inside a socket
+    # read for five to seven seconds first. Direct report: "stopping takes too
+    # long". Nothing escalated, so a wedged run could sit there indefinitely.
+    _STOP_GRACE_SEC = 4.0      # let the clean shutdown path finish
+    _STOP_KILL_SEC = 2.0       # then terminate, then kill
+
+    def _escalate_stop(self, proc) -> None:
+        """Escalate a stop that the signal alone did not finish.
+
+        Runs on a daemon thread so the bridge keeps serving commands while it
+        waits -- the UI has already been told the run stopped, and this is only
+        about making sure the process actually goes away.
+        """
+        def _run():
+            try:
+                proc.wait(timeout=self._STOP_GRACE_SEC)
+                return                      # clean exit, nothing to do
+            except subprocess.TimeoutExpired:
+                pass
+            try:
+                _log_capsule_line(
+                    f"Still running {self._STOP_GRACE_SEC:.0f}s after the stop signal "
+                    "— terminating.")
+                proc.terminate()
+                proc.wait(timeout=self._STOP_KILL_SEC)
+                return
+            except subprocess.TimeoutExpired:
+                pass
+            except Exception:
+                return
+            try:
+                _log_capsule_line("Still running after terminate — killing.")
+                proc.kill()
+            except Exception:
+                pass
+
+        threading.Thread(target=_run, daemon=True).start()
+
     def stop_capsule(self) -> None:
         if self._capsule_proc is None or self._capsule_proc.poll() is not None:
             emit("error", message="No capsule run in progress.")
@@ -432,6 +475,7 @@ class Bridge:
             _log_capsule_line("Stop requested — CTRL_BREAK_EVENT sent.")
             emit("capsule_stopped")
             emit("log", message="Capsule run interrupted…", level="dim")
+            self._escalate_stop(self._capsule_proc)
         except Exception as exc:
             emit("error", message=f"Failed to stop capsule run: {exc}")
 
@@ -539,7 +583,8 @@ class Bridge:
             elif cmd == "replay":
                 self.replay(int(msg.get("n", 10)))
             elif cmd == "run_capsule":
-                self.run_capsule(msg.get("capsule_name", ""))
+                self.run_capsule(msg.get("capsule_name", ""),
+                                 msg.get("extra_args") or [])
             elif cmd == "stop_capsule":
                 self.stop_capsule()
             elif cmd == "start_inbox_router":
