@@ -860,9 +860,19 @@ const FORM_FILLING_TOOLS = (intakeFile) => [
 const TEST_MOCKUPS = {
   form_filling: FORM_FILLING_TOOLS("data_entry_intake.txt"),
 
+  // Scope #2 gets the SOURCE only -- the spreadsheet the run reads from.
+  //
+  // The mock portal used to be opened here too, and that was the bug: Play
+  // runs automate.py with --show, which opens its OWN Playwright browser on
+  // the portal. Opening it here as well left two browser windows showing the
+  // same page, and the one this button opened was the dead one -- the agent
+  // never touches it. Reported directly: "launch test tools is opened and then
+  // when 'play' button is clicked another one is opened".
+  //
+  // The spreadsheet is the half Play does NOT open, so it is the half worth
+  // having a button for.
   "Sheet-to-Portal Matcher": [
     { type: "open", target: path.join(REPO_ROOT, "components", "scope2", "data", "sheets", "grade_sheet.xlsx") },
-    { type: "open", target: path.join(REPO_ROOT, "practice_apps", "mocksite", "index.html") },
   ],
 };
 
