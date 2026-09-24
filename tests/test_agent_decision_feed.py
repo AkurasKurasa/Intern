@@ -135,9 +135,9 @@ def test_the_agent_actually_calls_it_after_recording_a_step():
     """The emit has to sit where decision_by and t_conf are both known -- the
     same place the run's own result record is appended."""
     source = AGENT_PY.read_text(encoding="utf-8")
-    assert "_emit_decision(step_idx + 1, _by, t_conf," in source
+    assert "_emit_decision_once(self, step_idx + 1, _by, t_conf," in source
     appended = source.index('"step_time_sec":     round(_step_time_sec, 4),')
-    called = source.index("_emit_decision(step_idx + 1")
+    called = source.index("_emit_decision_once(self, step_idx + 1, _by")
     assert called > appended, "the emit must follow the result record, not precede it"
 
 
@@ -156,7 +156,8 @@ def test_a_skipped_llm_call_is_reported_as_source_not_llm():
     assert '"_fast_path": "lookup"' in source
 
     # the re-label must happen before the emit reads it
-    assert source.index('_by = "source"') < source.index("_emit_decision(step_idx + 1")
+    assert (source.index('_by = "source"')
+            < source.index("_emit_decision_once(self, step_idx + 1, _by"))
 
 # ------------------------------- the batch fast-fill path (found live)
 
@@ -259,3 +260,62 @@ def test_the_flags_are_wired_from_run_task_to_the_agent():
     run_task = (REPO / "run_task.py").read_text(encoding="utf-8")
     assert "disable_batch_fill    = _args.no_batch_fill," in run_task
     assert "disable_source_lookup = _args.force_llm_values," in run_task
+
+# ------------------------- emitted where decided, not where the loop ends
+
+
+def test_the_emit_is_guarded_so_a_step_counts_once():
+    """The loop body has roughly two dozen early exits and the decision is
+    known well before most of them. Emitting at the decision point is what
+    makes value steps count at all; the guard is what stops a step that also
+    reaches the bottom being counted twice."""
+    source = AGENT_PY.read_text(encoding="utf-8")
+    assert "def _emit_decision_once(agent, step, decision_by, confidence, action_type):" in source
+    assert 'if getattr(agent, "_decision_emitted", False):' in source
+    assert "agent._decision_emitted = True" in source
+
+
+def test_the_guard_is_reset_at_the_top_of_every_step():
+    """Without the reset, the very first step would report and every step
+    after it would be silently dropped."""
+    source = AGENT_PY.read_text(encoding="utf-8")
+    loop = source.index("for step_idx in range(n):")
+    reset = source.index("self._decision_emitted = False")
+    assert reset > loop
+    assert reset - loop < 900, "the reset must be at the top of the loop body"
+
+
+def test_value_steps_emit_at_the_decision_not_at_the_end():
+    """Reported directly: Source and LLM both sat on zero in transformer mode
+    while Transformer climbed. Those steps decide, type, and then `continue`
+    long before the bottom of the loop, so a single bottom emit never saw
+    them."""
+    source = AGENT_PY.read_text(encoding="utf-8")
+    # one definition plus three call sites: two decision points and the
+    # bottom fallback.
+    assert source.count("_emit_decision_once(") == 4
+    # both LLM sites re-label a skipped call as source
+    assert source.count('"source" if (isinstance(llm_action, dict)') == 2
+
+
+def test_the_only_unguarded_emits_are_the_batch_fast_fill_ones():
+    """A bare _emit_decision() on the per-step path would bypass the guard and
+    double-count.
+
+    Two bare calls do live inside the loop, and they are legitimate: the batch
+    fast-fill sites. They are a separate stream -- they number themselves with
+    _next_decision_step() rather than step_idx, because that path fills many
+    fields inside a single step -- so the per-step guard does not apply to
+    them and must not.
+    """
+    source = AGENT_PY.read_text(encoding="utf-8")
+    loop_body = source[source.index("for step_idx in range(n):"):]
+
+    bare = loop_body.count("_emit_decision(")
+    batch = loop_body.count("_emit_decision(_next_decision_step(),")
+    assert bare == batch == 2, (
+        f"{bare} bare emit(s) in the step loop, {batch} of them batch fast-fill; "
+        "any other bare call bypasses the per-step guard")
+
+    # and the per-step path always goes through the guard
+    assert loop_body.count("_emit_decision_once(") == 3

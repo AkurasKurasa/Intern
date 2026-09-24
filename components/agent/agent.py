@@ -85,6 +85,20 @@ def _reset_decision_seq():
     _DECISION_SEQ[0] = 0
 
 
+def _emit_decision_once(agent, step, decision_by, confidence, action_type):
+    """Emit at most one decision per step, wherever the step happens to end.
+
+    The step loop has many early exits, and the decision is known well before
+    most of them. Emitting at the decision point and guarding here is what
+    makes the tally count every step rather than only the ones that run the
+    whole body.
+    """
+    if getattr(agent, "_decision_emitted", False):
+        return
+    agent._decision_emitted = True
+    _emit_decision(step, decision_by, confidence, action_type)
+
+
 def _emit_decision(step, decision_by, confidence, action_type):
     """Print one DECISION line. Best-effort and silent on failure."""
     try:
@@ -1512,6 +1526,15 @@ class LLMAgent:
         _REPEAT_LIMIT: int = 3
 
         for step_idx in range(n):
+          # Reset per step. The emit below used to sit only at the BOTTOM of
+          # this loop body, past roughly two dozen `continue` statements --
+          # so any step that took an early exit (which every value-typing step
+          # in the OPT2 path does) was never reported at all, and the HUD
+          # showed Source and LLM stuck on zero while Transformer climbed.
+          # Reported directly: "why is it both 0 on transformer mode".
+          # Decisions are now emitted where they are MADE; this flag keeps a
+          # step that also reaches the bottom from being counted twice.
+          self._decision_emitted = False
           try:
             # Multi-record advance (2026-08-12): _try_advance_tab sets these
             # two flags after clicking Submit — checked here, once, at the
@@ -3197,6 +3220,12 @@ class LLMAgent:
 
                     prediction = self._merge(t_pred, t_conf, llm_action, state)
                     _decision_maker = "llm"
+                    _emit_decision_once(
+                        self, step_idx + 1,
+                        "source" if (isinstance(llm_action, dict)
+                                     and llm_action.get("_fast_path") == "lookup")
+                        else "llm",
+                        None, prediction.get("action_type"))
                     logger.info("[OPT2] TRANSFORMER chose TYPE → LLM value for '%s' → %r",
                                 _flabel, prediction.get("text", "")[:40])
 
@@ -4481,6 +4510,12 @@ class LLMAgent:
                 # ── Merge: LLM decides what, transformer decides where ──────
                 prediction = self._merge(t_pred, t_conf, llm_action, state)
                 _decision_maker = "llm"
+                _emit_decision_once(
+                    self, step_idx + 1,
+                    "source" if (isinstance(llm_action, dict)
+                                 and llm_action.get("_fast_path") == "lookup")
+                    else "llm",
+                    None, prediction.get("action_type"))
                 print(f"\n  [LLM TOOK OVER]  reason: {reason}\n", flush=True)
 
                 # Stuck-click guard
@@ -5718,8 +5753,8 @@ class LLMAgent:
             if (_by == "llm" and isinstance(llm_action, dict)
                     and llm_action.get("_fast_path") == "lookup"):
                 _by = "source"
-            _emit_decision(step_idx + 1, _by, t_conf,
-                           prediction.get("action_type"))
+            _emit_decision_once(self, step_idx + 1, _by, t_conf,
+                                prediction.get("action_type"))
 
             if not result.success:
                 # Skip-and-continue: one failed action shouldn't kill the whole
