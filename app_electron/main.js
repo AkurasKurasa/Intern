@@ -872,6 +872,12 @@ const TEST_MOCKUPS = {
   "Form Filling - disordered source":
     FORM_FILLING_TOOLS("data_entry_intake_DISORDERED_TEST.txt"),
 
+  // Transformer: the ORDERED packet, same as the first entry. The variable
+  // here is not the data at all -- it is the capsule's --no_batch_fill flag,
+  // which turns off the direct-write path so every field is reached by a real
+  // click and the learned pointer has to pick the target.
+  "Form Filling - transformer": FORM_FILLING_TOOLS("data_entry_intake.txt"),
+
   "Sheet-to-Portal Matcher": [
     { type: "open", target: path.join(REPO_ROOT, "components", "scope2", "data", "sheets", "grade_sheet.xlsx") },
     { type: "open", target: path.join(REPO_ROOT, "practice_apps", "mocksite", "index.html") },

@@ -82,6 +82,19 @@
       "created": "2026-05-17T17:52:45",
       "emoji": "\ud83d\udd00",
       "args": []
+    },
+    {
+      "name": "Form Filling - transformer",
+      "description": "The ORDERED packet with the batch fast-fill turned off. Same data as 'ordered source', so the only variable is the fill path. Normally the agent writes each value straight into the control and Tabs on, which never needs a click - so the transformer is never asked where to go and [TRANSFORMER] is zero in the log. With the fast path off, every field is reached by a real click and the learned pointer picks the target. Slower by design; this is the counterfactual for 'what does the transformer contribute', not a demo mode.",
+      "model_path": "tasks/form_filling/model.pt",
+      "trigger_keywords": [],
+      "trigger_apps": [],
+      "trace_dir": "tasks/form_filling/traces",
+      "created": "2026-05-17T17:52:45",
+      "emoji": "\ud83e\udde0",
+      "args": [
+        "--no_batch_fill"
+      ]
     }
   ]
 }
