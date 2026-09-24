@@ -91,7 +91,13 @@ class WorkflowCapsule:
             entrypoint_abs = os.path.join(repo_root, self.entrypoint)
             if not os.path.isfile(entrypoint_abs):
                 raise FileNotFoundError(f"Entry point not found: {entrypoint_abs}")
-            argv = [sys.executable, "-u", entrypoint_abs] + list(self.args)
+            # extra_args are chosen at Play time (the run-options modal), so they
+            # come after the capsule's own pinned args. This branch was missed
+            # when extra_args was first added -- only the run_task branch below
+            # honoured them -- which silently dropped Scope #2's portal choice
+            # and ran every variant as whatever registry.json had pinned.
+            argv = ([sys.executable, "-u", entrypoint_abs]
+                    + list(self.args) + list(extra_args or []))
             if self.checkpoint_flag and self.model_path:
                 abs_model = self.model_path if os.path.isabs(self.model_path) \
                     else os.path.join(repo_root, self.model_path)

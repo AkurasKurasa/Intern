@@ -844,3 +844,12 @@ textarea.field { resize: vertical; font-family: var(--font-ui); }
   font-size: 13px; color: var(--text-muted); border-radius: var(--radius-sm);
 }
 .fillmode-cancel:hover { color: var(--ink); background: var(--sunk); }
+
+/* The choices are built by the renderer now, since the list differs per
+   capsule -- two fill modes for Scope #1, eight portal variants for Scope #2.
+   Eight rows needs a scroll bound so the panel cannot outgrow the window. */
+.fillmode-choices { max-height: 52vh; overflow-y: auto; margin: 0 -2px; padding: 0 2px; }
+.fillmode-choices::-webkit-scrollbar { width: 8px; }
+.fillmode-choices::-webkit-scrollbar-thumb {
+  background: var(--border-strong); border-radius: 4px;
+}

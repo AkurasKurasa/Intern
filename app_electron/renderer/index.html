@@ -399,26 +399,9 @@
     <div class="fillmode-panel" role="dialog" aria-modal="true"
          aria-labelledby="fillModeTitle">
       <h2 class="fillmode-title" id="fillModeTitle">How should it fill the form?</h2>
-      <p class="fillmode-sub">Same task and same data either way. This only changes
-         how the agent reaches each field.</p>
+      <p class="fillmode-sub" id="fillModeSub"></p>
 
-      <button class="fillmode-option" id="fillModeDirect" type="button">
-        <span class="fillmode-dot fm-source"></span>
-        <span class="fillmode-body">
-          <strong>Direct write</strong>
-          <span>Writes each value straight into the field and presses Tab. No mouse,
-                no clicking &mdash; so the transformer is never asked anything. Fast.</span>
-        </span>
-      </button>
-
-      <button class="fillmode-option" id="fillModeTransformer" type="button">
-        <span class="fillmode-dot fm-transformer"></span>
-        <span class="fillmode-body">
-          <strong>Transformer</strong>
-          <span>Turns the direct-write path off, so every field has to be reached by a
-                real click and the learned pointer picks the target. Slower.</span>
-        </span>
-      </button>
+      <div class="fillmode-choices" id="fillModeChoices"></div>
 
       <button class="fillmode-cancel" id="fillModeCancel" type="button">Cancel</button>
     </div>

@@ -846,11 +846,68 @@ function refreshChipEmojis() {
 // is asked here rather than by keeping a near-duplicate capsule per mode.
 //
 // Resolves to the extra argv for run_task.py, or null if cancelled.
-const FILL_MODE_CAPSULES = new Set(["form_filling"]);
+// Per-capsule run options, declared as data. Each entry is the question the
+// modal asks and the argv each answer contributes. Kept here rather than as a
+// capsule per combination, because these are choices you make at the moment
+// you run, not properties of the task.
+const RUN_OPTIONS = {
+  form_filling: {
+    title: "How should it fill the form?",
+    subtitle: "Same task and same data either way. This only changes how the "
+            + "agent reaches each field.",
+    choices: [
+      { dot: "fm-source", name: "Direct write",
+        desc: "Writes each value straight into the field and presses Tab. No mouse, "
+            + "no clicking — so the transformer is never asked anything. Fast.",
+        args: [] },
+      { dot: "fm-transformer", name: "Transformer",
+        desc: "Turns the direct-write path off, so every field has to be reached by a "
+            + "real click and the learned pointer picks the target. Slower.",
+        args: ["--no_batch_fill"] },
+    ],
+  },
+
+  // The mocksite ships eight portals that differ by one thing each -- that IS
+  // the Scope #2 experiment, so every one needs to be reachable. The variant
+  // was previously pinned to v0_base in registry.json, which made the other
+  // seven unreachable from the app.
+  "Sheet-to-Portal Matcher": {
+    title: "Which portal should it run against?",
+    subtitle: "Same demonstration and same spreadsheet every time. Each portal "
+            + "changes one thing, so what differs in the result is caused by that.",
+    choices: [
+      { dot: "fm-source", name: "V0 — base",
+        desc: "No change. The control.", args: ["--variant", "v0_base"] },
+      { dot: "fm-transformer", name: "V1 — reordered",
+        desc: "Sheet columns in a different DOM order. Tests position independence.",
+        args: ["--variant", "v1_reordered"] },
+      { dot: "fm-transformer", name: "V2 — relabeled",
+        desc: "Fields renamed to Learner Reference Number, Degree Program, Final "
+            + "Rating, Academic Standing. Tests semantic matching.",
+        args: ["--variant", "v2_relabeled"] },
+      { dot: "fm-transformer", name: "V3 — extra fields",
+        desc: "Adds Section and Adviser, which no column feeds. Tests correct "
+            + "non-assignment.", args: ["--variant", "v3_extra_fields"] },
+      { dot: "fm-transformer", name: "V4 — unassociated headers",
+        desc: "Inputs carry no aria-labelledby; only the column header names them. "
+            + "Tests the label cascade.", args: ["--variant", "v4_unassociated"] },
+      { dot: "fm-transformer", name: "V5 — near-duplicates",
+        desc: "Adds Grade (Recomputed) and Year Enrolled. Tests abstention.",
+        args: ["--variant", "v5_near_duplicates"] },
+      { dot: "fm-transformer", name: "V6a — options",
+        desc: "Remarks options renamed to PASSED / FAILED. Tests option matching.",
+        args: ["--variant", "v6a_options"] },
+      { dot: "fm-transformer", name: "V6b — inverted scale",
+        desc: "1.00–5.00 grading scale, 3.00 passing. Tests that the induced "
+            + "operator direction flips.", args: ["--variant", "v6b_scale"] },
+    ],
+  },
+};
 
 const fillModeBackdrop = document.getElementById("fillModeBackdrop");
-const fillModeDirect = document.getElementById("fillModeDirect");
-const fillModeTransformer = document.getElementById("fillModeTransformer");
+const fillModeTitle = document.getElementById("fillModeTitle");
+const fillModeSub = document.getElementById("fillModeSub");
+const fillModeChoices = document.getElementById("fillModeChoices");
 const fillModeCancel = document.getElementById("fillModeCancel");
 
 let fillModeResolve = null;
@@ -862,8 +919,6 @@ function closeFillMode(value) {
   if (resolve) resolve(value);
 }
 
-fillModeDirect.addEventListener("click", () => closeFillMode([]));
-fillModeTransformer.addEventListener("click", () => closeFillMode(["--no_batch_fill"]));
 fillModeCancel.addEventListener("click", () => closeFillMode(null));
 fillModeBackdrop.addEventListener("click", (e) => {
   if (e.target === fillModeBackdrop) closeFillMode(null);
@@ -872,18 +927,48 @@ document.addEventListener("keydown", (e) => {
   if (e.key === "Escape" && !fillModeBackdrop.hidden) closeFillMode(null);
 });
 
-function askFillMode(capsuleName) {
-  if (!FILL_MODE_CAPSULES.has(capsuleName)) return Promise.resolve([]);
+function askRunOptions(capsuleName) {
+  const spec = RUN_OPTIONS[capsuleName];
+  if (!spec) return Promise.resolve([]);   // no question to ask, run as-is
+
+  fillModeTitle.textContent = spec.title;
+  fillModeSub.textContent = spec.subtitle;
+  fillModeChoices.innerHTML = "";
+
+  spec.choices.forEach((choice) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "fillmode-option";
+
+    const dot = document.createElement("span");
+    dot.className = "fillmode-dot " + choice.dot;
+
+    const body = document.createElement("span");
+    body.className = "fillmode-body";
+    const name = document.createElement("strong");
+    name.textContent = choice.name;
+    const desc = document.createElement("span");
+    desc.textContent = choice.desc;
+    body.appendChild(name);
+    body.appendChild(desc);
+
+    btn.appendChild(dot);
+    btn.appendChild(body);
+    btn.addEventListener("click", () => closeFillMode(choice.args));
+    fillModeChoices.appendChild(btn);
+  });
+
   fillModeBackdrop.hidden = false;
-  fillModeDirect.focus();
+  const first = fillModeChoices.querySelector(".fillmode-option");
+  if (first) first.focus();
   return new Promise((resolve) => { fillModeResolve = resolve; });
 }
 
-// Asks the mode first, then runs. Returns whatever capsulesAPI.run returns, or
-// null when the chooser was dismissed -- callers must treat null as "no run
-// happened" rather than as a failed one.
+// Asks first, then runs. Returns whatever capsulesAPI.run returns, or null when
+// the chooser was dismissed -- callers must treat null as "no run happened"
+// rather than as a failed one.
 async function runCapsuleWithFillMode(capsuleName) {
-  const extraArgs = await askFillMode(capsuleName);
+  const extraArgs = await askRunOptions(capsuleName);
   if (extraArgs === null) return null;
   return window.capsulesAPI.run(capsuleName, extraArgs);
 }
