@@ -188,6 +188,16 @@ def main():
         model, _ = train(examples, feature_mask=FEATURE_MASK)
 
     scorable = [f for f in fields if f.label not in derived_labels]
+
+    # Say what is about to happen, because the next line is the longest silent
+    # stretch in the whole run: score_matrix embeds every column/field pair,
+    # which loads all-MiniLM-L6-v2 the first time. Found live -- a user watching
+    # the Play panel saw "loaded matcher.pt" and then nothing, assumed the run
+    # was dead, and stopped it three seconds before the browser would have
+    # opened. Same failure the countdown had: the process was working fine, it
+    # just had nothing to show in the one place being watched.
+    _flush_safe_print(f"  scoring {len(columns)} columns against "
+                      f"{len(scorable)} fields (embedding, first run is slower)...")
     matrix = score_matrix(model, columns, scorable, FEATURE_MASK)
 
     # ---------------------------------------------------------------- 4
