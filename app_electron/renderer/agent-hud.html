@@ -171,6 +171,11 @@ h3 {
 .tgt { font-size: 11px; color: var(--accent); white-space: nowrap;
        overflow: hidden; text-overflow: ellipsis; }
 .conf { font-variant-numeric: tabular-nums; font-size: 10px; color: var(--muted); }
+.via { font-size: 9px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+.via-llm { color: var(--llm); }
+.via-lookup { color: var(--source); }
+.mbar i.via-llm { background: var(--llm); }
+.mbar i.via-lookup { background: var(--source); }
 .mbar { grid-column: 1 / -1; height: 3px; border-radius: 2px;
         background: var(--line); overflow: hidden; }
 .mbar i { display: block; height: 100%; width: 100%; background: var(--accent);
@@ -410,8 +415,17 @@ function s2Init(d) {
     pair.className = "pair";
     const src = document.createElement("div");
     src.className = "src"; src.textContent = esc(a.source_header);
+    // The matcher reports a probability; lookup and the LLM do not, so they
+    // show which tier decided instead of an invented number -- in the same
+    // colours Scope #1 uses for Source and LLM.
     const conf = document.createElement("div");
-    conf.className = "conf"; conf.textContent = num(a.score);
+    const via = a.via || "matcher";
+    if (via === "matcher") {
+      conf.className = "conf"; conf.textContent = num(a.score);
+    } else {
+      conf.className = "via via-" + via;
+      conf.textContent = via === "llm" ? "LLM" : "lookup";
+    }
     const tgt = document.createElement("div");
     tgt.className = "tgt"; tgt.textContent = "→ " + esc(a.target_label);
     const spacer = document.createElement("div");
@@ -421,7 +435,8 @@ function s2Init(d) {
     bar.appendChild(fill);
     pair.append(src, conf, tgt, spacer, bar);
     mapRows.appendChild(pair);
-    const pct = Math.max(0, Math.min(1, Number(a.score) || 0));
+    if (via !== "matcher") fill.classList.add("via-" + via);
+    const pct = via === "matcher" ? Math.max(0, Math.min(1, Number(a.score) || 0)) : 1;
     requestAnimationFrame(() => { fill.style.transform = "scaleX(" + pct + ")"; });
   });
 

@@ -712,6 +712,26 @@ perception.
 
   **Tests** — `tests/scope2/test_hud.py`, 16 tests. Units (payload shape; a mapping missing every optional key; a disabled HUD never touching the page; a throwing HUD swallowed, not raised; the static no-form-controls guard), browser behaviour (shadow-root encapsulation checked with `document.querySelector` rather than a Playwright locator, since locators pierce open shadow roots on purpose and would pass either way; no leaked stylesheet; the abstention and the rule actually rendered; row outline restored exactly; gutter given back on destroy; click-through verified via `elementFromPoint` plus a real Save click), and end-to-end (show/headless result equivalence). Full Scope #2 suite: **189 passing**, up from 182 passing + 3 failing.
 
+- [x] `scope2_three_tier_mapping` -- Built 2026-09-26, direct request: make Scope #2 work the way Scope #1 fills its form -- read the label, look it up, fall back to the LLM -- Scope #2 only.
+
+  DECISIONS, each chosen by the user from explicit options: (1) keep the trained matcher as the MIDDLE tier rather than removing it, so Scope #2 keeps its only learned component and its abstention claim; (2) keep rule induction for the derived Remarks field, since the >=75 cutoff read off the data (and V6b's flipped <=3.00) is Scope #2's strongest result; (3) allow the LLM to refuse (answer NONE), so V3/V5's refusal behaviour survives.
+
+  CORRECTED PREMISES before building: Scope #2 never used the transformer -- that is Scope #1's model; Scope #2's learned part is the 1,121-parameter matcher. And Scope #2 already wrote values directly (Playwright fill(), the same manoeuvre as Scope #1's WM_SETTEXT), so only the MAPPING decision changed, not the writing.
+
+  ORDER: lookup -> matcher -> LLM, each seeing only what the tiers before it left undecided. New module components/scope2/resolver/fallback.py wraps the resolver without modifying it -- test_matcher_resolver.py compares Assignment.to_dict() exactly, so resolver/assign.py is untouched. When lookup claims nothing (the normal case) the matcher sees exactly the inputs it always did.
+
+  NEITHER NEW TIER READS truth_key (the portal's data-key -- the answer) or column_key. Same invariant test_no_demonstration_only_signal pins for the matcher; test_the_prompt_never_sees_the_answer pins it here by asserting the prompt is byte-identical with truth_key set, unset, or deliberately wrong.
+
+  REAL BUG FOUND WHILE VERIFYING, by running V2 rather than reading: the lookup's loose word-subset match (the same test as Scope #1's _get_fuzzy) mapped the label 'Final Rating 0-100' to the DECOY column FINAL, uniquely and confidently -- the one-word header is a subset of the label, while the right column FINAL GRADE is not. Because lookup runs first, it overrode the matcher. Fixed by requiring no RIVAL: a loose hit is trusted only when no other column shares even one word with the field -- the matcher's margin rule applied to lookup. This is the exact confidently-wrong-first-match failure Scope #1's lookup still has.
+
+  NO REGRESSION, proven by replaying the pre-change pipeline on V0, V2 and V5: the final mappings are identical with the LLM unavailable. On V2 one pair (PROGRAM -> Degree Program) is now decided by lookup instead of the matcher.
+
+  KNOWN LIMIT OF THIS DESIGN: the LLM only sees fields the matcher ABSTAINS on. It cannot catch a confident matcher error -- on V2 the matcher maps the decoy FINAL to 'Final Rating 0-100' at 1.00, which the old pipeline also did (the documented miss in the README's 2/3 for V2).
+
+  NOT VERIFIED LIVE: LM Studio's daemon was down during this session, so the LLM tier's matched path has only been tested with a scripted model. The unavailable path was verified end to end: fields stay empty, rows still fill and verify.
+
+  TESTS: tests/scope2/test_fallback.py, 36 tests -- lookup (exact, unique loose, ambiguous, rival/decoy regression, conflicts, alignment columns excluded), candidate filtering, the no-answer invariant, strict answer parsing (FINAL never read out of FINAL GRADE), LLM refusal/conflict/unavailable paths, the real client degrading on a dead port, and an E2E lock that the matcher's V0 decisions are unchanged. 255 passing, 1 skipped (the live-LLM test).
+
 ---
 
 ### Scope #3 — Email / Ticket Triage

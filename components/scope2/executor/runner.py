@@ -157,7 +157,10 @@ def hud_payload(mapping, variant, dry_run, total_rows):
         "total_rows": total_rows,
         "assignments": [
             {"source_header": a["source_header"], "target_label": a["target_label"],
-             "score": a.get("score"), "margin": a.get("margin")}
+             "score": a.get("score"), "margin": a.get("margin"),
+             # which tier decided it -- lookup, matcher or llm. Hand-written
+             # mappings predate tiers, so default to the matcher.
+             "via": a.get("via", "matcher")}
             for a in mapping.get("assignments", [])
         ],
         "abstained": [

@@ -42,11 +42,22 @@ from features import encoders  # noqa: E402
 from features.extractor import FEATURE_NAMES  # noqa: E402
 from model.matcher import load as load_matcher  # noqa: E402
 from model.train import build_dataset, score_matrix, train  # noqa: E402
-from resolver.assign import BUCKET_DERIVED, resolve  # noqa: E402
+from resolver.assign import BUCKET_DERIVED, Mapping, resolve  # noqa: E402
+from resolver.fallback import (  # noqa: E402
+    VIA_LLM, VIA_LOOKUP, VIA_MATCHER, LMStudioAsker, llm_tier, lookup_tier, remaining,
+)
 from rules.induce_from_session import induce_from_session  # noqa: E402
 
 SHEET = REPO / "data" / "sheets" / "grade_sheet.xlsx"
 SESSION = REPO / "data" / "demos" / "v0_6rows.jsonl"
+
+# The sheet columns that align a sheet row to a portal row rather than feeding
+# a field: the portal PRINTS the Student ID and Student Name, it does not take
+# them as input. Already declared in the row_alignment block below; named once
+# here so the lookup and LLM tiers can keep them out of the candidate pool.
+KEY_COLUMN = "STUDENT NUMBER"
+VERIFY_COLUMN = "NAME OF STUDENT"
+ALIGNMENT_COLUMNS = (KEY_COLUMN, VERIFY_COLUMN)
 
 # Feature 16 is position-based and measurably harmful across variants
 # (11/24 with it, 18/24 without), so the shipped configuration drops it.
@@ -124,6 +135,10 @@ def main():
                     help="actually save; the default is a dry run")
     ap.add_argument("--limit", type=int, default=None,
                     help="only process the first N students")
+    ap.add_argument("--no_llm", action="store_true",
+                    help="skip the LLM fallback tier: lookup then matcher only, the "
+                         "configuration eval/run_variants.py measures. For comparing "
+                         "what the LLM tier adds on the same portal.")
     ap.add_argument("--show", action="store_true",
                     help="run in a visible browser and leave it open at the end")
     ap.add_argument("--log", type=Path, default=None,
@@ -177,7 +192,32 @@ def main():
         print(f"  {_color(entry['rule'].describe(), _BLUE)}")
 
     # ---------------------------------------------------------------- 3
+    # Three tiers, cheapest first, each seeing only what the ones before it
+    # left undecided:
+    #
+    #   lookup   Scope #1's label lookup -- a column whose name IS the field's
+    #   matcher  the trained network + Hungarian + abstention, unchanged
+    #   LLM      only for fields the matcher could not decide, and allowed to
+    #            answer NONE
+    #
+    # Direct request: make Scope #2 work like Scope #1's form -- lookup, then
+    # LLM fallback -- while keeping the matcher and keeping rule induction.
+    # Only the mapping decision changed; values are still written with fill().
     banner(4, "Matching columns to fields")
+    scorable = [f for f in fields if f.label not in derived_labels]
+
+    # -- tier 1: lookup --------------------------------------------------
+    looked_up = lookup_tier(scorable, columns, exclude=ALIGNMENT_COLUMNS)
+    for d in looked_up:
+        print(f"  {d.column:<20} -> {_color(f'{d.field:<28}', _GREEN)} "
+              f"{_color('label match', _DIM)}")
+    lookup_fields = {d.field for d in looked_up}
+    lookup_columns = {d.column for d in looked_up}
+
+    # -- tier 2: matcher, over what lookup left ------------------------
+    m_fields = remaining(scorable, lookup_fields, key=lambda f: f.label)
+    m_columns = remaining(columns, lookup_columns, key=lambda c: c.header)
+
     if args.matcher:
         model, artifact = load_matcher(args.matcher)
         meta = artifact.get("metadata", {})
@@ -187,26 +227,24 @@ def main():
         examples, _, _ = build_dataset(args.session, "v0_base", args.sheet)
         model, _ = train(examples, feature_mask=FEATURE_MASK)
 
-    scorable = [f for f in fields if f.label not in derived_labels]
-
-    # Say what is about to happen, because the next line is the longest silent
-    # stretch in the whole run: score_matrix embeds every column/field pair,
-    # which loads all-MiniLM-L6-v2 the first time. Found live -- a user watching
-    # the Play panel saw "loaded matcher.pt" and then nothing, assumed the run
-    # was dead, and stopped it three seconds before the browser would have
-    # opened. Same failure the countdown had: the process was working fine, it
-    # just had nothing to show in the one place being watched.
-    _flush_safe_print(f"  scoring {len(columns)} columns against "
-                      f"{len(scorable)} fields (embedding, first run is slower)...")
-    matrix = score_matrix(model, columns, scorable, FEATURE_MASK)
-
-    # ---------------------------------------------------------------- 4
-    mapping = resolve(columns, scorable, matrix, derived_labels=derived_labels)
+    if m_fields and m_columns:
+        # Say what is about to happen, because the next line is the longest
+        # silent stretch in the whole run: score_matrix embeds every
+        # column/field pair, which loads all-MiniLM-L6-v2 the first time.
+        # Found live -- a user saw "loaded matcher.pt" and then nothing, and
+        # stopped the run three seconds before the browser would have opened.
+        _flush_safe_print(f"  scoring {len(m_columns)} columns against "
+                          f"{len(m_fields)} fields (embedding, first run is slower)...")
+        matrix = score_matrix(model, m_columns, m_fields, FEATURE_MASK)
+        mapping = resolve(m_columns, m_fields, matrix, derived_labels=derived_labels)
+    else:
+        mapping = Mapping(unmapped_fields=[f.label for f in m_fields],
+                          unmapped_columns=[c.header for c in m_columns],
+                          partition={BUCKET_DERIVED: sorted(derived_labels)})
 
     # Pad first, color second: an f-string width applies to the whole string
     # including the invisible escape bytes, so coloring first pads the ANSI
-    # codes instead of the text and the columns stop lining up -- the same
-    # ordering automate_inbox.py's own summary had to fix.
+    # codes instead of the text and the columns stop lining up.
     for assignment in mapping.auto:
         print(f"  {assignment.source_header:<20} -> "
               f"{_color(f'{assignment.target_label:<28}', _GREEN)} "
@@ -215,13 +253,59 @@ def main():
         # Yellow, not red: abstaining is the system working, not failing.
         print(f"  {assignment.source_header:<20} -> {_color('ABSTAINED', _YELLOW)} "
               f"(score {assignment.score:.2f}, margin {assignment.margin:.2f})")
-    if mapping.unmapped_fields:
-        print(_color(f"  left empty: {', '.join(mapping.unmapped_fields)}", _DIM))
-    if mapping.partition.get(BUCKET_DERIVED):
-        print(f"  filled by rule: "
-              f"{_color(', '.join(mapping.partition[BUCKET_DERIVED]), _BLUE)}")
 
-    if not mapping.auto:
+    # -- tier 3: LLM, for what the matcher could not decide -------------
+    claimed = lookup_columns | {a.source_header for a in mapping.auto}
+    undecided = [f for f in m_fields if f.label in mapping.unmapped_fields]
+    llm_decisions = []
+    if undecided and args.no_llm:
+        print(_color(f"  LLM tier skipped (--no_llm): {len(undecided)} field(s) "
+                     "left for it", _DIM))
+    elif undecided:
+        asker = LMStudioAsker()
+        pool = remaining(columns, claimed, key=lambda c: c.header)
+        _flush_safe_print(f"  asking the LLM about {len(undecided)} field(s) the "
+                          "matcher could not decide...")
+        llm_decisions = llm_tier(undecided, pool, asker, exclude=ALIGNMENT_COLUMNS)
+        if asker.model:
+            print(_color(f"  (model: {asker.model})", _DIM))
+        for d in llm_decisions:
+            if d.column:
+                print(f"  {d.column:<20} -> {_color(f'{d.field:<28}', _GREEN)} "
+                      f"{_color('LLM', _BLUE)}")
+            else:
+                print(f"  {'':<20}    {d.field:<28} "
+                      f"{_color(d.reason, _YELLOW)}")
+        if asker.error and not asker.model:
+            print(_color(f"  {asker.error} - those fields stay empty; the lookup "
+                         "and matcher results stand.", _YELLOW))
+
+    # -- the combined mapping the executor fills from -------------------
+    llm_matched = [d for d in llm_decisions if d.column]
+    assignments = (
+        [d.to_assignment() for d in looked_up]
+        + [{**a.to_dict(), "via": VIA_MATCHER} for a in mapping.auto]
+        + [d.to_assignment() for d in llm_matched]
+    )
+    final_columns = {a["source_header"] for a in assignments}
+    final_fields = {a["target_label"] for a in assignments}
+
+    # A matcher abstention the LLM then resolved is no longer a refusal.
+    abstained = [a for a in mapping.abstained if a.source_header not in final_columns]
+    unmapped_fields = [f.label for f in scorable if f.label not in final_fields]
+    unmapped_columns = [c.header for c in columns if c.header not in final_columns]
+
+    if unmapped_fields:
+        print(_color(f"  left empty: {', '.join(unmapped_fields)}", _DIM))
+    if derived_labels:
+        print(f"  filled by rule: {_color(', '.join(sorted(derived_labels)), _BLUE)}")
+
+    via_counts = {v: sum(1 for a in assignments if a["via"] == v)
+                  for v in (VIA_LOOKUP, VIA_MATCHER, VIA_LLM)}
+    print(_color(f"  decided by: lookup {via_counts[VIA_LOOKUP]}, matcher "
+                 f"{via_counts[VIA_MATCHER]}, LLM {via_counts[VIA_LLM]}", _DIM))
+
+    if not assignments:
         raise SystemExit("\n  nothing could be mapped confidently - stopping "
                          "rather than guessing")
 
@@ -232,16 +316,19 @@ def main():
         "variant": args.variant,
         "sheet": {"path": str(args.sheet), "sheet_name": "SUMMARY",
                   "header_row": 11, "key_column": "STUDENT NUMBER"},
-        "assignments": [a.to_dict() for a in mapping.auto],
+        # Every accepted pairing from all three tiers, each tagged with the
+        # tier that decided it ("via"). fill_order() reads only the
+        # header/label pair, so the tag rides along to the log and the HUD.
+        "assignments": assignments,
         # Abstentions were being dropped here, which meant the executor - and
         # so the run log and the HUD - had no record that the Resolver had
         # deliberately refused a column. Refusing a decoy is a result, not a
         # gap, so it travels with the mapping. fill_order() reads only
         # "assignments" and "derived_rules", so nothing downstream fills them.
-        "abstained": [a.to_dict() for a in mapping.abstained],
+        "abstained": [a.to_dict() for a in abstained],
         "derived_rules": [e["rule"].to_dict() for e in rules],
-        "unmapped_fields": mapping.unmapped_fields,
-        "unmapped_columns": mapping.unmapped_columns,
+        "unmapped_fields": unmapped_fields,
+        "unmapped_columns": unmapped_columns,
         "control_fields": [c.label for c in controls],
         "row_alignment": {
             "key_column": "STUDENT NUMBER", "key_field": "Student ID",
@@ -273,8 +360,10 @@ def main():
     log.write(log_path)
 
     banner(6, "Result")
-    print(f"  columns mapped        {_color(str(len(mapping.auto)), _BOLD)}")
-    print(f"  abstained             {_color(str(len(mapping.abstained)), _YELLOW)}")
+    print(f"  columns mapped        {_color(str(len(assignments)), _BOLD)}"
+          f"   (lookup {via_counts[VIA_LOOKUP]}, matcher {via_counts[VIA_MATCHER]}, "
+          f"LLM {via_counts[VIA_LLM]})")
+    print(f"  abstained             {_color(str(len(abstained)), _YELLOW)}")
     print(f"  fields filled by rule {_color(str(len(rules)), _BLUE)}")
     print(f"  rows verified         "
           f"{_color(f'{len(filled)}/{len(log.rows)}', _GREEN if not failed else _YELLOW)}")
