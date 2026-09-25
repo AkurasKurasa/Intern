@@ -33,9 +33,7 @@
       "entrypoint": "components/scope2/automate.py",
       "args": [
         "--commit",
-        "--show",
-        "--limit",
-        "5"
+        "--show"
       ],
       "checkpoint_flag": "--matcher",
       "cwd": ""
