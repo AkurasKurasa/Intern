@@ -150,7 +150,22 @@ const AGENT_HUD_WIDTH = 268;
 // type scale was opened up (a design-hook finding: six font sizes inside a
 // 1.6x range read as no hierarchy at all) -- at the old 250 the split bar at
 // the foot of the tally was clipped clean off.
-const AGENT_HUD_HEIGHT = 336;
+// Two scopes, two shapes. Scope #1 reports one decision per step and needs
+// three short sections; Scope #2 lays out its whole mapping, its abstentions
+// and its induced rule up front. Measured in a browser for each, rather than
+// picking one size and letting the taller one clip.
+const AGENT_HUD_HEIGHT = 336;        // Scope #1
+const AGENT_HUD_HEIGHT_SCOPE2 = 600; // Scope #2
+
+function resizeAgentHud(height) {
+  if (!agentHudWindow || agentHudWindow.isDestroyed()) return;
+  const [w, h] = agentHudWindow.getSize();
+  if (h === height) return;
+  agentHudWindow.setSize(w, height);
+  // Keep it pinned to the same top-right corner as it grows.
+  const { width: sw } = require("electron").screen.getPrimaryDisplay().workAreaSize;
+  agentHudWindow.setPosition(sw - AGENT_HUD_WIDTH - MINI_MARGIN, MINI_MARGIN);
+}
 
 function createAgentHudWindow() {
   if (agentHudWindow && !agentHudWindow.isDestroyed()) return agentHudWindow;
@@ -312,9 +327,23 @@ function broadcast(channel, payload) {
     const raw = payload.line.trim();
     if (raw.startsWith("DECISION ")) {
       try {
+        resizeAgentHud(AGENT_HUD_HEIGHT);
         sendToAgentHud("agent-decision", JSON.parse(raw.slice(9)));
       } catch (e) {
         // A malformed line is a display problem, never a run problem.
+      }
+    }
+
+    // SCOPE2HUD {json} -- the same floating window, fed by Scope #2's
+    // executor. Its panel used to be rendered into the portal page itself;
+    // it reports here now so both scopes share one surface.
+    if (raw.startsWith("SCOPE2HUD ")) {
+      try {
+        const payload = JSON.parse(raw.slice(10));
+        if (payload.kind === "init") resizeAgentHud(AGENT_HUD_HEIGHT_SCOPE2);
+        sendToAgentHud("agent-scope2", payload);
+      } catch (e) {
+        // same: a display line must never affect the run
       }
     }
   }

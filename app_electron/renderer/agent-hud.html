@@ -37,6 +37,7 @@
   --source: #3fb950;      /* matched straight from the intake data */
   --ok: #3fb950;
   --warn: #d29922;
+  --bad: #f85149;
 }
 
 html, body { height: 100%; background: transparent; overflow: hidden; }
@@ -52,6 +53,10 @@ body {
   height: 100%;
   display: flex;
   flex-direction: column;
+  /* The window is sized per scope, but a variant with many abstentions can
+     still run long -- scroll rather than clip, so nothing is silently cut. */
+  overflow-y: auto;
+  scrollbar-width: thin;
   background: var(--bg);
   border: 1px solid var(--line);
   border-radius: 10px;
@@ -61,8 +66,12 @@ body {
 
 /* ---- header ---- */
 
+.hud::-webkit-scrollbar { width: 7px; }
+.hud::-webkit-scrollbar-thumb { background: var(--line); border-radius: 4px; }
+
 .hd {
   display: flex;
+  flex: none;
   align-items: center;
   gap: 8px;
   padding: 10px 12px;
@@ -152,6 +161,44 @@ h3 {
 /* ---- waiting state ---- */
 
 .idle-msg { color: var(--muted); line-height: 1.5; }
+
+/* ---- Scope #2 rows ---- */
+.pair { display: grid; grid-template-columns: 1fr auto; gap: 2px 8px;
+        align-items: baseline; margin-bottom: 8px; }
+.pair:last-child { margin-bottom: 0; }
+.src { font-family: Consolas, monospace; font-size: 11px; white-space: nowrap;
+       overflow: hidden; text-overflow: ellipsis; }
+.tgt { font-size: 11px; color: var(--accent); white-space: nowrap;
+       overflow: hidden; text-overflow: ellipsis; }
+.conf { font-variant-numeric: tabular-nums; font-size: 10px; color: var(--muted); }
+.mbar { grid-column: 1 / -1; height: 3px; border-radius: 2px;
+        background: var(--line); overflow: hidden; }
+.mbar i { display: block; height: 100%; width: 100%; background: var(--accent);
+          transform: scaleX(0); transform-origin: left center;
+          transition: transform .4s cubic-bezier(.22, 1, .36, 1); }
+
+.item { display: flex; gap: 7px; align-items: flex-start; padding: 5px 0;
+        font-size: 11px; }
+.item + .item { border-top: 1px solid var(--line); }
+.ic { flex: none; width: 13px; text-align: center; font-weight: 700; }
+.why { color: var(--muted); font-size: 10px; }
+.warn .ic { color: var(--warn); }
+.derive .ic { color: var(--llm); }
+.rule { font-size: 11px; line-height: 1.55; }
+.rule em { font-style: normal; color: var(--llm); font-weight: 600; }
+.rule code { font-family: Consolas, monospace; color: var(--text);
+             background: var(--panel); padding: 1px 4px; border-radius: 3px; }
+
+.pb { height: 5px; border-radius: 3px; background: var(--line);
+      overflow: hidden; margin-bottom: 9px; }
+.pb i { display: block; height: 100%; width: 100%; background: var(--source);
+        transform: scaleX(0); transform-origin: left center;
+        transition: transform .25s linear; }
+.pb i.bad { background: var(--bad); }
+.ct-bad b { color: var(--bad); }
+.now { margin-top: 8px; font-size: 10px; color: var(--muted);
+       font-family: Consolas, monospace; white-space: nowrap; overflow: hidden;
+       text-overflow: ellipsis; min-height: 14px; }
 </style>
 </head>
 <body>
@@ -197,6 +244,35 @@ h3 {
           <span class="s-llm" id="splitLlm"></span>
         </div>
       </div>
+    </section>
+
+    <!-- Scope #2. Its panel used to render into the portal page itself; it
+         lives here now so both scopes report through one surface. The sections
+         are the same three claims it always showed: what it mapped, what it
+         refused, and what it derived rather than copied. -->
+    <section class="sec" id="s2Mapping" hidden>
+      <h3>Learned mapping <span class="grp-q" id="s2MapCount"></span></h3>
+      <div id="s2MapRows"></div>
+    </section>
+
+    <section class="sec" id="s2Refused" hidden>
+      <h3>Refused to guess <span class="grp-q" id="s2RefCount"></span></h3>
+      <div id="s2RefRows"></div>
+    </section>
+
+    <section class="sec" id="s2Rule" hidden>
+      <h3>Derived, not copied</h3>
+      <div id="s2RuleRows"></div>
+    </section>
+
+    <section class="sec" id="s2Progress" hidden>
+      <div class="pb"><i id="s2Bar"></i></div>
+      <div class="row">
+        <span class="ct ct-source"><b id="s2Ok">0</b> verified</span>
+        <span class="ct ct-bad"><b id="s2Bad">0</b> failed</span>
+        <span class="ct ct-none">of <b id="s2Total">0</b></span>
+      </div>
+      <div class="now" id="s2Now"></div>
     </section>
 
     <section class="sec" id="idleSection">
@@ -276,6 +352,8 @@ function render(d) {
 }
 
 function reset() {
+  S2.forEach((id) => { const n = el(id); if (n) n.hidden = true; });
+  s2.done = 0; s2.failed = 0; s2.total = 0;
   counts.transformer = 0;
   counts.llm = 0;
   counts.source = 0;
@@ -291,7 +369,161 @@ function finish() {
   el("step").textContent = "done";
 }
 
+// ---------------------------------------------------------------- Scope #2
+//
+// A different run shape, so a different set of sections: Scope #1 reports one
+// decision per step, Scope #2 decides its whole mapping up front and then
+// works through rows. Both land in this one window, which is the point.
+
+const S2 = ["s2Mapping", "s2Refused", "s2Rule", "s2Progress"];
+const s2 = { done: 0, failed: 0, total: 0 };
+
+function esc(v) { return v == null ? "" : String(v); }
+function num(v) { return v == null ? "?" : Number(v).toFixed(2); }
+
+function s2Show(ids) {
+  S2.forEach((id) => { el(id).hidden = !ids.includes(id); });
+}
+
+function s2Init(d) {
+  el("idleSection").hidden = true;
+  el("whoSection").hidden = true;
+  el("tallySection").hidden = true;
+  el("dot").className = "dot";
+  el("step").textContent = esc(d.variant);
+
+  s2.done = 0; s2.failed = 0; s2.total = Number(d.total_rows) || 0;
+  el("s2Ok").textContent = "0";
+  el("s2Bad").textContent = "0";
+  el("s2Total").textContent = String(s2.total);
+  el("s2Bar").style.transform = "scaleX(0)";
+  el("s2Bar").className = "";
+  el("s2Now").textContent = "";
+
+  // what it mapped
+  const maps = d.assignments || [];
+  el("s2MapCount").textContent = maps.length ? String(maps.length) : "";
+  const mapRows = el("s2MapRows");
+  mapRows.innerHTML = "";
+  maps.forEach((a) => {
+    const pair = document.createElement("div");
+    pair.className = "pair";
+    const src = document.createElement("div");
+    src.className = "src"; src.textContent = esc(a.source_header);
+    const conf = document.createElement("div");
+    conf.className = "conf"; conf.textContent = num(a.score);
+    const tgt = document.createElement("div");
+    tgt.className = "tgt"; tgt.textContent = "→ " + esc(a.target_label);
+    const spacer = document.createElement("div");
+    const bar = document.createElement("div");
+    bar.className = "mbar";
+    const fill = document.createElement("i");
+    bar.appendChild(fill);
+    pair.append(src, conf, tgt, spacer, bar);
+    mapRows.appendChild(pair);
+    const pct = Math.max(0, Math.min(1, Number(a.score) || 0));
+    requestAnimationFrame(() => { fill.style.transform = "scaleX(" + pct + ")"; });
+  });
+
+  // what it refused -- abstentions are a result, not a gap
+  const abst = d.abstained || [];
+  const open = d.unmapped_fields || [];
+  const refRows = el("s2RefRows");
+  refRows.innerHTML = "";
+  el("s2RefCount").textContent = (abst.length + open.length) || "";
+  abst.forEach((a) => {
+    refRows.appendChild(s2Item("warn", "⊘", esc(a.source_header) + " — abstained",
+      "score " + num(a.score) + ", margin " + num(a.margin) + " — too close to call"));
+  });
+  open.forEach((label) => {
+    refRows.appendChild(s2Item("warn", "○", esc(label), "no source column — left empty"));
+  });
+
+  // what it derived
+  const rules = d.derived_rules || [];
+  const ruleRows = el("s2RuleRows");
+  ruleRows.innerHTML = "";
+  rules.forEach((r) => {
+    const ops = { ">=": "≥", "<=": "≤", ">": ">", "<": "<" };
+    const item = document.createElement("div");
+    item.className = "item derive";
+    const ic = document.createElement("span");
+    ic.className = "ic"; ic.textContent = "ƒ";
+    const body = document.createElement("div");
+    const p = document.createElement("div");
+    p.className = "rule";
+    const em = document.createElement("em"); em.textContent = esc(r.field);
+    const c1 = document.createElement("code"); c1.textContent = esc(r.if_true);
+    const c2 = document.createElement("code");
+    c2.textContent = esc(r.depends_on_field) + " " + (ops[r.operator] || r.operator) + " " + esc(r.cutoff);
+    const c3 = document.createElement("code"); c3.textContent = esc(r.if_false);
+    p.append(em, document.createTextNode(" is "), c1, document.createTextNode(" when "),
+             c2, document.createTextNode(", otherwise "), c3, document.createTextNode("."));
+    body.appendChild(p);
+    if (r.observed_interval) {
+      const why = document.createElement("div");
+      why.className = "why";
+      why.textContent = "cutoff located between " + r.observed_interval[0] +
+                        " and " + r.observed_interval[1] + " from the demonstration alone";
+      body.appendChild(why);
+    }
+    item.append(ic, body);
+    ruleRows.appendChild(item);
+  });
+
+  s2Show([maps.length ? "s2Mapping" : null,
+          (abst.length || open.length) ? "s2Refused" : null,
+          rules.length ? "s2Rule" : null,
+          "s2Progress"].filter(Boolean));
+}
+
+function s2Item(cls, icon, title, why) {
+  const item = document.createElement("div");
+  item.className = "item " + cls;
+  const ic = document.createElement("span");
+  ic.className = "ic"; ic.textContent = icon;
+  const body = document.createElement("div");
+  const t = document.createElement("div"); t.textContent = title;
+  const w = document.createElement("div"); w.className = "why"; w.textContent = why;
+  body.append(t, w);
+  item.append(ic, body);
+  return item;
+}
+
+function onScope2(d) {
+  if (!d || !d.kind) return;
+  if (d.kind === "init") { s2Init(d); return; }
+  if (d.kind === "stage") { el("step").textContent = esc(d.text); return; }
+  if (d.kind === "row") {
+    el("s2Now").textContent = "row " + (Number(d.index) + 1) + "  ·  " + esc(d.student_id);
+    return;
+  }
+  if (d.kind === "cell") {
+    let v = esc(d.value);
+    if (v.length > 22) v = v.slice(0, 21) + "…";
+    el("s2Now").textContent = esc(d.label) + " ← " + v;
+    return;
+  }
+  if (d.kind === "rowDone") {
+    if (d.ok) s2.done += 1; else s2.failed += 1;
+    el("s2Ok").textContent = String(s2.done);
+    el("s2Bad").textContent = String(s2.failed);
+    const seen = s2.done + s2.failed;
+    if (s2.total) {
+      el("s2Bar").style.transform = "scaleX(" + (seen / s2.total) + ")";
+      el("s2Bar").className = s2.failed ? "bad" : "";
+    }
+    return;
+  }
+  if (d.kind === "finish") {
+    el("dot").className = "dot " + (s2.failed ? "bad" : "done");
+    el("step").textContent = esc(d.status);
+    el("s2Now").textContent = esc(d.detail);
+  }
+}
+
 window.agentHud.onDecision(render);
+window.agentHud.onScope2(onScope2);
 window.agentHud.onReset(reset);
 window.agentHud.onFinish(finish);
 </script>

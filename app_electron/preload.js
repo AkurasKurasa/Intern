@@ -5,6 +5,7 @@ const { contextBridge, ipcRenderer } = require("electron");
 // window that needs nothing else -- it only ever receives, never invokes.
 contextBridge.exposeInMainWorld("agentHud", {
   onDecision: (cb) => ipcRenderer.on("agent-decision", (_e, d) => cb(d)),
+  onScope2: (cb) => ipcRenderer.on("agent-scope2", (_e, d) => cb(d)),
   onReset: (cb) => ipcRenderer.on("agent-hud-reset", () => cb()),
   onFinish: (cb) => ipcRenderer.on("agent-hud-finish", () => cb()),
 });

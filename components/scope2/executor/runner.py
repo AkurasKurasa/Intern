@@ -48,58 +48,100 @@ STATUS_EL = "#form-status"
 # when show=True, so a measurement run never loads it and the numbers a
 # headless run produces are unaffected by its existence. See hud.js' own header
 # for why it is shadow-DOM'd rather than styled into the page.
+# The in-page script is now ONLY a row highlighter. The decision panel itself
+# moved to the Electron app's floating Agent window, so Scope #1 and Scope #2
+# report through the same surface instead of each having its own -- direct
+# request, for uniformity.
+#
+# What stayed in the page is the one thing that cannot live outside it:
+# outlining the row being filled and scrolling it into view. That is not the
+# panel, and losing it would make a 50-row run much harder to follow.
 HUD_JS = (Path(__file__).parent / "hud.js").read_text(encoding="utf-8")
 
 
-class Hud:
-    """Drives executor/hud.js, or does nothing at all when disabled.
+def _emit_hud(kind, **payload):
+    """One machine-readable line for the floating Agent window.
 
-    Every call is best-effort: a HUD that throws must never fail a run whose
-    fills and readbacks all succeeded, so each method swallows its own errors.
-    The no-op path (`enabled=False`) is what headless and test runs get, and it
-    touches neither the page nor the DOM.
+    Same convention run_task.py's COUNTDOWN lines and agent.py's DECISION
+    lines already use: print to stdout, which recorder_bridge.py is already
+    pumping line by line to the app. No new IPC, no second transport.
+
+    Presentation only -- wrapped whole, and any failure is discarded, because
+    a HUD line must never break a run whose rows all filled and verified.
+    """
+    try:
+        payload["kind"] = kind
+        print("SCOPE2HUD " + json.dumps(payload))
+        try:
+            sys.stdout.flush()
+        except OSError:
+            # Windows, spawned with no console (the Electron Play button uses
+            # windowsHide) -- the write already landed. Same guard
+            # print_countdown() needed for the same reason.
+            pass
+    except Exception:  # noqa: BLE001 - never break a run over a display line
+        pass
+
+
+class Hud:
+    """Drives the floating Agent window, and the in-page row highlight.
+
+    Method names and call sites are unchanged from when this drove an in-page
+    panel; only where the output goes has changed. `enabled` still gates
+    everything, so a headless measurement run emits nothing and touches no
+    page -- the property the equivalence test pins.
     """
 
     def __init__(self, page=None, enabled=False):
         self._page = page if enabled else None
+        self._enabled = enabled
 
     @property
     def enabled(self):
-        return self._page is not None
+        return self._enabled
 
-    def _call(self, expression, *args):
+    def _highlight(self, expression, *args):
+        """Best-effort call into the page, for the row outline only."""
         if self._page is None:
-            return None
+            return
         try:
-            return self._page.evaluate(expression, *args)
+            self._page.evaluate(expression, *args)
         except Exception:  # noqa: BLE001 - presentation must not break a run
-            return None
+            pass
 
     def install(self, payload):
-        if self._page is None:
+        if not self._enabled:
             return
-        try:
-            self._page.evaluate(HUD_JS)
-        except Exception:  # noqa: BLE001
-            self._page = None
-            return
-        self._call("p => window.__agentHUD.init(p)", payload)
+        _emit_hud("init", **payload)
+        if self._page is not None:
+            try:
+                self._page.evaluate(HUD_JS)
+            except Exception:  # noqa: BLE001
+                self._page = None
 
     def stage(self, text):
-        self._call("t => window.__agentHUD.stage(t)", text)
+        if self._enabled:
+            _emit_hud("stage", text=text)
 
     def row(self, index, student_id):
-        self._call("a => window.__agentHUD.row(a[0], a[1])", [index, student_id])
+        if not self._enabled:
+            return
+        _emit_hud("row", index=index, student_id=str(student_id))
+        self._highlight("i => window.__agentHUD.row(i)", index)
 
     def cell(self, label, value):
-        self._call("a => window.__agentHUD.cell(a[0], a[1])", [label, str(value)])
+        if self._enabled:
+            _emit_hud("cell", label=str(label), value=str(value))
 
     def row_done(self, ok):
-        self._call("o => window.__agentHUD.rowDone(o)", bool(ok))
+        if self._enabled:
+            _emit_hud("rowDone", ok=bool(ok))
 
     def finish(self, status, detail=""):
-        self._call("s => window.__agentHUD.finish(s)",
-                   {"status": status, "detail": detail})
+        if not self._enabled:
+            return
+        _emit_hud("finish", status=str(status), detail=str(detail))
+        self._highlight("() => window.__agentHUD.release()")
 
 
 def hud_payload(mapping, variant, dry_run, total_rows):
