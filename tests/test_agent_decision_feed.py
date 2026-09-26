@@ -291,11 +291,27 @@ def test_value_steps_emit_at_the_decision_not_at_the_end():
     long before the bottom of the loop, so a single bottom emit never saw
     them."""
     source = AGENT_PY.read_text(encoding="utf-8")
-    # one definition plus three call sites: two decision points and the
-    # bottom fallback.
-    assert source.count("_emit_decision_once(") == 4
+    # one definition plus seven call sites: two LLM decision points, the
+    # bottom fallback, and the four single-field / checkbox fast-fill writes.
+    assert source.count("_emit_decision_once(") == 8
     # both LLM sites re-label a skipped call as source
     assert source.count('"source" if (isinstance(llm_action, dict)') == 2
+
+
+def test_every_fast_fill_that_writes_a_value_reports_it():
+    """Reported again, 2026-09-26: in Transformer mode Source and LLM still sat
+    on zero. Batch fill is off there, so every value is written by the
+    single-field fast-fill and the checkbox fast-fill -- and neither reported
+    anything. The rule this pins, rather than a count: each '[OPT2] fast-fill'
+    log line is followed, before its `continue`, by a report."""
+    lines = AGENT_PY.read_text(encoding="utf-8").splitlines()
+    sites = [i for i, l in enumerate(lines)
+             if 'logger.info("[OPT2] fast-fill' in l]
+    assert len(sites) == 4, sites   # edit, combobox, checkbox on, checkbox off
+    for i in sites:
+        window = "\n".join(lines[i:i + 12])
+        assert '_emit_decision_once(self, step_idx + 1, "source"' in window, (
+            f"agent.py:{i + 1} writes a value without reporting it")
 
 
 def test_the_only_unguarded_emits_are_the_batch_fast_fill_ones():
@@ -318,4 +334,4 @@ def test_the_only_unguarded_emits_are_the_batch_fast_fill_ones():
         "any other bare call bypasses the per-step guard")
 
     # and the per-step path always goes through the guard
-    assert loop_body.count("_emit_decision_once(") == 3
+    assert loop_body.count("_emit_decision_once(") == 7

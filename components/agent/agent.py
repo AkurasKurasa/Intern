@@ -2877,6 +2877,12 @@ class LLMAgent:
                             self._ensure_foreground(state)
                             logger.info("[OPT2] fast-fill '%s' → %r (no transformer, no LLM, no click)",
                                         _ff_label, _ff_val_known[:40])
+                            # Reported to the Agent window like the batch
+                            # path's fills. This path never did, and it is
+                            # the one that writes every value in Transformer
+                            # mode (batch fill off) -- so Source read 0 there
+                            # while dozens of source values were written.
+                            _emit_decision_once(self, step_idx + 1, "source", None, "fill")
                             self._executor.execute({
                                 "action_type": "keyboard", "text": _ff_val_known,
                                 "key_count": len(_ff_val_known), "keystrokes": list(_ff_val_known),
@@ -2905,6 +2911,7 @@ class LLMAgent:
                             if _ff_cb_result.success:
                                 logger.info("[OPT2] fast-fill '%s' → %r (no transformer, no LLM, no click)",
                                             _ff_label, _ff_val_known[:40])
+                                _emit_decision_once(self, step_idx + 1, "source", None, "fill")
                                 self._mark_attempted(_ff_fel, elements=state.get("elements", []), section=_ff_sec)
                                 self._executor.execute({"action_type": "keyboard",
                                                         "key_count": 1, "keystrokes": ["tab"]})
@@ -2949,6 +2956,7 @@ class LLMAgent:
                                     _cfwa.SendMessage(_chk_hw, 0x00F1, 1, 0)  # BM_SETCHECK, BST_CHECKED
                                     logger.info("[OPT2] fast-fill checkbox '%s' → checked "
                                                 "(no transformer, no LLM, no click)", _chk_label)
+                                    _emit_decision_once(self, step_idx + 1, "source", None, "check")
                                     self._checked_fields.add(_chk_label)
                                     self._mark_attempted(_ff_fel, elements=state.get("elements", []), section=_ff_sec)
                                     self._executor.execute({"action_type": "keyboard",
@@ -2966,6 +2974,7 @@ class LLMAgent:
                             # type-intercept path's own unchecked branch.
                             logger.info("[OPT2] fast-fill checkbox '%s' → leave unchecked "
                                         "(no transformer, no LLM, no click)", _chk_label)
+                            _emit_decision_once(self, step_idx + 1, "source", None, "check")
                             self._checked_fields.add(_chk_label)
                             self._mark_attempted(_ff_fel, elements=state.get("elements", []), section=_ff_sec)
                             self._executor.execute({"action_type": "keyboard",
