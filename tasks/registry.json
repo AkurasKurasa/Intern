@@ -2,7 +2,7 @@
   "capsules": [
     {
       "name": "form_filling",
-      "description": "Fill GUI forms from a structured data source",
+      "description": "Fill the car insurance form from the intake packet open in Notepad. Pressing Play asks which fill mode to use: direct write, where each value is written straight into the control and Tab moves on, or transformer, where the direct-write path is off so every field has to be reached by a real click and the learned pointer picks the target.",
       "model_path": "tasks/form_filling/model.pt",
       "trigger_keywords": [
         "form",
@@ -17,28 +17,24 @@
       ],
       "trace_dir": "tasks/form_filling/traces",
       "created": "2026-05-17T17:52:45",
-      "emoji": "📋"
+      "emoji": "\ud83d\udccb",
+      "args": []
     },
     {
       "name": "Sheet-to-Portal Matcher",
-      "description": "Match spreadsheet columns to web-portal fields automatically, induce any derived-value rules, then fill and verify every row (Scope #2)",
-      "model_path": "components/scope2/data/models/matcher.pt",
+      "description": "Fill a web portal from a grade sheet the way Scope #1 fills its form: each field's label is looked up among the sheet's column names, and the LLM is asked only for the few the sheet cannot name. Derived fields (Remarks) come from a rule induced from a demonstration. Pressing Play asks which of the eight portal variants to run against (Scope #2).",
+      "model_path": "",
       "trigger_keywords": [],
       "trigger_apps": [],
       "trace_dir": "",
       "created": "2026-08-15T00:00:00",
-      "emoji": "🧮",
+      "emoji": "\ud83e\uddee",
       "kind": "script",
       "entrypoint": "components/scope2/automate.py",
       "args": [
-        "--variant",
-        "v0_base",
         "--commit",
-        "--show",
-        "--limit",
-        "5"
+        "--show"
       ],
-      "checkpoint_flag": "--matcher",
       "cwd": ""
     },
     {
@@ -49,7 +45,7 @@
       "trigger_apps": [],
       "trace_dir": "",
       "created": "2026-08-23T00:00:00",
-      "emoji": "📬",
+      "emoji": "\ud83d\udcec",
       "kind": "script",
       "entrypoint": "components/inbox_router/automate_inbox.py",
       "args": [

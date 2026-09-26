@@ -1,5 +1,15 @@
 const { contextBridge, ipcRenderer } = require("electron");
 
+// Scope #1's floating decision HUD. Its own tiny bridge rather than another
+// key on recorderAPI, because agent-hud.html is a separate, non-focusable
+// window that needs nothing else -- it only ever receives, never invokes.
+contextBridge.exposeInMainWorld("agentHud", {
+  onDecision: (cb) => ipcRenderer.on("agent-decision", (_e, d) => cb(d)),
+  onScope2: (cb) => ipcRenderer.on("agent-scope2", (_e, d) => cb(d)),
+  onReset: (cb) => ipcRenderer.on("agent-hud-reset", () => cb()),
+  onFinish: (cb) => ipcRenderer.on("agent-hud-finish", () => cb()),
+});
+
 contextBridge.exposeInMainWorld("recorderAPI", {
   start: (outputDir) => ipcRenderer.invoke("recorder-start", outputDir),
   // trace_type/url are never passed by the renderer directly -- main.js
@@ -45,7 +55,8 @@ contextBridge.exposeInMainWorld("capsulesAPI", {
   create: (name, description) => ipcRenderer.invoke("capsules-create", name, description),
   update: (name, updates) => ipcRenderer.invoke("capsules-update", name, updates),
   delete: (name) => ipcRenderer.invoke("capsules-delete", name),
-  run: (capsuleName) => ipcRenderer.invoke("capsule-run", capsuleName),
+  run: (capsuleName, extraArgs) =>
+    ipcRenderer.invoke("capsule-run", capsuleName, extraArgs),
   stop: () => ipcRenderer.invoke("capsule-stop"),
   openLog: () => ipcRenderer.invoke("capsule-open-log"),
   readLog: () => ipcRenderer.invoke("capsule-read-log"),

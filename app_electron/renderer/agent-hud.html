@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Agent</title>
+<style>
+/* Scope #1's live decision HUD.
+
+   Scope #2 renders its reasoning into the page it is automating, inside a
+   shadow root. Scope #1 has no page -- it drives a native wxPython window on
+   the real screen -- so the equivalent is this: a small frameless window that
+   floats beside the form and is never touched.
+
+   The safety property here is focusable:false on the BrowserWindow (see
+   createAgentHudWindow in main.js), which is the direct analogue of the Scope
+   #2 HUD's pointer-events:none. That panel could have swallowed a click meant
+   for the portal; this one could swallow the keystrokes the agent is typing.
+   Nothing in here is interactive, for the same reason. */
+
+/* Type scale, four steps, each at least 1.25x the one below:
+     9px   micro labels (uppercase, tracked)
+     12px  body and notes
+     15px  the confidence figure
+     19px  the decider name and the tally counts
+   Sizes closer than that read as an accident rather than a hierarchy. */
+
+* { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
+
+:root {
+  --bg: #11161d;
+  --panel: #1a212b;
+  --line: #2b3542;
+  --text: #e6edf5;
+  --muted: #8b9bb0;
+  --accent: #4da3ff;      /* transformer */
+  --llm: #bc8cff;         /* LLM */
+  --source: #3fb950;      /* matched straight from the intake data */
+  --ok: #3fb950;
+  --warn: #d29922;
+  --bad: #f85149;
+}
+
+html, body { height: 100%; background: transparent; overflow: hidden; }
+
+body {
+  font: 12px/1.5 "Segoe UI", system-ui, sans-serif;
+  color: var(--text);
+  padding: 6px;
+  cursor: default;
+}
+
+.hud {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  /* The window is sized per scope, but a variant with many abstentions can
+     still run long -- scroll rather than clip, so nothing is silently cut. */
+  overflow-y: auto;
+  scrollbar-width: thin;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  /* No `overflow: hidden` here. It used to sit below overflow-y: auto in
+     this same rule, and the later declaration wins -- so long content was
+     clipped, not scrollable. overflow-y: auto already clips to the rounded
+     corners. */
+  box-shadow: 0 12px 34px rgba(0, 0, 0, .45);
+}
+/* A flex column shrinks its children to fit before it overflows, so the
+   sections were squashed instead of scrolling. Keep their natural height. */
+.hud > .sec { flex: none; }
+
+/* ---- header ---- */
+
+.hud::-webkit-scrollbar { width: 7px; }
+.hud::-webkit-scrollbar-thumb { background: var(--line); border-radius: 4px; }
+
+.hd {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--line);
+  /* Stays put while the sections scroll under it: it holds the status and
+     is the drag handle, so it must never scroll out of reach. */
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--bg);
+  /* The one interactive affordance: the whole header is a drag handle, so the
+     panel can be moved off the form if it ever sits somewhere awkward. Drag
+     is not focus -- the window still never becomes the keyboard target. */
+  -webkit-app-region: drag;
+}
+
+.dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--accent); flex: none;
+  animation: pulse 1.4s ease-in-out infinite;
+}
+@keyframes pulse { 0%,100% { opacity: 1; transform: scale(1); }
+                   50% { opacity: .35; transform: scale(.72); } }
+.dot.done { animation: none; background: var(--ok); }
+.dot.idle { animation: none; background: var(--muted); }
+
+.ttl { font-weight: 700; letter-spacing: .02em; }
+.step { margin-left: auto; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+/* ---- who decided ---- */
+
+.sec { padding: 14px 13px; border-bottom: 1px solid var(--line); }
+.sec:last-child { border-bottom: 0; }
+
+h3 {
+  font-size: 9px; font-weight: 700; letter-spacing: .1em;
+  text-transform: uppercase; color: var(--muted); margin-bottom: 10px;
+}
+
+.who { display: flex; align-items: baseline; gap: 8px; margin-bottom: 7px; }
+
+.who-name { font-size: 19px; font-weight: 650; letter-spacing: -.02em; }
+.who-name.transformer { color: var(--accent); }
+.who-name.llm { color: var(--llm); }
+.who-name.source { color: var(--source); }
+.who-name.unknown { color: var(--muted); }
+
+.who-conf {
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+  font-size: 15px; font-weight: 600;
+}
+
+.bar { height: 4px; border-radius: 2px; background: var(--line); overflow: hidden; }
+.bar i {
+  display: block; height: 100%; width: 100%;
+  background: var(--accent);
+  transform: scaleX(0); transform-origin: left center;
+  /* transform, not width: width relayouts every frame. Same reason the Scope
+     #2 HUD's bars were changed over. */
+  transition: transform .3s cubic-bezier(.22, 1, .36, 1);
+}
+.bar i.llm { background: var(--llm); }
+.bar i.source { background: var(--source); }
+
+.note { margin-top: 9px; color: var(--muted); line-height: 1.45; }
+
+/* ---- the split so far ---- */
+
+.grp + .grp { margin-top: 14px; }
+.grp h3 { display: flex; align-items: baseline; gap: 6px; margin-bottom: 7px; }
+.grp-q { font-size: 9px; font-weight: 500; letter-spacing: 0;
+         text-transform: none; color: var(--muted); opacity: .8; }
+
+.row { display: flex; gap: 14px; align-items: baseline; flex-wrap: wrap; }
+.ct { font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.ct b { font-size: 17px; font-weight: 700; margin-right: 3px; }
+.ct-transformer b { color: var(--accent); }
+.ct-source b { color: var(--source); }
+.ct-llm b { color: var(--llm); }
+.ct-none { font-size: 10px; opacity: .7; }
+
+.split { margin-top: 8px; height: 4px; border-radius: 2px;
+         overflow: hidden; display: flex; background: var(--line); }
+/* Three segments now, so these are flex-basis rather than one scaled bar.
+   flex-basis is a layout property, but it changes only when a step lands (a
+   few times a second at most), not every frame of an animation -- which is
+   what the transform rule above exists to avoid. */
+.split span { display: block; height: 100%; transition: flex-basis .3s ease; }
+.split .s-llm { background: var(--llm); }
+.split .s-source { background: var(--source); }
+
+/* ---- waiting state ---- */
+
+.idle-msg { color: var(--muted); line-height: 1.5; }
+
+/* ---- Scope #2 rows ---- */
+.pair { display: grid; grid-template-columns: 1fr auto; gap: 2px 8px;
+        align-items: baseline; margin-bottom: 8px; }
+.pair:last-child { margin-bottom: 0; }
+.src { font-family: Consolas, monospace; font-size: 11px; white-space: nowrap;
+       overflow: hidden; text-overflow: ellipsis; }
+.tgt { font-size: 11px; color: var(--accent); white-space: nowrap;
+       overflow: hidden; text-overflow: ellipsis; }
+.conf { font-variant-numeric: tabular-nums; font-size: 10px; color: var(--muted); }
+.via { font-size: 9px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+.via-llm { color: var(--llm); }
+.via-source { color: var(--source); }
+.mbar i.via-llm { background: var(--llm); }
+.mbar i.via-source { background: var(--source); }
+.mbar { grid-column: 1 / -1; height: 3px; border-radius: 2px;
+        background: var(--line); overflow: hidden; }
+.mbar i { display: block; height: 100%; width: 100%; background: var(--accent);
+          transform: scaleX(0); transform-origin: left center;
+          transition: transform .4s cubic-bezier(.22, 1, .36, 1); }
+
+.item { display: flex; gap: 7px; align-items: flex-start; padding: 5px 0;
+        font-size: 11px; }
+.item + .item { border-top: 1px solid var(--line); }
+.ic { flex: none; width: 13px; text-align: center; font-weight: 700; }
+.why { color: var(--muted); font-size: 10px; }
+.warn .ic { color: var(--warn); }
+.derive .ic { color: var(--llm); }
+.rule { font-size: 11px; line-height: 1.55; }
+.rule em { font-style: normal; color: var(--llm); font-weight: 600; }
+.rule code { font-family: Consolas, monospace; color: var(--text);
+             background: var(--panel); padding: 1px 4px; border-radius: 3px; }
+
+.pb { height: 5px; border-radius: 3px; background: var(--line);
+      overflow: hidden; margin-bottom: 9px; }
+.pb i { display: block; height: 100%; width: 100%; background: var(--source);
+        transform: scaleX(0); transform-origin: left center;
+        transition: transform .25s linear; }
+.pb i.bad { background: var(--bad); }
+.ct-bad b { color: var(--bad); }
+.now { margin-top: 8px; font-size: 10px; color: var(--muted);
+       font-family: Consolas, monospace; white-space: nowrap; overflow: hidden;
+       text-overflow: ellipsis; min-height: 14px; }
+</style>
+</head>
+<body>
+  <div class="hud">
+    <header class="hd">
+      <span class="dot idle" id="dot"></span>
+      <span class="ttl">Agent</span>
+      <span class="step" id="step">—</span>
+    </header>
+
+    <section class="sec" id="whoSection" hidden>
+      <h3>Decided by</h3>
+      <div class="who">
+        <span class="who-name unknown" id="whoName">—</span>
+        <span class="who-conf" id="whoConf"></span>
+      </div>
+      <div class="bar"><i id="whoBar"></i></div>
+      <p class="note" id="whoNote"></p>
+    </section>
+
+    <!-- Two rows, not one. The transformer answers "where do I go next"; the
+         other two answer "what do I type". Counting them in a single row made
+         the numbers look like rivals when they are tallies of different
+         things, which is exactly what confused a reader of the first
+         version. -->
+    <section class="sec" id="tallySection" hidden>
+      <div class="grp">
+        <h3>Moves <span class="grp-q">where to go</span></h3>
+        <div class="row">
+          <span class="ct ct-transformer"><b id="nTransformer">0</b> Transformer</span>
+          <span class="ct ct-none" id="moveNote">Tab &mdash; no decision needed</span>
+        </div>
+      </div>
+
+      <div class="grp">
+        <h3>Values <span class="grp-q">what to type</span></h3>
+        <div class="row">
+          <span class="ct ct-source"><b id="nSource">0</b> Source</span>
+          <span class="ct ct-llm"><b id="nLlm">0</b> LLM</span>
+        </div>
+        <div class="split">
+          <span class="s-source" id="splitSource"></span>
+          <span class="s-llm" id="splitLlm"></span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Scope #2. Its panel used to render into the portal page itself; it
+         lives here now so both scopes report through one surface. The sections
+         are the same three claims it always showed: what it mapped, what it
+         refused, and what it derived rather than copied. -->
+    <section class="sec" id="s2Mapping" hidden>
+      <h3>Learned mapping <span class="grp-q" id="s2MapCount"></span></h3>
+      <div id="s2MapRows"></div>
+    </section>
+
+    <section class="sec" id="s2Refused" hidden>
+      <h3>Refused to guess <span class="grp-q" id="s2RefCount"></span></h3>
+      <div id="s2RefRows"></div>
+    </section>
+
+    <section class="sec" id="s2Rule" hidden>
+      <h3>Derived, not copied</h3>
+      <div id="s2RuleRows"></div>
+    </section>
+
+    <section class="sec" id="s2Progress" hidden>
+      <div class="pb"><i id="s2Bar"></i></div>
+      <div class="row">
+        <span class="ct ct-source"><b id="s2Ok">0</b> verified</span>
+        <span class="ct ct-bad"><b id="s2Bad">0</b> failed</span>
+        <span class="ct ct-none">of <b id="s2Total">0</b></span>
+      </div>
+      <div class="now" id="s2Now"></div>
+    </section>
+
+    <section class="sec" id="idleSection">
+      <p class="idle-msg">Waiting for the run to start.</p>
+    </section>
+  </div>
+
+<script>
+"use strict";
+
+const el = (id) => document.getElementById(id);
+
+// The transformer's confidence is a real score; the LLM path has no
+// comparable number, so the bar is only meaningful for transformer steps.
+// Showing a 0.00 bar for every LLM step would read as "the LLM was not
+// confident", which is not what an absent score means.
+// Each note names WHICH question the step answered, because that is the thing
+// a reader has to hold onto: the transformer never competes with the other
+// two, it is answering something else entirely.
+const NOTES = {
+  transformer: "Where to go — the learned pointer picked which field to click.",
+  llm: "What to type — no match on the sheet, so the model worked it out.",
+  source: "What to type — matched straight off the sheet. No model asked.",
+  unknown: "",
+};
+
+const LABELS = { transformer: "Transformer", llm: "LLM", source: "Source", unknown: "—" };
+
+const counts = { transformer: 0, llm: 0, source: 0 };
+
+function render(d) {
+  const by = counts.hasOwnProperty(d.by) ? d.by : "unknown";
+
+  el("idleSection").hidden = true;
+  el("whoSection").hidden = false;
+  el("tallySection").hidden = false;
+  el("dot").className = "dot";
+
+  el("step").textContent = "step " + d.step;
+
+  el("whoName").className = "who-name " + by;
+  el("whoName").textContent = LABELS[by];
+
+  const bar = el("whoBar");
+  bar.className = by === "transformer" ? "" : by;
+
+  if (by === "transformer") {
+    const conf = Math.max(0, Math.min(1, Number(d.conf) || 0));
+    el("whoConf").textContent = conf.toFixed(2);
+    requestAnimationFrame(() => { bar.style.transform = "scaleX(" + conf + ")"; });
+  } else {
+    el("whoConf").textContent = "";
+    bar.style.transform = "scaleX(0)";
+  }
+
+  el("whoNote").textContent = NOTES[by];
+
+  if (by !== "unknown") counts[by] += 1;
+
+  el("nTransformer").textContent = String(counts.transformer);
+  el("nLlm").textContent = String(counts.llm);
+  el("nSource").textContent = String(counts.source);
+
+  // Once the transformer has moved even once, the "Tab" note is no longer
+  // what is happening, so it goes.
+  el("moveNote").textContent = counts.transformer
+    ? "clicked into each field"
+    : "Tab — no decision needed";
+
+  // The bar covers VALUES only. Mixing a move count into it was the thing
+  // that made the numbers look like rivals: they tally different questions,
+  // so there is no shared total to take a share of.
+  const values = counts.source + counts.llm;
+  const share = (n) => (values ? (n / values) * 100 : 0) + "%";
+  el("splitSource").style.flexBasis = share(counts.source);
+  el("splitLlm").style.flexBasis = share(counts.llm);
+}
+
+function reset() {
+  S2.forEach((id) => { const n = el(id); if (n) n.hidden = true; });
+  s2.done = 0; s2.failed = 0; s2.total = 0;
+  counts.transformer = 0;
+  counts.llm = 0;
+  counts.source = 0;
+  el("idleSection").hidden = false;
+  el("whoSection").hidden = true;
+  el("tallySection").hidden = true;
+  el("dot").className = "dot idle";
+  el("step").textContent = "—";
+}
+
+function finish() {
+  el("dot").className = "dot done";
+  el("step").textContent = "done";
+}
+
+// ---------------------------------------------------------------- Scope #2
+//
+// A different run shape, so a different set of sections: Scope #1 reports one
+// decision per step, Scope #2 decides its whole mapping up front and then
+// works through rows. Both land in this one window, which is the point.
+
+const S2 = ["s2Mapping", "s2Refused", "s2Rule", "s2Progress"];
+const s2 = { done: 0, failed: 0, total: 0 };
+
+function esc(v) { return v == null ? "" : String(v); }
+function num(v) { return v == null ? "?" : Number(v).toFixed(2); }
+
+function s2Show(ids) {
+  S2.forEach((id) => { el(id).hidden = !ids.includes(id); });
+}
+
+function s2Init(d) {
+  el("idleSection").hidden = true;
+  el("whoSection").hidden = true;
+  el("tallySection").hidden = true;
+  el("dot").className = "dot";
+  el("step").textContent = esc(d.variant);
+
+  s2.done = 0; s2.failed = 0; s2.total = Number(d.total_rows) || 0;
+  el("s2Ok").textContent = "0";
+  el("s2Bad").textContent = "0";
+  el("s2Total").textContent = String(s2.total);
+  el("s2Bar").style.transform = "scaleX(0)";
+  el("s2Bar").className = "";
+  el("s2Now").textContent = "";
+
+  // what it mapped
+  const maps = d.assignments || [];
+  el("s2MapCount").textContent = maps.length ? String(maps.length) : "";
+  const mapRows = el("s2MapRows");
+  mapRows.innerHTML = "";
+  maps.forEach((a) => {
+    const pair = document.createElement("div");
+    pair.className = "pair";
+    const src = document.createElement("div");
+    src.className = "src"; src.textContent = esc(a.source_header);
+    // Which tier decided -- source or LLM, the same two words and colours
+    // Scope #1 uses. Neither reports a probability, so no number is shown.
+    const conf = document.createElement("div");
+    const via = a.via === "llm" ? "llm" : "source";
+    conf.className = "via via-" + via;
+    conf.textContent = via === "llm" ? "LLM" : "source";
+    const tgt = document.createElement("div");
+    tgt.className = "tgt"; tgt.textContent = "→ " + esc(a.target_label);
+    const spacer = document.createElement("div");
+    const bar = document.createElement("div");
+    bar.className = "mbar";
+    const fill = document.createElement("i");
+    bar.appendChild(fill);
+    pair.append(src, conf, tgt, spacer, bar);
+    mapRows.appendChild(pair);
+    fill.classList.add("via-" + via);
+    requestAnimationFrame(() => { fill.style.transform = "scaleX(1)"; });
+  });
+
+  // what it left empty, and why -- a refusal is a result, not a gap. Each
+  // field once: the LLM's reason when it was asked, otherwise "no column".
+  const why = {};
+  (d.abstained || []).forEach((a) => { why[a.target_label] = a.reason; });
+  const open = d.unmapped_fields || [];
+  const refRows = el("s2RefRows");
+  refRows.innerHTML = "";
+  el("s2RefCount").textContent = open.length || "";
+  open.forEach((label) => {
+    const reason = why[label] ? "LLM: " + why[label] : "no source column";
+    refRows.appendChild(s2Item("warn", "○", esc(label), esc(reason) + " — left empty"));
+  });
+
+  // what it derived
+  const rules = d.derived_rules || [];
+  const ruleRows = el("s2RuleRows");
+  ruleRows.innerHTML = "";
+  rules.forEach((r) => {
+    const ops = { ">=": "≥", "<=": "≤", ">": ">", "<": "<" };
+    const item = document.createElement("div");
+    item.className = "item derive";
+    const ic = document.createElement("span");
+    ic.className = "ic"; ic.textContent = "ƒ";
+    const body = document.createElement("div");
+    const p = document.createElement("div");
+    p.className = "rule";
+    const em = document.createElement("em"); em.textContent = esc(r.field);
+    const c1 = document.createElement("code"); c1.textContent = esc(r.if_true);
+    const c2 = document.createElement("code");
+    c2.textContent = esc(r.depends_on_field) + " " + (ops[r.operator] || r.operator) + " " + esc(r.cutoff);
+    const c3 = document.createElement("code"); c3.textContent = esc(r.if_false);
+    p.append(em, document.createTextNode(" is "), c1, document.createTextNode(" when "),
+             c2, document.createTextNode(", otherwise "), c3, document.createTextNode("."));
+    body.appendChild(p);
+    if (r.observed_interval) {
+      const why = document.createElement("div");
+      why.className = "why";
+      why.textContent = "cutoff located between " + r.observed_interval[0] +
+                        " and " + r.observed_interval[1] + " from the demonstration alone";
+      body.appendChild(why);
+    }
+    item.append(ic, body);
+    ruleRows.appendChild(item);
+  });
+
+  s2Show([maps.length ? "s2Mapping" : null,
+          open.length ? "s2Refused" : null,
+          rules.length ? "s2Rule" : null,
+          "s2Progress"].filter(Boolean));
+}
+
+function s2Item(cls, icon, title, why) {
+  const item = document.createElement("div");
+  item.className = "item " + cls;
+  const ic = document.createElement("span");
+  ic.className = "ic"; ic.textContent = icon;
+  const body = document.createElement("div");
+  const t = document.createElement("div"); t.textContent = title;
+  const w = document.createElement("div"); w.className = "why"; w.textContent = why;
+  body.append(t, w);
+  item.append(ic, body);
+  return item;
+}
+
+function onScope2(d) {
+  if (!d || !d.kind) return;
+  if (d.kind === "init") { s2Init(d); return; }
+  if (d.kind === "stage") { el("step").textContent = esc(d.text); return; }
+  if (d.kind === "row") {
+    el("s2Now").textContent = "row " + (Number(d.index) + 1) + "  ·  " + esc(d.student_id);
+    return;
+  }
+  if (d.kind === "cell") {
+    let v = esc(d.value);
+    if (v.length > 22) v = v.slice(0, 21) + "…";
+    el("s2Now").textContent = esc(d.label) + " ← " + v;
+    return;
+  }
+  if (d.kind === "rowDone") {
+    if (d.ok) s2.done += 1; else s2.failed += 1;
+    el("s2Ok").textContent = String(s2.done);
+    el("s2Bad").textContent = String(s2.failed);
+    const seen = s2.done + s2.failed;
+    if (s2.total) {
+      el("s2Bar").style.transform = "scaleX(" + (seen / s2.total) + ")";
+      el("s2Bar").className = s2.failed ? "bad" : "";
+    }
+    return;
+  }
+  if (d.kind === "finish") {
+    el("dot").className = "dot " + (s2.failed ? "bad" : "done");
+    el("step").textContent = esc(d.status);
+    el("s2Now").textContent = esc(d.detail);
+  }
+}
+
+window.agentHud.onDecision(render);
+window.agentHud.onScope2(onScope2);
+window.agentHud.onReset(reset);
+window.agentHud.onFinish(finish);
+</script>
+</body>
+</html>

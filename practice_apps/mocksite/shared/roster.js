@@ -1,7 +1,7 @@
 /* Class roster - 50 synthetic students. No real student records.
 
    Index, Student ID and Student Name are predefined by the portal. Course, Year,
-   Grade, Remarks and Recommendations start blank: they are what the encoder
+   Midterm, Final, Grade, Remarks and Recommendations start blank: they are what the encoder
    (human or automated) fills in.
 
    The grade sheets in data/sheets must reuse these exact Student IDs in their

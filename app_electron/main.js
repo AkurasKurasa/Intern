@@ -67,6 +67,25 @@ function runLmsCli(args, timeoutMs = 15000) {
   });
 }
 
+// How long a spawned GUI script gets to prove it is alive. An ImportError
+// exits in well under this; a real wx window is still running long after it.
+// Only used to turn an instant crash into a visible error -- a script still
+// alive at this point is left completely alone.
+const EARLY_EXIT_MS = 1200;
+
+// One-shot python call, same shape and reasoning as runLmsCli above: a
+// bounded call whose output fits in memory, so execFile rather than a
+// streamed spawn. Used for scripts/check_env.py, which answers "is this
+// machine actually set up to run that script" before anything is launched.
+function runPython(args, timeoutMs = 20000) {
+  return new Promise((resolve) => {
+    execFile(resolvePython(), args, { cwd: REPO_ROOT, timeout: timeoutMs, windowsHide: true },
+      (error, stdout, stderr) => {
+        resolve({ ok: !error, stdout: (stdout || "").trim(), stderr: (stderr || "").trim(), error });
+      });
+  });
+}
+
 let mainWindow = null;
 let miniWindow = null;
 let miniWorkflowWindow = null;
@@ -111,6 +130,91 @@ let capsuleIsRunning = false;
 // recording is already in progress, instead of only finding out on the
 // next live event.
 let recorderIsRecording = false;
+
+// ── Scope #1's floating decision HUD ─────────────────────────────────────
+// Scope #2 renders its reasoning into the page it is automating, inside a
+// shadow root. Scope #1 has no page -- it drives a native wxPython window on
+// the real screen -- so the equivalent is a small always-on-top window that
+// floats beside the form.
+//
+// focusable:false is the load-bearing option here, and the direct analogue of
+// the Scope #2 HUD's pointer-events:none. That panel could have swallowed a
+// click meant for the portal; this one would swallow the keystrokes the agent
+// is trying to type into the form. Everything else (frameless, skipTaskbar,
+// no menu) follows from it being a display rather than a window you use.
+let agentHudWindow = null;
+
+const AGENT_HUD_WIDTH = 268;
+// Measured in the browser, not guessed: header + "decided by" + tally, plus
+// the 6px body padding each side and the 1px border. Re-measured after the
+// type scale was opened up (a design-hook finding: six font sizes inside a
+// 1.6x range read as no hierarchy at all) -- at the old 250 the split bar at
+// the foot of the tally was clipped clean off.
+// Two scopes, two shapes. Scope #1 reports one decision per step and needs
+// three short sections; Scope #2 lays out its whole mapping, its abstentions
+// and its induced rule up front. Measured in a browser for each, rather than
+// picking one size and letting the taller one clip.
+const AGENT_HUD_HEIGHT = 336;        // Scope #1
+const AGENT_HUD_HEIGHT_SCOPE2 = 600; // Scope #2
+
+function resizeAgentHud(height) {
+  if (!agentHudWindow || agentHudWindow.isDestroyed()) return;
+  const [w, h] = agentHudWindow.getSize();
+  if (h === height) return;
+  agentHudWindow.setSize(w, height);
+  // Keep it pinned to the same top-right corner as it grows.
+  const { width: sw } = require("electron").screen.getPrimaryDisplay().workAreaSize;
+  agentHudWindow.setPosition(sw - AGENT_HUD_WIDTH - MINI_MARGIN, MINI_MARGIN);
+}
+
+function createAgentHudWindow() {
+  if (agentHudWindow && !agentHudWindow.isDestroyed()) return agentHudWindow;
+
+  const { width: sw } = require("electron").screen.getPrimaryDisplay().workAreaSize;
+  agentHudWindow = new BrowserWindow({
+    width: AGENT_HUD_WIDTH,
+    height: AGENT_HUD_HEIGHT,
+    x: sw - AGENT_HUD_WIDTH - MINI_MARGIN,
+    y: MINI_MARGIN,
+    frame: false,
+    transparent: true,
+    resizable: false,
+    movable: true,
+    minimizable: false,
+    maximizable: false,
+    skipTaskbar: true,
+    alwaysOnTop: true,
+    // Never the keyboard target. Without this the agent's own typing could
+    // land here instead of in the form it is filling.
+    focusable: false,
+    show: false,
+    webPreferences: { preload: path.join(__dirname, "preload.js") },
+  });
+  agentHudWindow.loadFile(path.join(__dirname, "renderer", "agent-hud.html"));
+  // "screen-saver" keeps it above a fullscreen target window, which a plain
+  // alwaysOnTop does not on Windows.
+  agentHudWindow.setAlwaysOnTop(true, "screen-saver");
+  agentHudWindow.on("closed", () => { agentHudWindow = null; });
+  return agentHudWindow;
+}
+
+function showAgentHud() {
+  const win = createAgentHudWindow();
+  // showInactive, not show: show() would focus it even with focusable:false
+  // on some Windows builds, and this window must never take focus.
+  win.showInactive();
+  win.webContents.send("agent-hud-reset");
+}
+
+function sendToAgentHud(channel, payload) {
+  if (agentHudWindow && !agentHudWindow.isDestroyed()) {
+    agentHudWindow.webContents.send(channel, payload);
+  }
+}
+
+function hideAgentHud() {
+  if (agentHudWindow && !agentHudWindow.isDestroyed()) agentHudWindow.hide();
+}
 
 let localServerProcess = null;
 
@@ -199,9 +303,49 @@ function broadcast(channel, payload) {
   if (miniWorkflowWindow && !miniWorkflowWindow.isDestroyed()) {
     miniWorkflowWindow.webContents.send(channel, payload);
   }
-  if (payload && (payload.event === "capsule_started")) capsuleIsRunning = true;
+  if (payload && (payload.event === "capsule_started")) {
+    capsuleIsRunning = true;
+    // The floating decision HUD opens with the run and closes with it. Opened
+    // here rather than on COUNTDOWN_BEGIN so it is already on screen during
+    // the 5-second handover, which is exactly when a viewer is looking at the
+    // target window waiting for something to happen.
+    showAgentHud();
+  }
   if (payload && (payload.event === "capsule_done" || payload.event === "capsule_stopped")) {
     capsuleIsRunning = false;
+    sendToAgentHud("agent-hud-finish");
+    // Left on screen briefly so the final split is readable, then dismissed --
+    // an always-on-top panel that outlives its run is just clutter over
+    // whatever the user does next.
+    setTimeout(hideAgentHud, 6000);
+  }
+
+  // DECISION {json} -- one line per step from components/agent/agent.py's
+  // _emit_decision(). Parsed here rather than in the renderer because the HUD
+  // is its own window: the main window's Play panel never sees these.
+  if (payload && payload.event === "capsule_progress" && typeof payload.line === "string") {
+    const raw = payload.line.trim();
+    if (raw.startsWith("DECISION ")) {
+      try {
+        resizeAgentHud(AGENT_HUD_HEIGHT);
+        sendToAgentHud("agent-decision", JSON.parse(raw.slice(9)));
+      } catch (e) {
+        // A malformed line is a display problem, never a run problem.
+      }
+    }
+
+    // SCOPE2HUD {json} -- the same floating window, fed by Scope #2's
+    // executor. Its panel used to be rendered into the portal page itself;
+    // it reports here now so both scopes share one surface.
+    if (raw.startsWith("SCOPE2HUD ")) {
+      try {
+        const payload = JSON.parse(raw.slice(10));
+        if (payload.kind === "init") resizeAgentHud(AGENT_HUD_HEIGHT_SCOPE2);
+        sendToAgentHud("agent-scope2", payload);
+      } catch (e) {
+        // same: a display line must never affect the run
+      }
+    }
   }
   if (payload && payload.event === "started") recorderIsRecording = true;
   if (payload && (payload.event === "saved" || payload.event === "error")) {
@@ -693,7 +837,7 @@ ipcMain.handle("capsules-set-emoji", (_evt, capsuleName, emoji) =>
 ipcMain.handle("capsules-create", (_evt, name, description) => createTask(name, description));
 ipcMain.handle("capsules-update", (_evt, name, updates) => updateCapsule(name, updates));
 ipcMain.handle("capsules-delete", (_evt, name) => deleteCapsule(name));
-ipcMain.handle("capsule-run", async (_evt, capsuleName) => {
+ipcMain.handle("capsule-run", async (_evt, capsuleName, extraArgs) => {
   // kind="url" isn't a subprocess at all -- there's nothing for
   // recorder_bridge.py/Python to run, so this short-circuits before ever
   // reaching queueOrSend(). Scope #3's Inbox Dispatch page is deliberately
@@ -706,7 +850,11 @@ ipcMain.handle("capsule-run", async (_evt, capsuleName) => {
     if (capsule.url) shell.openExternal(capsule.url);
     return { opened: true };
   }
-  queueOrSend({ cmd: "run_capsule", capsule_name: capsuleName });
+  // extraArgs is the fill-mode chosen in the Play modal (currently
+  // ["--no_batch_fill"] or nothing). Passed per-run rather than pinned in
+  // registry.json so one capsule covers both modes.
+  queueOrSend({ cmd: "run_capsule", capsule_name: capsuleName,
+                extra_args: Array.isArray(extraArgs) ? extraArgs : [] });
   return { opened: false };
 });
 ipcMain.handle("capsule-stop", () => {
@@ -729,16 +877,34 @@ ipcMain.handle("capsule-set-current", (_evt, capsuleName) => {
 // playwright browser itself -- so this opens the source spreadsheet and
 // the mock portal's own landing page instead, purely for the user to look
 // at, same source+target pairing as Scope #1's just for inspection.
+// Scope #1 reads its values out of whatever Notepad has open (run_task.py's
+// SOURCE_WINDOW matches on the window title), so the intake file this button
+// opens IS the experiment. The two variants below differ in nothing else: same
+// capsule, same model, same form, same values -- only the order of the packet.
+const FORM_FILLING_TOOLS = (intakeFile) => [
+  { type: "python", script: path.join(REPO_ROOT, "practice_apps", "car_insurance_entry", "car_insurance_form_wx.py"), requires: ["wx"] },
+  { type: "notepad", target: path.join(REPO_ROOT, "data_entry_tasks", intakeFile) },
+];
+
 const TEST_MOCKUPS = {
-  form_filling: [
-    { type: "python", script: path.join(REPO_ROOT, "practice_apps", "car_insurance_entry", "car_insurance_form_wx.py") },
-    { type: "notepad", target: path.join(REPO_ROOT, "data_entry_tasks", "data_entry_intake.txt") },
-  ],
+  form_filling: FORM_FILLING_TOOLS("data_entry_intake.txt"),
+
+  // Scope #2 gets the SOURCE only -- the spreadsheet the run reads from.
+  //
+  // The mock portal used to be opened here too, and that was the bug: Play
+  // runs automate.py with --show, which opens its OWN Playwright browser on
+  // the portal. Opening it here as well left two browser windows showing the
+  // same page, and the one this button opened was the dead one -- the agent
+  // never touches it. Reported directly: "launch test tools is opened and then
+  // when 'play' button is clicked another one is opened".
+  //
+  // The spreadsheet is the half Play does NOT open, so it is the half worth
+  // having a button for.
   "Sheet-to-Portal Matcher": [
     { type: "open", target: path.join(REPO_ROOT, "components", "scope2", "data", "sheets", "grade_sheet.xlsx") },
-    { type: "open", target: path.join(REPO_ROOT, "practice_apps", "mocksite", "index.html") },
   ],
 };
+
 
 // Unified from three separate handlers (test-launch-mockups, view-schedule,
 // launch-cold-email) per direct request -- one button now opens everything
@@ -784,9 +950,59 @@ ipcMain.handle("launch-test-tools", async (_evt, capsuleName) => {
     for (const t of targets) {
       if (t.type === "python") {
         const pythonExe = resolvePython();
+
+        // Ask first whether the script CAN run. Found live: wxPython was
+        // declared in requirements.txt but never installed, so this spawn
+        // died on ImportError immediately -- and because it used
+        // stdio:"ignore" with detached:true, the error went nowhere and
+        // this handler still reported success. The user pressed the button
+        // and simply got nothing, with no way to find out why.
+        if (t.requires && t.requires.length) {
+          const probe = await runPython([
+            path.join(REPO_ROOT, "scripts", "check_env.py"),
+            "--json", "--only", ...t.requires,
+          ]);
+          let report = null;
+          try {
+            report = JSON.parse(probe.stdout);
+          } catch (e) {
+            report = null;
+          }
+          if (report && report.missing && report.missing.length) {
+            const names = report.missing.map((m) => m.package).join(", ");
+            return {
+              ok: false,
+              error: `${path.basename(t.script)} needs ${names}, which ${
+                report.missing.length === 1 ? "is" : "are"
+              } not installed.\n\nFix:  ${report.fix}`,
+            };
+          }
+        }
+
+        // stdio is piped rather than ignored so a crash has somewhere to go,
+        // and the process is still detached+unref'd so the window outlives
+        // this app. A script that dies within EARLY_EXIT_MS is reported as a
+        // failure; one that is still alive by then is treated as launched.
         const child = spawn(pythonExe, [t.script], {
-          cwd: REPO_ROOT, detached: true, stdio: "ignore", windowsHide: false,
+          cwd: REPO_ROOT, detached: true, stdio: ["ignore", "ignore", "pipe"],
+          windowsHide: false,
         });
+        let stderr = "";
+        if (child.stderr) child.stderr.on("data", (d) => { stderr += d.toString(); });
+
+        const failure = await new Promise((resolve) => {
+          const settle = setTimeout(() => resolve(null), EARLY_EXIT_MS);
+          child.on("error", (err) => { clearTimeout(settle); resolve(err.message); });
+          child.on("exit", (code) => {
+            clearTimeout(settle);
+            resolve(code === 0 ? null : (stderr.trim().split("\n").pop() || `exited with code ${code}`));
+          });
+        });
+
+        if (failure) {
+          return { ok: false, error: `${path.basename(t.script)} failed to start.\n\n${failure}` };
+        }
+        if (child.stderr) child.stderr.removeAllListeners("data");
         child.unref();
         opened.push(path.basename(t.script));
       } else if (t.type === "notepad") {
@@ -823,7 +1039,16 @@ ipcMain.handle("settings-lmstudio-refresh", async () => {
   // sentence ("The server is running on port 1234." / a not-running
   // message), so this checks for the one substring that actually matters
   // rather than parsing free text further.
-  const serverRunning = status.ok && /running/i.test(status.stdout);
+  // `lms server status` prints to STDERR, not stdout -- verified directly:
+  //   exit 0 | stdout "" | stderr "The server is running on port 1234."
+  // Testing stdout alone therefore reported "Server not running" every time,
+  // even with the server up and http://localhost:1234/v1/models answering.
+  // The `not running` guard matters because the negative message contains the
+  // word "running" too, so a bare /running/ test would flip the bug the other
+  // way and claim a stopped server was up.
+  const statusText = `${status.stdout || ""} ${status.stderr || ""}`;
+  const serverRunning =
+    status.ok && /\brunning\b/i.test(statusText) && !/\bnot\s+running\b/i.test(statusText);
 
   let modelList = [];
   try {

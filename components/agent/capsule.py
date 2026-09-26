@@ -63,7 +63,8 @@ class WorkflowCapsule:
     # Claude-hosted mockup, which could never reach the local backend).
     local_server:     str = ""
 
-    def launch_command(self, repo_root: str) -> tuple[list[str], str]:
+    def launch_command(self, repo_root: str,
+                       extra_args: list[str] | None = None) -> tuple[list[str], str]:
         """Return (argv, cwd) to Popen for this capsule.
 
         Raises FileNotFoundError if the target script/checkpoint doesn't
@@ -90,7 +91,13 @@ class WorkflowCapsule:
             entrypoint_abs = os.path.join(repo_root, self.entrypoint)
             if not os.path.isfile(entrypoint_abs):
                 raise FileNotFoundError(f"Entry point not found: {entrypoint_abs}")
-            argv = [sys.executable, "-u", entrypoint_abs] + list(self.args)
+            # extra_args are chosen at Play time (the run-options modal), so they
+            # come after the capsule's own pinned args. This branch was missed
+            # when extra_args was first added -- only the run_task branch below
+            # honoured them -- which silently dropped Scope #2's portal choice
+            # and ran every variant as whatever registry.json had pinned.
+            argv = ([sys.executable, "-u", entrypoint_abs]
+                    + list(self.args) + list(extra_args or []))
             if self.checkpoint_flag and self.model_path:
                 abs_model = self.model_path if os.path.isabs(self.model_path) \
                     else os.path.join(repo_root, self.model_path)
@@ -106,7 +113,16 @@ class WorkflowCapsule:
         if not os.path.isfile(abs_model):
             raise FileNotFoundError(f"Checkpoint not found: {abs_model}")
         run_task_script = os.path.join(repo_root, "run_task.py")
-        argv = [sys.executable, "-u", run_task_script, "--model", abs_model]
+        # `self.args` is honoured here as well as in the custom-entrypoint
+        # branch above, so a capsule can pin run_task.py flags in
+        # registry.json. That is what makes the ablations reachable from the
+        # Play button rather than only from a terminal: a capsule carrying
+        # ["--no_batch_fill"] runs the transformer-driven path, one carrying
+        # ["--force_llm_values"] makes the LLM supply every value.
+        # extra_args are chosen at Play time (the fill-mode modal), so they
+        # come after the capsule's own pinned args and can add to them.
+        argv = ([sys.executable, "-u", run_task_script, "--model", abs_model]
+                + list(self.args) + list(extra_args or []))
         return argv, repo_root
 
 

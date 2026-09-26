@@ -392,6 +392,21 @@
   </div>
 
   <!-- ── Handover overlay — covers the whole window, incl. titlebar ────── -->
+  <!-- Fill-mode chooser. Scope #1 can fill a form two genuinely different
+       ways and the choice is per-run, not a property of the task, so it is
+       asked at Play rather than split into separate capsules. -->
+  <div class="fillmode-backdrop" id="fillModeBackdrop" hidden>
+    <div class="fillmode-panel" role="dialog" aria-modal="true"
+         aria-labelledby="fillModeTitle">
+      <h2 class="fillmode-title" id="fillModeTitle">How should it fill the form?</h2>
+      <p class="fillmode-sub" id="fillModeSub"></p>
+
+      <div class="fillmode-choices" id="fillModeChoices"></div>
+
+      <button class="fillmode-cancel" id="fillModeCancel" type="button">Cancel</button>
+    </div>
+  </div>
+
   <div class="handover-overlay" id="handoverOverlay" hidden>
     <p class="handover-eyebrow">HANDING OVER CONTROL</p>
     <div class="handover-countdown" id="handoverCountdown">5</div>
