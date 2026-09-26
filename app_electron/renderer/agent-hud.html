@@ -60,9 +60,15 @@ body {
   background: var(--bg);
   border: 1px solid var(--line);
   border-radius: 10px;
-  overflow: hidden;
+  /* No `overflow: hidden` here. It used to sit below overflow-y: auto in
+     this same rule, and the later declaration wins -- so long content was
+     clipped, not scrollable. overflow-y: auto already clips to the rounded
+     corners. */
   box-shadow: 0 12px 34px rgba(0, 0, 0, .45);
 }
+/* A flex column shrinks its children to fit before it overflows, so the
+   sections were squashed instead of scrolling. Keep their natural height. */
+.hud > .sec { flex: none; }
 
 /* ---- header ---- */
 
@@ -76,6 +82,12 @@ body {
   gap: 8px;
   padding: 10px 12px;
   border-bottom: 1px solid var(--line);
+  /* Stays put while the sections scroll under it: it holds the status and
+     is the drag handle, so it must never scroll out of reach. */
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--bg);
   /* The one interactive affordance: the whole header is a drag handle, so the
      panel can be moved off the form if it ever sits somewhere awkward. Drag
      is not focus -- the window still never becomes the keyboard target. */

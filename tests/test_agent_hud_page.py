@@ -111,6 +111,34 @@ def test_a_refused_field_is_listed_once_with_the_llm_reason(hud_page):
     assert "PROGRAM went to Course" in text
 
 
+def test_overflowing_content_scrolls_with_the_wheel_and_the_header_stays(hud_page):
+    """Reported: content past the bottom edge could not be read. `.hud` said
+    overflow-y: auto and then overflow: hidden in the same rule -- the later
+    one won, so it clipped. Overfill the 600 px window, then wheel it."""
+    long = dict(MAPPING, unmapped_fields=[f"Extra field {i}" for i in range(25)])
+    buf, original = io.StringIO(), sys.stdout
+    sys.stdout = buf
+    try:
+        Hud(None, enabled=True).install(hud_payload(long, "v3_extra_fields", False, 50))
+    finally:
+        sys.stdout = original
+    init = json.loads(buf.getvalue().split("SCOPE2HUD ", 1)[1].splitlines()[0])
+    feed(hud_page, [init])
+
+    sizes = hud_page.evaluate("() => { const h = document.querySelector('.hud');"
+                              " return [h.scrollHeight, h.clientHeight]; }")
+    assert sizes[0] > sizes[1], "the test must actually overflow the window"
+
+    hud_page.mouse.move(130, 400)
+    hud_page.mouse.wheel(0, 600)
+    hud_page.wait_for_timeout(300)
+    assert hud_page.evaluate("() => document.querySelector('.hud').scrollTop") > 0
+    # the header is pinned: still at the top of the panel after scrolling
+    top = hud_page.evaluate("() => document.querySelector('.hd').getBoundingClientRect().top")
+    assert top < 10
+    assert hud_page.errors == []
+
+
 def test_the_rule_and_the_row_count_are_shown(hud_page):
     feed(hud_page, run_lines(rows=3))
     assert "Remarks" in hud_page.inner_text("#s2RuleRows")
