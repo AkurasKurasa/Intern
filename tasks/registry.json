@@ -22,8 +22,8 @@
     },
     {
       "name": "Sheet-to-Portal Matcher",
-      "description": "Match spreadsheet columns to web-portal fields automatically, induce any derived-value rules, then fill and verify every row (Scope #2). Pressing Play asks which of the eight portal variants to run against -- each changes one thing (reordered columns, renamed fields, decoys, near-duplicates, a different grading scale) so what differs in the result is caused by that one change.",
-      "model_path": "components/scope2/data/models/matcher.pt",
+      "description": "Fill a web portal from a grade sheet the way Scope #1 fills its form: each field's label is looked up among the sheet's column names, and the LLM is asked only for the few the sheet cannot name. Derived fields (Remarks) come from a rule induced from a demonstration. Pressing Play asks which of the eight portal variants to run against (Scope #2).",
+      "model_path": "",
       "trigger_keywords": [],
       "trigger_apps": [],
       "trace_dir": "",
@@ -35,7 +35,6 @@
         "--commit",
         "--show"
       ],
-      "checkpoint_flag": "--matcher",
       "cwd": ""
     },
     {

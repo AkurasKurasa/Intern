@@ -173,9 +173,9 @@ h3 {
 .conf { font-variant-numeric: tabular-nums; font-size: 10px; color: var(--muted); }
 .via { font-size: 9px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
 .via-llm { color: var(--llm); }
-.via-lookup { color: var(--source); }
+.via-source { color: var(--source); }
 .mbar i.via-llm { background: var(--llm); }
-.mbar i.via-lookup { background: var(--source); }
+.mbar i.via-source { background: var(--source); }
 .mbar { grid-column: 1 / -1; height: 3px; border-radius: 2px;
         background: var(--line); overflow: hidden; }
 .mbar i { display: block; height: 100%; width: 100%; background: var(--accent);
@@ -415,17 +415,12 @@ function s2Init(d) {
     pair.className = "pair";
     const src = document.createElement("div");
     src.className = "src"; src.textContent = esc(a.source_header);
-    // The matcher reports a probability; lookup and the LLM do not, so they
-    // show which tier decided instead of an invented number -- in the same
-    // colours Scope #1 uses for Source and LLM.
+    // Which tier decided -- source or LLM, the same two words and colours
+    // Scope #1 uses. Neither reports a probability, so no number is shown.
     const conf = document.createElement("div");
-    const via = a.via || "matcher";
-    if (via === "matcher") {
-      conf.className = "conf"; conf.textContent = num(a.score);
-    } else {
-      conf.className = "via via-" + via;
-      conf.textContent = via === "llm" ? "LLM" : "lookup";
-    }
+    const via = a.via === "llm" ? "llm" : "source";
+    conf.className = "via via-" + via;
+    conf.textContent = via === "llm" ? "LLM" : "source";
     const tgt = document.createElement("div");
     tgt.className = "tgt"; tgt.textContent = "→ " + esc(a.target_label);
     const spacer = document.createElement("div");
@@ -435,23 +430,21 @@ function s2Init(d) {
     bar.appendChild(fill);
     pair.append(src, conf, tgt, spacer, bar);
     mapRows.appendChild(pair);
-    if (via !== "matcher") fill.classList.add("via-" + via);
-    const pct = via === "matcher" ? Math.max(0, Math.min(1, Number(a.score) || 0)) : 1;
-    requestAnimationFrame(() => { fill.style.transform = "scaleX(" + pct + ")"; });
+    fill.classList.add("via-" + via);
+    requestAnimationFrame(() => { fill.style.transform = "scaleX(1)"; });
   });
 
-  // what it refused -- abstentions are a result, not a gap
-  const abst = d.abstained || [];
+  // what it left empty, and why -- a refusal is a result, not a gap. Each
+  // field once: the LLM's reason when it was asked, otherwise "no column".
+  const why = {};
+  (d.abstained || []).forEach((a) => { why[a.target_label] = a.reason; });
   const open = d.unmapped_fields || [];
   const refRows = el("s2RefRows");
   refRows.innerHTML = "";
-  el("s2RefCount").textContent = (abst.length + open.length) || "";
-  abst.forEach((a) => {
-    refRows.appendChild(s2Item("warn", "⊘", esc(a.source_header) + " — abstained",
-      "score " + num(a.score) + ", margin " + num(a.margin) + " — too close to call"));
-  });
+  el("s2RefCount").textContent = open.length || "";
   open.forEach((label) => {
-    refRows.appendChild(s2Item("warn", "○", esc(label), "no source column — left empty"));
+    const reason = why[label] ? "LLM: " + why[label] : "no source column";
+    refRows.appendChild(s2Item("warn", "○", esc(label), esc(reason) + " — left empty"));
   });
 
   // what it derived

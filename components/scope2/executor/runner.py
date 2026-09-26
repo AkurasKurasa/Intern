@@ -25,6 +25,7 @@ import json
 import re
 import sys
 import time
+from collections import Counter
 from dataclasses import dataclass, field, asdict
 from datetime import datetime, timezone
 from pathlib import Path
@@ -158,14 +159,15 @@ def hud_payload(mapping, variant, dry_run, total_rows):
         "assignments": [
             {"source_header": a["source_header"], "target_label": a["target_label"],
              "score": a.get("score"), "margin": a.get("margin"),
-             # which tier decided it -- lookup, matcher or llm. Hand-written
-             # mappings predate tiers, so default to the matcher.
-             "via": a.get("via", "matcher")}
+             # which tier decided it -- source or llm. A hand-written mapping
+             # names its columns itself, which is what "source" means.
+             "via": a.get("via", "source")}
             for a in mapping.get("assignments", [])
         ],
+        # Fields the LLM refused, with its reason, so the HUD can say why a
+        # field was left empty.
         "abstained": [
-            {"source_header": a["source_header"], "score": a.get("score"),
-             "margin": a.get("margin")}
+            {"target_label": a.get("target_label"), "reason": a.get("reason", "")}
             for a in mapping.get("abstained", [])
         ],
         "derived_rules": mapping.get("derived_rules", []),
@@ -309,6 +311,31 @@ class PortalSheet:
             )
         return index
 
+    def printed_column(self, header_label, values, contains=False, sample_rows=5):
+        """printed_index, falling back to what the column PRINTS.
+
+        The header name is a guess about this portal's wording: V2 calls
+        Student ID "Learner Reference Number", and the run stopped before
+        writing a thing. What survives relabelling is the content -- the
+        column whose cells hold the sheet's own key values. Sampled over a
+        few rows; a tie or no hit is no answer, and the run stops as before.
+        """
+        index = header_index(self.headers, header_label)
+        if index is not None:
+            return index
+        wanted = {str(v).strip().casefold() for v in values if str(v).strip()}
+        hits = Counter()
+        for i in range(min(self.rows.count(), sample_rows)):
+            cells = self.rows.nth(i).locator("td").all_inner_texts()
+            for j, text in enumerate(cells):
+                t = text.strip().casefold()
+                if t and (any(w in t for w in wanted) if contains else t in wanted):
+                    hits[j] += 1
+        ranked = hits.most_common(2)
+        if ranked and (len(ranked) == 1 or ranked[0][1] > ranked[1][1]):
+            return ranked[0][0]
+        return self.printed_index(header_label)   # raises with the page's headers
+
     def find_row(self, student_id, id_index):
         """As row_for, but also returns the row's position on the page.
 
@@ -343,7 +370,12 @@ class PortalSheet:
         if candidate.count() == 1:
             return candidate.first
         # V4: no accessible name. Fall back to the scanned column position.
-        cell = row.locator("td").nth(descriptor.column_index + 1)
+        # column_index is the header's position among ALL the row's header
+        # cells -- the select-all checkbox column included -- and every row
+        # has exactly one cell per header, so it is the cell's position as
+        # is. A "+ 1" here shifted every V4 write one column right (Course
+        # into Year, Grade into Remarks), found by filling V4 end to end.
+        cell = row.locator("td").nth(descriptor.column_index)
         return cell.locator("input, select, textarea").first
 
     def fill(self, row, label, value):
@@ -465,8 +497,10 @@ def run(variant, mapping_path, dry_run=True, base_url=None, limit=None,
             inputs = [d for d in descriptors if d.kind == KIND_INPUT]
             sheet = PortalSheet(page, inputs, header_columns(page))
 
-            id_index = sheet.printed_index(alignment["key_field"])
-            name_index = sheet.printed_index(alignment["verify_field"])
+            id_index = sheet.printed_column(alignment["key_field"],
+                                            df[alignment["key_column"]])
+            name_index = sheet.printed_column(alignment["verify_field"],
+                                              df[alignment["verify_column"]], contains=True)
 
             missing = [l for l in mapped_labels if l not in sheet.by_label]
             missing += [r["field"] for r in derived_rules if r["field"] not in sheet.by_label]

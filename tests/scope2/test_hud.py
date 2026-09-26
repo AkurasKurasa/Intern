@@ -40,11 +40,14 @@ HUD_JS = (REPO / "executor" / "hud.js").read_text(encoding="utf-8")
 SAMPLE_MAPPING = {
     "assignments": [
         {"source_header": "PROGRAM", "target_label": "Course",
-         "score": 0.99, "margin": 0.81, "status": "auto"},
+         "score": None, "margin": None, "status": "auto", "via": "llm"},
+        {"source_header": "FINAL GRADE", "target_label": "Grade 0-100",
+         "score": None, "margin": None, "status": "auto", "via": "source"},
     ],
+    # a field the LLM refused, with its reason
     "abstained": [
-        {"source_header": "FINAL", "target_label": "Grade 0-100",
-         "score": 0.00, "margin": 0.04, "status": "abstain"},
+        {"source_header": None, "target_label": "Recommendations optional",
+         "reason": "LLM answered NONE"},
     ],
     "derived_rules": [
         {"field": "Remarks", "kind": "threshold", "depends_on_field": "Grade 0-100",
@@ -78,10 +81,21 @@ def test_payload_carries_every_decision_the_resolver_made():
 
     assert payload["variant"] == "v0_base"
     assert payload["total_rows"] == 50
-    assert [a["source_header"] for a in payload["assignments"]] == ["PROGRAM"]
-    assert [a["source_header"] for a in payload["abstained"]] == ["FINAL"]
+    assert [a["source_header"] for a in payload["assignments"]] == ["PROGRAM", "FINAL GRADE"]
+    assert payload["abstained"] == [{"target_label": "Recommendations optional",
+                                     "reason": "LLM answered NONE"}]
     assert payload["derived_rules"][0]["cutoff"] == 75
     assert payload["unmapped_fields"] == ["Recommendations optional"]
+
+
+def test_every_mapping_says_which_tier_decided_it():
+    """Source or LLM -- the same two words Scope #1's HUD uses. A hand-written
+    mapping with no tag names its columns itself, which is what source means."""
+    payload = hud_payload(SAMPLE_MAPPING, "v0_base", dry_run=True, total_rows=50)
+    assert [a["via"] for a in payload["assignments"]] == ["llm", "source"]
+    bare = hud_payload({"assignments": [{"source_header": "A", "target_label": "B"}]},
+                       "v0_base", dry_run=True, total_rows=1)
+    assert bare["assignments"][0]["via"] == "source"
 
 
 def test_payload_survives_a_mapping_missing_every_optional_key():
@@ -116,7 +130,7 @@ def test_every_stage_of_a_run_emits_a_parseable_line():
     init = lines[0]
     assert init["variant"] == "v0_base"
     assert init["total_rows"] == 50
-    assert init["abstained"][0]["source_header"] == "FINAL"
+    assert init["abstained"][0]["target_label"] == "Recommendations optional"
     assert init["derived_rules"][0]["cutoff"] == 75
 
     assert lines[2]["index"] == 3 and lines[2]["student_id"] == "2021-10022"

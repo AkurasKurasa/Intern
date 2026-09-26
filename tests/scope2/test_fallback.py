@@ -1,22 +1,20 @@
-"""Scope #2's lookup and LLM tiers (resolver/fallback.py).
+"""Scope #2's mapping tiers (resolver/fallback.py).
 
-    lookup  ->  matcher (unchanged)  ->  LLM
+    source lookup  ->  LLM
 
-Direct request: make Scope #2 decide its mapping the way Scope #1 fills its
-form -- read the label, look it up, fall back to the LLM -- while keeping the
-trained matcher as the middle tier, keeping rule induction for Remarks, and
-allowing the LLM to refuse.
+Direct request: build Scope #2 the way Scope #1 fills its form -- read the
+label, find it in the source, ask the LLM only for what the source cannot
+name -- with no embedding model and no trained matcher, because Scope #1 has
+neither.
 
 The assertions that carry the weight:
 
-  * neither tier ever reads truth_key or column_key -- the same architectural
-    invariant test_features.py pins for the matcher
+  * neither tier ever reads truth_key or column_key
   * both tiers prefer refusing to guessing: ambiguous lookups pass the field
-    on, NONE is honoured, loose answers count as NONE, a column claimed twice
-    is refused for both
+    on, NONE is honoured, loose answers count as NONE, a contested column
+    goes to one claimant only when a tie-break names exactly one
   * a dead LLM leaves fields empty and never stops the run
-  * with lookup finding nothing (the normal case) and the LLM off, the
-    pipeline makes exactly the decisions it made before this change
+  * a run never loads an embedding model or torch
 
 Run:  python -m pytest tests/scope2/test_fallback.py -q
 """
@@ -33,8 +31,9 @@ sys.path.insert(0, str(REPO))
 
 from descriptors import FieldDescriptor, SourceColumn  # noqa: E402
 from resolver.fallback import (  # noqa: E402
-    VIA_LLM, VIA_LOOKUP, LMStudioAsker, TierDecision, build_prompt,
-    candidate_columns, llm_tier, lookup_tier, parse_answer, words,
+    VIA_LLM, VIA_SOURCE, LMStudioAsker, TierDecision, build_prompt,
+    build_tiebreak_prompt, candidate_columns, label_words, llm_tier, lookup_tier,
+    parse_answer, parse_field_answer,
 )
 
 
@@ -67,7 +66,12 @@ ALIGN = ("STUDENT NUMBER", "NAME OF STUDENT")
 
 def test_lookup_takes_an_exact_name():
     ds = lookup_tier([fld("Program")], SHEET, exclude=ALIGN)
-    assert [(d.field, d.column, d.via) for d in ds] == [("Program", "PROGRAM", VIA_LOOKUP)]
+    assert [(d.field, d.column, d.via) for d in ds] == [("Program", "PROGRAM", VIA_SOURCE)]
+
+
+def test_the_source_tier_is_called_source_like_scope_1():
+    """Both HUDs say 'source' for the same tier."""
+    assert VIA_SOURCE == "source"
 
 
 def test_lookup_takes_a_unique_word_subset():
@@ -108,14 +112,33 @@ def test_a_decoy_is_not_taken_just_because_it_is_the_only_subset():
     assert ds == []
 
 
-def test_lookup_finds_nothing_on_the_real_portal_labels():
-    """The honest baseline, and why the matcher and LLM exist: plain name
-    matching scores 0/24 across the variants. None of V0's labels match a
-    sheet header, so lookup must decide nothing and leave all of them."""
+def test_format_hints_are_not_part_of_a_name():
+    """'Year 1-5' is read as 'Year', the way a person reads it."""
+    assert label_words("Year 1-5") == ["year"]
+    assert label_words("Grade 1.00-5.00") == ["grade"]
+    assert label_words("Recommendations optional") == ["recommendations", "optional"]
+
+
+def test_the_source_decides_most_of_v0_and_leaves_the_rest_for_the_llm():
+    """V0 as the portal now scans. Before hints were ignored, plain lookup
+    decided 0 of these; now it decides the four whose names ARE the sheet's,
+    and leaves Course (the sheet says PROGRAM) and Recommendations (no column
+    at all) for the LLM."""
     v0 = [fld("Course"), fld("Year 1-5", "number", min="1", max="5"),
+          fld("Midterm 0-100", "number", min="0", max="100"),
+          fld("Final 0-100", "number", min="0", max="100"),
           fld("Grade 0-100", "number", min="0", max="100"),
           fld("Recommendations optional", "textarea")]
-    assert lookup_tier(v0, SHEET, exclude=ALIGN) == []
+    got = {d.field: d.column for d in lookup_tier(v0, SHEET, exclude=ALIGN)}
+    assert got == {"Year 1-5": "YEAR LEVEL", "Midterm 0-100": "MIDTERM",
+                   "Final 0-100": "FINAL", "Grade 0-100": "FINAL GRADE"}
+
+
+def test_the_source_never_takes_a_column_whose_values_do_not_fit():
+    """V6b grades on 1.00-5.00. FINAL GRADE is called 'grade' too, but its
+    values (85, 96...) cannot go in that field; writing them would be wrong."""
+    g = fld("Grade 1.00-5.00", "number", min="1", max="5")
+    assert lookup_tier([g], SHEET, exclude=ALIGN) == []
 
 
 def test_two_fields_claiming_one_column_get_neither():
@@ -143,6 +166,14 @@ def test_a_ranged_number_field_only_sees_numeric_columns_inside_its_range():
 
 def test_a_text_field_sees_every_column():
     assert len(candidate_columns(fld("Course"), SHEET)) == len(SHEET)
+
+
+def test_a_notes_box_never_sees_a_column_of_bare_numbers():
+    """Found on V2 and V6b: asked alone about 'Recommendations optional', the
+    4B model answered FINAL GRADE. A multi-line box is for prose."""
+    names = [c.header for c in candidate_columns(fld("Notes", "textarea"), SHEET)]
+    assert "PROGRAM" in names and "NAME OF STUDENT" in names
+    assert not {"No.", "MIDTERM", "FINAL", "YEAR LEVEL", "FINAL GRADE"} & set(names)
 
 
 # --------------------------------------------------------------- the prompt
@@ -205,12 +236,17 @@ def test_final_is_never_read_out_of_final_grade():
 # --------------------------------------------------------------- the LLM tier
 
 
-def scripted(answers):
-    """An `ask` that answers per field label, and records every prompt."""
+def scripted(answers, tiebreaks=None):
+    """An `ask` that answers per field label -- or, for a tie-break, per
+    contested column -- and records every prompt."""
     seen = []
+    tiebreaks = tiebreaks or {}
 
     def ask(prompt):
         seen.append(prompt)
+        contested = re.search(r"Spreadsheet column: (.+)", prompt)
+        if contested:
+            return tiebreaks.get(contested.group(1).strip())
         label = re.search(r'label: "([^"]+)"', prompt).group(1)
         return answers.get(label)
     ask.seen = seen
@@ -229,15 +265,45 @@ def test_llm_none_leaves_the_field_empty():
     assert ds[0].column is None and "NONE" in ds[0].reason
 
 
-def test_a_column_claimed_by_two_fields_is_refused_for_both():
-    """The model failing to tell two fields apart is exactly when a guess would
-    be wrong half the time."""
-    ask = scripted({"Grade 0-100": "FINAL", "Grade (Recomputed)": "FINAL"})
+def test_a_contested_column_with_no_clear_winner_is_refused_for_both():
+    """Two fields claimed FINAL and the tie-break named neither: a guess here
+    would be wrong half the time."""
+    ask = scripted({"Grade 0-100": "FINAL", "Grade (Recomputed)": "FINAL"},
+                   tiebreaks={"FINAL": "NONE"})
     fields = [fld("Grade 0-100", "number", min="0", max="100"),
               fld("Grade (Recomputed)", "number", min="0", max="100")]
     ds = llm_tier(fields, SHEET, ask, exclude=ALIGN)
     assert all(d.column is None for d in ds)
     assert all("claimed by 2 fields" in d.reason for d in ds)
+
+
+def test_a_contested_column_goes_to_the_one_field_the_tiebreak_names():
+    """Found on V0: asked alone, both Course and 'Recommendations optional'
+    were answered PROGRAM, so both were refused and Course went empty. Asked
+    once from the column's side, the model picks Course."""
+    ask = scripted({"Course": "PROGRAM", "Remarks text": "PROGRAM"},
+                   tiebreaks={"PROGRAM": "Course"})
+    ds = llm_tier([fld("Course"), fld("Remarks text")], SHEET, ask, exclude=ALIGN)
+    got = {d.field: d.column for d in ds}
+    assert got == {"Course": "PROGRAM", "Remarks text": None}
+    assert "went to Course" in next(d.reason for d in ds if d.field == "Remarks text")
+    assert sum("Spreadsheet column:" in p for p in ask.seen) == 1
+
+
+def test_a_tiebreak_answer_must_be_exactly_one_claimant():
+    a, b = fld("Course"), fld("Section")
+    assert parse_field_answer('"Course".', [a, b]) == "Course"
+    assert parse_field_answer("course", [a, b]) == "Course"
+    assert parse_field_answer("Adviser", [a, b]) is None       # not a claimant
+    assert parse_field_answer("Course or Section", [a, b]) is None
+    assert parse_field_answer(None, [a, b]) is None
+
+
+def test_the_tiebreak_prompt_never_sees_the_answer():
+    truthful = fld("Course", truth_key="course", column_key="course")
+    blinded = fld("Course", truth_key=None, column_key="zzz")
+    program = SHEET[5]
+    assert build_tiebreak_prompt(program, [truthful]) == build_tiebreak_prompt(program, [blinded])
 
 
 def test_an_unreachable_llm_leaves_fields_empty_and_does_not_raise():
@@ -282,46 +348,97 @@ def test_the_model_name_is_discovered_not_written_down():
     """Scope #3's classifier once failed every call on a placeholder model
     name. Nothing in this module may name a model."""
     src = (REPO / "resolver" / "fallback.py").read_text(encoding="utf-8")
-    assert "models.list()" in src
+    assert '"/models"' in src
     assert "gemma" not in src.lower() and "local-model" not in src
+
+
+def test_the_client_is_cheap_to_start():
+    """Measured: 'localhost' cost ~2 s per fresh process on Windows (IPv6 tried
+    first) and importing openai cost 2.2 s -- 6 of the LLM step's 7.7 s.
+    The two questions themselves took 0.2 s each."""
+    assert LMStudioAsker().base_url.startswith("http://127.0.0.1:")
+    src = (REPO / "resolver" / "fallback.py").read_text(encoding="utf-8")
+    assert "import openai" not in src and "from openai" not in src
 
 
 # -------------------------------------------------------------- end to end
 
 
-def _automate(*args):
+def _automate(*args, variant="v0_base"):
     out = subprocess.run(
-        [sys.executable, "-u", str(REPO / "automate.py"), "--limit", "2", *args],
+        [sys.executable, "-u", str(REPO / "automate.py"), "--variant", variant,
+         "--limit", "2", *args],
         capture_output=True, text=True, cwd=str(REPO), timeout=900)
     return re.sub(r"\x1b\[[0-9;]*m", "", out.stdout + out.stderr), out.returncode
 
 
+def test_a_run_never_loads_an_embedding_model_or_torch():
+    """Scope #1 loads no embedding model, so neither may Scope #2. The model
+    load was ~9 s of every Play before this change. (features.encoders may be
+    imported as a module -- it only loads the model when called -- and
+    rules/options.py no longer calls it.)"""
+    probe = ("import sys; sys.path.insert(0, r'%s'); import automate; "
+             "bad = [m for m in ('sentence_transformers', 'torch', 'transformers', "
+             "'model.matcher', 'openai') if m in sys.modules]; "
+             "print('LOADED', bad)" % REPO)
+    out = subprocess.run([sys.executable, "-c", probe], capture_output=True,
+                         text=True, cwd=str(REPO), timeout=300)
+    assert "LOADED []" in out.stdout, out.stdout + out.stderr
+
+
+def test_nothing_on_the_run_path_calls_the_embedding_model():
+    """Static check on every module a run imports from this scope."""
+    for rel in ("automate.py", "resolver/fallback.py", "rules/options.py",
+                "rules/rebind.py", "executor/runner.py"):
+        src = (REPO / rel).read_text(encoding="utf-8")
+        assert "encoders." not in src, rel
+
+
+def test_there_is_no_countdown():
+    """The 5 s countdown was a fifth of the wait before the portal appeared and
+    bought nothing: this script drives its own browser, not the user's."""
+    src = (REPO / "automate.py").read_text(encoding="utf-8")
+    assert "COUNTDOWN" not in src
+
+
 @pytest.mark.slow
-def test_matcher_decisions_are_unchanged_when_lookup_finds_nothing():
-    """The regression lock. On V0 lookup decides nothing, so with the LLM off
-    the matcher sees exactly the inputs it saw before this change and must make
-    exactly the same three decisions and the same abstention."""
+def test_v0_is_mostly_source_without_the_llm():
     if not (REPO / "data" / "sheets" / "grade_sheet.xlsx").exists():
         pytest.skip("run data/sheets/make_sheets.py first")
-    text, code = _automate("--no_llm", "--matcher", "data/models/matcher.pt")
+    text, code = _automate("--no_llm")
     assert code == 0, text[-2000:]
-    assert "decided by: lookup 0, matcher 3, LLM 0" in text
-    assert re.search(r"PROGRAM\s+-> Course", text)
-    assert re.search(r"YEAR LEVEL\s+-> Year 1-5", text)
-    assert re.search(r"FINAL GRADE\s+-> Grade 0-100", text)
-    assert re.search(r"FINAL\s+-> ABSTAINED", text)
+    assert "decided by: source 4, LLM 0" in text
+    for pair in (r"YEAR LEVEL\s+-> Year 1-5", r"MIDTERM\s+-> Midterm 0-100",
+                 r"FINAL\s+-> Final 0-100", r"FINAL GRADE\s+-> Grade 0-100"):
+        assert re.search(pair, text), pair
+    assert "filled by rule: Remarks (from Grade 0-100)" in text
     assert "2 rows filled and verified, 0 failed" in text
 
 
 @pytest.mark.slow
-def test_the_llm_tier_runs_end_to_end_when_lm_studio_is_up():
+@pytest.mark.parametrize("variant", ["v2_relabeled", "v4_unassociated", "v6b_scale"])
+def test_every_variant_fills_and_verifies(variant):
+    """The three that crashed before, each for its own reason: V2 renames
+    Student ID and Remarks (rule and row alignment named V0's labels), V4 has
+    no accessible names (the column fallback was one cell to the right), V6b's
+    grade takes a different scale (the rule's input fills no field)."""
+    if not (REPO / "data" / "sheets" / "grade_sheet.xlsx").exists():
+        pytest.skip("run data/sheets/make_sheets.py first")
+    text, code = _automate("--no_llm", variant=variant)
+    assert code == 0, text[-2000:]
+    assert "2 rows filled and verified, 0 failed" in text
+
+
+@pytest.mark.slow
+def test_the_llm_runs_end_to_end_when_lm_studio_is_up():
     """Only meaningful with LM Studio serving a model; skipped otherwise. On
-    V0 the matcher leaves only 'Recommendations optional', which has no source
-    column -- so the correct LLM answer is NONE, and a mapping there would be
-    the model inventing one."""
+    V0 the source leaves Course and 'Recommendations optional'. The right
+    answers: PROGRAM -> Course, and nothing for Recommendations."""
     if LMStudioAsker(timeout=3)("ping") is None:
         pytest.skip("LM Studio is not serving a chat model")
-    text, code = _automate("--matcher", "data/models/matcher.pt")
+    text, code = _automate()
     assert code == 0, text[-2000:]
-    assert "asking the LLM about 1 field(s)" in text
+    assert "asking the LLM about 2 field(s)" in text
+    assert re.search(r"PROGRAM\s+-> Course\s+LLM", text)
+    assert "decided by: source 4, LLM 1" in text
     assert "2 rows filled and verified, 0 failed" in text
