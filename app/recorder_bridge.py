@@ -413,9 +413,12 @@ class Bridge:
             _log_capsule_line(f"Run ended (exit code {code}).")
             emit("capsule_done", code=code)
 
-        threading.Thread(target=_pump, daemon=True).start()
+        # Announce the run BEFORE reading its output: the app resets its
+        # activity feed and starts the Running view on capsule_started, so a
+        # line pumped first would be wiped or land before the run "began".
         emit("capsule_started", label=label)
         emit("log", message=f"Capsule run started — {label}", level="ok")
+        threading.Thread(target=_pump, daemon=True).start()
 
     # How long a clean stop is allowed to take before it stops being clean.
     # CTRL_BREAK_EVENT raises KeyboardInterrupt in run_task.py, which is the

@@ -229,6 +229,15 @@ window.recorderAPI.onEvent((event) => {
       progressLineCount = 0;
       capsuleLog(`▶ Running — ${event.label}`, "ok");
       setCapsuleRunning(true);
+      // The run starts here, not at COUNTDOWN_BEGIN. Scope #2 dropped its
+      // countdown (it drives its own browser, so the 5 s bought nothing), and
+      // everything that was keyed off the countdown then never happened for
+      // it: no Running view, no elapsed timer, Duration "—" on the summary.
+      // A task with no countdown is still a run.
+      stepFeedEl.innerHTML = "";
+      tbAgentPill.hidden = false;
+      showTaskRunView("running");
+      startElapsedTimer();
       break;
     case "capsule_progress":
       handleCapsuleProgressLine(event.line);
@@ -435,7 +444,20 @@ function showFinished(code) {
     finishedHeadlineEl.textContent = "Stopped early — you have control again.";
     finishedBodyEl.textContent = `Intern's run ended unexpectedly (exit code ${code}). Check the activity log below for details.`;
   }
-  showTasksSubview("finished");
+  showTaskRunView("finished");
+}
+
+// Running and Finished belong to the Tasks section. Showing one of them
+// while another section (Home) is on screen drew both at once: the
+// "Stopped -- you have control again" summary on top of Home's "Nothing
+// running / Show Intern the task once" hero. So switch to Tasks first --
+// that hides Home's views and marks the right nav item -- then pick the
+// sub-view.
+function showTaskRunView(name) {
+  // Only when actually elsewhere: showMain() also reloads the task list,
+  // which a run starting or ending on the Tasks page has no reason to do.
+  if (!navWorkflows.classList.contains("active")) showMain("workflows");
+  showTasksSubview(name);
 }
 
 // Esc, "Take back control" (on the running banner) and "Cancel" (on the
@@ -529,15 +551,12 @@ function handleCapsuleProgressLine(line) {
   if (line === "COUNTDOWN_BEGIN") {
     ppCountdown.hidden = false;
     countdownHintPending = true;
-    // The real handover moment: the process is about to click into the
-    // target window and start typing. Everything below is driven off this
-    // exact same event, not a separate client-side timer.
-    tbAgentPill.hidden = false;
+    // The handover moment: the process is about to click into the target
+    // window and start typing. Only the countdown overlay hangs off this --
+    // the Running view and the elapsed timer start at capsule_started, so a
+    // task with no countdown gets them too.
     handoverTaskNameEl.textContent = currentCapsule ? currentCapsule.name : "—";
     handoverOverlay.hidden = false;
-    stepFeedEl.innerHTML = "";
-    showTasksSubview("running");
-    startElapsedTimer();
     return;
   }
   if (line === "COUNTDOWN_END") {

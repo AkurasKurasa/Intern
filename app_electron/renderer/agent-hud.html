@@ -480,7 +480,7 @@ function s2Init(d) {
   });
 
   s2Show([maps.length ? "s2Mapping" : null,
-          (abst.length || open.length) ? "s2Refused" : null,
+          open.length ? "s2Refused" : null,
           rules.length ? "s2Rule" : null,
           "s2Progress"].filter(Boolean));
 }
