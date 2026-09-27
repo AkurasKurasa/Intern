@@ -1,0 +1,2666 @@
+================================================================================
+  PINNACLE AUTO INSURANCE — DATA ENTRY INTAKE PACKET
+  Packet Date: 2026-03-18 | Batch ID: PAI-20260318-04
+  Internal Use Only | Prepared by: Operations Manager
+================================================================================
+
+INSTRUCTIONS FOR DATA ENTRY STAFF
+-----------------------------------
+Enter each record below into the Car Insurance Data Entry Form in the order
+listed. IMPORTANT - unlike the standard packet, the fields below are NOT in
+form order. Each field still belongs to the tab and section it is printed
+under, but within a section the order is scrambled. You will have to find
+each field on the form rather than tabbing straight down it.
+
+Flag any field marked [VERIFY] with your supervisor before submitting.
+All dates use MM/DD/YYYY format unless noted.
+
+================================================================================
+  RECORD 1 OF 10
+================================================================================
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  TAB 1 — POLICY
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+[ Policy Information ]
+Policy Term          : 6 Month
+Policy Number        : PAI-2026-00441
+Policy Type          : Full Coverage
+Policy Status        : Active
+Effective Date       : 04/01/2026
+Expiration Date      : 10/01/2026
+
+[ Agent / Agency ]
+Agent ID             : AGT-0092
+Agency Name          : Pinnacle Auto — Riverside Branch
+Agent Name           : Sandra Whitfield
+Underwriter          : Marcus D. Chen
+
+[ Flags ]
+Renewal Policy       : YES (check)
+E-Signature Obtained : YES (check)
+Paperless / e-Delivery : YES (check)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  TAB 2 — POLICYHOLDER
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+[ Personal Information ]
+Years Continuously Insured : 9
+Marital Status       : Married
+Middle Name          : Arthur
+SSN                  : 512-88-4401  [VERIFY]
+Gender               : Male
+Education Level      : Bachelor's Degree
+Last Name            : Delgado
+Credit Score         : 724
+Date of Birth        : 07/14/1978
+First Name           : James
+Suffix               : (none)
+Occupation           : Employed Full-Time
+
+[ Contact Information ]
+Work Phone           : (951) 300-0044
+Cell Phone           : (951) 882-5573
+Home Phone           : (951) 440-2281
+Email Address        : jdelgado78@gmail.com
+
+[ Address ]
+Street Address 1     : 4418 Creekstone Drive
+City                 : Riverside
+Street Address 2     : (none)
+ZIP Code             : 92506
+County               : Riverside
+Homeowner            : YES (check)
+Country              : United States
+Years at Address     : 6
+State                : California
+
+[ Driver's License ]
+DL Issuing State     : California
+DL Expiration        : 07/14/2028
+DL Number            : D7734821
+
+[ Prior Insurance ]
+Prior Liability Limits : 50/100
+Prior Policy No.     : SF-CA-2025-7712
+Prior Expiry Date    : 03/31/2026
+Prior Insurer        : State Farm
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  TAB 3 — VEHICLE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+[ Vehicle Identification ]
+Year                 : 2020
+VIN                  : 1HGCV1F30LA081234
+Number of Doors      : 4
+Color                : Gray
+Body Type            : Sedan
+Trim / Sub-model     : Sport 2.0T
+Model                : Accord
+Make                 : Honda
+
+[ Engine & Drivetrain ]
+Fuel Type            : Gasoline
+Transmission         : Automatic
+Displacement (L)     : 2.0
+Drive Type           : FWD
+Cylinders            : 4
+
+[ Usage & Mileage ]
+Garaging Location    : Private Garage
+Current Mileage      : 38450
+Annual Miles Est.    : 12000
+Primary Use          : Commute
+
+[ Ownership / Purchase ]
+Title State          : California
+Current Market Value ($) : 22400
+Purchase Date        : 02/15/2020
+Vehicle Condition    : Good
+Purchase Price ($)   : 29800
+
+[ Lien / Financing ]
+Loan / Lease No.     : HFS-2020-441829
+Lienholder Address   : P.O. Box 7829, Orlando, FL 32854
+Lienholder/Lender    : Honda Financial Services
+
+[ Safety & Features ]
+Airbags              : YES (check)
+Adaptive Cruise Control : NO
+Salvage Title        : NO
+Parking Sensors      : NO
+Anti-Theft Device    : YES (check)
+Custom Equipment / Mods : NO
+Daytime Running Lights : YES (check)
+Backup Camera        : YES (check)
+Lane Departure Warning : YES (check)
+Custom Equipment Value ($) : (leave blank)
+ABS Brakes           : YES (check)
+GPS Tracking         : NO
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  TAB 4 — COVERAGE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+[ Liability Limits ]
+Property Damage ($)      : 100,000
+Bodily Injury (k$/k$)    : 100/300
+
+[ Collision & Comprehensive ]
+Comprehensive Deductible : 250
+Collision Deductible     : 500
+
+[ Additional Coverages ]
+Diminishing Deductible   : NO
+Uninsured/Underinsured Motorist : YES (check)
+Roadside Assistance      : YES (check)
+Rideshare Coverage       : NO
+Accident Forgiveness     : YES (check)
+GAP Insurance            : NO
+Medical Payments         : YES (check)
+New Car Replacement      : NO
+Rental Reimbursement     : YES (check)
+Personal Injury Protection (PIP) : NO
+
+[ Optional Limits ]
+MedPay Limit ($)         : 5000
+UM/UIM Limit             : 100/300
+Rental Limit             : $30/day
+PIP Limit ($)            : (leave blank)
+
+[ Discounts Applied ]
+Good Student             : NO
+Multi-Car                : NO
+Military                 : NO
+Affinity Group           : NO
+Defensive Driving Course : NO
+Good Driver (5+ yr clean): YES (check)
+Loyalty Discount         : YES (check)
+Multi-Policy / Bundle    : YES (check)
+
+[ Premium Summary ]
+Payment Frequency        : Monthly
+Total Premium ($)        : 187.42
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  TAB 5 — DRIVERS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+[ Driver 2 ]
+Last Name            : Delgado
+Gender               : Female
+DL Issuing State     : California
+DL Expiration        : 03/22/2027
+SR-22 Required       : NO
+Date of Birth        : 03/22/1980
+DL Number            : F8821047
+Relationship         : Spouse
+Excluded Driver      : NO
+Accidents (3 yr)     : 0
+Violations (3 yr)    : 0
+First Name           : Maria
+
+[ Driver 3 ]
+DL Expiration        : 09/05/2027
+Last Name            : Delgado
+Date of Birth        : 09/05/2006
+DL Number            : D0012938
+SR-22 Required       : NO
+DL Issuing State     : California
+First Name           : Tyler
+Excluded Driver      : NO
+Accidents (3 yr)     : 0
+Relationship         : Child
+Violations (3 yr)    : 1  ← speeding ticket 11/2025
+Gender               : Male
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  TAB 6 — HISTORY
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+[ Driving Record — Primary Driver (3-Year Look-Back) ]
+Comprehensive Claims     : 1
+Total Claims Filed       : 1
+Not-At-Fault Accidents   : 0
+Moving Violations        : 0
+Total Accidents          : 0
+At-Fault Accidents       : 0
+
+[ Special Flags ]
+DUI / DWI on Record      : NO
+License Suspended or Revoked : NO
+SR-22 / FR-44 Filed      : NO
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  TAB 7 — CLAIMS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+[ Claim Details ]
+Claim Type               : Comprehensive
+Claim Amount ($)         : 1240.00
+Claim Number             : CLM-2024-88341
+Resolution Date          : 08/19/2024
+Date of Loss             : 08/03/2024
+Claim Status             : Closed
+Settlement Amount ($)    : 990.00
+Deductible ($)           : 250.00
+Claim Description        : Windshield cracked by falling tree branch during
+Adjuster Name            : Renee Harmon
+                           storm. No collision involved. Vehicle was parked
+                           in driveway at time of incident.
+
+[ Circumstances ]
+Third Party Involved     : NO
+Policyholder At Fault    : NO
+Police Report Filed      : NO
+Injury Involved          : NO
+
+[ Third Party Information ]
+Third Party Policy       : (leave blank)
+Police Report No.        : (leave blank)
+Third Party Name         : (leave blank)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  TAB 8 — PAYMENT
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+[ Billing Summary ]
+Payment Frequency        : Monthly
+Last Payment Date        : (leave blank)
+Balance Due ($)          : (leave blank)
+Payment Due Date         : 04/01/2026
+Last Payment Amount ($)  : (leave blank)
+Total Premium ($)        : 187.42
+Down Payment ($)         : 374.84  (first 2 months collected upfront)
+Auto-Pay Enrolled        : YES (check)
+
+[ Payment Method ]
+Method                   : Credit Card
+
+[ Credit / Debit Card ]
+Cardholder Name          : James A. Delgado
+CVV                      : 341  [VERIFY — do not store]
+Card Number              : 4532 8812 0044 7761  [VERIFY before saving]
+Expiration (MM/YY)       : 09/28
+
+[ Bank Account (ACH) ]
+Bank Name                : (leave blank)
+Account Type             : (leave blank)
+Routing Number           : (leave blank)
+Account Number           : (leave blank)
+
+[ Billing Address ]
+ZIP Code                 : 92506
+State                    : California
+Street Address           : 4418 Creekstone Drive
+City                     : Riverside
+
+
+================================================================================
+  RECORD 2 OF 10
+================================================================================
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  TAB 1 — POLICY
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+[ Policy Information ]
+Policy Term          : 12 Month  ← NOTE: Annual term, not 6-month
+Expiration Date      : 04/01/2027
+Policy Type          : Liability Only
+Policy Status        : Active
+Policy Number        : PAI-2026-00442
+Effective Date       : 04/01/2026
+
+[ Agent / Agency ]
+Underwriter          : Sylvia Okafor
+Agent Name           : Derrick P. Nguyen
+Agency Name          : Pinnacle Auto — Downtown Branch
+Agent ID             : AGT-0055
+
+[ Flags ]
+Renewal Policy       : NO
+E-Signature Obtained : NO
+Paperless / e-Delivery : NO  ← paper statements requested
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  TAB 2 — POLICYHOLDER
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+[ Personal Information ]
+Occupation           : Retired
+Credit Score         : 651  [VERIFY — borderline; flag for underwriter review]
+Suffix               : (none)
+Gender               : Female
+Marital Status       : Widowed
+Education Level      : High School / GED
+Middle Name          : (none)
+Last Name            : Tompkins
+First Name           : Brenda
+SSN                  : 628-44-9201  [VERIFY]
+Date of Birth        : 11/30/1962
+Years Continuously Insured : 3
+
+[ Contact Information ]
+Cell Phone           : (214) 771-3340
+Work Phone           : (none)
+Email Address        : brenda.tompkins62@yahoo.com
+Home Phone           : (214) 552-9018
+
+[ Address ]
+Homeowner            : NO  ← renter
+Street Address 1     : 8820 Magnolia Creek Ln
+ZIP Code             : 75218
+Years at Address     : 11
+Country              : United States
+County               : Dallas
+City                 : Dallas
+Street Address 2     : Apt 4B
+State                : Texas
+
+[ Driver's License ]
+DL Number            : T4491028
+DL Expiration        : 11/30/2026
+DL Issuing State     : Texas
+
+[ Prior Insurance ]
+Prior Insurer        : Progressive
+Prior Policy No.     : PRG-TX-2025-0041
+Prior Liability Limits : 30/60
+Prior Expiry Date    : 03/31/2026
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  TAB 3 — VEHICLE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+[ Vehicle Identification ]
+Body Type            : Sedan
+Number of Doors      : 4
+Make                 : Toyota
+VIN                  : 2T1BURHE0JC041872
+Trim / Sub-model     : LE
+Color                : White
+Year                 : 2018
+Model                : Corolla
+
+[ Engine & Drivetrain ]
+Drive Type           : FWD
+Displacement (L)     : 1.8
+Fuel Type            : Gasoline
+Cylinders            : 4
+Transmission         : Automatic
+
+[ Usage & Mileage ]
+Annual Miles Est.    : 8500
+Primary Use          : Personal/Pleasure
+Current Mileage      : 74210
+Garaging Location    : Street Parking  ← higher theft risk, note for underwriter
+
+[ Ownership / Purchase ]
+Title State          : Texas
+Purchase Date        : 06/20/2018
+Purchase Price ($)   : 19200
+Vehicle Condition    : Good
+Current Market Value ($) : 11750
+
+[ Lien / Financing ]
+Loan / Lease No.     : (leave blank)
+Lienholder/Lender    : (none — vehicle is paid off)
+Lienholder Address   : (leave blank)
+
+[ Safety & Features ]
+Airbags              : YES (check)
+Parking Sensors      : NO
+GPS Tracking         : NO
+Salvage Title        : NO
+ABS Brakes           : YES (check)
+Daytime Running Lights : YES (check)
+Backup Camera        : YES (check)
+Custom Equipment Value ($) : (leave blank)
+Anti-Theft Device    : NO
+Adaptive Cruise Control : NO
+Lane Departure Warning : NO
+Custom Equipment / Mods : NO
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  TAB 4 — COVERAGE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+[ Liability Limits ]
+Property Damage ($)      : 25,000
+Bodily Injury (k$/k$)    : 30/60  ← state minimum; client declined higher limits
+
+[ Collision & Comprehensive ]
+Comprehensive Deductible : (N/A — no comprehensive coverage)
+Collision Deductible     : (N/A — no collision coverage)
+
+[ Additional Coverages ]
+Medical Payments         : NO
+GAP Insurance            : NO
+Accident Forgiveness     : NO
+Uninsured/Underinsured Motorist : NO
+Roadside Assistance      : NO
+Personal Injury Protection (PIP) : YES (check)  ← required in Texas
+Rental Reimbursement     : NO
+Rideshare Coverage       : NO
+Diminishing Deductible   : NO
+New Car Replacement      : NO
+
+[ Optional Limits ]
+UM/UIM Limit             : (leave blank)
+MedPay Limit ($)         : (leave blank)
+PIP Limit ($)            : 2500
+Rental Limit             : (leave blank)
+
+[ Discounts Applied ]
+Good Driver (5+ yr clean): YES (check)  ← 3 clean years
+Good Student             : NO
+Multi-Car                : NO
+Defensive Driving Course : YES (check)  ← completed course 01/2026
+Loyalty Discount         : NO
+Affinity Group           : NO
+Military                 : NO
+Multi-Policy / Bundle    : NO
+
+[ Premium Summary ]
+Payment Frequency        : Monthly
+Total Premium ($)        : 63.18
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  TAB 5 — DRIVERS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+[ Driver 2 ]
+(none — sole driver; leave all Driver 2 fields blank)
+
+[ Driver 3 ]
+(none; leave all Driver 3 fields blank)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  TAB 6 — HISTORY
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+[ Driving Record — Primary Driver (3-Year Look-Back) ]
+Not-At-Fault Accidents   : 0
+Total Claims Filed       : 0
+Moving Violations        : 0
+Comprehensive Claims     : 0
+Total Accidents          : 0
+At-Fault Accidents       : 0
+
+[ Special Flags ]
+License Suspended or Revoked : NO
+DUI / DWI on Record      : NO
+SR-22 / FR-44 Filed      : NO
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  TAB 7 — CLAIMS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+(No prior claims — leave all fields in this tab blank)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  TAB 8 — PAYMENT
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+[ Billing Summary ]
+Last Payment Date        : (leave blank)
+Payment Frequency        : Monthly
+Last Payment Amount ($)  : (leave blank)
+Down Payment ($)         : 63.18  (first month only)
+Total Premium ($)        : 63.18
+Balance Due ($)          : (leave blank)
+Auto-Pay Enrolled        : YES (check)
+Payment Due Date         : 04/15/2026
+
+[ Payment Method ]
+Method                   : Bank Transfer (ACH)
+
+[ Credit / Debit Card ]
+Card Number              : (leave blank)
+CVV                      : (leave blank)
+Expiration (MM/YY)       : (leave blank)
+Cardholder Name          : (leave blank)
+
+[ Bank Account (ACH) ]
+Account Type             : Checking
+Bank Name                : Frost Bank
+Routing Number           : 114900164  [VERIFY]
+Account Number           : 007441928830  [VERIFY — do not store full number]
+
+[ Billing Address ]
+City                     : Dallas
+ZIP Code                 : 75218
+State                    : Texas
+Street Address           : 8820 Magnolia Creek Ln, Apt 4B
+
+
+================================================================================
+  RECORD 3 OF 10
+================================================================================
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  TAB 1 — POLICY
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+[ Policy Information ]
+Effective Date       : 04/01/2026
+Policy Type          : Full Coverage
+Policy Status        : Active
+Expiration Date      : 10/01/2026
+Policy Number        : PAI-2026-00443
+Policy Term          : 6 Month
+
+[ Agent / Agency ]
+Agent ID             : AGT-0092
+Agent Name           : Sandra Whitfield
+Underwriter          : Marcus D. Chen
+Agency Name          : Pinnacle Auto — Riverside Branch
+
+[ Flags ]
+E-Signature Obtained : YES (check)
+Paperless / e-Delivery : YES (check)
+Renewal Policy       : NO
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  TAB 2 — POLICYHOLDER
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+[ Personal Information ]
+Marital Status       : Single
+Education Level      : Some College
+Date of Birth        : 05/08/1990
+Occupation           : Self-Employed
+Suffix               : Jr.
+Years Continuously Insured : 1
+Last Name            : Ostrowski
+SSN                  : 401-72-8810  [VERIFY]
+Credit Score         : 598  [VERIFY — high risk tier; confirm with underwriter]
+Gender               : Male
+First Name           : Kevin
+Middle Name          : T.
+
+[ Contact Information ]
+Home Phone           : (none)
+Email Address        : kostrowski90@protonmail.com
+Work Phone           : (909) 334-7820  ← same as cell
+Cell Phone           : (909) 334-7820
+
+[ Address ]
+Country              : United States
+City                 : San Dimas
+State                : California
+Years at Address     : 2
+Street Address 1     : 201 W. Arrow Hwy
+Street Address 2     : Suite 7
+ZIP Code             : 91773
+County               : Los Angeles
+Homeowner            : NO
+
+[ Driver's License ]
+DL Expiration        : 05/08/2027
+DL Issuing State     : California
+DL Number            : O5512047
+
+[ Prior Insurance ]
+Prior Liability Limits : (none)
+Prior Expiry Date    : (none)
+Prior Insurer        : (none — previously uninsured for 4 months)
+Prior Policy No.     : (none)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  TAB 3 — VEHICLE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+[ Vehicle Identification ]
+VIN                  : WBA8E9G58JNU21893
+Year                 : 2018
+Make                 : BMW
+Body Type            : Sedan
+Model                : 3 Series
+Number of Doors      : 4
+Color                : Black
+Trim / Sub-model     : 330i xDrive
+
+[ Engine & Drivetrain ]
+Cylinders            : 4
+Drive Type           : AWD
+Displacement (L)     : 2.0 Turbo
+Fuel Type            : Gasoline
+Transmission         : Automatic
+
+[ Usage & Mileage ]
+Garaging Location    : Parking Lot
+Primary Use          : Commute
+Current Mileage      : 51880
+Annual Miles Est.    : 15000
+
+[ Ownership / Purchase ]
+Current Market Value ($) : 24100
+Vehicle Condition    : Good
+Purchase Price ($)   : 31500  (used)
+Title State          : California
+Purchase Date        : 09/12/2022
+
+[ Lien / Financing ]
+Loan / Lease No.     : CAF-2022-0081947
+Lienholder Address   : P.O. Box 901076, Fort Worth, TX 76101
+Lienholder/Lender    : Chase Auto Finance
+
+[ Safety & Features ]
+ABS Brakes           : YES (check)
+Custom Equipment / Mods : YES (check)
+Daytime Running Lights : YES (check)
+Airbags              : YES (check)
+Parking Sensors      : YES (check)
+Anti-Theft Device    : YES (check)
+Custom Equipment Value ($) : 1800  ← aftermarket audio system
+Adaptive Cruise Control : YES (check)
+Salvage Title        : NO
+Backup Camera        : YES (check)
+Lane Departure Warning : YES (check)
+GPS Tracking         : YES (check)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  TAB 4 — COVERAGE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+[ Liability Limits ]
+Property Damage ($)      : 50,000
+Bodily Injury (k$/k$)    : 50/100  ← client declined 100/300; noted in file
+
+[ Collision & Comprehensive ]
+Comprehensive Deductible : 500
+Collision Deductible     : 1000  ← higher deductible chosen to reduce premium
+
+[ Additional Coverages ]
+Accident Forgiveness     : NO
+Medical Payments         : NO
+New Car Replacement      : NO
+GAP Insurance            : YES (check)  ← required by Chase Auto Finance
+Rental Reimbursement     : YES (check)
+Rideshare Coverage       : NO
+Roadside Assistance      : YES (check)
+Diminishing Deductible   : NO
+Uninsured/Underinsured Motorist : YES (check)
+Personal Injury Protection (PIP) : NO
+
+[ Optional Limits ]
+PIP Limit ($)            : (leave blank)
+Rental Limit             : $30/day
+MedPay Limit ($)         : (leave blank)
+UM/UIM Limit             : 50/100
+
+[ Discounts Applied ]
+Affinity Group           : NO
+Military                 : NO
+Defensive Driving Course : NO
+Multi-Policy / Bundle    : NO
+Good Student             : NO
+Loyalty Discount         : NO
+Multi-Car                : NO
+Good Driver (5+ yr clean): NO  ← see driving history
+
+[ Premium Summary ]
+Payment Frequency        : Monthly
+Total Premium ($)        : 241.07
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  TAB 5 — DRIVERS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+[ Driver 2 ]
+(none; leave all Driver 2 fields blank)
+
+[ Driver 3 ]
+(none; leave all Driver 3 fields blank)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  TAB 6 — HISTORY
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+[ Driving Record — Primary Driver (3-Year Look-Back) ]
+Not-At-Fault Accidents   : 1
+Total Claims Filed       : 1
+Moving Violations        : 1
+Total Accidents          : 2
+Comprehensive Claims     : 0
+At-Fault Accidents       : 1
+
+[ Special Flags ]
+License Suspended or Revoked : NO
+SR-22 / FR-44 Filed      : NO
+DUI / DWI on Record      : NO
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  TAB 7 — CLAIMS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+[ Claim Details ]
+Claim Amount ($)         : 9450.00
+Claim Number             : CLM-2023-55109
+Deductible ($)           : 500.00
+Settlement Amount ($)    : 8950.00
+Claim Description        : Policyholder rear-ended a stopped vehicle on the
+Adjuster Name            : Thomas Reyes
+Date of Loss             : 07/21/2023
+Claim Type               : Collision
+Resolution Date          : 09/05/2023
+Claim Status             : Closed
+                           I-210 freeway during heavy traffic. Airbags deployed.
+                           Front bumper and hood sustained significant damage.
+                           Other party's vehicle sustained rear bumper damage.
+
+[ Circumstances ]
+Policyholder At Fault    : YES (check)
+Injury Involved          : NO
+Third Party Involved     : YES (check)
+Police Report Filed      : YES (check)
+
+[ Third Party Information ]
+Third Party Policy       : GEC-2023-114409
+Third Party Name         : Diana Fuentes
+Police Report No.        : CHP-2023-0072841
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  TAB 8 — PAYMENT
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+[ Billing Summary ]
+Total Premium ($)        : 241.07
+Payment Due Date         : 04/01/2026
+Down Payment ($)         : 241.07  (first month only; lienholder requires proof by 04/05/2026)
+Last Payment Amount ($)  : (leave blank)
+Last Payment Date        : (leave blank)
+Balance Due ($)          : (leave blank)
+Payment Frequency        : Monthly
+Auto-Pay Enrolled        : YES (check)
+
+[ Payment Method ]
+Method                   : Credit Card
+
+[ Credit / Debit Card ]
+Expiration (MM/YY)       : 02/27
+Cardholder Name          : Kevin T. Ostrowski Jr.
+Card Number              : 5412 7531 9900 2241  [VERIFY before saving]
+CVV                      : 819  [VERIFY — do not store]
+
+[ Bank Account (ACH) ]
+Routing Number           : (leave blank)
+Account Number           : (leave blank)
+Bank Name                : (leave blank)
+Account Type             : (leave blank)
+
+[ Billing Address ]
+Street Address           : 201 W. Arrow Hwy, Suite 7
+State                    : California
+ZIP Code                 : 91773
+City                     : San Dimas
+
+
+================================================================================
+  RECORD 4 OF 10
+================================================================================
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  TAB 1 — POLICY
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+[ Policy Information ]
+Expiration Date      : 10/01/2026
+Policy Type          : Full Coverage
+Policy Term          : 6 Month
+Policy Status        : Active
+Effective Date       : 04/01/2026
+Policy Number        : PAI-2026-00444
+
+[ Agent / Agency ]
+Agent ID             : AGT-0031
+Agent Name           : Patricia Holloway
+Underwriter          : Marcus D. Chen
+Agency Name          : Pinnacle Auto — Northside Branch
+
+[ Flags ]
+Paperless / e-Delivery : YES (check)
+Renewal Policy       : YES (check)
+E-Signature Obtained : YES (check)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  TAB 2 — POLICYHOLDER
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+[ Personal Information ]
+Occupation           : Employed Full-Time
+Years Continuously Insured : 7
+First Name           : Natalie
+Middle Name          : Rose
+Gender               : Female
+Last Name            : Chambers
+Marital Status       : Single
+Credit Score         : 788
+Suffix               : (none)
+SSN                  : 374-60-1142  [VERIFY]
+Education Level      : Master's Degree
+Date of Birth        : 02/18/1985
+
+[ Contact Information ]
+Email Address        : nchambers85@outlook.com
+Home Phone           : (312) 774-0392
+Work Phone           : (none)
+Cell Phone           : (312) 449-8801
+
+[ Address ]
+ZIP Code             : 60642
+County               : Cook
+Homeowner            : NO
+State                : Illinois
+City                 : Chicago
+Country              : United States
+Years at Address     : 4
+Street Address 1     : 1127 N. Halsted St
+Street Address 2     : Apt 3B
+
+[ Driver's License ]
+DL Expiration        : 02/18/2028
+DL Issuing State     : Illinois
+DL Number            : C44182019
+
+[ Prior Insurance ]
+Prior Insurer        : Allstate
+Prior Expiry Date    : 03/31/2026
+Prior Policy No.     : ALL-IL-2025-0033891
+Prior Liability Limits : 50/100
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  TAB 3 — VEHICLE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+[ Vehicle Identification ]
+Color                : White
+Trim / Sub-model     : Long Range
+Model                : Model S
+Number of Doors      : 4
+VIN                  : 5YJSA1E26MF481023
+Make                 : Tesla
+Year                 : 2021
+Body Type            : Sedan
+
+[ Engine & Drivetrain ]
+Fuel Type            : Electric
+Cylinders            : 0  (Electric)
+Displacement (L)     : N/A
+Drive Type           : AWD
+Transmission         : Automatic (single-speed)
+
+[ Usage & Mileage ]
+Annual Miles Est.    : 10000
+Garaging Location    : Private Garage
+Current Mileage      : 22100
+Primary Use          : Commute
+
+[ Ownership / Purchase ]
+Title State          : Illinois
+Purchase Price ($)   : 79990
+Purchase Date        : 06/10/2021
+Current Market Value ($) : 58000
+Vehicle Condition    : Excellent
+
+[ Lien / Financing ]
+Lienholder Address   : 3500 Deer Creek Rd, Palo Alto, CA 94304
+Lienholder/Lender    : Tesla Financial Services
+Loan / Lease No.     : TFS-2021-0047712
+
+[ Safety & Features ]
+Backup Camera        : YES (check)
+Daytime Running Lights : YES (check)
+Custom Equipment Value ($) : (leave blank)
+Custom Equipment / Mods : NO
+GPS Tracking         : YES (check)
+Salvage Title        : NO
+Airbags              : YES (check)
+Adaptive Cruise Control : YES (check)
+ABS Brakes           : YES (check)
+Parking Sensors      : YES (check)
+Anti-Theft Device    : YES (check)
+Lane Departure Warning : YES (check)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  TAB 4 — COVERAGE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+[ Liability Limits ]
+Property Damage ($)      : 100,000
+Bodily Injury (k$/k$)    : 250/500
+
+[ Collision & Comprehensive ]
+Comprehensive Deductible : 500
+Collision Deductible     : 1000
+
+[ Additional Coverages ]
+Rideshare Coverage       : NO
+Personal Injury Protection (PIP) : YES (check)
+Roadside Assistance      : YES (check)
+Rental Reimbursement     : YES (check)
+Diminishing Deductible   : YES (check)
+GAP Insurance            : YES (check)
+New Car Replacement      : NO
+Uninsured/Underinsured Motorist : YES (check)
+Medical Payments         : NO
+Accident Forgiveness     : YES (check)
+
+[ Optional Limits ]
+UM/UIM Limit             : 250/500
+MedPay Limit ($)         : (leave blank)
+Rental Limit             : $40/day
+PIP Limit ($)            : 10000
+
+[ Discounts Applied ]
+Military                 : NO
+Good Driver (5+ yr clean): YES (check)
+Defensive Driving Course : YES (check)
+Multi-Car                : NO
+Affinity Group           : NO
+Loyalty Discount         : YES (check)
+Good Student             : NO
+Multi-Policy / Bundle    : NO
+
+[ Premium Summary ]
+Payment Frequency        : Monthly
+Total Premium ($)        : 312.55
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  TAB 5 — DRIVERS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+[ Driver 2 ]
+(none; leave all Driver 2 fields blank)
+
+[ Driver 3 ]
+(none; leave all Driver 3 fields blank)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  TAB 6 — HISTORY
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+[ Driving Record — Primary Driver (3-Year Look-Back) ]
+At-Fault Accidents       : 0
+Total Claims Filed       : 0
+Total Accidents          : 0
+Comprehensive Claims     : 0
+Not-At-Fault Accidents   : 0
+Moving Violations        : 0
+
+[ Special Flags ]
+SR-22 / FR-44 Filed      : NO
+DUI / DWI on Record      : NO
+License Suspended or Revoked : NO
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  TAB 7 — CLAIMS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+[ Claim Details ]
+Claim Status             : (leave blank)
+Claim Type               : (leave blank)
+Adjuster Name            : (leave blank)
+Resolution Date          : (leave blank)
+Claim Amount ($)         : (leave blank)
+Settlement Amount ($)    : (leave blank)
+Claim Number             : (none)
+Claim Description        : (leave blank)
+Deductible ($)           : (leave blank)
+Date of Loss             : (leave blank)
+
+[ Circumstances ]
+Policyholder At Fault    : NO
+Injury Involved          : NO
+Third Party Involved     : NO
+Police Report Filed      : NO
+
+[ Third Party Information ]
+Third Party Name         : (leave blank)
+Police Report No.        : (leave blank)
+Third Party Policy       : (leave blank)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  TAB 8 — PAYMENT
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+[ Billing Summary ]
+Total Premium ($)        : 312.55
+Auto-Pay Enrolled        : YES (check)
+Payment Frequency        : Monthly
+Payment Due Date         : 04/01/2026
+Last Payment Date        : (leave blank)
+Last Payment Amount ($)  : (leave blank)
+Balance Due ($)          : (leave blank)
+Down Payment ($)         : 625.10  (first 2 months upfront)
+
+[ Payment Method ]
+Method                   : Bank Transfer (ACH)
+
+[ Credit / Debit Card ]
+Card Number              : (leave blank)
+Cardholder Name          : (leave blank)
+CVV                      : (leave blank)
+Expiration (MM/YY)       : (leave blank)
+
+[ Bank Account (ACH) ]
+Routing Number           : 021000021
+Account Number           : 4400198827  [VERIFY before saving]
+Account Type             : Checking
+Bank Name                : Chase Bank
+
+[ Billing Address ]
+City                     : Chicago
+ZIP Code                 : 60642
+Street Address           : 1127 N. Halsted St, Apt 3B
+State                    : Illinois
+
+
+================================================================================
+  RECORD 5 OF 10
+================================================================================
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  TAB 1 — POLICY
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+[ Policy Information ]
+Policy Status        : Pending
+Policy Number        : PAI-2026-00445
+Policy Term          : 6 Month
+Expiration Date      : 10/15/2026
+Effective Date       : 04/15/2026
+Policy Type          : Liability Only
+
+[ Agent / Agency ]
+Underwriter          : Sylvia Okafor
+Agent ID             : AGT-0055
+Agent Name           : Derrick P. Nguyen
+Agency Name          : Pinnacle Auto — Downtown Branch
+
+[ Flags ]
+Renewal Policy       : NO
+E-Signature Obtained : NO
+Paperless / e-Delivery : NO
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  TAB 2 — POLICYHOLDER
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+[ Personal Information ]
+SSN                  : 291-55-8830  [VERIFY]
+Date of Birth        : 09/03/1972
+Marital Status       : Divorced
+Education Level      : Associate Degree
+Gender               : Male
+Occupation           : Employed Full-Time
+First Name           : Marcus
+Credit Score         : 690
+Last Name            : Webb
+Middle Name          : (none)
+Years Continuously Insured : 12
+Suffix               : (none)
+
+[ Contact Information ]
+Cell Phone           : (602) 553-9927
+Email Address        : mwebb1972@gmail.com
+Home Phone           : (602) 881-4410
+Work Phone           : (none)
+
+[ Address ]
+Years at Address     : 8
+Country              : United States
+Street Address 1     : 8842 E. Thomas Rd
+Street Address 2     : (none)
+City                 : Scottsdale
+State                : Arizona
+Homeowner            : YES (check)
+County               : Maricopa
+ZIP Code             : 85251
+
+[ Driver's License ]
+DL Expiration        : 09/03/2029
+DL Issuing State     : Arizona
+DL Number            : W44819022
+
+[ Prior Insurance ]
+Prior Insurer        : Progressive
+Prior Expiry Date    : 04/14/2026
+Prior Liability Limits : 25/50
+Prior Policy No.     : PRG-AZ-2025-098712
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  TAB 3 — VEHICLE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+[ Vehicle Identification ]
+Body Type            : Pickup Truck
+Make                 : Ford
+Year                 : 2013
+Color                : Red
+Number of Doors      : 4
+VIN                  : 1FTFW1ET5DFC56781
+Trim / Sub-model     : XLT SuperCrew
+Model                : F-150
+
+[ Engine & Drivetrain ]
+Displacement (L)     : 5.0
+Cylinders            : 8
+Drive Type           : 4WD
+Transmission         : Automatic
+Fuel Type            : Gasoline
+
+[ Usage & Mileage ]
+Garaging Location    : Private Garage
+Annual Miles Est.    : 14000
+Primary Use          : Commute
+Current Mileage      : 97340
+
+[ Ownership / Purchase ]
+Current Market Value ($) : 14800
+Purchase Price ($)   : 19500  (used)
+Title State          : Arizona
+Purchase Date        : 03/22/2018
+Vehicle Condition    : Fair
+
+[ Lien / Financing ]
+Loan / Lease No.     : (leave blank)
+Lienholder/Lender    : (none — owned outright)
+Lienholder Address   : (leave blank)
+
+[ Safety & Features ]
+Airbags              : YES (check)
+Custom Equipment / Mods : YES (check)
+Lane Departure Warning : NO
+ABS Brakes           : YES (check)
+Salvage Title        : NO
+Anti-Theft Device    : NO
+Backup Camera        : NO
+Custom Equipment Value ($) : 2400  (aftermarket lift kit + running boards)
+Daytime Running Lights : NO
+Adaptive Cruise Control : NO
+GPS Tracking         : NO
+Parking Sensors      : NO
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  TAB 4 — COVERAGE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+[ Liability Limits ]
+Property Damage ($)      : 25,000
+Bodily Injury (k$/k$)    : 25/50
+
+[ Collision & Comprehensive ]
+Comprehensive Deductible : (leave blank — liability only)
+Collision Deductible     : (leave blank — liability only)
+
+[ Additional Coverages ]
+Uninsured/Underinsured Motorist : YES (check)
+Diminishing Deductible   : NO
+Rideshare Coverage       : NO
+Personal Injury Protection (PIP) : NO
+Rental Reimbursement     : NO
+Accident Forgiveness     : NO
+GAP Insurance            : NO
+New Car Replacement      : NO
+Medical Payments         : NO
+Roadside Assistance      : NO
+
+[ Optional Limits ]
+Rental Limit             : (leave blank)
+UM/UIM Limit             : 25/50
+PIP Limit ($)            : (leave blank)
+MedPay Limit ($)         : (leave blank)
+
+[ Discounts Applied ]
+Defensive Driving Course : NO
+Multi-Car                : NO
+Good Student             : NO
+Affinity Group           : NO
+Loyalty Discount         : NO
+Multi-Policy / Bundle    : NO
+Military                 : NO
+Good Driver (5+ yr clean): NO
+
+[ Premium Summary ]
+Payment Frequency        : Monthly
+Total Premium ($)        : 89.15
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  TAB 5 — DRIVERS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+[ Driver 2 ]
+(none; leave all Driver 2 fields blank)
+
+[ Driver 3 ]
+(none; leave all Driver 3 fields blank)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  TAB 6 — HISTORY
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+[ Driving Record — Primary Driver (3-Year Look-Back) ]
+Moving Violations        : 2
+Not-At-Fault Accidents   : 1
+Total Accidents          : 1
+At-Fault Accidents       : 0
+Total Claims Filed       : 0
+Comprehensive Claims     : 0
+
+[ Special Flags ]
+SR-22 / FR-44 Filed      : NO
+License Suspended or Revoked : NO
+DUI / DWI on Record      : NO
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  TAB 7 — CLAIMS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+[ Claim Details ]
+Claim Amount ($)         : (leave blank)
+Resolution Date          : (leave blank)
+Date of Loss             : (leave blank)
+Claim Type               : (leave blank)
+Claim Status             : (leave blank)
+Claim Description        : (leave blank)
+Adjuster Name            : (leave blank)
+Claim Number             : (none)
+Settlement Amount ($)    : (leave blank)
+Deductible ($)           : (leave blank)
+
+[ Circumstances ]
+Injury Involved          : NO
+Police Report Filed      : NO
+Third Party Involved     : NO
+Policyholder At Fault    : NO
+
+[ Third Party Information ]
+Third Party Name         : (leave blank)
+Third Party Policy       : (leave blank)
+Police Report No.        : (leave blank)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  TAB 8 — PAYMENT
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+[ Billing Summary ]
+Down Payment ($)         : 89.15  (first month only)
+Last Payment Date        : (leave blank)
+Auto-Pay Enrolled        : NO
+Payment Due Date         : 04/15/2026
+Balance Due ($)          : (leave blank)
+Last Payment Amount ($)  : (leave blank)
+Payment Frequency        : Monthly
+Total Premium ($)        : 89.15
+
+[ Payment Method ]
+Method                   : Check
+
+[ Credit / Debit Card ]
+CVV                      : (leave blank)
+Card Number              : (leave blank)
+Cardholder Name          : (leave blank)
+Expiration (MM/YY)       : (leave blank)
+
+[ Bank Account (ACH) ]
+Account Type             : (leave blank)
+Routing Number           : (leave blank)
+Account Number           : (leave blank)
+Bank Name                : (leave blank)
+
+[ Billing Address ]
+State                    : Arizona
+Street Address           : 8842 E. Thomas Rd
+City                     : Scottsdale
+ZIP Code                 : 85251
+
+
+================================================================================
+  RECORD 6 OF 10
+================================================================================
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  TAB 1 — POLICY
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+[ Policy Information ]
+Policy Type          : Full Coverage
+Expiration Date      : 03/01/2027
+Policy Status        : Active
+Effective Date       : 03/01/2026
+Policy Term          : 12 Month
+Policy Number        : PAI-2026-00446
+
+[ Agent / Agency ]
+Underwriter          : Marcus D. Chen
+Agent ID             : AGT-0092
+Agent Name           : Sandra Whitfield
+Agency Name          : Pinnacle Auto — Riverside Branch
+
+[ Flags ]
+E-Signature Obtained : YES (check)
+Paperless / e-Delivery : YES (check)
+Renewal Policy       : YES (check)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  TAB 2 — POLICYHOLDER
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+[ Personal Information ]
+First Name           : Linda
+Education Level      : Bachelor's Degree
+Last Name            : Parrish
+Credit Score         : 752
+Suffix               : (none)
+Years Continuously Insured : 15
+Middle Name          : Ann
+Gender               : Female
+SSN                  : 459-31-7740  [VERIFY]
+Marital Status       : Married
+Date of Birth        : 06/01/1968
+Occupation           : Employed Full-Time
+
+[ Contact Information ]
+Work Phone           : (404) 700-0050
+Home Phone           : (404) 228-8813
+Cell Phone           : (404) 592-1120
+Email Address        : linda.parrish68@gmail.com
+
+[ Address ]
+State                : Georgia
+Street Address 2     : Unit 12C
+City                 : Atlanta
+ZIP Code             : 30326
+Country              : United States
+County               : Fulton
+Homeowner            : NO
+Street Address 1     : 3301 Peachtree Rd NE
+Years at Address     : 3
+
+[ Driver's License ]
+DL Expiration        : 06/01/2030
+DL Number            : P0339918
+DL Issuing State     : Georgia
+
+[ Prior Insurance ]
+Prior Expiry Date    : 02/28/2026
+Prior Insurer        : GEICO
+Prior Policy No.     : GEC-GA-2025-221148
+Prior Liability Limits : 100/300
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  TAB 3 — VEHICLE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+[ Vehicle Identification ]
+Model                : Rogue
+Color                : Silver
+Number of Doors      : 4
+Make                 : Nissan
+Year                 : 2018
+VIN                  : KNMAT2MT8JP551840
+Body Type            : SUV
+Trim / Sub-model     : SV
+
+[ Engine & Drivetrain ]
+Cylinders            : 4
+Drive Type           : AWD
+Fuel Type            : Gasoline
+Displacement (L)     : 2.5
+Transmission         : CVT
+
+[ Usage & Mileage ]
+Annual Miles Est.    : 11000
+Primary Use          : Commute
+Current Mileage      : 61200
+Garaging Location    : Private Garage
+
+[ Ownership / Purchase ]
+Purchase Price ($)   : 28400
+Purchase Date        : 11/08/2018
+Vehicle Condition    : Good
+Title State          : Georgia
+Current Market Value ($) : 17900
+
+[ Lien / Financing ]
+Loan / Lease No.     : (leave blank)
+Lienholder/Lender    : (none — owned outright)
+Lienholder Address   : (leave blank)
+
+[ Safety & Features ]
+Airbags              : YES (check)
+Custom Equipment / Mods : NO
+Backup Camera        : YES (check)
+Salvage Title        : NO
+Anti-Theft Device    : YES (check)
+Adaptive Cruise Control : NO
+GPS Tracking         : NO
+Lane Departure Warning : YES (check)
+Parking Sensors      : YES (check)
+Custom Equipment Value ($) : (leave blank)
+Daytime Running Lights : YES (check)
+ABS Brakes           : YES (check)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  TAB 4 — COVERAGE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+[ Liability Limits ]
+Property Damage ($)      : 50,000
+Bodily Injury (k$/k$)    : 100/300
+
+[ Collision & Comprehensive ]
+Comprehensive Deductible : 500
+Collision Deductible     : 500
+
+[ Additional Coverages ]
+GAP Insurance            : NO
+New Car Replacement      : NO
+Diminishing Deductible   : NO
+Rideshare Coverage       : NO
+Rental Reimbursement     : YES (check)
+Roadside Assistance      : YES (check)
+Medical Payments         : YES (check)
+Accident Forgiveness     : NO
+Personal Injury Protection (PIP) : NO
+Uninsured/Underinsured Motorist : YES (check)
+
+[ Optional Limits ]
+Rental Limit             : $30/day
+MedPay Limit ($)         : 2500
+UM/UIM Limit             : 100/300
+PIP Limit ($)            : (leave blank)
+
+[ Discounts Applied ]
+Defensive Driving Course : NO
+Good Driver (5+ yr clean): YES (check)
+Loyalty Discount         : YES (check)
+Good Student             : NO
+Affinity Group           : NO
+Military                 : NO
+Multi-Car                : NO
+Multi-Policy / Bundle    : YES (check)
+
+[ Premium Summary ]
+Payment Frequency        : Monthly
+Total Premium ($)        : 162.88
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  TAB 5 — DRIVERS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+[ Driver 2 ]
+Date of Birth        : 01/14/1966
+Last Name            : Parrish
+Accidents (3 yr)     : 0
+First Name           : Robert
+Violations (3 yr)    : 0
+DL Number            : P1190047
+Excluded Driver      : NO
+DL Expiration        : 01/14/2030
+Relationship         : Spouse
+Gender               : Male
+DL Issuing State     : Georgia
+SR-22 Required       : NO
+
+[ Driver 3 ]
+(none; leave all Driver 3 fields blank)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  TAB 6 — HISTORY
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+[ Driving Record — Primary Driver (3-Year Look-Back) ]
+At-Fault Accidents       : 0
+Moving Violations        : 0
+Total Accidents          : 0
+Not-At-Fault Accidents   : 0
+Total Claims Filed       : 0
+Comprehensive Claims     : 0
+
+[ Special Flags ]
+License Suspended or Revoked : NO
+DUI / DWI on Record      : NO
+SR-22 / FR-44 Filed      : NO
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  TAB 7 — CLAIMS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+[ Claim Details ]
+Claim Description        : (leave blank)
+Settlement Amount ($)    : (leave blank)
+Claim Amount ($)         : (leave blank)
+Adjuster Name            : (leave blank)
+Claim Type               : (leave blank)
+Claim Number             : (none)
+Claim Status             : (leave blank)
+Deductible ($)           : (leave blank)
+Resolution Date          : (leave blank)
+Date of Loss             : (leave blank)
+
+[ Circumstances ]
+Third Party Involved     : NO
+Police Report Filed      : NO
+Injury Involved          : NO
+Policyholder At Fault    : NO
+
+[ Third Party Information ]
+Police Report No.        : (leave blank)
+Third Party Policy       : (leave blank)
+Third Party Name         : (leave blank)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  TAB 8 — PAYMENT
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+[ Billing Summary ]
+Balance Due ($)          : (leave blank)
+Total Premium ($)        : 162.88
+Payment Due Date         : 03/01/2026
+Down Payment ($)         : 325.76  (first 2 months upfront)
+Last Payment Date        : 03/01/2026
+Last Payment Amount ($)  : 325.76
+Payment Frequency        : Monthly
+Auto-Pay Enrolled        : YES (check)
+
+[ Payment Method ]
+Method                   : Bank Transfer (ACH)
+
+[ Credit / Debit Card ]
+Cardholder Name          : (leave blank)
+Expiration (MM/YY)       : (leave blank)
+Card Number              : (leave blank)
+CVV                      : (leave blank)
+
+[ Bank Account (ACH) ]
+Account Type             : Checking
+Bank Name                : Wells Fargo
+Routing Number           : 121000248
+Account Number           : 7712003345  [VERIFY before saving]
+
+[ Billing Address ]
+State                    : Georgia
+ZIP Code                 : 30326
+Street Address           : 3301 Peachtree Rd NE, Unit 12C
+City                     : Atlanta
+
+
+================================================================================
+  RECORD 7 OF 10
+================================================================================
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  TAB 1 — POLICY
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+[ Policy Information ]
+Policy Number        : PAI-2026-00447
+Expiration Date      : 10/01/2026
+Policy Type          : Full Coverage
+Effective Date       : 04/01/2026
+Policy Status        : Active
+Policy Term          : 6 Month
+
+[ Agent / Agency ]
+Agency Name          : Pinnacle Auto — Eastside Branch
+Underwriter          : Sylvia Okafor
+Agent Name           : Cynthia Ramos
+Agent ID             : AGT-0012
+
+[ Flags ]
+Paperless / e-Delivery : YES (check)
+E-Signature Obtained : YES (check)
+Renewal Policy       : NO
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  TAB 2 — POLICYHOLDER
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+[ Personal Information ]
+Suffix               : III
+Occupation           : Employed Full-Time
+First Name           : Derek
+Marital Status       : Single
+Education Level      : Bachelor's Degree
+Credit Score         : 731
+Years Continuously Insured : 3
+SSN                  : 541-29-0087  [VERIFY]
+Date of Birth        : 03/17/1994
+Last Name            : Fontaine
+Gender               : Male
+Middle Name          : (none)
+
+[ Contact Information ]
+Work Phone           : (none)
+Email Address        : derekfontaine94@icloud.com
+Cell Phone           : (504) 448-2290
+Home Phone           : (none)
+
+[ Address ]
+County               : Orleans
+State                : Louisiana
+ZIP Code             : 70130
+City                 : New Orleans
+Homeowner            : NO
+Street Address 1     : 2200 Magazine St
+Country              : United States
+Years at Address     : 2
+Street Address 2     : Apt 5
+
+[ Driver's License ]
+DL Issuing State     : Louisiana
+DL Number            : F0094471
+DL Expiration        : 03/17/2028
+
+[ Prior Insurance ]
+Prior Insurer        : Farmers
+Prior Expiry Date    : 03/31/2026
+Prior Liability Limits : 50/100
+Prior Policy No.     : FRM-LA-2025-004418
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  TAB 3 — VEHICLE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+[ Vehicle Identification ]
+Make                 : Toyota
+VIN                  : 2T1BURHE0JC038812
+Number of Doors      : 4
+Model                : Corolla
+Color                : Blue
+Trim / Sub-model     : LE
+Body Type            : Sedan
+Year                 : 2018
+
+[ Engine & Drivetrain ]
+Fuel Type            : Gasoline
+Cylinders            : 4
+Displacement (L)     : 1.8
+Drive Type           : FWD
+Transmission         : CVT
+
+[ Usage & Mileage ]
+Annual Miles Est.    : 9000
+Current Mileage      : 45600
+Primary Use          : Pleasure
+Garaging Location    : Street
+Garaging Location    : Street
+
+[ Ownership / Purchase ]
+Purchase Price ($)   : 17900  (used)
+Current Market Value ($) : 13500
+Title State          : Louisiana
+Vehicle Condition    : Good
+Purchase Date        : 08/01/2020
+
+[ Lien / Financing ]
+Lienholder/Lender    : (none — owned outright)
+Loan / Lease No.     : (leave blank)
+Lienholder Address   : (leave blank)
+
+[ Safety & Features ]
+Lane Departure Warning : YES (check)
+Parking Sensors      : NO
+Backup Camera        : YES (check)
+Airbags              : YES (check)
+Custom Equipment / Mods : NO
+Custom Equipment Value ($) : (leave blank)
+ABS Brakes           : YES (check)
+Salvage Title        : NO
+Daytime Running Lights : YES (check)
+Adaptive Cruise Control : NO
+GPS Tracking         : NO
+Anti-Theft Device    : YES (check)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  TAB 4 — COVERAGE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+[ Liability Limits ]
+Property Damage ($)      : 100,000
+Bodily Injury (k$/k$)    : 100/300
+
+[ Collision & Comprehensive ]
+Comprehensive Deductible : 250
+Collision Deductible     : 500
+
+[ Additional Coverages ]
+Roadside Assistance      : YES (check)
+Uninsured/Underinsured Motorist : YES (check)
+Personal Injury Protection (PIP) : NO
+GAP Insurance            : NO
+Rental Reimbursement     : YES (check)
+Rideshare Coverage       : NO
+Accident Forgiveness     : NO
+Medical Payments         : YES (check)
+New Car Replacement      : NO
+Diminishing Deductible   : NO
+
+[ Optional Limits ]
+PIP Limit ($)            : (leave blank)
+UM/UIM Limit             : 100/300
+MedPay Limit ($)         : 2500
+Rental Limit             : $30/day
+
+[ Discounts Applied ]
+Loyalty Discount         : NO
+Military                 : NO
+Good Student             : NO
+Multi-Policy / Bundle    : NO
+Affinity Group           : NO
+Defensive Driving Course : NO
+Good Driver (5+ yr clean): YES (check)
+Multi-Car                : NO
+
+[ Premium Summary ]
+Payment Frequency        : Monthly
+Total Premium ($)        : 144.22
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  TAB 5 — DRIVERS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+[ Driver 2 ]
+(none; leave all Driver 2 fields blank)
+
+[ Driver 3 ]
+(none; leave all Driver 3 fields blank)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  TAB 6 — HISTORY
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+[ Driving Record — Primary Driver (3-Year Look-Back) ]
+Total Accidents          : 0
+Total Claims Filed       : 1
+Moving Violations        : 1
+Not-At-Fault Accidents   : 0
+At-Fault Accidents       : 0
+Comprehensive Claims     : 1
+
+[ Special Flags ]
+SR-22 / FR-44 Filed      : NO
+DUI / DWI on Record      : NO
+License Suspended or Revoked : NO
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  TAB 7 — CLAIMS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+[ Claim Details ]
+Date of Loss             : 01/14/2025
+Claim Amount ($)         : 3100.00
+Adjuster Name            : Patricia Kim
+Claim Number             : CLM-2025-22018
+Claim Description        : Vehicle flooded during Hurricane Ida remnant heavy rain
+Claim Type               : Comprehensive
+Resolution Date          : 02/03/2025
+Claim Status             : Closed
+Settlement Amount ($)    : 2850.00
+Deductible ($)           : 250.00
+                           event. Interior water damage to seat cushions and
+                           electronics. Vehicle was parked on street.
+
+[ Circumstances ]
+Policyholder At Fault    : NO
+Police Report Filed      : NO
+Injury Involved          : NO
+Third Party Involved     : NO
+
+[ Third Party Information ]
+Police Report No.        : (leave blank)
+Third Party Policy       : (leave blank)
+Third Party Name         : (leave blank)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  TAB 8 — PAYMENT
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+[ Billing Summary ]
+Payment Frequency        : Monthly
+Balance Due ($)          : (leave blank)
+Total Premium ($)        : 144.22
+Payment Due Date         : 04/01/2026
+Auto-Pay Enrolled        : YES (check)
+Last Payment Date        : (leave blank)
+Last Payment Amount ($)  : (leave blank)
+Down Payment ($)         : 288.44  (first 2 months upfront)
+
+[ Payment Method ]
+Method                   : Credit Card
+
+[ Credit / Debit Card ]
+CVV                      : 227  [VERIFY — do not store]
+Expiration (MM/YY)       : 11/28
+Cardholder Name          : Derek Fontaine III
+Card Number              : 4111 2233 5566 8877  [VERIFY before saving]
+
+[ Bank Account (ACH) ]
+Routing Number           : (leave blank)
+Bank Name                : (leave blank)
+Account Type             : (leave blank)
+Account Number           : (leave blank)
+
+[ Billing Address ]
+City                     : New Orleans
+ZIP Code                 : 70130
+State                    : Louisiana
+Street Address           : 2200 Magazine St, Apt 5
+
+
+================================================================================
+  RECORD 8 OF 10
+================================================================================
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  TAB 1 — POLICY
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+[ Policy Information ]
+Policy Term          : 6 Month
+Policy Status        : Active
+Policy Type          : Full Coverage
+Policy Number        : PAI-2026-00448
+Expiration Date      : 10/01/2026
+Effective Date       : 04/01/2026
+
+[ Agent / Agency ]
+Underwriter          : Marcus D. Chen
+Agency Name          : Pinnacle Auto — Northside Branch
+Agent Name           : Patricia Holloway
+Agent ID             : AGT-0031
+
+[ Flags ]
+Renewal Policy       : YES (check)
+E-Signature Obtained : YES (check)
+Paperless / e-Delivery : NO
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  TAB 2 — POLICYHOLDER
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+[ Personal Information ]
+SSN                  : 388-12-6654  [VERIFY]
+Last Name            : Jefferson
+Credit Score         : 711
+Marital Status       : Married
+Gender               : Female
+Suffix               : (none)
+Occupation           : Employed Full-Time
+Education Level      : Bachelor's Degree
+Date of Birth        : 10/25/1979
+Years Continuously Insured : 10
+Middle Name          : Mae
+First Name           : Yolanda
+
+[ Contact Information ]
+Home Phone           : (713) 882-5510
+Cell Phone           : (713) 441-3309
+Work Phone           : (713) 600-1200
+Email Address        : yolanda.jefferson@hotmail.com
+
+[ Address ]
+Street Address 2     : Apt 204
+State                : Texas
+Homeowner            : NO
+City                 : Houston
+Country              : United States
+County               : Harris
+Years at Address     : 5
+ZIP Code             : 77056
+Street Address 1     : 5520 Westheimer Rd
+
+[ Driver's License ]
+DL Issuing State     : Texas
+DL Expiration        : 10/25/2028
+DL Number            : J4421890
+
+[ Prior Insurance ]
+Prior Policy No.     : NW-TX-2025-119033
+Prior Liability Limits : 50/100
+Prior Expiry Date    : 03/31/2026
+Prior Insurer        : Nationwide
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  TAB 3 — VEHICLE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+[ Vehicle Identification ]
+Color                : White
+Make                 : Honda
+Model                : Pilot
+Body Type            : SUV
+Year                 : 2017
+Number of Doors      : 4
+VIN                  : 5FNYF6H51HB022447
+Trim / Sub-model     : EX-L
+
+[ Engine & Drivetrain ]
+Transmission         : Automatic
+Cylinders            : 6
+Drive Type           : AWD
+Fuel Type            : Gasoline
+Displacement (L)     : 3.5
+
+[ Usage & Mileage ]
+Current Mileage      : 83110
+Primary Use          : Commute
+Annual Miles Est.    : 13000
+Garaging Location    : Parking Lot
+
+[ Ownership / Purchase ]
+Purchase Date        : 05/19/2019
+Vehicle Condition    : Good
+Title State          : Texas
+Purchase Price ($)   : 33200  (used)
+Current Market Value ($) : 21600
+
+[ Lien / Financing ]
+Lienholder Address   : (leave blank)
+Lienholder/Lender    : (none — owned outright)
+Loan / Lease No.     : (leave blank)
+
+[ Safety & Features ]
+Salvage Title        : NO
+Custom Equipment / Mods : NO
+GPS Tracking         : NO
+Lane Departure Warning : NO
+Backup Camera        : YES (check)
+Daytime Running Lights : YES (check)
+Parking Sensors      : YES (check)
+Adaptive Cruise Control : NO
+Anti-Theft Device    : YES (check)
+Airbags              : YES (check)
+ABS Brakes           : YES (check)
+Custom Equipment Value ($) : (leave blank)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  TAB 4 — COVERAGE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+[ Liability Limits ]
+Property Damage ($)      : 100,000
+Bodily Injury (k$/k$)    : 100/300
+
+[ Collision & Comprehensive ]
+Comprehensive Deductible : 500
+Collision Deductible     : 1000
+
+[ Additional Coverages ]
+Accident Forgiveness     : YES (check)
+Diminishing Deductible   : NO
+New Car Replacement      : NO
+Personal Injury Protection (PIP) : YES (check)
+Roadside Assistance      : YES (check)
+Rental Reimbursement     : YES (check)
+Medical Payments         : NO
+Uninsured/Underinsured Motorist : YES (check)
+Rideshare Coverage       : NO
+GAP Insurance            : NO
+
+[ Optional Limits ]
+UM/UIM Limit             : 100/300
+MedPay Limit ($)         : (leave blank)
+Rental Limit             : $40/day
+PIP Limit ($)            : 2500
+
+[ Discounts Applied ]
+Good Driver (5+ yr clean): YES (check)
+Affinity Group           : NO
+Multi-Car                : YES (check)
+Defensive Driving Course : NO
+Loyalty Discount         : YES (check)
+Good Student             : NO
+Military                 : NO
+Multi-Policy / Bundle    : YES (check)
+
+[ Premium Summary ]
+Payment Frequency        : Monthly
+Total Premium ($)        : 158.40
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  TAB 5 — DRIVERS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+[ Driver 2 ]
+DL Issuing State     : Texas
+Relationship         : Spouse
+Date of Birth        : 07/18/1977
+SR-22 Required       : NO
+Violations (3 yr)    : 0
+Excluded Driver      : NO
+Last Name            : Jefferson
+First Name           : Calvin
+Accidents (3 yr)     : 0
+Gender               : Male
+DL Expiration        : 07/18/2029
+DL Number            : J0812940
+
+[ Driver 3 ]
+(none; leave all Driver 3 fields blank)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  TAB 6 — HISTORY
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+[ Driving Record — Primary Driver (3-Year Look-Back) ]
+Not-At-Fault Accidents   : 0
+Comprehensive Claims     : 2
+Total Claims Filed       : 2
+Total Accidents          : 0
+At-Fault Accidents       : 0
+Moving Violations        : 0
+
+[ Special Flags ]
+License Suspended or Revoked : NO
+DUI / DWI on Record      : NO
+SR-22 / FR-44 Filed      : NO
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  TAB 7 — CLAIMS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+[ Claim Details ]
+Claim Description        : Hailstorm caused dents to hood, roof, and trunk lid.
+Adjuster Name            : Gloria Esteban
+Claim Type               : Comprehensive
+Claim Amount ($)         : 2200.00
+Date of Loss             : 05/28/2024
+Deductible ($)           : 500.00
+Claim Number             : CLM-2024-40019
+Settlement Amount ($)    : 1700.00
+Resolution Date          : 06/10/2024
+Claim Status             : Closed
+                           No mechanical damage. Vehicle was parked in open
+                           parking lot during storm event.
+
+[ Circumstances ]
+Injury Involved          : NO
+Police Report Filed      : NO
+Third Party Involved     : NO
+Policyholder At Fault    : NO
+
+[ Third Party Information ]
+Third Party Name         : (leave blank)
+Third Party Policy       : (leave blank)
+Police Report No.        : (leave blank)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  TAB 8 — PAYMENT
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+[ Billing Summary ]
+Last Payment Date        : (leave blank)
+Auto-Pay Enrolled        : YES (check)
+Last Payment Amount ($)  : (leave blank)
+Payment Due Date         : 04/01/2026
+Balance Due ($)          : (leave blank)
+Down Payment ($)         : 316.80  (first 2 months upfront)
+Total Premium ($)        : 158.40
+Payment Frequency        : Monthly
+
+[ Payment Method ]
+Method                   : Credit Card
+
+[ Credit / Debit Card ]
+Card Number              : 4916 7700 3311 5540  [VERIFY before saving]
+Cardholder Name          : Yolanda M. Jefferson
+Expiration (MM/YY)       : 06/29
+CVV                      : 512  [VERIFY — do not store]
+
+[ Bank Account (ACH) ]
+Routing Number           : (leave blank)
+Bank Name                : (leave blank)
+Account Number           : (leave blank)
+Account Type             : (leave blank)
+
+[ Billing Address ]
+ZIP Code                 : 77056
+City                     : Houston
+State                    : Texas
+Street Address           : 5520 Westheimer Rd, Apt 204
+
+
+================================================================================
+  RECORD 9 OF 10
+================================================================================
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  TAB 1 — POLICY
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+[ Policy Information ]
+Effective Date       : 04/01/2026
+Policy Status        : Active
+Policy Term          : 12 Month
+Policy Type          : Liability Only
+Expiration Date      : 04/01/2027
+Policy Number        : PAI-2026-00449
+
+[ Agent / Agency ]
+Agency Name          : Pinnacle Auto — Eastside Branch
+Agent ID             : AGT-0012
+Underwriter          : Sylvia Okafor
+Agent Name           : Cynthia Ramos
+
+[ Flags ]
+Paperless / e-Delivery : YES (check)
+E-Signature Obtained : YES (check)
+Renewal Policy       : NO
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  TAB 2 — POLICYHOLDER
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+[ Personal Information ]
+Credit Score         : 622  [VERIFY — young driver / limited credit history]
+First Name           : Samuel
+SSN                  : 617-83-4402  [VERIFY]
+Last Name            : Brennan
+Occupation           : Student
+Suffix               : (none)
+Marital Status       : Single
+Middle Name          : Lee
+Years Continuously Insured : 1
+Date of Birth        : 07/30/2000
+Education Level      : Some College
+Gender               : Male
+
+[ Contact Information ]
+Work Phone           : (none)
+Email Address        : sbrennan2000@student.edu
+Home Phone           : (none)
+Cell Phone           : (614) 774-0019
+
+[ Address ]
+Street Address 2     : Dorm 204
+Homeowner            : NO
+Years at Address     : 1
+Street Address 1     : 390 W. 8th Ave
+ZIP Code             : 43201
+Country              : United States
+County               : Franklin
+City                 : Columbus
+State                : Ohio
+
+[ Driver's License ]
+DL Number            : B3310907
+DL Expiration        : 07/30/2027
+DL Issuing State     : Ohio
+
+[ Prior Insurance ]
+Prior Liability Limits : (none)
+Prior Policy No.     : (none)
+Prior Insurer        : (none — new policy, first time insured independently)
+Prior Expiry Date    : (none)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  TAB 3 — VEHICLE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+[ Vehicle Identification ]
+Trim / Sub-model     : LT
+Year                 : 2013
+Body Type            : Hatchback
+VIN                  : 1G1PA5SH5D7149822
+Make                 : Chevrolet
+Model                : Sonic
+Number of Doors      : 4
+Color                : Orange
+
+[ Engine & Drivetrain ]
+Drive Type           : FWD
+Fuel Type            : Gasoline
+Displacement (L)     : 1.4 Turbo
+Transmission         : Manual
+Cylinders            : 4
+
+[ Usage & Mileage ]
+Garaging Location    : Street
+Annual Miles Est.    : 8000
+Primary Use          : Pleasure
+Current Mileage      : 112400
+
+[ Ownership / Purchase ]
+Purchase Price ($)   : 8200  (used)
+Purchase Date        : 10/05/2022
+Title State          : Ohio
+Vehicle Condition    : Fair
+Current Market Value ($) : 5800
+
+[ Lien / Financing ]
+Lienholder Address   : (leave blank)
+Lienholder/Lender    : (none — owned outright)
+Loan / Lease No.     : (leave blank)
+
+[ Safety & Features ]
+Daytime Running Lights : NO
+Backup Camera        : NO
+Custom Equipment Value ($) : (leave blank)
+ABS Brakes           : YES (check)
+Adaptive Cruise Control : NO
+Salvage Title        : NO
+Lane Departure Warning : NO
+Custom Equipment / Mods : NO
+Airbags              : YES (check)
+Anti-Theft Device    : NO
+Parking Sensors      : NO
+GPS Tracking         : NO
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  TAB 4 — COVERAGE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+[ Liability Limits ]
+Property Damage ($)      : 25,000
+Bodily Injury (k$/k$)    : 25/50
+
+[ Collision & Comprehensive ]
+Comprehensive Deductible : (leave blank — liability only)
+Collision Deductible     : (leave blank — liability only)
+
+[ Additional Coverages ]
+GAP Insurance            : NO
+Medical Payments         : NO
+Rental Reimbursement     : NO
+Personal Injury Protection (PIP) : NO
+Roadside Assistance      : YES (check)
+Rideshare Coverage       : NO
+Uninsured/Underinsured Motorist : YES (check)
+Diminishing Deductible   : NO
+New Car Replacement      : NO
+Accident Forgiveness     : NO
+
+[ Optional Limits ]
+PIP Limit ($)            : (leave blank)
+Rental Limit             : (leave blank)
+UM/UIM Limit             : 25/50
+MedPay Limit ($)         : (leave blank)
+
+[ Discounts Applied ]
+Good Student             : YES (check)  ← GPA 3.6, Dean's List
+Loyalty Discount         : NO
+Multi-Car                : NO
+Affinity Group           : NO
+Military                 : NO
+Good Driver (5+ yr clean): NO
+Multi-Policy / Bundle    : NO
+Defensive Driving Course : YES (check)
+
+[ Premium Summary ]
+Payment Frequency        : Monthly
+Total Premium ($)        : 102.44
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  TAB 5 — DRIVERS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+[ Driver 2 ]
+(none; leave all Driver 2 fields blank)
+
+[ Driver 3 ]
+(none; leave all Driver 3 fields blank)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  TAB 6 — HISTORY
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+[ Driving Record — Primary Driver (3-Year Look-Back) ]
+Moving Violations        : 1
+At-Fault Accidents       : 0
+Total Accidents          : 0
+Not-At-Fault Accidents   : 0
+Total Claims Filed       : 0
+Comprehensive Claims     : 0
+
+[ Special Flags ]
+License Suspended or Revoked : NO
+SR-22 / FR-44 Filed      : NO
+DUI / DWI on Record      : NO
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  TAB 7 — CLAIMS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+[ Claim Details ]
+Adjuster Name            : (leave blank)
+Date of Loss             : (leave blank)
+Claim Amount ($)         : (leave blank)
+Claim Type               : (leave blank)
+Claim Number             : (none)
+Resolution Date          : (leave blank)
+Deductible ($)           : (leave blank)
+Claim Description        : (leave blank)
+Settlement Amount ($)    : (leave blank)
+Claim Status             : (leave blank)
+
+[ Circumstances ]
+Injury Involved          : NO
+Policyholder At Fault    : NO
+Third Party Involved     : NO
+Police Report Filed      : NO
+
+[ Third Party Information ]
+Third Party Name         : (leave blank)
+Third Party Policy       : (leave blank)
+Police Report No.        : (leave blank)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  TAB 8 — PAYMENT
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+[ Billing Summary ]
+Payment Due Date         : 04/01/2026
+Payment Frequency        : Monthly
+Down Payment ($)         : 102.44  (first month only)
+Last Payment Date        : (leave blank)
+Balance Due ($)          : (leave blank)
+Auto-Pay Enrolled        : NO
+Last Payment Amount ($)  : (leave blank)
+Total Premium ($)        : 102.44
+
+[ Payment Method ]
+Method                   : Debit Card
+
+[ Credit / Debit Card ]
+Expiration (MM/YY)       : 05/27
+Cardholder Name          : Samuel L. Brennan
+CVV                      : 901  [VERIFY — do not store]
+Card Number              : 4000 1122 3344 5566  [VERIFY before saving]
+
+[ Bank Account (ACH) ]
+Bank Name                : (leave blank)
+Account Type             : (leave blank)
+Routing Number           : (leave blank)
+Account Number           : (leave blank)
+
+[ Billing Address ]
+Street Address           : 390 W. 8th Ave, Dorm 204
+ZIP Code                 : 43201
+State                    : Ohio
+City                     : Columbus
+
+
+================================================================================
+  RECORD 10 OF 10
+================================================================================
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  TAB 1 — POLICY
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+[ Policy Information ]
+Policy Number        : PAI-2026-00450
+Policy Term          : 12 Month
+Policy Status        : Active
+Expiration Date      : 04/01/2027
+Policy Type          : Full Coverage
+Effective Date       : 04/01/2026
+
+[ Agent / Agency ]
+Agent Name           : Sandra Whitfield
+Underwriter          : Marcus D. Chen
+Agency Name          : Pinnacle Auto — Riverside Branch
+Agent ID             : AGT-0092
+
+[ Flags ]
+E-Signature Obtained : YES (check)
+Paperless / e-Delivery : YES (check)
+Renewal Policy       : YES (check)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  TAB 2 — POLICYHOLDER
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+[ Personal Information ]
+Marital Status       : Married
+Suffix               : (none)
+Date of Birth        : 04/11/1981
+First Name           : Raj
+Gender               : Male
+Credit Score         : 801
+SSN                  : 502-67-3318  [VERIFY]
+Occupation           : Self-Employed
+Last Name            : Patel
+Education Level      : Master's Degree
+Years Continuously Insured : 14
+Middle Name          : (none)
+
+[ Contact Information ]
+Cell Phone           : (408) 591-0044
+Work Phone           : (408) 330-7712  ← same as home
+Home Phone           : (408) 330-7712
+Email Address        : raj.patel81@gmail.com
+
+[ Address ]
+Street Address 1     : 1440 Saratoga Ave
+Homeowner            : YES (check)
+State                : California
+Street Address 2     : (none)
+County               : Santa Clara
+Country              : United States
+City                 : San Jose
+Years at Address     : 7
+ZIP Code             : 95129
+
+[ Driver's License ]
+DL Expiration        : 04/11/2029
+DL Issuing State     : California
+DL Number            : P7782011
+
+[ Prior Insurance ]
+Prior Policy No.     : AAA-CA-2025-7741009
+Prior Expiry Date    : 03/31/2026
+Prior Liability Limits : 100/300
+Prior Insurer        : AAA Insurance
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  TAB 3 — VEHICLE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+[ Vehicle Identification ]
+Body Type            : Sedan
+Color                : Midnight Black
+VIN                  : 19XFC2F83LE203977
+Model                : Civic
+Number of Doors      : 4
+Make                 : Honda
+Year                 : 2020
+Trim / Sub-model     : Touring
+
+[ Engine & Drivetrain ]
+Displacement (L)     : 1.5 Turbo
+Drive Type           : FWD
+Transmission         : CVT
+Cylinders            : 4
+Fuel Type            : Gasoline
+
+[ Usage & Mileage ]
+Primary Use          : Pleasure
+Annual Miles Est.    : 8000
+Garaging Location    : Private Garage
+Current Mileage      : 31700
+
+[ Ownership / Purchase ]
+Purchase Date        : 03/01/2020
+Purchase Price ($)   : 27400
+Title State          : California
+Current Market Value ($) : 20500
+Vehicle Condition    : Excellent
+
+[ Lien / Financing ]
+Lienholder Address   : (leave blank)
+Loan / Lease No.     : (leave blank)
+Lienholder/Lender    : (none — owned outright)
+
+[ Safety & Features ]
+Lane Departure Warning : YES (check)
+GPS Tracking         : NO
+Custom Equipment / Mods : NO
+ABS Brakes           : YES (check)
+Airbags              : YES (check)
+Custom Equipment Value ($) : (leave blank)
+Adaptive Cruise Control : YES (check)
+Daytime Running Lights : YES (check)
+Anti-Theft Device    : YES (check)
+Backup Camera        : YES (check)
+Salvage Title        : NO
+Parking Sensors      : YES (check)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  TAB 4 — COVERAGE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+[ Liability Limits ]
+Property Damage ($)      : 100,000
+Bodily Injury (k$/k$)    : 250/500
+
+[ Collision & Comprehensive ]
+Comprehensive Deductible : 250
+Collision Deductible     : 500
+
+[ Additional Coverages ]
+GAP Insurance            : NO
+Uninsured/Underinsured Motorist : YES (check)
+Accident Forgiveness     : YES (check)
+Personal Injury Protection (PIP) : NO
+New Car Replacement      : NO
+Rideshare Coverage       : NO
+Medical Payments         : YES (check)
+Rental Reimbursement     : YES (check)
+Roadside Assistance      : YES (check)
+Diminishing Deductible   : YES (check)
+
+[ Optional Limits ]
+PIP Limit ($)            : (leave blank)
+Rental Limit             : $40/day
+MedPay Limit ($)         : 5000
+UM/UIM Limit             : 250/500
+
+[ Discounts Applied ]
+Multi-Car                : NO
+Military                 : NO
+Good Student             : NO
+Good Driver (5+ yr clean): YES (check)
+Loyalty Discount         : YES (check)
+Defensive Driving Course : NO
+Affinity Group           : NO
+Multi-Policy / Bundle    : YES (check)
+
+[ Premium Summary ]
+Payment Frequency        : Monthly
+Total Premium ($)        : 171.60
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  TAB 5 — DRIVERS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+[ Driver 2 ]
+SR-22 Required       : NO
+DL Issuing State     : California
+Excluded Driver      : NO
+Date of Birth        : 08/22/1983
+Gender               : Female
+Violations (3 yr)    : 0
+Accidents (3 yr)     : 0
+Relationship         : Spouse
+DL Expiration        : 08/22/2029
+DL Number            : P8801023
+Last Name            : Patel
+First Name           : Priya
+
+[ Driver 3 ]
+(none; leave all Driver 3 fields blank)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  TAB 6 — HISTORY
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+[ Driving Record — Primary Driver (3-Year Look-Back) ]
+Moving Violations        : 0
+Comprehensive Claims     : 0
+At-Fault Accidents       : 0
+Total Accidents          : 0
+Total Claims Filed       : 0
+Not-At-Fault Accidents   : 0
+
+[ Special Flags ]
+DUI / DWI on Record      : NO
+License Suspended or Revoked : NO
+SR-22 / FR-44 Filed      : NO
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  TAB 7 — CLAIMS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+[ Claim Details ]
+Claim Amount ($)         : (leave blank)
+Adjuster Name            : (leave blank)
+Date of Loss             : (leave blank)
+Resolution Date          : (leave blank)
+Claim Description        : (leave blank)
+Deductible ($)           : (leave blank)
+Claim Status             : (leave blank)
+Claim Number             : (none)
+Claim Type               : (leave blank)
+Settlement Amount ($)    : (leave blank)
+
+[ Circumstances ]
+Third Party Involved     : NO
+Injury Involved          : NO
+Police Report Filed      : NO
+Policyholder At Fault    : NO
+
+[ Third Party Information ]
+Third Party Policy       : (leave blank)
+Third Party Name         : (leave blank)
+Police Report No.        : (leave blank)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  TAB 8 — PAYMENT
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+[ Billing Summary ]
+Payment Frequency        : Monthly
+Last Payment Date        : (leave blank)
+Auto-Pay Enrolled        : YES (check)
+Down Payment ($)         : 343.20  (first 2 months upfront)
+Total Premium ($)        : 171.60
+Last Payment Amount ($)  : (leave blank)
+Balance Due ($)          : (leave blank)
+Payment Due Date         : 04/01/2026
+
+[ Payment Method ]
+Method                   : Bank Transfer (ACH)
+
+[ Credit / Debit Card ]
+CVV                      : (leave blank)
+Cardholder Name          : (leave blank)
+Expiration (MM/YY)       : (leave blank)
+Card Number              : (leave blank)
+
+[ Bank Account (ACH) ]
+Routing Number           : 121000358
+Account Number           : 9900448812  [VERIFY before saving]
+Account Type             : Checking
+Bank Name                : Bank of America
+
+[ Billing Address ]
+ZIP Code                 : 95129
+Street Address           : 1440 Saratoga Ave
+City                     : San Jose
+State                    : California
+
+
+================================================================================
+  END OF BATCH PAI-20260318-04
+  Reviewed By:   ______________ | Date: ______________
+  Total Records: 10 | Entered By: ______________ | Date: ______________
+================================================================================

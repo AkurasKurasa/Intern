@@ -17,6 +17,7 @@ trigger_keywords/trigger_apps can never match), not a special case, but
 it's cheap to prove directly rather than just assumed from the code shape.
 """
 import sys
+import json
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -298,3 +299,23 @@ class TestRouteNeverReturnsAScriptCapsule:
         result = registry.route("run the sheet matcher", "Grade Portal", fallback="fallback.pt")
 
         assert result == "fallback.pt"
+
+
+class TestLocalServerField:
+    def test_defaults_to_empty_string(self):
+        capsule = WorkflowCapsule(
+            name="x", description="", model_path="", trigger_keywords=[], trigger_apps=[],
+        )
+        assert capsule.local_server == ""
+
+    def test_round_trips_through_registry_load(self, tmp_path):
+        registry_path = tmp_path / "registry.json"
+        registry_path.write_text(json.dumps({"capsules": [{
+            "name": "Inbox Dispatch", "description": "", "model_path": "",
+            "trigger_keywords": [], "trigger_apps": [], "kind": "url",
+            "url": "http://localhost:8765/",
+            "local_server": "components/inbox_router/local_server.py",
+        }]}), encoding="utf-8")
+        registry = CapsuleRegistry(registry_path=str(registry_path))
+        capsule = registry.list_capsules()[0]
+        assert capsule.local_server == "components/inbox_router/local_server.py"

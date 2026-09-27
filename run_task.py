@@ -254,6 +254,19 @@ if __name__ == "__main__":
                               "prediction. For comparing a normal run against a model-off "
                               "run on the same record — does it still complete, and how "
                               "much slower/faster. Not for normal use.")
+    _parser.add_argument("--no_batch_fill", action="store_true",
+                         help="Ablation: turn off the batch fast-fill, so every field is "
+                              "reached by a real click and the TRANSFORMER picks the "
+                              "target. The normal path batch-writes values directly and "
+                              "Tabs between them, which skips the transformer entirely -- "
+                              "a normal run can finish with the model never consulted. Use "
+                              "this to measure what the transformer contributes, or to see "
+                              "it work in the decision HUD.")
+    _parser.add_argument("--force_llm_values", action="store_true",
+                         help="Ablation: turn off the direct lookup, so every value has to "
+                              "come from the LLM instead of being matched out of the intake "
+                              "file. Answers 'how much of this is the model and how much is "
+                              "plain text matching'. Slower, and needs LM Studio running.")
     _args = _parser.parse_args()
     if _args.end_record is not None and _args.end_record < _args.start_record:
         logger.warning("--end_record (%d) is before --start_record (%d) — the run will "
@@ -333,6 +346,8 @@ if __name__ == "__main__":
             pure_transformer = False,
             disable_auto_handlers = True,   # kill legacy heuristics — transformer(WHERE)+LLM(WHAT) merge drives
             disable_transformer = _args.disable_transformer,  # ablation test, off by default
+            disable_batch_fill    = _args.no_batch_fill,      # ablation, off by default
+            disable_source_lookup = _args.force_llm_values,   # ablation, off by default
             observer         = _observer,   # None → agent defaults to UIA; else vision
             visual_reader    = visual_reader,
             visual_cache     = visual_cache,

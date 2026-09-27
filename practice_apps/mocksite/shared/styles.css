@@ -1,41 +1,90 @@
 /* Styling is held constant across every variant so the experiment isolates
-   structure and labelling. Do not fork this file per variant. */
+   structure and labelling. Do not fork this file per variant.
+
+   That rule is about CONSISTENCY, not about staying ugly: every variant links
+   this one file, so improving it here improves all eight identically and the
+   experiment stays exactly as controlled as it was. What must never happen is
+   v0 looking different from v2.
+
+   Two further rules this file keeps, because the instrument depends on them:
+
+     * CSS only. No markup, no labels, no attributes, no column order. The Page
+       Scanner and the label cascade read the DOM; restyling must leave what
+       they see byte-for-byte identical. Proven by scanning all eight variants
+       before and after and diffing the descriptors.
+     * The four cell states stay unmistakable at a glance - not encoded, unsaved
+       edit, rejected on save, just saved. Results are read off this page, so a
+       state that is merely pretty but ambiguous is a regression. */
 
 :root {
-  --bg: #f4f5f7;
+  /* Neutral ramp: one hue, so the accent is the only real colour on screen. */
+  --bg: #eef1f5;
   --panel: #ffffff;
-  --border: #d6d9de;
-  --text: #1d2125;
-  --muted: #626f7e;
-  --accent: #2b5fa8;
-  --danger: #a83232;
-  --ok: #2c6e49;
+  --border: #dfe3e9;
+  --border-soft: #e9ecf1;
+  --text: #16202b;
+  --muted: #64748b;
+  --faint: #94a3b8;
+
+  --accent: #1f5fd0;
+  --accent-soft: #eaf1fd;
+  --danger: #b4232b;
+  --danger-soft: #fdeceb;
+  --ok: #18794e;
+  --ok-soft: #e7f4ec;
+
   --row-alt: #fafbfc;
+  --row-hover: #f2f6fd;
+  --head: #f6f8fa;
+
+  /* A cell with nothing in it yet. Quiet enough to read past, distinct enough
+     to count. The old treatment was a hard diagonal hatch on every empty cell,
+     which on a 50-row sheet covered most of the table and buried the values
+     that were actually there. */
+  --blank: #f4f6f9;
+
+  --radius: 10px;
+  --radius-sm: 6px;
+  --shadow: 0 1px 2px rgba(16, 32, 48, .06), 0 8px 24px -12px rgba(16, 32, 48, .18);
+  --ring: 0 0 0 3px rgba(31, 95, 208, .18);
 }
 
 * { box-sizing: border-box; }
 
 body {
   margin: 0;
-  padding: 24px;
+  padding: 32px 24px 48px;
   background: var(--bg);
   color: var(--text);
-  font: 14px/1.45 "Segoe UI", Arial, sans-serif;
+  font: 14px/1.5 "Segoe UI", system-ui, -apple-system, Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
 }
 
 main { max-width: 1220px; margin: 0 auto; }
 
-h1 { font-size: 20px; margin: 0 0 4px; }
-h2 { font-size: 15px; margin: 0 0 12px; font-weight: 600; }
+h1 {
+  font-size: 22px;
+  line-height: 1.25;
+  letter-spacing: -0.015em;
+  margin: 0 0 6px;
+  font-weight: 650;
+}
 
-.subtitle { color: var(--muted); margin: 0 0 20px; }
+h2 { font-size: 15px; margin: 0 0 12px; font-weight: 650; letter-spacing: -0.01em; }
+
+.subtitle {
+  color: var(--muted);
+  margin: 0 0 22px;
+  max-width: 78ch;
+}
 
 .panel {
   background: var(--panel);
   border: 1px solid var(--border);
-  border-radius: 4px;
-  padding: 16px;
+  border-radius: var(--radius);
+  padding: 18px;
   margin-bottom: 20px;
+  box-shadow: var(--shadow);
 }
 
 /* ---- form controls ---- */
@@ -45,9 +94,9 @@ label { font-weight: 600; margin-bottom: 4px; }
 input, select, textarea {
   font: inherit;
   width: 100%;
-  padding: 6px 8px;
+  padding: 7px 9px;
   border: 1px solid var(--border);
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
   background: #fff;
   color: inherit;
 }
@@ -55,27 +104,35 @@ input, select, textarea {
 textarea { min-height: 58px; resize: vertical; }
 
 input:focus, select:focus, textarea:focus {
-  outline: 2px solid var(--accent);
-  outline-offset: -1px;
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: var(--ring);
 }
 
 .actions { display: flex; gap: 8px; align-items: center; }
 
 button {
   font: inherit;
-  padding: 7px 16px;
+  font-weight: 600;
+  padding: 8px 16px;
   border: 1px solid var(--accent);
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
   background: var(--accent);
   color: #fff;
   cursor: pointer;
+  transition: background .12s ease, border-color .12s ease, box-shadow .12s ease;
 }
 
-button.secondary { background: #fff; color: var(--text); border-color: var(--border); }
+button:hover { background: #1a51b4; border-color: #1a51b4; }
+button:active { background: #17489f; }
+button:focus-visible { outline: none; box-shadow: var(--ring); }
 
-.status { color: var(--muted); font-weight: normal; }
-.status.error { color: var(--danger); }
-.status.ok { color: var(--ok); }
+button.secondary { background: #fff; color: var(--text); border-color: var(--border); }
+button.secondary:hover { background: var(--head); border-color: #cbd3dd; }
+
+.status { color: var(--muted); font-weight: 500; }
+.status.error { color: var(--danger); font-weight: 600; }
+.status.ok { color: var(--ok); font-weight: 600; }
 
 /* ---- toolbar above the sheet ---- */
 
@@ -85,7 +142,7 @@ button.secondary { background: #fff; color: var(--text); border-color: var(--bor
   align-items: center;
   gap: 12px 16px;
   flex-wrap: wrap;
-  margin-bottom: 12px;
+  margin-bottom: 14px;
 }
 
 .toolbar h2 { margin: 0; }
@@ -96,28 +153,48 @@ button.secondary { background: #fff; color: var(--text); border-color: var(--bor
   max-height: 560px;
   overflow: auto;
   border: 1px solid var(--border);
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
+  background: #fff;
 }
 
-table { width: 100%; border-collapse: collapse; }
+table { width: 100%; border-collapse: separate; border-spacing: 0; }
+
+/* Let the sheet keep its column widths and scroll sideways instead of
+   compressing. The wider variants (V3 adds Section and Adviser, V5 adds two
+   more) have nine columns to fit; squeezed into the container they clipped
+   "BS Computer Science" down to "BS Computer Sc". .table-scroll already
+   scrolls, so the space is there - the table just had to stop giving it up. */
+.sheet { min-width: max-content; }
 
 th, td {
-  border-bottom: 1px solid var(--border);
-  padding: 6px 8px;
+  border-bottom: 1px solid var(--border-soft);
+  padding: 9px 12px;
   text-align: left;
   vertical-align: top;
-  white-space: nowrap;
 }
+
+/* nowrap belongs to the roster sheet, where a cell holds one short value and
+   wrapping would ruin the grid. Applying it to every table on the site put it
+   on the index's prose table too, where the long "Tests" sentences could not
+   wrap and overflowed the card instead. */
+.sheet th, .sheet td { white-space: nowrap; }
 
 thead th {
   position: sticky;
   top: 0;
-  z-index: 1;
-  background: #eceef1;
-  font-size: 12px;
+  z-index: 2;
+  background: var(--head);
+  border-bottom: 1px solid var(--border);
+  font-size: 11px;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.06em;
   color: var(--muted);
+  padding-top: 10px;
+  padding-bottom: 10px;
+  /* The sticky row needs its own hairline: a border on a sticky cell scrolls
+     away with the cell in some engines, a shadow does not. */
+  box-shadow: inset 0 -1px 0 var(--border);
 }
 
 td.num, th.num { text-align: right; }
@@ -128,34 +205,54 @@ td.num, th.num { text-align: right; }
    until hovered or focused, so a 50-row sheet reads as a grid of values rather
    than as 250 stacked form controls. */
 
-.sheet th, .sheet td { border-right: 1px solid var(--border); }
+.sheet th, .sheet td { border-right: 1px solid var(--border-soft); }
 .sheet th:last-child, .sheet td:last-child { border-right: 0; }
 
 .sheet tbody tr:nth-child(even) { background: var(--row-alt); }
-.sheet tbody tr:hover { background: #f1f5fa; }
+.sheet tbody tr:hover { background: var(--row-hover); }
 
 /* Cells that hold an input give up their padding to it, so the whole cell is
    a click target. */
 .sheet td { padding: 0; }
-.sheet td.fixed, .sheet td.pick, .sheet th { padding: 6px 8px; }
-.sheet td.fixed { padding-top: 8px; }
-.sheet td.fixed.num { color: var(--muted); }
+.sheet td.fixed, .sheet td.pick, .sheet th { padding: 7px 10px; }
+.sheet td.fixed { padding-top: 9px; }
+
+/* The identity columns are printed by the portal, not typed. Student ID and
+   Student Name stay at full strength - they are what a person scans down to
+   find a row, and what the executor verifies alignment against - while the
+   Index is only a counter and recedes. Tabular figures so the IDs and grades
+   form clean vertical columns instead of ragged ones. */
+.sheet td.fixed { font-variant-numeric: tabular-nums; }
+.sheet td.fixed.num { color: var(--faint); }
 
 /* Format hint inside a column header. Not part of the header's name. */
-.hint { text-transform: none; letter-spacing: 0; font-weight: normal; opacity: 0.75; }
+.hint {
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 500;
+  color: var(--faint);
+}
 
 .sheet td input, .sheet td select, .sheet td textarea {
   border: 1px solid transparent;
   border-radius: 0;
   background: transparent;
-  padding: 6px 8px;
-  min-height: 31px;
+  padding: 7px 10px;
+  min-height: 33px;
   color: inherit;
+  font-variant-numeric: tabular-nums;
+  transition: background .1s ease, box-shadow .1s ease;
 }
 
+/* Placeholders repeat down all 50 rows of a column. At full strength they read
+   as content and compete with the values that are really there. */
+.sheet td ::placeholder,
+.sheet td input::placeholder,
+.sheet td textarea::placeholder { color: var(--faint); opacity: .55; }
+
 .sheet td textarea {
-  min-height: 31px;
-  height: 31px;
+  min-height: 33px;
+  height: 33px;
   overflow: hidden;
   resize: none;
   white-space: pre;
@@ -168,70 +265,184 @@ td.num, th.num { text-align: right; }
 
 .sheet td input:focus, .sheet td select:focus, .sheet td textarea:focus {
   background: #fff;
-  outline: 2px solid var(--accent);
-  outline-offset: -2px;
+  border-color: var(--accent);
+  box-shadow: var(--ring);
+  position: relative;
+  z-index: 1;
 }
 
 /* Room to read a note while writing it; collapses again on blur. */
 .sheet td textarea:focus { height: 66px; white-space: pre-wrap; }
 
 .sheet input[type="checkbox"] {
-  width: auto;
+  width: 15px;
+  height: 15px;
   min-height: 0;
   padding: 0;
-  margin: 4px 0 0;
+  margin: 5px 0 0;
+  accent-color: var(--accent);
+  cursor: pointer;
 }
 
-.sheet .pick { width: 34px; text-align: center; }
-.c-index { width: 56px; }
-.c-id { width: 108px; }
+.sheet .pick { width: 38px; text-align: center; }
+.c-index { width: 60px; }
+.c-id { width: 112px; }
 .c-lrn { width: 150px; }
 .c-name { width: 200px; }
-.c-tiny { width: 68px; }
-.c-small { width: 104px; }
+.c-tiny { width: 72px; }
+.c-small { width: 106px; }
 .c-wide { width: 210px; }
 .c-widest { width: 260px; }
 
-/* A cell with no value yet. The hatch distinguishes "not encoded" from an
-   encoded empty string, which matters when reading results off the page. */
-td.blank {
-  background: repeating-linear-gradient(
-    45deg, transparent, transparent 6px, #eef0f2 6px, #eef0f2 12px);
-}
+/* ---- cell states ----
+
+   Four states, each readable at a glance and each distinct from the others by
+   more than colour alone, so the page can still be read off a screenshot or by
+   someone who does not separate red from green. */
+
+/* A cell with no value yet. Distinguishes "not encoded" from an encoded empty
+   string, which matters when reading results off the page. */
+td.blank { background: var(--blank); }
+.sheet tbody tr:hover td.blank { background: #eef2f8; }
 
 /* Edited but not yet committed to the record. */
 tr.dirty > td:first-child { box-shadow: inset 3px 0 0 var(--accent); }
 
 /* Rejected by validation on the last save attempt. */
-td.invalid { background: #fbeaea; box-shadow: inset 0 0 0 1px var(--danger); }
+td.invalid {
+  background: var(--danger-soft);
+  box-shadow: inset 0 0 0 1px var(--danger);
+}
 
-tr.just-saved td { background: #eaf3ec; }
+tr.just-saved td { background: var(--ok-soft); }
+tr.just-saved > td:first-child { box-shadow: inset 3px 0 0 var(--ok); }
 
 /* ---- legend ---- */
 
 .legend {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 18px;
   flex-wrap: wrap;
-  margin: 10px 0 0;
+  margin: 14px 0 2px;
   color: var(--muted);
   font-size: 12px;
 }
 
-.legend .key { display: inline-flex; align-items: center; gap: 6px; }
+.legend .key { display: inline-flex; align-items: center; gap: 7px; }
 
 .legend .swatch {
-  width: 22px;
-  height: 13px;
+  width: 24px;
+  height: 14px;
   border: 1px solid var(--border);
+  border-radius: 3px;
   background: #fff;
 }
 
-.legend .swatch.blank {
-  background: repeating-linear-gradient(
-    45deg, transparent, transparent 6px, #eef0f2 6px, #eef0f2 12px);
+.legend .swatch.blank { background: var(--blank); }
+.legend .swatch.dirty { border-left: 3px solid var(--accent); }
+.legend .swatch.invalid { background: var(--danger-soft); border-color: var(--danger); }
+
+/* ==================================================================
+   Main section
+   ------------------------------------------------------------------
+   Everything below shapes the page body itself - the roster card on a
+   variant page, and the variant catalogue on the index. Still no
+   markup: the progress meter is a pseudo-element driven by a custom
+   property portal.js sets, so the DOM the Page Scanner walks is
+   unchanged.
+   ================================================================== */
+
+/* ---- page title block ---- */
+
+.page-title { margin-bottom: 20px; }
+
+h1 { font-size: 26px; font-weight: 700; letter-spacing: -.02em; }
+
+.subtitle { font-size: 13.5px; line-height: 1.6; }
+
+/* ---- the roster card ----
+   The card holds three bands: a header with the title and progress, the
+   sheet itself edge to edge, and a footer carrying the legend. Letting
+   the table run to the card's edges is what makes it read as one object
+   rather than a table dropped inside a box. */
+
+.panel { padding: 0; overflow: hidden; }
+
+.toolbar {
+  margin: 0;
+  padding: 16px 18px 14px;
+  border-bottom: 1px solid var(--border);
+  position: relative;
 }
 
-.legend .swatch.dirty { border-left: 3px solid var(--accent); }
-.legend .swatch.invalid { background: #fbeaea; border-color: var(--danger); }
+.toolbar h2 { font-size: 16px; }
+
+/* Encoding progress. portal.js sets --encoded (0..1) on .panel as rows are
+   filled; this renders it as a hairline across the foot of the card header.
+   A pseudo-element rather than a new node, so nothing is added to the DOM. */
+.toolbar::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: -1px;
+  height: 2px;
+  width: 100%;
+  transform: scaleX(var(--encoded, 0));
+  transform-origin: left center;
+  background: linear-gradient(90deg, var(--accent), #3f86ef);
+  transition: transform .35s cubic-bezier(.22, 1, .36, 1);
+}
+
+.panel .table-scroll {
+  border: 0;
+  border-radius: 0;
+  max-height: 60vh;
+}
+
+/* ---- identity block vs entry block ----
+   The columns the portal prints and the columns a person fills are two
+   different things; a single rule down the seam says so without adding
+   colour or weight anywhere. */
+
+.sheet th.c-name + th,
+.sheet td.fixed + td:not(.fixed) {
+  border-left: 2px solid var(--border);
+}
+
+/* ---- card footer ---- */
+
+.legend {
+  margin: 0;
+  padding: 11px 18px;
+  border-top: 1px solid var(--border);
+  background: var(--head);
+}
+
+/* ---- index: the variant catalogue ----
+   A reference table of eight rows, each a link plus two sentences. It is
+   prose, so it wraps, and the columns are proportioned for reading rather
+   than squeezed to content. */
+
+.panel > table { width: 100%; }
+.panel > table th { background: var(--head); border-bottom: 1px solid var(--border); }
+.panel > table th:first-child,
+.panel > table td:first-child { padding-left: 18px; }
+.panel > table th:last-child,
+.panel > table td:last-child { padding-right: 18px; }
+
+.panel > table td { line-height: 1.55; }
+.panel > table tbody tr:last-child td { border-bottom: 0; }
+.panel > table tbody tr:hover { background: var(--row-hover); }
+
+.panel > table td:nth-child(1) { width: 20%; white-space: nowrap; }
+.panel > table td:nth-child(2) { width: 46%; color: var(--text); }
+.panel > table td:nth-child(3) { width: 34%; color: var(--muted); font-size: 13px; }
+
+.panel > table a {
+  color: var(--accent);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.panel > table a:hover { text-decoration: underline; }

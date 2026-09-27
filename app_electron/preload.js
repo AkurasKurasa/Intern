@@ -1,7 +1,20 @@
 const { contextBridge, ipcRenderer } = require("electron");
 
+// Scope #1's floating decision HUD. Its own tiny bridge rather than another
+// key on recorderAPI, because agent-hud.html is a separate, non-focusable
+// window that needs nothing else -- it only ever receives, never invokes.
+contextBridge.exposeInMainWorld("agentHud", {
+  onDecision: (cb) => ipcRenderer.on("agent-decision", (_e, d) => cb(d)),
+  onScope2: (cb) => ipcRenderer.on("agent-scope2", (_e, d) => cb(d)),
+  onReset: (cb) => ipcRenderer.on("agent-hud-reset", () => cb()),
+  onFinish: (cb) => ipcRenderer.on("agent-hud-finish", () => cb()),
+});
+
 contextBridge.exposeInMainWorld("recorderAPI", {
   start: (outputDir) => ipcRenderer.invoke("recorder-start", outputDir),
+  // trace_type/url are never passed by the renderer directly -- main.js
+  // infers them from whichever capsule is currently loaded (see
+  // "recorder-start" handler), so Start Recording needs no new button.
   stop: () => ipcRenderer.invoke("recorder-stop"),
   replay: (n) => ipcRenderer.invoke("recorder-replay", n),
   restoreMain: () => ipcRenderer.invoke("restore-main"),
@@ -42,7 +55,8 @@ contextBridge.exposeInMainWorld("capsulesAPI", {
   create: (name, description) => ipcRenderer.invoke("capsules-create", name, description),
   update: (name, updates) => ipcRenderer.invoke("capsules-update", name, updates),
   delete: (name) => ipcRenderer.invoke("capsules-delete", name),
-  run: (capsuleName) => ipcRenderer.invoke("capsule-run", capsuleName),
+  run: (capsuleName, extraArgs) =>
+    ipcRenderer.invoke("capsule-run", capsuleName, extraArgs),
   stop: () => ipcRenderer.invoke("capsule-stop"),
   openLog: () => ipcRenderer.invoke("capsule-open-log"),
   readLog: () => ipcRenderer.invoke("capsule-read-log"),
@@ -54,19 +68,22 @@ contextBridge.exposeInMainWorld("capsulesAPI", {
   // capsule changes); runCurrent() is what the widget's Play circle calls.
   setCurrent: (capsuleName) => ipcRenderer.invoke("capsule-set-current", capsuleName),
   runCurrent: () => ipcRenderer.invoke("capsule-run-current"),
-  // "Test" section -- opens the real target apps for a workflow so the
-  // user can get the environment ready (or just look around) before
-  // pressing Play.
-  launchTestMockups: (capsuleName) => ipcRenderer.invoke("test-launch-mockups", capsuleName),
+  // "Test" section -- opens everything relevant to a loaded workflow at
+  // once (real target apps, and for Inbox Dispatch also its schedule log
+  // + Cold Email page) so the user can get the environment ready, or just
+  // look around, before pressing Play. Unified from three separate calls
+  // per direct request.
+  launchTestTools: (capsuleName) => ipcRenderer.invoke("launch-test-tools", capsuleName),
 });
 
 contextBridge.exposeInMainWorld("inboxAPI", {
   start: () => ipcRenderer.invoke("inbox-start"),
   stop: () => ipcRenderer.invoke("inbox-stop"),
   list: () => ipcRenderer.invoke("inbox-list"),
-  confirm: (messageId, decision) => ipcRenderer.invoke("inbox-confirm", messageId, decision),
-  override: (messageId, newDecision, reason) =>
-    ipcRenderer.invoke("inbox-override", messageId, newDecision, reason),
+  confirm: (messageId, decision, replyBody) =>
+    ipcRenderer.invoke("inbox-confirm", messageId, decision, replyBody),
+  override: (messageId, newDecision, reason, replyBody) =>
+    ipcRenderer.invoke("inbox-override", messageId, newDecision, reason, replyBody),
   openLog: () => ipcRenderer.invoke("inbox-open-log"),
   // No onEvent() of its own -- inbox_* events arrive through the same
   // recorderAPI.onEvent() stream every other bridge event already uses.

@@ -153,6 +153,230 @@
         "INBOX"
       ],
       "to": ""
+    },
+    {
+      "id": "mock-201",
+      "thread_id": "thread-201",
+      "sender": "Marcus Chen <marcus.chen@acmebroker.com>",
+      "sender_email": "marcus.chen@acmebroker.com",
+      "subject": "Question on the Delgado policy coverage limits",
+      "snippet": "Quick one -- did we confirm the umbrella coverage limit with the client yet?",
+      "body_text": "Hey,\n\nQuick one -- did we confirm the umbrella coverage limit with the client yet? Underwriting is asking before they finalize.\n\nThanks,\nMarcus",
+      "received_at": "2026-08-25T09:40:00-07:00",
+      "labels": [
+        "INBOX",
+        "UNREAD"
+      ]
+    },
+    {
+      "id": "mock-202",
+      "thread_id": "thread-202",
+      "sender": "HR Benefits <benefits@companyhr.example.com>",
+      "sender_email": "benefits@companyhr.example.com",
+      "subject": "Open enrollment starts Monday -- action needed for your team",
+      "snippet": "Open enrollment begins Monday. Please make sure your team completes their elections by the deadline.",
+      "body_text": "Hi,\n\nOpen enrollment begins Monday. Please make sure your team completes their benefit elections by the deadline. Happy to answer questions on a call if helpful.\n\nHR Benefits Team",
+      "received_at": "2026-08-25T13:15:00-07:00",
+      "labels": [
+        "INBOX",
+        "UNREAD"
+      ]
+    },
+    {
+      "id": "mock-203",
+      "thread_id": "thread-203",
+      "sender": "Dana Whitfield <dana.whitfield@northline.example.com>",
+      "sender_email": "dana.whitfield@northline.example.com",
+      "subject": "Vendor call - proposing Sept 3rd, 2pm",
+      "snippet": "Can we set up a call for Sept 3rd at 2pm to walk through the Q3 proposal?",
+      "body_text": "Hi,\n\nCan we set up a call for September 3rd at 2pm to walk through the Q3 proposal details? Let me know if that works on your end.\n\nBest,\nDana",
+      "received_at": "2026-08-26T10:20:00-07:00",
+      "labels": [
+        "INBOX",
+        "UNREAD"
+      ]
+    },
+    {
+      "id": "mock-204",
+      "thread_id": "thread-204",
+      "sender": "Contracts Team <contracts@meyerlegal.example.com>",
+      "sender_email": "contracts@meyerlegal.example.com",
+      "subject": "Reminder: Meyer contract deadline is Sept 5th",
+      "snippet": "Just a reminder that the signed Meyer contract is due back to us by September 5th.",
+      "body_text": "Hello,\n\nJust a reminder that the signed Meyer contract is due back to us by September 5th. Let us know if you need an extension.\n\nContracts Team",
+      "received_at": "2026-08-27T08:00:00-07:00",
+      "labels": [
+        "INBOX",
+        "UNREAD"
+      ]
+    },
+    {
+      "id": "mock-205",
+      "thread_id": "thread-205",
+      "sender": "Compliance Office <compliance@internalaudit.example.com>",
+      "sender_email": "compliance@internalaudit.example.com",
+      "subject": "Discrepancy flagged in Q2 filing -- needs review",
+      "snippet": "Our audit tool flagged a discrepancy in the Q2 filing that needs a human look before we proceed.",
+      "body_text": "Hi,\n\nOur audit tool flagged a discrepancy in the Q2 filing that needs a human look before we proceed with submission. This isn't something we want to act on without your review.\n\nCompliance Office",
+      "received_at": "2026-08-28T11:05:00-07:00",
+      "labels": [
+        "INBOX",
+        "UNREAD"
+      ]
+    },
+    {
+      "id": "mock-206",
+      "thread_id": "thread-206",
+      "sender": "No Reply <no-reply@teamcollab.example.com>",
+      "sender_email": "no-reply@teamcollab.example.com",
+      "subject": "Your weekly activity summary",
+      "snippet": "Here's your automated weekly summary of team activity.",
+      "body_text": "This is an automated weekly summary. You had 14 messages, 3 mentions, and 2 upcoming deadlines this week.",
+      "received_at": "2026-08-29T06:00:00-07:00",
+      "labels": [
+        "INBOX",
+        "UNREAD"
+      ]
+    },
+    {
+      "id": "mock-301",
+      "thread_id": "thread-301",
+      "sender": "Priya Ramaswami <priya@ramaswami-consulting.example.com>",
+      "sender_email": "priya@ramaswami-consulting.example.com",
+      "subject": "Kickoff call for the Q3 partnership - your availability?",
+      "snippet": "Would Thursday Sept 4th at 10am work for a kickoff call on the partnership?",
+      "body_text": "Hi,\n\nWould Thursday, September 4th at 10am work for a kickoff call on the partnership? Should only take 30 minutes.\n\nBest,\nPriya",
+      "received_at": "2026-08-27T14:00:00-07:00",
+      "labels": [
+        "INBOX",
+        "UNREAD"
+      ]
+    },
+    {
+      "id": "mock-302",
+      "thread_id": "thread-302",
+      "sender": "Marcus Oyelaran <m.oyelaran@delridge.example.com>",
+      "sender_email": "m.oyelaran@delridge.example.com",
+      "subject": "Procurement review meeting - Sept 8, 11am",
+      "snippet": "Scheduling a procurement review for Sept 8th at 11am, please confirm attendance.",
+      "body_text": "Hi,\n\nWe're scheduling a procurement review for September 8th at 11am to go over the Q3 terms. Please confirm you can attend.\n\nMarcus",
+      "received_at": "2026-08-28T09:30:00-07:00",
+      "labels": [
+        "INBOX",
+        "UNREAD"
+      ]
+    },
+    {
+      "id": "mock-303",
+      "thread_id": "thread-303",
+      "sender": "Events Team <events@insurtechconf.example.com>",
+      "sender_email": "events@insurtechconf.example.com",
+      "subject": "Registration deadline for InsurTech Summit - Sept 10",
+      "snippet": "Early registration for the InsurTech Summit closes September 10th.",
+      "body_text": "Hi,\n\nJust a reminder that early registration for the InsurTech Summit closes September 10th. Register before then to lock in the discounted rate.\n\nEvents Team",
+      "received_at": "2026-08-28T15:45:00-07:00",
+      "labels": [
+        "INBOX",
+        "UNREAD"
+      ]
+    },
+    {
+      "id": "mock-304",
+      "thread_id": "thread-304",
+      "sender": "Registrar Office <registrar@campusportal.edu>",
+      "sender_email": "registrar@campusportal.edu",
+      "subject": "Grade appeal window opens Sept 2, closes Sept 12",
+      "snippet": "The grade appeal window for Section 4B opens September 2nd and closes September 12th.",
+      "body_text": "Hello,\n\nThe grade appeal window for Section 4B opens September 2nd and closes September 12th. Please make sure any pending reviews are handled within that window.\n\nRegistrar Office",
+      "received_at": "2026-08-29T08:20:00-07:00",
+      "labels": [
+        "INBOX",
+        "UNREAD"
+      ]
+    },
+    {
+      "id": "mock-305",
+      "thread_id": "thread-305",
+      "sender": "Jordan Reyes <jordan.reyes@acmebroker.com>",
+      "sender_email": "jordan.reyes@acmebroker.com",
+      "subject": "Client walkthrough - can we do Monday Sept 1st, 3pm?",
+      "snippet": "Client wants a walkthrough of the new policy terms, proposing Monday Sept 1st at 3pm.",
+      "body_text": "Hi,\n\nThe client wants a walkthrough of the new policy terms before signing. Proposing Monday, September 1st at 3pm -- let me know if that works.\n\nJordan",
+      "received_at": "2026-08-29T12:10:00-07:00",
+      "labels": [
+        "INBOX",
+        "UNREAD"
+      ]
+    },
+    {
+      "id": "mock-306",
+      "thread_id": "thread-306",
+      "sender": "Contracts Team <contracts@meyerlegal.example.com>",
+      "sender_email": "contracts@meyerlegal.example.com",
+      "subject": "Follow-up call on Meyer contract terms - propose Sept 4th",
+      "snippet": "Before the Sept 5th deadline, can we do a quick call on Sept 4th to clarify a few terms?",
+      "body_text": "Hello,\n\nBefore the September 5th deadline, can we do a quick call on September 4th to clarify a couple of terms in the Meyer contract? Any time that afternoon works on our end.\n\nContracts Team",
+      "received_at": "2026-08-29T16:30:00-07:00",
+      "labels": [
+        "INBOX",
+        "UNREAD"
+      ]
+    },
+    {
+      "id": "mock-307",
+      "thread_id": "thread-307",
+      "sender": "Dana Whitfield <dana.whitfield@northline.example.com>",
+      "sender_email": "dana.whitfield@northline.example.com",
+      "subject": "Follow-up: can we push the Sept 3rd call to Sept 9th, 1pm?",
+      "snippet": "Something came up -- could we move our call to Sept 9th at 1pm instead?",
+      "body_text": "Hi,\n\nSomething came up on our end -- could we move our call to September 9th at 1pm instead of the 3rd? Sorry for the shuffle.\n\nBest,\nDana",
+      "received_at": "2026-08-30T09:00:00-07:00",
+      "labels": [
+        "INBOX",
+        "UNREAD"
+      ]
+    },
+    {
+      "id": "mock-308",
+      "thread_id": "thread-308",
+      "sender": "Alex Rivera <alex.rivera@teamcollab.example.com>",
+      "sender_email": "alex.rivera@teamcollab.example.com",
+      "subject": "Team retro - Friday Sept 6th, 2:30pm",
+      "snippet": "Putting the retro on the calendar for Friday Sept 6th at 2:30pm.",
+      "body_text": "Hey,\n\nPutting the team retro on the calendar for Friday, September 6th at 2:30pm. Same room as usual.\n\nAlex",
+      "received_at": "2026-08-30T10:15:00-07:00",
+      "labels": [
+        "INBOX",
+        "UNREAD"
+      ]
+    },
+    {
+      "id": "mock-309",
+      "thread_id": "thread-309",
+      "sender": "Payroll Team <payroll@companyhr.example.com>",
+      "sender_email": "payroll@companyhr.example.com",
+      "subject": "Timesheet submission deadline - Sept 2, 5pm",
+      "snippet": "All timesheets for this pay period are due by Sept 2nd, 5pm.",
+      "body_text": "Hi,\n\nA reminder that all timesheets for this pay period are due by September 2nd, 5pm. Late submissions may delay payment.\n\nPayroll Team",
+      "received_at": "2026-08-30T07:30:00-07:00",
+      "labels": [
+        "INBOX",
+        "UNREAD"
+      ]
+    },
+    {
+      "id": "mock-310",
+      "thread_id": "thread-310",
+      "sender": "Priya Ramaswami <priya@ramaswami-consulting.example.com>",
+      "sender_email": "priya@ramaswami-consulting.example.com",
+      "subject": "Loved the proposal - let's talk pricing Sept 11th?",
+      "snippet": "Really liked the proposal. Could we set up a pricing discussion Sept 11th?",
+      "body_text": "Hi,\n\nReally liked the proposal you sent over. Could we set up a call to talk through pricing on September 11th, any time in the morning?\n\nBest,\nPriya",
+      "received_at": "2026-08-30T11:45:00-07:00",
+      "labels": [
+        "INBOX",
+        "UNREAD"
+      ]
     }
   ],
   "sent": [

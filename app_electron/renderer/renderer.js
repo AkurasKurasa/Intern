@@ -203,7 +203,18 @@ window.recorderAPI.onEvent((event) => {
       statSessions.textContent = String(sessions);
       statFrames.textContent = String(event.steps);
       statPending.hidden = true;
-      log(`Saved — ${event.steps} frames. Now click Replay ×N to repeat it.`, "ok");
+      if (event.trace_type === "web") {
+        // Web recordings (Inbox Dispatch) don't replay -- there's no
+        // pyautogui-style playback for a page, the "Play" for this task IS
+        // automate_inbox.py driving the real page directly. What matters
+        // here is whether any real training examples actually came out of
+        // the session just recorded.
+        log(event.examples_written > 0
+          ? `Saved — ${event.steps} frames, ${event.examples_written} real example(s) captured for training.`
+          : `Saved — ${event.steps} frames, but no submitted replies or schedule notes were found in this recording.`, "ok");
+      } else {
+        log(`Saved — ${event.steps} frames. Now click Replay ×N to repeat it.`, "ok");
+      }
       break;
     case "replay_progress":
       statStatus.textContent = `Replaying ${event.current}/${event.total}`;
@@ -218,6 +229,15 @@ window.recorderAPI.onEvent((event) => {
       progressLineCount = 0;
       capsuleLog(`▶ Running — ${event.label}`, "ok");
       setCapsuleRunning(true);
+      // The run starts here, not at COUNTDOWN_BEGIN. Scope #2 dropped its
+      // countdown (it drives its own browser, so the 5 s bought nothing), and
+      // everything that was keyed off the countdown then never happened for
+      // it: no Running view, no elapsed timer, Duration "—" on the summary.
+      // A task with no countdown is still a run.
+      stepFeedEl.innerHTML = "";
+      tbAgentPill.hidden = false;
+      showTaskRunView("running");
+      startElapsedTimer();
       break;
     case "capsule_progress":
       handleCapsuleProgressLine(event.line);
@@ -305,7 +325,7 @@ const ppDetailSave      = document.getElementById("ppDetailSave");
 const ppCheckpointGroup = document.getElementById("ppCheckpointGroup");
 const ppCheckpoint   = document.getElementById("ppCheckpoint");
 const ppTestGroup    = document.getElementById("ppTestGroup");
-const btnLaunchMockups = document.getElementById("btnLaunchMockups");
+const btnLaunchTestTools = document.getElementById("btnLaunchTestTools");
 const btnPlay        = document.getElementById("btnPlay");
 const btnStopCapsule = document.getElementById("btnStopCapsule");
 const btnDeploy      = document.getElementById("btnDeploy");
@@ -424,7 +444,20 @@ function showFinished(code) {
     finishedHeadlineEl.textContent = "Stopped early — you have control again.";
     finishedBodyEl.textContent = `Intern's run ended unexpectedly (exit code ${code}). Check the activity log below for details.`;
   }
-  showTasksSubview("finished");
+  showTaskRunView("finished");
+}
+
+// Running and Finished belong to the Tasks section. Showing one of them
+// while another section (Home) is on screen drew both at once: the
+// "Stopped -- you have control again" summary on top of Home's "Nothing
+// running / Show Intern the task once" hero. So switch to Tasks first --
+// that hides Home's views and marks the right nav item -- then pick the
+// sub-view.
+function showTaskRunView(name) {
+  // Only when actually elsewhere: showMain() also reloads the task list,
+  // which a run starting or ending on the Tasks page has no reason to do.
+  if (!navWorkflows.classList.contains("active")) showMain("workflows");
+  showTasksSubview(name);
 }
 
 // Esc, "Take back control" (on the running banner) and "Cancel" (on the
@@ -442,7 +475,9 @@ btnHandoverCancel.addEventListener("click", stopIfRunning);
 btnBackToTasks.addEventListener("click", () => showTasksSubview("list"));
 btnRunAgain.addEventListener("click", () => {
   if (!currentCapsule) return;
-  window.capsulesAPI.run(currentCapsule.name);
+  // Asks again rather than repeating the last mode: "run again" after a run
+  // that answered a question is usually the moment you want the other answer.
+  runCapsuleWithFillMode(currentCapsule.name);
 });
 
 // ── Home hero / Tasks header live counts ─────────────────────────────────
@@ -516,15 +551,12 @@ function handleCapsuleProgressLine(line) {
   if (line === "COUNTDOWN_BEGIN") {
     ppCountdown.hidden = false;
     countdownHintPending = true;
-    // The real handover moment: the process is about to click into the
-    // target window and start typing. Everything below is driven off this
-    // exact same event, not a separate client-side timer.
-    tbAgentPill.hidden = false;
+    // The handover moment: the process is about to click into the target
+    // window and start typing. Only the countdown overlay hangs off this --
+    // the Running view and the elapsed timer start at capsule_started, so a
+    // task with no countdown gets them too.
     handoverTaskNameEl.textContent = currentCapsule ? currentCapsule.name : "—";
     handoverOverlay.hidden = false;
-    stepFeedEl.innerHTML = "";
-    showTasksSubview("running");
-    startElapsedTimer();
     return;
   }
   if (line === "COUNTDOWN_END") {
@@ -563,7 +595,7 @@ function setCapsuleRunning(isRunning) {
   btnStopCapsule.disabled = !isRunning;
   // Disabled while a run is live -- popping more windows while the agent
   // is actively driving the mouse/keyboard (Scope #1) would be disruptive.
-  btnLaunchMockups.disabled = isRunning;
+  btnLaunchTestTools.disabled = isRunning;
   // The mini Play/Stop widget has no capsule-picker UI of its own, so it
   // needs to know which capsule name "Play" should mean -- this is the one
   // place that's called both right after a capsule loads/deploys AND on
@@ -587,9 +619,16 @@ async function loadCapsuleIntoSlot(capsule) {
   applyCapsuleEmojiDisplay(ppCapsuleEmoji, capsule.emoji);
   ppCapsuleName.textContent = capsule.name;
   ppSlot.classList.add("filled");
-  // "Test" shows for any loaded task, unlike Checkpoint -- it's not tied
-  // to having a swappable model, just to a task being selected at all.
-  ppTestGroup.hidden = false;
+  // "Test" shows for any loaded task with a real target app to open,
+  // unlike Checkpoint -- it's not tied to having a swappable model, just
+  // to a task being selected at all. Only hidden for a kind="url" capsule
+  // with no local_server (a genuinely external link, nothing to launch
+  // here) -- "Launch mockups" would just fail with "no test mockups
+  // defined" every time. Every other kind always shows it. Inbox Dispatch
+  // is kind="script" now (Play itself clicks through the real page via
+  // automate_inbox.py), but still carries url+local_server so this Test
+  // button can open its practice page on the same local server.
+  ppTestGroup.hidden = capsule.kind === "url" && !capsule.local_server;
 
   // A script-kind capsule (e.g. Scope #2) may or may not have a real,
   // swappable checkpoint -- Scope #2's matcher.pt is a genuine trained
@@ -682,20 +721,24 @@ btnDeploy.addEventListener("click", async () => {
   }
 });
 
-btnLaunchMockups.addEventListener("click", async () => {
+// Unified from three separate handlers (Launch mockups / View Schedule /
+// Launch Cold Email) per direct request -- one click now opens everything
+// relevant to the loaded task at once, via the single launch-test-tools
+// IPC channel that already branches per task on the main-process side.
+btnLaunchTestTools.addEventListener("click", async () => {
   if (!currentCapsule) return;
-  btnLaunchMockups.disabled = true;
+  btnLaunchTestTools.disabled = true;
   try {
-    const result = await window.capsulesAPI.launchTestMockups(currentCapsule.name);
+    const result = await window.capsulesAPI.launchTestTools(currentCapsule.name);
     if (result.ok) {
       capsuleLog(`Opened: ${result.opened.join(", ")}`, "ok");
     } else {
       capsuleLog(result.error, "err");
     }
   } catch (e) {
-    capsuleLog(`Couldn't launch mockups: ${e.message || e}`, "err");
+    capsuleLog(`Couldn't launch test tools: ${e.message || e}`, "err");
   } finally {
-    btnLaunchMockups.disabled = false;
+    btnLaunchTestTools.disabled = false;
   }
 });
 
@@ -814,12 +857,148 @@ function refreshChipEmojis() {
   });
 }
 
+// ── Fill-mode chooser ────────────────────────────────────────────────────
+// Scope #1 can fill the form two genuinely different ways over the same data:
+// writing each value straight into the control and tabbing on, or turning that
+// path off so every field is reached by a real click and the trained pointer
+// picks the target. That is a per-run choice, not a property of the task, so it
+// is asked here rather than by keeping a near-duplicate capsule per mode.
+//
+// Resolves to the extra argv for run_task.py, or null if cancelled.
+// Per-capsule run options, declared as data. Each entry is the question the
+// modal asks and the argv each answer contributes. Kept here rather than as a
+// capsule per combination, because these are choices you make at the moment
+// you run, not properties of the task.
+const RUN_OPTIONS = {
+  form_filling: {
+    title: "How should it fill the form?",
+    subtitle: "Same task and same data either way. This only changes how the "
+            + "agent reaches each field.",
+    choices: [
+      { dot: "fm-source", name: "Direct write",
+        desc: "Writes each value straight into the field and presses Tab. No mouse, "
+            + "no clicking — so the transformer is never asked anything. Fast.",
+        args: [] },
+      { dot: "fm-transformer", name: "Transformer",
+        desc: "Turns the direct-write path off, so every field has to be reached by a "
+            + "real click and the learned pointer picks the target. Slower.",
+        args: ["--no_batch_fill"] },
+    ],
+  },
+
+  // The mocksite ships eight portals that differ by one thing each -- that IS
+  // the Scope #2 experiment, so every one needs to be reachable. The variant
+  // was previously pinned to v0_base in registry.json, which made the other
+  // seven unreachable from the app.
+  "Sheet-to-Portal Matcher": {
+    title: "Which portal should it run against?",
+    subtitle: "Same demonstration and same spreadsheet every time. Each portal "
+            + "changes one thing, so what differs in the result is caused by that.",
+    choices: [
+      { dot: "fm-source", name: "V0 — base",
+        desc: "No change. The control.", args: ["--variant", "v0_base"] },
+      { dot: "fm-transformer", name: "V1 — reordered",
+        desc: "Sheet columns in a different DOM order. Tests position independence.",
+        args: ["--variant", "v1_reordered"] },
+      { dot: "fm-transformer", name: "V2 — relabeled",
+        desc: "Fields renamed to Learner Reference Number, Degree Program, Final "
+            + "Rating, Academic Standing. Tests semantic matching.",
+        args: ["--variant", "v2_relabeled"] },
+      { dot: "fm-transformer", name: "V3 — extra fields",
+        desc: "Adds Section and Adviser, which no column feeds. Tests correct "
+            + "non-assignment.", args: ["--variant", "v3_extra_fields"] },
+      { dot: "fm-transformer", name: "V4 — unassociated headers",
+        desc: "Inputs carry no aria-labelledby; only the column header names them. "
+            + "Tests the label cascade.", args: ["--variant", "v4_unassociated"] },
+      { dot: "fm-transformer", name: "V5 — near-duplicates",
+        desc: "Adds Grade (Recomputed) and Year Enrolled. Tests abstention.",
+        args: ["--variant", "v5_near_duplicates"] },
+      { dot: "fm-transformer", name: "V6a — options",
+        desc: "Remarks options renamed to PASSED / FAILED. Tests option matching.",
+        args: ["--variant", "v6a_options"] },
+      { dot: "fm-transformer", name: "V6b — inverted scale",
+        desc: "1.00–5.00 grading scale, 3.00 passing. Tests that the induced "
+            + "operator direction flips.", args: ["--variant", "v6b_scale"] },
+    ],
+  },
+};
+
+const fillModeBackdrop = document.getElementById("fillModeBackdrop");
+const fillModeTitle = document.getElementById("fillModeTitle");
+const fillModeSub = document.getElementById("fillModeSub");
+const fillModeChoices = document.getElementById("fillModeChoices");
+const fillModeCancel = document.getElementById("fillModeCancel");
+
+let fillModeResolve = null;
+
+function closeFillMode(value) {
+  fillModeBackdrop.hidden = true;
+  const resolve = fillModeResolve;
+  fillModeResolve = null;
+  if (resolve) resolve(value);
+}
+
+fillModeCancel.addEventListener("click", () => closeFillMode(null));
+fillModeBackdrop.addEventListener("click", (e) => {
+  if (e.target === fillModeBackdrop) closeFillMode(null);
+});
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && !fillModeBackdrop.hidden) closeFillMode(null);
+});
+
+function askRunOptions(capsuleName) {
+  const spec = RUN_OPTIONS[capsuleName];
+  if (!spec) return Promise.resolve([]);   // no question to ask, run as-is
+
+  fillModeTitle.textContent = spec.title;
+  fillModeSub.textContent = spec.subtitle;
+  fillModeChoices.innerHTML = "";
+
+  spec.choices.forEach((choice) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "fillmode-option";
+
+    const dot = document.createElement("span");
+    dot.className = "fillmode-dot " + choice.dot;
+
+    const body = document.createElement("span");
+    body.className = "fillmode-body";
+    const name = document.createElement("strong");
+    name.textContent = choice.name;
+    const desc = document.createElement("span");
+    desc.textContent = choice.desc;
+    body.appendChild(name);
+    body.appendChild(desc);
+
+    btn.appendChild(dot);
+    btn.appendChild(body);
+    btn.addEventListener("click", () => closeFillMode(choice.args));
+    fillModeChoices.appendChild(btn);
+  });
+
+  fillModeBackdrop.hidden = false;
+  const first = fillModeChoices.querySelector(".fillmode-option");
+  if (first) first.focus();
+  return new Promise((resolve) => { fillModeResolve = resolve; });
+}
+
+// Asks first, then runs. Returns whatever capsulesAPI.run returns, or null when
+// the chooser was dismissed -- callers must treat null as "no run happened"
+// rather than as a failed one.
+async function runCapsuleWithFillMode(capsuleName) {
+  const extraArgs = await askRunOptions(capsuleName);
+  if (extraArgs === null) return null;
+  return window.capsulesAPI.run(capsuleName, extraArgs);
+}
+
 btnPlay.addEventListener("click", async () => {
   if (!currentCapsule) return;
   // kind="url" never enters the running state (no subprocess, no
   // capsule_started event will ever arrive for it) -- log it directly
   // instead of leaving the button looking like it did nothing.
-  const result = await window.capsulesAPI.run(currentCapsule.name);
+  const result = await runCapsuleWithFillMode(currentCapsule.name);
+  if (result === null) return;   // chooser dismissed
   if (result && result.opened) {
     capsuleLog(`Opened ${currentCapsule.name} in your browser.`, "ok");
   }
@@ -862,9 +1041,30 @@ btnOpenLog.addEventListener("click", async () => {
    not a raw scan of data/demos/. Direct correction: "edit Save to to the
    specific workflows not some random data/demos/x" -- a folder that
    doesn't belong to any actual task is exactly what this used to allow.
-   Script-kind tasks (e.g. Scope #2) don't record via the Recorder at all,
-   so they're excluded here the same way findCapsuleForGroup() already
-   excludes them elsewhere. ─────────────────────────────────────────────── */
+   Script-kind tasks that don't record via the Recorder at all (e.g. Scope
+   #2's Sheet-to-Portal Matcher, which trains its own matcher in-process)
+   are excluded, the same pattern findCapsuleForGroup() already uses
+   elsewhere in this file -- but a script-kind capsule that DOES carry a
+   url (Inbox Dispatch) is exactly the web-recording case this dropdown
+   also needs to offer, so it's included alongside the agent-shaped ones.
+
+   Direct report after testing: "The only recording pathway is still
+   form_filling" -- traced to two real problems, not one. First, this
+   dropdown never listed Inbox Dispatch at all (fixed by the kind check
+   below). Second, and more load-bearing: selecting an option here only
+   ever set outDirInput's value (an output-folder string) -- it never
+   touched currentCapsuleName, the actual thing main.js's "recorder-start"
+   handler reads to decide trace_type="web" vs "form_filling". Whether a
+   web recording happens has always depended on a capsule being loaded
+   into the Play panel first, on a completely different tab, with nothing
+   in the Recorder panel showing or controlling that. Selecting an option
+   here now also loads that capsule into the Play panel for real (same
+   loadCapsuleIntoSlot() a Tasks-page click uses), which is what actually
+   keeps currentCapsuleName in sync -- so this dropdown is now the true,
+   visible control for "what am I recording," not just where it's saved.
+   ─────────────────────────────────────────────────────────────────────── */
+let recordableCapsulesCache = [];
+
 async function populateOutDirOptions() {
   let capsules = [];
   try {
@@ -872,14 +1072,23 @@ async function populateOutDirOptions() {
   } catch (e) {
     return;
   }
-  const recordable = capsules.filter((c) => c.kind === "agent");
+  // Registry entries omit "kind" entirely for the original agent shape
+  // (the Python-side WorkflowCapsule dataclass defaults kind="agent", but
+  // this JS-side listCapsules() is a raw JSON read with no such default --
+  // an entry with no "kind" key comes back as kind:undefined, never the
+  // literal string "agent"). Excluding "url"-kind (a pure external link,
+  // nothing to record) and plain script-kind capsules with no url is what
+  // correctly includes both an undefined (agent) kind and a script-kind
+  // capsule that also carries a url (a real web-recording target).
+  const recordable = capsules.filter((c) => c.kind !== "url" && (c.kind !== "script" || !!c.url));
+  recordableCapsulesCache = recordable;
   if (!recordable.length) return;
   const current = outDirInput.value;
   outDirInput.innerHTML = "";
   recordable.forEach((c) => {
     const opt = document.createElement("option");
     opt.value = `data/demos/${c.name}`;
-    opt.textContent = `data/demos/${c.name}`;
+    opt.textContent = c.url ? `${c.name} (real page)` : c.name;
     outDirInput.appendChild(opt);
   });
   if (Array.from(outDirInput.options).some((o) => o.value === current)) {
@@ -887,6 +1096,12 @@ async function populateOutDirOptions() {
   }
 }
 populateOutDirOptions();
+
+outDirInput.addEventListener("change", () => {
+  const idx = outDirInput.selectedIndex;
+  const capsule = recordableCapsulesCache[idx];
+  if (capsule) loadCapsuleIntoSlot(capsule);
+});
 
 // Tasks are shown as a grid of compact chips -- one per registered
 // capsule (agent-kind and script-kind alike), each a direct, clickable
@@ -924,7 +1139,6 @@ async function loadWorkflows() {
 // decorative filler, mirroring how the reference's own kickers ("Data
 // Bus Width 64-bits") are real specs, not placeholder labels.
 function taskChipKicker(capsule) {
-  if (capsule.kind === "script") return "TASK · SCRIPT";
   if (capsule.kind === "url") return "TASK · LINK";
   return "TASK · AGENT";
 }

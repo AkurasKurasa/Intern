@@ -20,11 +20,15 @@ from labeling.resolve import CASCADE, common_label, de_snake_case, resolve  # no
 
 # What the scanner must report for each variant: the label of every input
 # column, keyed by the data-key the portal carries as ground truth, plus the
-# cascade rule those columns are expected to resolve by.
+# cascade rule those columns are expected to resolve by. Midterm and Final
+# were added to every variant but V2 (the relabelled stress case) and V6b
+# (a 1.00-5.00 scale), so the sheet's own columns have a field to go to.
 EXPECTED = {
     "v0_base": (3, {
         "course": "Course",
         "year": "Year 1-5",
+        "midterm": "Midterm 0-100",
+        "final": "Final 0-100",
         "grade": "Grade 0-100",
         "remarks": "Remarks",
         "recommendations": "Recommendations optional",
@@ -35,6 +39,8 @@ EXPECTED = {
         "grade": "Grade 0-100",
         "course": "Course",
         "year": "Year 1-5",
+        "midterm": "Midterm 0-100",
+        "final": "Final 0-100",
     }),
     "v2_relabeled": (3, {
         "course": "Degree Program",
@@ -46,6 +52,8 @@ EXPECTED = {
     "v3_extra_fields": (3, {
         "course": "Course",
         "year": "Year 1-5",
+        "midterm": "Midterm 0-100",
+        "final": "Final 0-100",
         "section": "Section",
         "grade": "Grade 0-100",
         "remarks": "Remarks",
@@ -57,6 +65,8 @@ EXPECTED = {
     "v4_unassociated": (5, {
         "course": "Course",
         "year": "Year 1-5",
+        "midterm": "Midterm 0-100",
+        "final": "Final 0-100",
         "grade": "Grade 0-100",
         "remarks": "Remarks",
         "recommendations": "Recommendations optional",
@@ -64,6 +74,8 @@ EXPECTED = {
     "v5_near_duplicates": (3, {
         "course": "Course",
         "year": "Year 1-5",
+        "midterm": "Midterm 0-100",
+        "final": "Final 0-100",
         "year_enrolled": "Year Enrolled yyyy",
         "grade": "Grade 0-100",
         "grade_recomputed": "Grade (Recomputed) 0-100",
@@ -73,6 +85,8 @@ EXPECTED = {
     "v6a_options": (3, {
         "course": "Course",
         "year": "Year 1-5",
+        "midterm": "Midterm 0-100",
+        "final": "Final 0-100",
         "grade": "Grade 0-100",
         "remarks": "Remarks",
         "recommendations": "Recommendations optional",

@@ -28,7 +28,8 @@ _THIS_DIR = os.path.dirname(os.path.abspath(__file__))
 DEFAULT_DATA_DIR = os.path.join(_THIS_DIR, "data")
 DEFAULT_CREDENTIALS_DIR = os.path.join(_THIS_DIR, "credentials")
 
-SCOPES = ["https://www.googleapis.com/auth/gmail.modify"]
+SCOPES = ["https://www.googleapis.com/auth/gmail.modify",
+          "https://www.googleapis.com/auth/calendar.events"]
 PROCESSED_LABEL_NAME = "Intern/Processed"
 
 
@@ -159,7 +160,6 @@ class MockGmailClient(GmailClientBase):
         state["processed_ids"] = sorted(ids)
         self._save_state(state)
 
-
 class RealGmailClient(GmailClientBase):
     """Standard google-auth-oauthlib Desktop-app OAuth flow. First
     construction (once credentials/client_secret.json exists) opens a real
@@ -201,20 +201,21 @@ class RealGmailClient(GmailClientBase):
                 f.write(creds.to_json())
         self._service = build("gmail", "v1", credentials=creds)
 
+    def _ensure_label(self, name: str) -> str:
+        resp = self._service.users().labels().list(userId="me").execute()
+        for lbl in resp.get("labels", []):
+            if lbl["name"] == name:
+                return lbl["id"]
+        created = self._service.users().labels().create(
+            userId="me",
+            body={"name": name, "labelListVisibility": "labelShow", "messageListVisibility": "show"},
+        ).execute()
+        return created["id"]
+
     def _ensure_processed_label(self) -> str:
         if self._processed_label_id:
             return self._processed_label_id
-        resp = self._service.users().labels().list(userId="me").execute()
-        for lbl in resp.get("labels", []):
-            if lbl["name"] == PROCESSED_LABEL_NAME:
-                self._processed_label_id = lbl["id"]
-                return self._processed_label_id
-        created = self._service.users().labels().create(
-            userId="me",
-            body={"name": PROCESSED_LABEL_NAME, "labelListVisibility": "labelShow",
-                  "messageListVisibility": "show"},
-        ).execute()
-        self._processed_label_id = created["id"]
+        self._processed_label_id = self._ensure_label(PROCESSED_LABEL_NAME)
         return self._processed_label_id
 
     def _header(self, headers: list, name: str) -> str:
@@ -302,7 +303,6 @@ class RealGmailClient(GmailClientBase):
         self._service.users().messages().modify(
             userId="me", id=message_id, body={"addLabelIds": [label_id]},
         ).execute()
-
 
 def get_gmail_client(root: str = _THIS_DIR) -> GmailClientBase:
     """The whole Phase A -> Phase B swap. Everything upstream of this

@@ -19,6 +19,9 @@ from pattern_profile import PatternProfile
 from routing_rules import RuleLayer
 from llm_classifier import LLMClassifier
 from router import InboxRouter
+import decision_recorder
+import reply_recorder
+from decision_recorder import load_examples
 
 
 def _write_fixture(data_dir: Path, inbox=None, sent=None) -> None:
@@ -35,6 +38,19 @@ def _msg(id_, sender_email, subject, thread_id=None, body="", to=""):
         "subject": subject, "snippet": subject, "body_text": body,
         "received_at": "2026-08-16T09:00:00-07:00", "labels": ["INBOX"], "to": to,
     }
+
+
+class FakeCalendarClient:
+    def __init__(self):
+        self.events = []
+
+    def create_event(self, summary, description, start_iso, end_iso):
+        event_id = f"fake-event-{len(self.events) + 1}"
+        self.events.append({
+            "summary": summary, "description": description,
+            "start": start_iso, "end": end_iso, "event_id": event_id,
+        })
+        return event_id
 
 
 class TestMockGmailClient:
@@ -146,27 +162,6 @@ class TestRuleLayer:
         assert result.decision == "reply"
         assert result.confidence > 0.5
 
-    def test_keyword_match_routes_to_scope1(self, tmp_path):
-        registry_path = self._registry(tmp_path, [
-            {"name": "form_filling", "description": "", "model_path": "x.pt",
-             "trigger_keywords": ["insurance", "intake"], "trigger_apps": []},
-        ])
-        rules = RuleLayer(PatternProfile(path=str(tmp_path / "profile.json")), registry_path=registry_path)
-
-        result = rules.classify(EmailMessage(**_msg("i1", "broker@x.com", "New insurance intake form")))
-        assert result.decision == "route_scope1"
-        assert result.capsule_name == "form_filling"
-
-    def test_keyword_match_routes_to_scope2_for_script_kind_capsule(self, tmp_path):
-        registry_path = self._registry(tmp_path, [
-            {"name": "Sheet-to-Portal Matcher", "description": "", "model_path": "",
-             "trigger_keywords": ["grade sheet"], "trigger_apps": [], "kind": "script"},
-        ])
-        rules = RuleLayer(PatternProfile(path=str(tmp_path / "profile.json")), registry_path=registry_path)
-
-        result = rules.classify(EmailMessage(**_msg("i1", "reg@x.edu", "grade sheet ready")))
-        assert result.decision == "route_scope2"
-
     def test_no_signal_defers_to_llm(self, tmp_path):
         registry_path = self._registry(tmp_path, [])
         rules = RuleLayer(PatternProfile(path=str(tmp_path / "profile.json")), registry_path=registry_path)
@@ -176,11 +171,11 @@ class TestRuleLayer:
 
 
 class TestLLMClassifierOffline:
-    def test_no_provider_is_not_available_and_flags(self):
+    def test_no_provider_is_not_available_and_leaves_alone(self):
         classifier = LLMClassifier(provider="none")
         assert classifier.available is False
-        result = classifier.classify(EmailMessage(**_msg("i1", "a@b.com", "x")), None, None, [])
-        assert result.decision == "flag"
+        result = classifier.classify(EmailMessage(**_msg("i1", "a@b.com", "x")), None, None)
+        assert result.decision == "leave_alone"
         assert result.confidence == 0.0
 
     def test_draft_message_returns_empty_when_unavailable(self):
@@ -196,27 +191,24 @@ class TestInboxRouterPollOnce:
         registry_path = tmp_path / "registry.json"
         registry_path.write_text(json.dumps({"capsules": capsules or []}), encoding="utf-8")
         rules = RuleLayer(profile, registry_path=str(registry_path))
-        classifier = LLMClassifier(provider="none")  # offline -> unresolved emails get "flag"
+        classifier = LLMClassifier(provider="none")  # offline -> unresolved emails get "leave_alone"
         history_path = str(tmp_path / "data" / "routed_history.json")
-        return InboxRouter(client, profile, rules, classifier, history_path=history_path)
+        return InboxRouter(client, profile, rules, classifier, history_path=history_path,
+                            inbox_checkpoint_path=str(tmp_path / "no_such_checkpoint.pt"),
+                            examples_path=str(tmp_path / "data" / "training_examples.jsonl"),
+                            reply_examples_path=str(tmp_path / "data" / "reply_examples.jsonl"))
 
-    def test_poll_once_routes_and_marks_processed(self, tmp_path):
-        router = self._build(tmp_path, inbox=[_msg("i1", "broker@x.com", "insurance intake form")],
-                              capsules=[{"name": "form_filling", "description": "", "model_path": "x.pt",
-                                         "trigger_keywords": ["insurance", "intake"], "trigger_apps": []}])
+    def test_poll_once_marks_processed_so_it_does_not_reappear(self, tmp_path):
+        router = self._build(tmp_path, inbox=[_msg("i1", "stranger@x.com", "totally unrelated")])
         routed = router.poll_once()
         assert len(routed) == 1
-        assert routed[0]["decision"] == "route_scope1"
-        assert routed[0]["capsule_name"] == "form_filling"
-        assert routed[0]["layer"] == "rule"
-
         # Second poll: the message was marked processed, must not reappear.
         assert router.poll_once() == []
 
-    def test_unresolved_email_falls_through_to_flag_with_no_llm(self, tmp_path):
+    def test_unresolved_email_falls_through_to_leave_alone_with_no_llm(self, tmp_path):
         router = self._build(tmp_path, inbox=[_msg("i1", "stranger@x.com", "totally unrelated")])
         routed = router.poll_once()
-        assert routed[0]["decision"] == "flag"
+        assert routed[0]["decision"] == "leave_alone"
         assert routed[0]["layer"] == "llm"
 
     def test_history_file_reflects_routed_entries(self, tmp_path):
@@ -226,39 +218,128 @@ class TestInboxRouterPollOnce:
         assert len(history) == 1
         assert history[0]["message_id"] == "i1"
 
-    def test_hallucinated_capsule_name_is_rejected_and_flagged(self, tmp_path, monkeypatch):
-        router = self._build(tmp_path, inbox=[_msg("i1", "stranger@x.com", "unrelated")])
-        # Force the LLM path to "succeed" with a decision + a capsule name
-        # that was never registered -- the guard in _classify_and_record()
-        # must catch this, since the UI would otherwise call
-        # capsulesAPI.run() on a name that doesn't exist.
-        from llm_classifier import ClassificationResult
-        monkeypatch.setattr(
-            router._llm, "classify",
-            lambda *a, **k: ClassificationResult(decision="route_scope1", confidence=0.9,
-                                                  rationale="x", capsule_name="not_a_real_capsule"),
-        )
-        routed = router.poll_once()
-        assert routed[0]["decision"] == "flag"
-        assert routed[0]["capsule_name"] == ""
+    def test_confirming_a_message_with_duplicate_stale_history_rows_actually_removes_it_from_pending(self, tmp_path):
+        """Live-found regression: a message polled and routed across
+        several separate server restarts can accumulate more than one
+        "pending" row in routed_history.json for the same message_id (one
+        real confirmed row from an earlier session, plus later stale
+        "pending" duplicates from re-polling). confirm_suggestion() used
+        to update only the FIRST matching row -- so confirming silently
+        patched an old, already-resolved row while the newest "pending"
+        duplicate (the one pending_entries() actually reports, "latest
+        wins") never changed, and the message could never actually be
+        confirmed. Found live: mock-001 had 6 history rows and stayed
+        "pending" no matter how many times it was confirmed."""
+        router = self._build(tmp_path, inbox=[_msg("i1", "stranger@x.com", "vendor call")])
+        router.poll_once()  # writes the one real, current history row
 
-    def test_confirm_reply_creates_exactly_one_draft(self, tmp_path):
+        # Simulate the corrupted real-world state directly: several older
+        # "pending" duplicates for the same id, sitting BEFORE the real
+        # current row that poll_once() just wrote.
+        history_path = Path(router._history_path)
+        history = json.loads(history_path.read_text())["messages"]
+        current_row = history[-1]
+        assert current_row["message_id"] == "i1"
+        stale_duplicate = dict(current_row)
+        stale_duplicate["routed_at"] = "2026-08-01T00:00:00+00:00"
+        history_path.write_text(json.dumps({"messages": [stale_duplicate, stale_duplicate, current_row]}), encoding="utf-8")
+
+        assert any(e["message_id"] == "i1" for e in router.pending_entries())
+        router.confirm_suggestion("i1", "leave_alone")
+        assert not any(e["message_id"] == "i1" for e in router.pending_entries())
+
+    def test_confirm_reply_with_real_text_creates_one_draft_with_that_text(self, tmp_path):
+        # No LLM involved: the draft's body is exactly the real text
+        # passed in, nothing generated.
         router = self._build(tmp_path, inbox=[_msg("i1", "stranger@x.com", "unrelated")])
-        router.poll_once()  # -> flag (no LLM configured)
-        # Simulate the user overriding to "reply" then confirming it.
-        router.override_decision("i1", "reply")
-        router.confirm_suggestion("i1", "reply")
+        router.poll_once()  # -> leave_alone (no LLM configured)
+        router.confirm_suggestion("i1", "reply", reply_body="Thanks, I'll take a look.")
 
         drafts = json.loads((tmp_path / "data" / "mock_drafts.json").read_text())["drafts"]
         assert len(drafts) == 1
         assert drafts[0]["to"] == "stranger@x.com"
+        assert drafts[0]["body"] == "Thanks, I'll take a look."
 
-    def test_confirm_route_scope1_creates_no_draft(self, tmp_path):
-        router = self._build(tmp_path, inbox=[_msg("i1", "broker@x.com", "insurance intake")],
-                              capsules=[{"name": "form_filling", "description": "", "model_path": "x.pt",
-                                         "trigger_keywords": ["insurance"], "trigger_apps": []}])
+    def test_confirm_reply_with_no_text_creates_an_empty_draft_not_an_ai_one(self, tmp_path):
+        # The honesty guarantee: no reply_body means an empty draft, never
+        # an LLM filling in words on the user's behalf.
+        router = self._build(tmp_path, inbox=[_msg("i1", "stranger@x.com", "unrelated")])
         router.poll_once()
-        router.confirm_suggestion("i1", "route_scope1")
+        router.confirm_suggestion("i1", "reply")
+
+        drafts = json.loads((tmp_path / "data" / "mock_drafts.json").read_text())["drafts"]
+        assert len(drafts) == 1
+        assert drafts[0]["body"] == ""
+
+    def test_override_to_reply_with_real_text_now_creates_a_draft(self, tmp_path):
+        # Regression: override_decision() used to do nothing Gmail-side
+        # at all when overriding TO "reply" -- there was no way to
+        # override into a reply and actually get a draft out of it.
+        router = self._build(tmp_path, inbox=[_msg("i1", "stranger@x.com", "unrelated")])
+        router.poll_once()
+        router.override_decision("i1", "reply", reply_body="Sure, sounds good.")
+
+        drafts = json.loads((tmp_path / "data" / "mock_drafts.json").read_text())["drafts"]
+        assert len(drafts) == 1
+        assert drafts[0]["body"] == "Sure, sounds good."
+
+    def test_override_to_forward_with_a_typed_recipient_addresses_the_draft(self, tmp_path):
+        # Regression: forward drafts used to be created with "to" pulled
+        # only from entry["forward_to"] (the AI pipeline's own guess from
+        # a sender-pattern match) -- which is blank whenever the AI's own
+        # suggestion wasn't "forward" in the first place, silently
+        # creating an unaddressed, useless draft. A human typing a real
+        # recipient must actually reach the draft.
+        router = self._build(tmp_path, inbox=[_msg("i1", "stranger@x.com", "unrelated")])
+        router.poll_once()  # -> leave_alone (no LLM configured), forward_to stays blank on the entry
+        router.override_decision("i1", "forward", reply_body="FYI, please review.",
+                                  forward_to="colleague@example.com")
+
+        drafts = json.loads((tmp_path / "data" / "mock_drafts.json").read_text())["drafts"]
+        assert len(drafts) == 1
+        assert drafts[0]["to"] == "colleague@example.com"
+        assert drafts[0]["body"] == "FYI, please review."
+
+    def test_confirm_forward_with_no_typed_recipient_falls_back_to_the_ai_guess(self, tmp_path):
+        # When the human doesn't type a recipient (e.g. confirming an
+        # AI-suggested forward as-is), the AI pipeline's own guess on the
+        # entry is still used -- unchanged behavior for that path.
+        router = self._build(tmp_path, inbox=[_msg("i1", "stranger@x.com", "unrelated")])
+        router.poll_once()
+        # confirm_suggestion() reads self._pending first (the in-memory
+        # cache poll_once() populated) -- mutate that directly, not the
+        # on-disk history, to simulate "the AI pipeline itself found a
+        # forward target" for this same-process entry.
+        router._pending["i1"]["forward_to"] = "ai-guessed@example.com"
+
+        router.confirm_suggestion("i1", "forward", reply_body="Passing this along.")
+
+        drafts = json.loads((tmp_path / "data" / "mock_drafts.json").read_text())["drafts"]
+        assert len(drafts) == 1
+        assert drafts[0]["to"] == "ai-guessed@example.com"
+
+    def test_confirm_reply_with_real_text_records_a_real_reply_example(self, tmp_path):
+        router = self._build(tmp_path, inbox=[_msg("i1", "stranger@x.com", "unrelated", body="Can you help?")])
+        router.poll_once()
+        router.confirm_suggestion("i1", "reply", reply_body="Yes, happy to.")
+
+        examples = reply_recorder.load_reply_examples(path=router._reply_examples_path)
+        assert len(examples) == 1
+        assert examples[0]["reply_body"] == "Yes, happy to."
+        assert examples[0]["body_text"] == "Can you help?"
+
+    def test_confirm_reply_with_no_text_records_no_reply_example(self, tmp_path):
+        # Nothing real was written, so nothing gets saved as if it were.
+        router = self._build(tmp_path, inbox=[_msg("i1", "stranger@x.com", "unrelated")])
+        router.poll_once()
+        router.confirm_suggestion("i1", "reply")
+
+        assert reply_recorder.load_reply_examples(path=router._reply_examples_path) == []
+
+    def test_confirm_leave_alone_creates_no_draft(self, tmp_path):
+        router = self._build(tmp_path, inbox=[_msg("i1", "stranger@x.com", "unrelated")])
+        router.poll_once()
+        router.confirm_suggestion("i1", "leave_alone")
 
         assert not (tmp_path / "data" / "mock_drafts.json").exists()
         history = json.loads(Path(router._history_path).read_text())["messages"]
@@ -273,6 +354,161 @@ class TestInboxRouterPollOnce:
         assert history[0]["decision"] == "leave_alone"
         assert history[0]["status"] == "overridden"
         assert router._profile.pattern_for("stranger@x.com").ignore_count >= 1
+
+    def test_confirm_suggestion_records_a_training_example(self, tmp_path):
+        router = self._build(tmp_path, inbox=[_msg("i1", "stranger@x.com", "unrelated")])
+        router.poll_once()
+        router.confirm_suggestion("i1", "leave_alone")
+
+        examples = decision_recorder.load_examples(path=router._examples_path)
+        assert len(examples) == 1
+        assert examples[0]["decision"] == "leave_alone"
+        assert examples[0]["source"] == "live"
+
+    def test_override_decision_records_a_training_example(self, tmp_path):
+        router = self._build(tmp_path, inbox=[_msg("i1", "stranger@x.com", "unrelated")])
+        router.poll_once()
+        router.override_decision("i1", "reply", reason="actually needs a reply")
+
+        examples = decision_recorder.load_examples(path=router._examples_path)
+        assert len(examples) == 1
+        assert examples[0]["decision"] == "reply"
+        assert examples[0]["source"] == "live"
+
+    def test_pending_entries_returns_only_unconfirmed(self, tmp_path):
+        router = self._build(tmp_path, inbox=[
+            _msg("i1", "stranger@x.com", "totally unrelated"),
+            _msg("i2", "stranger@x.com", "also unrelated"),
+        ])
+        router.poll_once()
+        assert len(router.pending_entries()) == 2
+        router.confirm_suggestion("i1", "leave_alone")
+        pending = router.pending_entries()
+        assert len(pending) == 1
+        assert pending[0]["message_id"] == "i2"
+
+    def test_pending_entries_deduplicates_a_message_polled_more_than_once(self, tmp_path):
+        # A message can end up with more than one "pending" history row for
+        # the same message_id -- e.g. it was routed, the session ended
+        # before it was ever confirmed, and a later poll (against the same
+        # still-unprocessed message) routed it again. pending_entries()
+        # must show it once, not once per leftover row.
+        router = self._build(tmp_path, inbox=[
+            _msg("i1", "stranger@x.com", "totally unrelated"),
+        ])
+        router.poll_once()
+        assert len(router.pending_entries()) == 1
+        # Simulate a second, later routing of the SAME message (the mock
+        # gmail client's own list_inbox_unprocessed() would normally not
+        # return an already-polled id again, but the history file itself
+        # has no such guard -- append a second "pending" row for i1 by
+        # hand, matching what a genuine abandoned-then-repolled session
+        # would leave on disk).
+        router._append_history({
+            "message_id": "i1", "thread_id": "t1", "subject": "totally unrelated",
+            "sender": "Someone <stranger@x.com>", "sender_email": "stranger@x.com",
+            "received_at": "", "body_text": "", "decision": "leave_alone",
+            "capsule_name": "", "confidence": 0.0, "rationale": "", "layer": "rule",
+            "forward_to": "", "status": "pending", "draft_id": "",
+            "routed_at": "2099-01-01T00:00:00+00:00",
+        })
+        pending = router.pending_entries()
+        assert len(pending) == 1
+        assert pending[0]["message_id"] == "i1"
+
+    def test_pending_entries_includes_body_text(self, tmp_path):
+        router = self._build(tmp_path, inbox=[
+            _msg("i1", "sender@x.com", "test subject", body="this is the email body text"),
+        ])
+        router.poll_once()
+        pending = router.pending_entries()
+        assert len(pending) == 1
+        assert pending[0]["body_text"] == "this is the email body text"
+
+    def test_list_unprocessed_stubs_has_no_decision_and_does_not_mark_processed(self, tmp_path):
+        router = self._build(tmp_path, inbox=[
+            _msg("i1", "stranger@x.com", "unrelated one"),
+            _msg("i2", "stranger@x.com", "unrelated two"),
+        ])
+        stubs = router.list_unprocessed_stubs()
+        assert len(stubs) == 2
+        assert stubs[0] == {
+            "message_id": "i1", "subject": "unrelated one",
+            "sender": "Someone <stranger@x.com>", "sender_email": "stranger@x.com",
+        }
+        assert "decision" not in stubs[0]
+        # A peek, not a poll -- calling it again must return the same two,
+        # not an empty list.
+        assert len(router.list_unprocessed_stubs()) == 2
+        assert router.pending_entries() == []
+
+    def test_process_next_unprocessed_classifies_exactly_one_via_the_real_pipeline(self, tmp_path):
+        router = self._build(tmp_path, inbox=[
+            _msg("i1", "broker@x.com", "insurance intake form"),
+            _msg("i2", "stranger@x.com", "totally unrelated"),
+        ])
+
+        first = router.process_next_unprocessed()
+        assert first["message_id"] == "i1"
+        assert first["decision"] == "leave_alone"
+        assert first["layer"] == "llm"
+        # Only the one message was processed -- the other is still waiting.
+        assert len(router.list_unprocessed_stubs()) == 1
+        assert len(router.pending_entries()) == 1
+
+        second = router.process_next_unprocessed()
+        assert second["message_id"] == "i2"
+        assert len(router.list_unprocessed_stubs()) == 0
+        assert len(router.pending_entries()) == 2
+
+    def test_process_next_unprocessed_returns_none_when_inbox_is_empty(self, tmp_path):
+        router = self._build(tmp_path, inbox=[])
+        assert router.process_next_unprocessed() is None
+
+    def test_process_next_unprocessed_matches_poll_once_for_the_same_message(self, tmp_path):
+        # Same underlying _classify_and_record() call -- this pins that
+        # stepping through one-at-a-time produces byte-identical decisions
+        # to the existing bulk path, not a second, divergent code path.
+        bulk_router = self._build(tmp_path / "bulk", inbox=[_msg("i1", "broker@x.com", "insurance intake form")])
+        bulk_result = bulk_router.poll_once()[0]
+
+        step_router = self._build(tmp_path / "step", inbox=[_msg("i1", "broker@x.com", "insurance intake form")])
+        step_result = step_router.process_next_unprocessed()
+
+        for key in ("decision", "capsule_name", "confidence", "rationale", "layer"):
+            assert bulk_result[key] == step_result[key]
+
+
+class TestInboxRouterDefaultCalendarClient:
+    def test_default_calendar_client_comes_from_get_calendar_client(self, tmp_path, monkeypatch):
+        # Regression test: InboxRouter.__init__ used to default calendar_client
+        # to a hardcoded MockCalendarClient() literal, so RealCalendarClient was
+        # unreachable from any production code path even once real credentials
+        # existed. Just asserting router._calendar is a MockCalendarClient isn't
+        # proof by itself -- that's also what the old hardcoded literal produced.
+        # The real proof is that get_calendar_client()'s own credentials check
+        # actually ran: monkeypatch DEFAULT_CREDENTIALS_DIR to a tmp_path with no
+        # client_secret.json, so the function's real "no creds -> mock" logic is
+        # what's exercised here, deterministically, not skipped.
+        import calendar_client as calendar_client_module
+        monkeypatch.setattr(calendar_client_module, "DEFAULT_CREDENTIALS_DIR", str(tmp_path))
+
+        _write_fixture(tmp_path / "data", inbox=[], sent=[])
+        client = MockGmailClient(data_dir=str(tmp_path / "data"))
+        profile = PatternProfile(path=str(tmp_path / "data" / "profile.json"))
+        registry_path = tmp_path / "registry.json"
+        registry_path.write_text(json.dumps({"capsules": []}), encoding="utf-8")
+        rules = RuleLayer(profile, registry_path=str(registry_path))
+        classifier = LLMClassifier(provider="none")
+        history_path = str(tmp_path / "data" / "routed_history.json")
+
+        # No calendar_client argument -- must fall through to get_calendar_client().
+        router = InboxRouter(client, profile, rules, classifier, history_path=history_path,
+                              inbox_checkpoint_path=str(tmp_path / "no_such_checkpoint.pt"),
+                              examples_path=str(tmp_path / "data" / "training_examples.jsonl"),
+                              reply_examples_path=str(tmp_path / "data" / "reply_examples.jsonl"))
+
+        assert isinstance(router._calendar, calendar_client_module.MockCalendarClient)
 
 
 class TestInboxRouterSessionMetrics:
@@ -300,7 +536,10 @@ class TestInboxRouterSessionMetrics:
         rules = RuleLayer(profile, registry_path=str(registry_path))
         classifier = LLMClassifier(provider="none")
         history_path = str(tmp_path / "data" / "routed_history.json")
-        return InboxRouter(client, profile, rules, classifier, history_path=history_path)
+        return InboxRouter(client, profile, rules, classifier, history_path=history_path,
+                            inbox_checkpoint_path=str(tmp_path / "no_such_checkpoint.pt"),
+                            examples_path=str(tmp_path / "data" / "training_examples.jsonl"),
+                            reply_examples_path=str(tmp_path / "data" / "reply_examples.jsonl"))
 
     def test_record_session_metrics_writes_a_row_tagged_scope3(self, tmp_path):
         router = self._build(tmp_path, inbox=[_msg("i1", "stranger@x.com", "unrelated")])
@@ -318,28 +557,30 @@ class TestInboxRouterSessionMetrics:
     def test_record_session_metrics_counts_by_decision_type(self, tmp_path):
         router = self._build(
             tmp_path,
-            inbox=[_msg("i1", "broker@x.com", "insurance intake form"),
+            inbox=[_msg("i1", "boss@work.com", "status update"),
                    _msg("i2", "stranger@x.com", "unrelated")],
-            capsules=[{"name": "form_filling", "description": "", "model_path": "x.pt",
-                       "trigger_keywords": ["insurance", "intake"], "trigger_apps": []}],
         )
+        # Keyword-based capsule routing is gone -- a lopsided sender
+        # pattern is now the only thing that resolves at the rule layer.
+        pattern = router._profile._get_or_create("work.com")
+        pattern.reply_count, pattern.forward_count, pattern.ignore_count = 9, 0, 1
         router.poll_once()
         metrics_path = tmp_path / "run_metrics.jsonl"
         router._record_session_metrics(path=str(metrics_path))
 
         row = json.loads(metrics_path.read_text(encoding="utf-8").splitlines()[0])
-        assert row["decisions"]["route_scope1"] == 1
-        assert row["decisions"]["flag"] == 1
+        assert row["decisions"]["reply"] == 1
+        assert row["decisions"]["leave_alone"] == 1
 
     def test_record_session_metrics_counts_rule_vs_llm_layer(self, tmp_path):
         router = self._build(
             tmp_path,
-            inbox=[_msg("i1", "broker@x.com", "insurance intake form"),
+            inbox=[_msg("i1", "boss@work.com", "status update"),
                    _msg("i2", "stranger@x.com", "unrelated")],
-            capsules=[{"name": "form_filling", "description": "", "model_path": "x.pt",
-                       "trigger_keywords": ["insurance", "intake"], "trigger_apps": []}],
         )
-        router.poll_once()  # i1 -> rule (keyword match), i2 -> llm (falls through, no LLM configured -> flag)
+        pattern = router._profile._get_or_create("work.com")
+        pattern.reply_count, pattern.forward_count, pattern.ignore_count = 9, 0, 1
+        router.poll_once()  # i1 -> rule (lopsided pattern), i2 -> llm (falls through, no LLM configured -> leave_alone)
         metrics_path = tmp_path / "run_metrics.jsonl"
         router._record_session_metrics(path=str(metrics_path))
 
@@ -413,3 +654,279 @@ class TestInboxRouterSessionMetrics:
         )
         router.run_forever()
         assert len(calls) == 1
+
+
+class TestPracticeInbox:
+    def _build(self, tmp_path, inbox=None, sent=None):
+        _write_fixture(tmp_path / "data", inbox=inbox or [], sent=sent or [])
+        client = MockGmailClient(data_dir=str(tmp_path / "data"))
+        profile = PatternProfile(path=str(tmp_path / "data" / "profile.json"))
+        registry_path = tmp_path / "registry.json"
+        registry_path.write_text(json.dumps({"capsules": []}), encoding="utf-8")
+        rules = RuleLayer(profile, registry_path=str(registry_path))
+        classifier = LLMClassifier(provider="none")
+        history_path = str(tmp_path / "data" / "routed_history.json")
+        return InboxRouter(client, profile, rules, classifier, history_path=history_path,
+                            inbox_checkpoint_path=str(tmp_path / "no_such_checkpoint.pt"),
+                            examples_path=str(tmp_path / "data" / "training_examples.jsonl"),
+                            reply_examples_path=str(tmp_path / "data" / "reply_examples.jsonl"),
+                            schedule_log_path=str(tmp_path / "data" / "schedule.txt"))
+
+    def test_list_practice_inbox_returns_all_messages_unfiltered(self, tmp_path):
+        router = self._build(tmp_path, inbox=[
+            _msg("i1", "stranger@x.com", "first"),
+            _msg("i2", "stranger@x.com", "second"),
+        ])
+        # Mark one as already processed via the real triage flow -- practice
+        # mode must still show it, unlike poll_once()'s unprocessed-only view.
+        router.poll_once()
+        messages = router.list_practice_inbox()
+        assert {m.id for m in messages} == {"i1", "i2"}
+
+    def test_record_practice_decision_writes_a_real_example(self, tmp_path):
+        router = self._build(tmp_path, inbox=[_msg("i1", "stranger@x.com", "hello", body="real body text")])
+        router.record_practice_decision("i1", "reply")
+
+        examples = load_examples(path=str(tmp_path / "data" / "training_examples.jsonl"))
+        assert len(examples) == 1
+        assert examples[0]["message_id"] == "i1"
+        assert examples[0]["decision"] == "reply"
+        assert examples[0]["source"] == "live"
+        assert examples[0]["body_text"] == "real body text"
+
+    def test_record_practice_decision_updates_pattern_profile(self, tmp_path):
+        router = self._build(tmp_path, inbox=[_msg("i1", "boss@work.com", "hello")])
+        router.record_practice_decision("i1", "reply")
+
+        pattern = router._profile.pattern_for("boss@work.com")
+        assert pattern is not None
+        assert pattern.reply_count == 1
+
+    def test_record_practice_decision_unknown_message_id_does_not_raise(self, tmp_path):
+        router = self._build(tmp_path)
+        router.record_practice_decision("does-not-exist", "reply")  # must not raise
+        examples = load_examples(path=str(tmp_path / "data" / "training_examples.jsonl"))
+        assert examples == []
+
+    def test_record_practice_decision_with_reply_body_records_real_reply_content(self, tmp_path):
+        router = self._build(tmp_path, inbox=[_msg("i1", "stranger@x.com", "hello")])
+        router.record_practice_decision("i1", "reply", reply_body="Sure, that works for me.")
+
+        reply_examples = reply_recorder.load_reply_examples(path=str(tmp_path / "data" / "reply_examples.jsonl"))
+        assert len(reply_examples) == 1
+        assert reply_examples[0]["reply_body"] == "Sure, that works for me."
+        # The decision label is still recorded too, same as always.
+        examples = load_examples(path=str(tmp_path / "data" / "training_examples.jsonl"))
+        assert len(examples) == 1
+        assert examples[0]["decision"] == "reply"
+
+    def test_record_practice_decision_with_schedule_body_writes_to_schedule_file(self, tmp_path):
+        router = self._build(tmp_path, inbox=[_msg("i1", "stranger@x.com", "vendor call")])
+        router.record_practice_decision("i1", "schedule", reply_body="Vendor call Sept 3rd, 2pm.")
+
+        schedule_path = tmp_path / "data" / "schedule.txt"
+        assert schedule_path.exists()
+        content = schedule_path.read_text(encoding="utf-8")
+        assert "Vendor call Sept 3rd, 2pm." in content
+        # Recording to schedule.txt must never touch reply_examples.jsonl.
+        assert not (tmp_path / "data" / "reply_examples.jsonl").exists()
+
+    def test_record_practice_decision_blank_reply_body_records_no_content(self, tmp_path):
+        router = self._build(tmp_path, inbox=[_msg("i1", "stranger@x.com", "hello")])
+        router.record_practice_decision("i1", "reply", reply_body="   ")
+
+        # The honesty guarantee holds here too -- blank/whitespace-only
+        # text records nothing, but the decision label is still saved.
+        assert not (tmp_path / "data" / "reply_examples.jsonl").exists()
+        examples = load_examples(path=str(tmp_path / "data" / "training_examples.jsonl"))
+        assert len(examples) == 1
+        assert examples[0]["decision"] == "reply"
+
+    def test_record_practice_decision_reply_body_ignored_for_non_text_decisions(self, tmp_path):
+        router = self._build(tmp_path, inbox=[_msg("i1", "stranger@x.com", "hello")])
+        # A stray reply_body sent alongside cold_email/leave_alone must
+        # never be written anywhere -- only reply/forward/schedule ever
+        # record typed content.
+        router.record_practice_decision("i1", "leave_alone", reply_body="this should never be saved")
+
+        assert not (tmp_path / "data" / "reply_examples.jsonl").exists()
+        assert not (tmp_path / "data" / "schedule.txt").exists()
+
+
+class TestScheduleRecording:
+    def _build(self, tmp_path, inbox=None, sent=None, capsules=None, calendar_client=None):
+        _write_fixture(tmp_path / "data", inbox=inbox or [], sent=sent or [])
+        client = MockGmailClient(data_dir=str(tmp_path / "data"))
+        profile = PatternProfile(path=str(tmp_path / "data" / "profile.json"))
+        registry_path = tmp_path / "registry.json"
+        registry_path.write_text(json.dumps({"capsules": capsules or []}), encoding="utf-8")
+        rules = RuleLayer(profile, registry_path=str(registry_path))
+        classifier = LLMClassifier(provider="none")
+        history_path = str(tmp_path / "data" / "routed_history.json")
+        return InboxRouter(client, profile, rules, classifier, history_path=history_path,
+                            inbox_checkpoint_path=str(tmp_path / "no_such_checkpoint.pt"),
+                            examples_path=str(tmp_path / "data" / "training_examples.jsonl"),
+                            reply_examples_path=str(tmp_path / "data" / "reply_examples.jsonl"),
+                            schedule_log_path=str(tmp_path / "data" / "schedule.txt"),
+                            calendar_client=calendar_client)
+
+    def test_confirm_schedule_with_real_text_records_a_schedule_entry(self, tmp_path):
+        router = self._build(tmp_path, inbox=[_msg("i1", "boss@work.com", "vendor call")])
+        router.poll_once()
+
+        router.confirm_suggestion("i1", "schedule", reply_body="Aug 30 -- vendor call re: pricing")
+
+        schedule_path = str(tmp_path / "data" / "schedule.txt")
+        with open(schedule_path, "r", encoding="utf-8") as f:
+            content = f.read()
+        assert "Aug 30 -- vendor call re: pricing" in content
+
+    def test_confirm_schedule_with_no_text_records_nothing(self, tmp_path):
+        router = self._build(tmp_path, inbox=[_msg("i1", "boss@work.com", "vendor call")])
+        router.poll_once()
+
+        router.confirm_suggestion("i1", "schedule", reply_body="")
+
+        schedule_path = str(tmp_path / "data" / "schedule.txt")
+        assert not os.path.exists(schedule_path)
+
+    def test_confirm_schedule_does_not_touch_reply_examples(self, tmp_path):
+        router = self._build(tmp_path, inbox=[_msg("i1", "boss@work.com", "vendor call")])
+        router.poll_once()
+
+        router.confirm_suggestion("i1", "schedule", reply_body="a real note")
+
+        reply_examples_path = str(tmp_path / "data" / "reply_examples.jsonl")
+        assert not os.path.exists(reply_examples_path)
+
+    def test_override_to_schedule_with_real_text_records_a_schedule_entry(self, tmp_path):
+        router = self._build(tmp_path, inbox=[_msg("i1", "boss@work.com", "random subject")])
+        router.poll_once()
+
+        router.override_decision("i1", "schedule", "manual override", reply_body="Sept 2 -- follow up")
+
+        schedule_path = str(tmp_path / "data" / "schedule.txt")
+        with open(schedule_path, "r", encoding="utf-8") as f:
+            content = f.read()
+        assert "Sept 2 -- follow up" in content
+
+    def test_confirm_schedule_with_dates_creates_a_calendar_event(self, tmp_path):
+        calendar = FakeCalendarClient()
+        router = self._build(tmp_path, inbox=[_msg("i1", "boss@work.com", "vendor call")],
+                              calendar_client=calendar)
+        router.poll_once()
+        entry_id = router.pending_entries()[0]["message_id"]
+        router.confirm_suggestion(entry_id, "schedule", reply_body="Vendor call about Q3.",
+                                   event_start="2026-09-03T14:00:00-07:00",
+                                   event_end="2026-09-03T14:30:00-07:00")
+
+        assert len(calendar.events) == 1
+        assert calendar.events[0]["description"] == "Vendor call about Q3."
+        assert calendar.events[0]["start"] == "2026-09-03T14:00:00-07:00"
+        assert calendar.events[0]["end"] == "2026-09-03T14:30:00-07:00"
+
+    def test_confirm_schedule_without_dates_creates_no_calendar_event(self, tmp_path):
+        calendar = FakeCalendarClient()
+        router = self._build(tmp_path, inbox=[_msg("i1", "boss@work.com", "vendor call")],
+                              calendar_client=calendar)
+        router.poll_once()
+        entry_id = router.pending_entries()[0]["message_id"]
+        router.confirm_suggestion(entry_id, "schedule", reply_body="Vendor call about Q3.")
+
+        assert calendar.events == []
+
+    def test_override_to_schedule_with_dates_creates_a_calendar_event(self, tmp_path):
+        calendar = FakeCalendarClient()
+        router = self._build(tmp_path, inbox=[_msg("i1", "boss@work.com", "random subject")],
+                              calendar_client=calendar)
+        router.poll_once()
+        entry_id = router.pending_entries()[0]["message_id"]
+        router.override_decision(entry_id, "schedule", reason="needs scheduling",
+                                  reply_body="Follow-up call.",
+                                  event_start="2026-09-04T10:00:00-07:00",
+                                  event_end="2026-09-04T10:30:00-07:00")
+
+        assert len(calendar.events) == 1
+        assert calendar.events[0]["description"] == "Follow-up call."
+
+    def test_confirm_schedule_calendar_failure_does_not_crash(self, tmp_path):
+        class BrokenCalendarClient:
+            def create_event(self, *a, **kw):
+                raise RuntimeError("calendar API down")
+        router = self._build(tmp_path, inbox=[_msg("i1", "boss@work.com", "vendor call")],
+                              calendar_client=BrokenCalendarClient())
+        router.poll_once()
+        entry_id = router.pending_entries()[0]["message_id"]
+        # Must not raise -- a calendar failure is logged, not fatal, same as
+        # every other real-action failure in this file (draft creation).
+        router.confirm_suggestion(entry_id, "schedule", reply_body="note",
+                                   event_start="2026-09-03T14:00:00-07:00",
+                                   event_end="2026-09-03T14:30:00-07:00")
+
+
+class TestReadStdinCommandsCarryReplyBody:
+    """_read_stdin_commands() is the far end of the Electron 'Inbox' tab's
+    own confirm/override chain (preload.js -> main.js -> recorder_bridge.py
+    -> this). That chain has no live UI wired to it today, but its
+    reply_body plumbing was found to be entirely missing while fixing the
+    same defect in automate_inbox.py -- fixed here so it can never
+    reintroduce the same silent-empty-draft bug if a UI is ever wired to
+    it later."""
+
+    def _build(self, tmp_path, inbox=None):
+        _write_fixture(tmp_path / "data", inbox=inbox or [], sent=[])
+        client = MockGmailClient(data_dir=str(tmp_path / "data"))
+        profile = PatternProfile(path=str(tmp_path / "data" / "profile.json"))
+        registry_path = tmp_path / "registry.json"
+        registry_path.write_text(json.dumps({"capsules": []}), encoding="utf-8")
+        rules = RuleLayer(profile, registry_path=str(registry_path))
+        classifier = LLMClassifier(provider="none")
+        history_path = str(tmp_path / "data" / "routed_history.json")
+        return InboxRouter(client, profile, rules, classifier, history_path=history_path,
+                            inbox_checkpoint_path=str(tmp_path / "no_such_checkpoint.pt"),
+                            examples_path=str(tmp_path / "data" / "training_examples.jsonl"),
+                            reply_examples_path=str(tmp_path / "data" / "reply_examples.jsonl"))
+
+    def test_confirm_command_threads_reply_body_through(self, tmp_path, monkeypatch):
+        router = self._build(tmp_path)
+        captured = {}
+        monkeypatch.setattr(router, "confirm_suggestion",
+                             lambda message_id, decision, reply_body="": captured.update(
+                                 message_id=message_id, decision=decision, reply_body=reply_body))
+        line = json.dumps({"cmd": "confirm", "message_id": "m1", "decision": "reply",
+                            "reply_body": "Sure, that works."})
+        monkeypatch.setattr(sys, "stdin", iter([line]))
+
+        router._read_stdin_commands()
+
+        assert captured == {"message_id": "m1", "decision": "reply", "reply_body": "Sure, that works."}
+
+    def test_override_command_threads_reply_body_through(self, tmp_path, monkeypatch):
+        router = self._build(tmp_path)
+        captured = {}
+        monkeypatch.setattr(router, "override_decision",
+                             lambda message_id, new_decision, reason="", reply_body="": captured.update(
+                                 message_id=message_id, new_decision=new_decision,
+                                 reason=reason, reply_body=reply_body))
+        line = json.dumps({"cmd": "override", "message_id": "m1", "new_decision": "forward",
+                            "reason": "wrong guess", "reply_body": "Passing this along."})
+        monkeypatch.setattr(sys, "stdin", iter([line]))
+
+        router._read_stdin_commands()
+
+        assert captured == {"message_id": "m1", "new_decision": "forward",
+                             "reason": "wrong guess", "reply_body": "Passing this along."}
+
+    def test_confirm_command_without_reply_body_defaults_to_empty(self, tmp_path, monkeypatch):
+        # Every OTHER existing caller of "confirm" (there are none live
+        # today) must keep working with no reply_body key at all.
+        router = self._build(tmp_path)
+        captured = {}
+        monkeypatch.setattr(router, "confirm_suggestion",
+                             lambda message_id, decision, reply_body="": captured.update(reply_body=reply_body))
+        line = json.dumps({"cmd": "confirm", "message_id": "m1", "decision": "leave_alone"})
+        monkeypatch.setattr(sys, "stdin", iter([line]))
+
+        router._read_stdin_commands()
+
+        assert captured["reply_body"] == ""

@@ -293,6 +293,16 @@
     var unsaved = rows.filter(function (_, i) { return isDirty(i); }).length;
     counter.textContent = done + " of " + records.length + " encoded" +
       (unsaved ? " - " + unsaved + " unsaved" : "");
+
+    // Encoding progress, as a custom property rather than an element: the
+    // card header renders it with a pseudo-element (see .toolbar::after in
+    // shared/styles.css). Deliberately adds no node to the DOM, because the
+    // Page Scanner walks this page and the variants must stay structurally
+    // identical to what they were.
+    var panel = counter.closest ? counter.closest(".panel") : null;
+    if (panel && records.length) {
+      panel.style.setProperty("--encoded", String(done / records.length));
+    }
   }
 
   function setStatus(msg, kind) {

@@ -18,7 +18,7 @@ import os
 import re
 import sys
 from dataclasses import dataclass, field
-from typing import List, Optional
+from typing import Optional
 
 _THIS_DIR = os.path.dirname(os.path.abspath(__file__))
 if _THIS_DIR not in sys.path:
@@ -54,27 +54,37 @@ _DEFAULT_MODELS = {
 }
 _GROQ_BASE_URL = "https://api.groq.com/openai/v1"
 
+# Found live: a small local model can leak its own meta-commentary into
+# a rationale (seen mixed into a real "because:" line during a live
+# run). Every rationale in this project is English, so any CJK
+# (Chinese/Japanese/Korean) character is itself proof something went
+# wrong -- same signal, same regex as inbox_reply_llm.py's own guard on
+# generated reply/forward text, applied here to the rationale field
+# specifically. The decision/confidence themselves are still usable
+# even when the rationale is garbled, so this replaces the text rather
+# than failing the whole classification closed.
+_CJK_RE = re.compile(r"[一-鿿぀-ヿ가-힯]")
+
 _SYSTEM_PROMPT = (
     "You triage a single email for a real person. Choose exactly one of these outcomes:\n"
-    "  route_scope1 - hand off to a GUI form-filling assistant (data entry / intake tasks)\n"
-    "  route_scope2 - hand off to a spreadsheet-to-portal matcher (grades/rosters/sheets)\n"
     "  reply        - the user should reply directly\n"
     "  forward      - the user should forward this to someone else\n"
-    "  flag         - this needs a person's judgment, don't act automatically\n"
-    "  leave_alone  - no action needed\n"
-    "You are given the email, what's known about how this same sender has been "
-    "handled before, and which capsules (if any) are registered. Respond with ONLY "
-    "a JSON object: "
+    "  schedule     - this is about scheduling something (a meeting, appointment, "
+    "deadline) that belongs on a calendar\n"
+    "  cold_email   - unsolicited outreach from someone with no prior relationship "
+    "to the user\n"
+    "  leave_alone  - no action needed, or nothing confident enough to act on\n"
+    "You are given the email and what's known about how this same sender has been "
+    "handled before. Respond with ONLY a JSON object: "
     '{"decision": "...", "confidence": 0.0-1.0, "rationale": "one short sentence", '
-    '"capsule_name": "" , "forward_to": ""}. '
-    "capsule_name is only meaningful for route_scope1/route_scope2 and must be one of "
-    "the registered capsule names you were given, or empty if unsure."
+    '"capsule_name": "", "forward_to": ""}. '
+    "capsule_name is unused and should always be left empty."
 )
 
 
 @dataclass
 class ClassificationResult:
-    decision: str = "flag"
+    decision: str = "leave_alone"
     confidence: float = 0.0
     rationale: str = ""
     capsule_name: str = ""
@@ -100,9 +110,9 @@ class LLMClassifier:
         self.provider = provider
         self._llm_model = model_id or _DEFAULT_MODELS.get(provider, "")
         self._llm_client = None
-        self._init_provider(api_key, lmstudio_url)
+        self._init_provider(api_key, lmstudio_url, model_id)
 
-    def _init_provider(self, api_key: str, lmstudio_url: str) -> None:
+    def _init_provider(self, api_key: str, lmstudio_url: str, model_id: str = "") -> None:
         p = self.provider
         if p == "anthropic":
             if not _ANTHROPIC_OK:
@@ -125,7 +135,30 @@ class LLMClassifier:
         elif p == "lmstudio":
             if not _OPENAI_OK:
                 return
-            self._llm_client = _OpenAI(base_url=lmstudio_url, api_key="lm-studio")
+            # _DEFAULT_MODELS["lmstudio"] ("local-model") is a fixed
+            # placeholder that matches no real LM Studio model -- every
+            # classify() call was failing closed to "flag" even with a
+            # real model genuinely loaded, found live running the real
+            # classifier against a real, loaded model. LM Studio's own
+            # API needs the exact id of whatever's actually loaded right
+            # now, never a fixed name -- same fix already proven correct
+            # in cold_email_llm.py: ask LM Studio itself. Only done when
+            # no model_id was explicitly requested, so a caller who
+            # deliberately wants a specific one of several
+            # simultaneously-loaded models still gets exactly that one.
+            # Client construction and the dynamic lookup are one
+            # fail-closed unit, same as cold_email_llm.py: if LM Studio
+            # is unreachable at either step, stay on the placeholder
+            # rather than let __init__ raise.
+            try:
+                client = _OpenAI(base_url=lmstudio_url, api_key="lm-studio")
+                self._llm_client = client
+                if not model_id:
+                    models = client.models.list()
+                    if models.data:
+                        self._llm_model = models.data[0].id
+            except Exception:
+                pass  # stays the placeholder -- classify() still fails closed the same way
         # "none" or unknown provider -> self._llm_client stays None
 
     @property
@@ -133,13 +166,13 @@ class LLMClassifier:
         return self._llm_client is not None
 
     def classify(self, message: EmailMessage, pattern: Optional[SenderPattern],
-                 rule_hint: RuleDecision, capsule_hints: List[dict]) -> ClassificationResult:
+                 rule_hint: RuleDecision) -> ClassificationResult:
         if not self.available:
             return ClassificationResult(
-                decision="flag", confidence=0.0,
-                rationale="No LLM provider configured — flagged for a person to decide.",
+                decision="leave_alone", confidence=0.0,
+                rationale="No LLM provider configured — left alone, nothing confident to act on.",
             )
-        user_msg = self._build_prompt(message, pattern, capsule_hints)
+        user_msg = self._build_prompt(message, pattern)
         try:
             if self.provider == "anthropic":
                 raw = self._call_anthropic(user_msg)
@@ -152,16 +185,19 @@ class LLMClassifier:
             parsed = _parse_llm_response(raw)
         except Exception as exc:
             return ClassificationResult(
-                decision="flag", confidence=0.0,
-                rationale=f"LLM classification failed ({exc}) — flagged for a person to decide.",
+                decision="leave_alone", confidence=0.0,
+                rationale=f"LLM classification failed ({exc}) — left alone, nothing confident to act on.",
             )
-        decision = parsed.get("decision", "flag")
+        decision = parsed.get("decision", "leave_alone")
         if decision not in DECISIONS:
-            decision = "flag"
+            decision = "leave_alone"
+        rationale = str(parsed.get("rationale", ""))
+        if _CJK_RE.search(rationale):
+            rationale = "Decision made (rationale text was malformed)."
         return ClassificationResult(
             decision=decision,
             confidence=float(parsed.get("confidence", 0.5) or 0.5),
-            rationale=str(parsed.get("rationale", "")),
+            rationale=rationale,
             capsule_name=str(parsed.get("capsule_name", "") or ""),
             forward_to=str(parsed.get("forward_to", "") or ""),
         )
@@ -192,21 +228,16 @@ class LLMClassifier:
             return ""
         return ""
 
-    def _build_prompt(self, message: EmailMessage, pattern: Optional[SenderPattern],
-                       capsule_hints: List[dict]) -> str:
+    def _build_prompt(self, message: EmailMessage, pattern: Optional[SenderPattern]) -> str:
         pattern_desc = "No prior history with this sender."
         if pattern is not None and pattern.total() > 0:
             pattern_desc = (f"Prior history with {pattern.sender_domain}: "
                             f"replied {pattern.reply_count}x, forwarded {pattern.forward_count}x, "
                             f"left alone {pattern.ignore_count}x.")
-        capsules_desc = "\n".join(
-            f"  - {c.get('name')}: {c.get('description', '')}" for c in capsule_hints
-        ) or "  (none registered)"
         return (
             f"EMAIL\nFrom: {message.sender}\nSubject: {message.subject}\n\n"
             f"{message.body_text[:2000]}\n\n"
-            f"PATTERN PROFILE\n{pattern_desc}\n\n"
-            f"REGISTERED CAPSULES\n{capsules_desc}"
+            f"PATTERN PROFILE\n{pattern_desc}"
         )
 
     def _call_anthropic(self, user_msg: str) -> str:

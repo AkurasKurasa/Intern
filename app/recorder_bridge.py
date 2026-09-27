@@ -68,6 +68,9 @@ for _p in (_ROOT, _COMP):
 
 from recorder.recorder import DemoRecorder
 from agent.capsule import CapsuleRegistry
+from inbox_router.automate_inbox import ensure_server_running
+from inbox_router.reply_trace_translator import translate_session
+from inbox_router.gmail_client import get_gmail_client
 
 # Full, persisted transcript of everything the Play panel's Activity log
 # receives -- direct user request ("add a log feature... so you could
@@ -136,19 +139,39 @@ class Bridge:
         self._capsule_proc: subprocess.Popen | None = None
         self._registry = registry if registry is not None else CapsuleRegistry()
         self._inbox_proc: subprocess.Popen | None = None
+        # Handle for a local_server.py that THIS bridge started for a web
+        # recording. ensure_server_running() returns None when a server was
+        # already up -- that one belongs to someone else and must never be
+        # touched here. Same own-it-or-leave-it pattern as _inbox_proc above.
+        self._local_server_proc: subprocess.Popen | None = None
 
     # ── start / stop ─────────────────────────────────────────────────────────
-    def start(self, output_dir: str | None = None) -> None:
+    def start(self, output_dir: str | None = None, trace_type: str = "form_filling",
+              url: str = "") -> None:
         if self._running:
             emit("error", message="Already recording.")
             return
         if output_dir:
             self._out_dir = output_dir if os.path.isabs(output_dir) else os.path.join(_ROOT, output_dir)
 
+        if trace_type == "web":
+            try:
+                # KEEP the handle. It's non-None only when this call actually
+                # spawned local_server.py; discarding it left that Python
+                # process running forever -- it outlived Electron itself,
+                # holding the port, one more orphan per web recording.
+                self._local_server_proc = ensure_server_running()
+            except (Exception, SystemExit) as exc:
+                emit("error", message=f"Could not start the local server for web recording: {exc}")
+                return
+
         try:
-            self._recorder = DemoRecorder(output_dir=self._out_dir, trace_type="form_filling")
+            self._recorder = DemoRecorder(output_dir=self._out_dir, trace_type=trace_type, url=url)
         except Exception as exc:
             emit("error", message=f"Failed to start recorder: {exc}")
+            # We may have just started the server for a recording that then
+            # never began -- don't leave it behind.
+            self._stop_local_server()
             return
 
         self._running = True
@@ -162,9 +185,24 @@ class Bridge:
             finally:
                 steps = len(self._recorder._steps) if self._recorder else 0
                 session_dir = getattr(self._recorder, "output_dir", "")
+                recorded_trace_type = getattr(self._recorder, "trace_type", "")
                 self._running = False
                 self._poll_stop.set()
-                emit("saved", steps=steps, session_dir=session_dir)
+                # A web recording (Inbox Dispatch) captures a real session on
+                # disk, but that's just a raw trace -- nothing turns it into
+                # actual training data on its own. Direct instruction: "we
+                # need to utilize the Recorder because that's what we
+                # actually use" -- Stop must finish the job itself, not leave
+                # a session sitting there needing a separate manual command
+                # someone has to remember to run later.
+                examples_written = 0
+                if recorded_trace_type == "web" and steps > 0 and session_dir:
+                    try:
+                        examples_written = translate_session(session_dir, get_gmail_client())
+                    except Exception as exc:
+                        emit("log", message=f"Couldn't extract training examples from this recording: {exc}", level="err")
+                emit("saved", steps=steps, session_dir=session_dir,
+                     trace_type=recorded_trace_type, examples_written=examples_written)
 
         threading.Thread(target=_run, daemon=True).start()
         self._poll_thread = threading.Thread(target=self._poll, daemon=True)
@@ -190,11 +228,29 @@ class Bridge:
                 emit("frame_count", value=n, pending=pending)
             time.sleep(0.3)
 
+    def _stop_local_server(self) -> None:
+        """Terminate the local_server.py THIS bridge started, if any.
+        A None handle means ensure_server_running() found one already up --
+        that server belongs to another process; leave it alone."""
+        proc = self._local_server_proc
+        self._local_server_proc = None
+        if proc is None or proc.poll() is not None:
+            return
+        try:
+            proc.terminate()
+            proc.wait(timeout=5)
+        except Exception:
+            try:
+                proc.kill()
+            except Exception:
+                pass
+
     def stop(self) -> None:
         if not self._running or self._recorder is None:
             emit("error", message="Not currently recording.")
             return
         self._recorder._quit_event.set()
+        self._stop_local_server()
 
     # ── replay (pure file duplication, same as app/main.py's _do_replay) ─────
     def replay(self, n: int) -> None:
@@ -238,7 +294,8 @@ class Bridge:
     # apart. kind="script" capsules (e.g. Scope #2) get the same treatment:
     # WorkflowCapsule.launch_command() is the one place that decides the
     # actual argv, so both kinds share this exact Popen call.
-    def run_capsule(self, capsule_name: str) -> None:
+    def run_capsule(self, capsule_name: str,
+                    extra_args: list | None = None) -> None:
         if self._running:
             emit("error", message="Stop recording before running a capsule.")
             return
@@ -251,7 +308,7 @@ class Bridge:
             emit("error", message=f"Capsule not found: {capsule_name}")
             return
         try:
-            argv, cwd = capsule.launch_command(_ROOT)
+            argv, cwd = capsule.launch_command(_ROOT, extra_args)
         except FileNotFoundError as exc:
             emit("error", message=str(exc))
             return
@@ -356,9 +413,54 @@ class Bridge:
             _log_capsule_line(f"Run ended (exit code {code}).")
             emit("capsule_done", code=code)
 
-        threading.Thread(target=_pump, daemon=True).start()
+        # Announce the run BEFORE reading its output: the app resets its
+        # activity feed and starts the Running view on capsule_started, so a
+        # line pumped first would be wiped or land before the run "began".
         emit("capsule_started", label=label)
         emit("log", message=f"Capsule run started — {label}", level="ok")
+        threading.Thread(target=_pump, daemon=True).start()
+
+    # How long a clean stop is allowed to take before it stops being clean.
+    # CTRL_BREAK_EVENT raises KeyboardInterrupt in run_task.py, which is the
+    # right way to stop it: its run() catches that to save partial results and
+    # write metrics. But the signal only lands when Python next executes
+    # bytecode, and a step blocked in a live LLM request sits inside a socket
+    # read for five to seven seconds first. Direct report: "stopping takes too
+    # long". Nothing escalated, so a wedged run could sit there indefinitely.
+    _STOP_GRACE_SEC = 4.0      # let the clean shutdown path finish
+    _STOP_KILL_SEC = 2.0       # then terminate, then kill
+
+    def _escalate_stop(self, proc) -> None:
+        """Escalate a stop that the signal alone did not finish.
+
+        Runs on a daemon thread so the bridge keeps serving commands while it
+        waits -- the UI has already been told the run stopped, and this is only
+        about making sure the process actually goes away.
+        """
+        def _run():
+            try:
+                proc.wait(timeout=self._STOP_GRACE_SEC)
+                return                      # clean exit, nothing to do
+            except subprocess.TimeoutExpired:
+                pass
+            try:
+                _log_capsule_line(
+                    f"Still running {self._STOP_GRACE_SEC:.0f}s after the stop signal "
+                    "— terminating.")
+                proc.terminate()
+                proc.wait(timeout=self._STOP_KILL_SEC)
+                return
+            except subprocess.TimeoutExpired:
+                pass
+            except Exception:
+                return
+            try:
+                _log_capsule_line("Still running after terminate — killing.")
+                proc.kill()
+            except Exception:
+                pass
+
+        threading.Thread(target=_run, daemon=True).start()
 
     def stop_capsule(self) -> None:
         if self._capsule_proc is None or self._capsule_proc.poll() is not None:
@@ -376,6 +478,7 @@ class Bridge:
             _log_capsule_line("Stop requested — CTRL_BREAK_EVENT sent.")
             emit("capsule_stopped")
             emit("log", message="Capsule run interrupted…", level="dim")
+            self._escalate_stop(self._capsule_proc)
         except Exception as exc:
             emit("error", message=f"Failed to stop capsule run: {exc}")
 
@@ -441,12 +544,15 @@ class Bridge:
             return
         self._send_inbox_cmd({"cmd": "shutdown"})
 
-    def inbox_confirm_suggestion(self, message_id: str, decision: str) -> None:
-        self._send_inbox_cmd({"cmd": "confirm", "message_id": message_id, "decision": decision})
+    def inbox_confirm_suggestion(self, message_id: str, decision: str, reply_body: str = "") -> None:
+        self._send_inbox_cmd({"cmd": "confirm", "message_id": message_id, "decision": decision,
+                               "reply_body": reply_body})
 
-    def inbox_override_decision(self, message_id: str, new_decision: str, reason: str = "") -> None:
+    def inbox_override_decision(self, message_id: str, new_decision: str, reason: str = "",
+                                 reply_body: str = "") -> None:
         self._send_inbox_cmd({"cmd": "override", "message_id": message_id,
-                               "new_decision": new_decision, "reason": reason})
+                               "new_decision": new_decision, "reason": reason,
+                               "reply_body": reply_body})
 
     def _send_inbox_cmd(self, cmd: dict) -> None:
         if self._inbox_proc is None or self._inbox_proc.poll() is not None:
@@ -473,13 +579,15 @@ class Bridge:
 
             cmd = msg.get("cmd")
             if cmd == "start":
-                self.start(msg.get("output_dir"))
+                self.start(msg.get("output_dir"), msg.get("trace_type", "form_filling"),
+                           msg.get("url", ""))
             elif cmd == "stop":
                 self.stop()
             elif cmd == "replay":
                 self.replay(int(msg.get("n", 10)))
             elif cmd == "run_capsule":
-                self.run_capsule(msg.get("capsule_name", ""))
+                self.run_capsule(msg.get("capsule_name", ""),
+                                 msg.get("extra_args") or [])
             elif cmd == "stop_capsule":
                 self.stop_capsule()
             elif cmd == "start_inbox_router":
@@ -487,10 +595,11 @@ class Bridge:
             elif cmd == "stop_inbox_router":
                 self.stop_inbox_router()
             elif cmd == "inbox_confirm_suggestion":
-                self.inbox_confirm_suggestion(msg.get("message_id", ""), msg.get("decision", ""))
+                self.inbox_confirm_suggestion(msg.get("message_id", ""), msg.get("decision", ""),
+                                               msg.get("reply_body", ""))
             elif cmd == "inbox_override_decision":
                 self.inbox_override_decision(msg.get("message_id", ""), msg.get("new_decision", ""),
-                                              msg.get("reason", ""))
+                                              msg.get("reason", ""), msg.get("reply_body", ""))
             elif cmd == "shutdown":
                 if self._running and self._recorder is not None:
                     self._recorder._quit_event.set()
@@ -508,6 +617,10 @@ class Bridge:
                             self._inbox_proc.send_signal(signal.CTRL_BREAK_EVENT)
                         except Exception:
                             pass
+                # Shutdown can arrive without a preceding "stop" (Electron
+                # quitting mid-recording) -- same cleanup, so the server we
+                # started never outlives this process either.
+                self._stop_local_server()
                 break
             else:
                 emit("error", message=f"Unknown command: {cmd!r}")

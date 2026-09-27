@@ -2,9 +2,13 @@
 
 The rule's outcome is whatever the demonstrator picked - "Passed". The live form
 may spell it differently: "PASSED", "P", "Passed *". So the outcome is resolved
-against the option list actually on the page, using the same embedding and
-string similarity the Feature Extractor uses, and the select is driven by the
-resolved option rather than by typed text.
+against the option list actually on the page, using string similarity, and the
+select is driven by the resolved option rather than by typed text.
+
+String similarity only, no embedding model: Scope #2 is built like Scope #1,
+which loads none. This was the last place a run could still load MiniLM (~9 s)
+-- only when an option was worded differently, so the cost was invisible until
+it hit.
 
 If nothing clears the threshold, this returns None so the caller escalates.
 3.10 is explicit: never pick the nearest option when unsure.
@@ -17,7 +21,6 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO))
 
-from features import encoders  # noqa: E402
 from features.extractor import levenshtein_ratio  # noqa: E402
 
 # An exact or case-insensitive hit is certain; anything else has to clear this
@@ -40,16 +43,8 @@ class Resolution:
 
 
 def similarity(intended, option):
-    """String similarity, lifted by semantic similarity when available.
-
-    The two are combined by taking the better of them: "P" for "PASSED" is a
-    lexical match that embeddings dislike, while "Academic Standing" for
-    "Status" is the reverse.
-    """
-    lexical = levenshtein_ratio(intended, option)
-    if not encoders.available():
-        return lexical
-    return max(lexical, encoders.similarity(intended, option))
+    """String similarity between an outcome and an offered option."""
+    return levenshtein_ratio(intended, option)
 
 
 def resolve_option(intended, options):

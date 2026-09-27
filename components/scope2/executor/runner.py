@@ -25,6 +25,7 @@ import json
 import re
 import sys
 import time
+from collections import Counter
 from dataclasses import dataclass, field, asdict
 from datetime import datetime, timezone
 from pathlib import Path
@@ -43,6 +44,135 @@ RUNS_DIR = REPO / "data" / "runs"
 # Portal chrome that is not a data field.
 SAVE_BUTTON = "#submit-btn"
 STATUS_EL = "#form-status"
+
+# The live decision HUD (executor/hud.js). Read once at import; injected only
+# when show=True, so a measurement run never loads it and the numbers a
+# headless run produces are unaffected by its existence. See hud.js' own header
+# for why it is shadow-DOM'd rather than styled into the page.
+# The in-page script is now ONLY a row highlighter. The decision panel itself
+# moved to the Electron app's floating Agent window, so Scope #1 and Scope #2
+# report through the same surface instead of each having its own -- direct
+# request, for uniformity.
+#
+# What stayed in the page is the one thing that cannot live outside it:
+# outlining the row being filled and scrolling it into view. That is not the
+# panel, and losing it would make a 50-row run much harder to follow.
+HUD_JS = (Path(__file__).parent / "hud.js").read_text(encoding="utf-8")
+
+
+def _emit_hud(kind, **payload):
+    """One machine-readable line for the floating Agent window.
+
+    Same convention run_task.py's COUNTDOWN lines and agent.py's DECISION
+    lines already use: print to stdout, which recorder_bridge.py is already
+    pumping line by line to the app. No new IPC, no second transport.
+
+    Presentation only -- wrapped whole, and any failure is discarded, because
+    a HUD line must never break a run whose rows all filled and verified.
+    """
+    try:
+        payload["kind"] = kind
+        print("SCOPE2HUD " + json.dumps(payload))
+        try:
+            sys.stdout.flush()
+        except OSError:
+            # Windows, spawned with no console (the Electron Play button uses
+            # windowsHide) -- the write already landed. Same guard
+            # print_countdown() needed for the same reason.
+            pass
+    except Exception:  # noqa: BLE001 - never break a run over a display line
+        pass
+
+
+class Hud:
+    """Drives the floating Agent window, and the in-page row highlight.
+
+    Method names and call sites are unchanged from when this drove an in-page
+    panel; only where the output goes has changed. `enabled` still gates
+    everything, so a headless measurement run emits nothing and touches no
+    page -- the property the equivalence test pins.
+    """
+
+    def __init__(self, page=None, enabled=False):
+        self._page = page if enabled else None
+        self._enabled = enabled
+
+    @property
+    def enabled(self):
+        return self._enabled
+
+    def _highlight(self, expression, *args):
+        """Best-effort call into the page, for the row outline only."""
+        if self._page is None:
+            return
+        try:
+            self._page.evaluate(expression, *args)
+        except Exception:  # noqa: BLE001 - presentation must not break a run
+            pass
+
+    def install(self, payload):
+        if not self._enabled:
+            return
+        _emit_hud("init", **payload)
+        if self._page is not None:
+            try:
+                self._page.evaluate(HUD_JS)
+            except Exception:  # noqa: BLE001
+                self._page = None
+
+    def stage(self, text):
+        if self._enabled:
+            _emit_hud("stage", text=text)
+
+    def row(self, index, student_id):
+        if not self._enabled:
+            return
+        _emit_hud("row", index=index, student_id=str(student_id))
+        self._highlight("i => window.__agentHUD.row(i)", index)
+
+    def cell(self, label, value):
+        if self._enabled:
+            _emit_hud("cell", label=str(label), value=str(value))
+
+    def row_done(self, ok):
+        if self._enabled:
+            _emit_hud("rowDone", ok=bool(ok))
+
+    def finish(self, status, detail=""):
+        if not self._enabled:
+            return
+        _emit_hud("finish", status=str(status), detail=str(detail))
+        self._highlight("() => window.__agentHUD.release()")
+
+
+def hud_payload(mapping, variant, dry_run, total_rows):
+    """The Resolver's own output, reshaped for display.
+
+    Reads only what the mapping already carries - no portal-specific and no
+    task-specific knowledge - so every variant gets a HUD without this function
+    knowing anything about any of them.
+    """
+    return {
+        "variant": variant,
+        "dry_run": dry_run,
+        "total_rows": total_rows,
+        "assignments": [
+            {"source_header": a["source_header"], "target_label": a["target_label"],
+             "score": a.get("score"), "margin": a.get("margin"),
+             # which tier decided it -- source or llm. A hand-written mapping
+             # names its columns itself, which is what "source" means.
+             "via": a.get("via", "source")}
+            for a in mapping.get("assignments", [])
+        ],
+        # Fields the LLM refused, with its reason, so the HUD can say why a
+        # field was left empty.
+        "abstained": [
+            {"target_label": a.get("target_label"), "reason": a.get("reason", "")}
+            for a in mapping.get("abstained", [])
+        ],
+        "derived_rules": mapping.get("derived_rules", []),
+        "unmapped_fields": mapping.get("unmapped_fields", []),
+    }
 
 
 # ---------------------------------------------------------------- outcomes
@@ -181,6 +311,47 @@ class PortalSheet:
             )
         return index
 
+    def printed_column(self, header_label, values, contains=False, sample_rows=5):
+        """printed_index, falling back to what the column PRINTS.
+
+        The header name is a guess about this portal's wording: V2 calls
+        Student ID "Learner Reference Number", and the run stopped before
+        writing a thing. What survives relabelling is the content -- the
+        column whose cells hold the sheet's own key values. Sampled over a
+        few rows; a tie or no hit is no answer, and the run stops as before.
+        """
+        index = header_index(self.headers, header_label)
+        if index is not None:
+            return index
+        wanted = {str(v).strip().casefold() for v in values if str(v).strip()}
+        hits = Counter()
+        for i in range(min(self.rows.count(), sample_rows)):
+            cells = self.rows.nth(i).locator("td").all_inner_texts()
+            for j, text in enumerate(cells):
+                t = text.strip().casefold()
+                if t and (any(w in t for w in wanted) if contains else t in wanted):
+                    hits[j] += 1
+        ranked = hits.most_common(2)
+        if ranked and (len(ranked) == 1 or ranked[0][1] > ranked[1][1]):
+            return ranked[0][0]
+        return self.printed_index(header_label)   # raises with the page's headers
+
+    def find_row(self, student_id, id_index):
+        """As row_for, but also returns the row's position on the page.
+
+        The position is what the HUD needs to highlight the row it is filling.
+        Returning it from the scan that already walked the rows keeps that free:
+        asking for it separately would repeat an inner_text() per row, which is
+        the expensive part of this loop.
+        """
+        count = self.rows.count()
+        for i in range(count):
+            row = self.rows.nth(i)
+            printed = row.locator("td").nth(id_index).inner_text().strip()
+            if printed == student_id:
+                return row, i
+        return None, -1
+
     def row_for(self, student_id, id_index):
         """The portal row whose Student ID cell holds exactly this ID.
 
@@ -188,13 +359,7 @@ class PortalSheet:
         substring matching over a filled row can collide with a value the
         executor itself just wrote.
         """
-        count = self.rows.count()
-        for i in range(count):
-            row = self.rows.nth(i)
-            printed = row.locator("td").nth(id_index).inner_text().strip()
-            if printed == student_id:
-                return row
-        return None
+        return self.find_row(student_id, id_index)[0]
 
     def printed_text(self, row, index):
         return row.locator("td").nth(index).inner_text().strip()
@@ -205,7 +370,12 @@ class PortalSheet:
         if candidate.count() == 1:
             return candidate.first
         # V4: no accessible name. Fall back to the scanned column position.
-        cell = row.locator("td").nth(descriptor.column_index + 1)
+        # column_index is the header's position among ALL the row's header
+        # cells -- the select-all checkbox column included -- and every row
+        # has exactly one cell per header, so it is the cell's position as
+        # is. A "+ 1" here shifted every V4 write one column right (Course
+        # into Year, Grade into Remarks), found by filling V4 end to end.
+        cell = row.locator("td").nth(descriptor.column_index)
         return cell.locator("input, select, textarea").first
 
     def fill(self, row, label, value):
@@ -327,8 +497,10 @@ def run(variant, mapping_path, dry_run=True, base_url=None, limit=None,
             inputs = [d for d in descriptors if d.kind == KIND_INPUT]
             sheet = PortalSheet(page, inputs, header_columns(page))
 
-            id_index = sheet.printed_index(alignment["key_field"])
-            name_index = sheet.printed_index(alignment["verify_field"])
+            id_index = sheet.printed_column(alignment["key_field"],
+                                            df[alignment["key_column"]])
+            name_index = sheet.printed_column(alignment["verify_field"],
+                                              df[alignment["verify_column"]], contains=True)
 
             missing = [l for l in mapped_labels if l not in sheet.by_label]
             missing += [r["field"] for r in derived_rules if r["field"] not in sheet.by_label]
@@ -337,17 +509,27 @@ def run(variant, mapping_path, dry_run=True, base_url=None, limit=None,
 
             controls_before = sheet.checkbox_states()
 
+            # Presentation only, and only under --show: the HUD puts the
+            # Resolver's decisions on the page it is deciding about. Disabled,
+            # every call below is a no-op that never touches the page.
+            hud = Hud(page, enabled=show)
+            hud.install(hud_payload(mapping, variant, dry_run, len(df)))
+            hud.stage("Filling rows")
+
             for position, record in df.iterrows():
                 student_id = str(record[alignment["key_column"]]).strip()
                 result = RowResult(row=int(position) + 1, student_id=student_id,
                                    status="filled")
 
-                row = sheet.row_for(student_id, id_index)
+                row, row_index = sheet.find_row(student_id, id_index)
                 if row is None:
                     result.status = "failed"
                     result.reason = "no portal row prints this Student ID"
+                    hud.row_done(False)
                     log.rows.append(result)
                     continue
+
+                hud.row(row_index, student_id)
 
                 # Alignment check before any write: 3.10's readback logic applied
                 # to identity. A name mismatch means we found the wrong row.
@@ -359,6 +541,7 @@ def run(variant, mapping_path, dry_run=True, base_url=None, limit=None,
                         f"row alignment: sheet says {expected_name!r}, "
                         f"portal row prints {printed!r}"
                     )
+                    hud.row_done(False)
                     log.rows.append(result)
                     continue
 
@@ -368,6 +551,7 @@ def run(variant, mapping_path, dry_run=True, base_url=None, limit=None,
                         value = sheet_value(record[column_for[label]])
                         if value == "":
                             continue
+                        hud.cell(label, value)
                         sheet.fill(row, label, value)
                         result.filled[label] = value
                         written.append(label)
@@ -382,6 +566,7 @@ def run(variant, mapping_path, dry_run=True, base_url=None, limit=None,
                                 f"rule for {rule['field']!r} could not read "
                                 f"{rule['depends_on_field']!r} (got {driver!r})"
                             )
+                        hud.cell(rule["field"], outcome)
                         chosen = sheet.fill(row, rule["field"], outcome)
                         if chosen is None:
                             result.escalations.append(
@@ -408,6 +593,7 @@ def run(variant, mapping_path, dry_run=True, base_url=None, limit=None,
                     sheet.clear(row, written)
                     result.filled, result.verified = {}, {}
 
+                hud.row_done(result.status == "filled")
                 log.rows.append(result)
 
             controls_after = sheet.checkbox_states()
@@ -418,12 +604,17 @@ def run(variant, mapping_path, dry_run=True, base_url=None, limit=None,
             if dry_run:
                 log.commit_status = f"dry run - {len(ok)} rows filled and verified, not saved"
             elif ok:
+                hud.stage("Saving")
                 page.click(SAVE_BUTTON)
                 page.wait_for_timeout(200)
                 log.committed = True
                 log.commit_status = page.inner_text(STATUS_EL).strip()
             else:
                 log.commit_status = "nothing verified, nothing saved"
+
+            failures = len(log.rows) - len(ok)
+            hud.finish("Done" if not failures else f"Done, {failures} failed",
+                       log.commit_status)
 
             if capture_state:
                 log.portal_state = page.evaluate(

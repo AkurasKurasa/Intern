@@ -66,6 +66,11 @@ from gmail_client import EmailMessage, GmailClientBase, RealGmailClient, get_gma
 from llm_classifier import LLMClassifier
 from pattern_profile import PatternProfile
 from routing_rules import RuleLayer
+from inbox_agent import DEFAULT_CHECKPOINT_PATH, InboxAgent
+from decision_recorder import DEFAULT_EXAMPLES_PATH, record_example
+from reply_recorder import DEFAULT_REPLY_EXAMPLES_PATH, record_reply_example
+from schedule_recorder import DEFAULT_SCHEDULE_LOG_PATH, record_schedule_entry
+from calendar_client import CalendarClientBase, MockCalendarClient, get_calendar_client
 
 HISTORY_PATH = os.path.join(_THIS_DIR, "data", "routed_history.json")
 SENT_LOOKBACK_DAYS = 90
@@ -95,8 +100,8 @@ def emit(event: str, **fields) -> None:
 def _pick_provider() -> tuple[str, str]:
     """Same preference order as this project's other entry points: prefer
     whichever real API key is actually set, else local LM Studio, else no
-    LLM at all (RuleLayer + "flag everything the rules can't resolve"
-    still works with zero LLM configured)."""
+    LLM at all (RuleLayer + "leave alone everything the rules can't
+    resolve" still works with zero LLM configured)."""
     if os.environ.get("ANTHROPIC_API_KEY"):
         return "anthropic", os.environ["ANTHROPIC_API_KEY"]
     if os.environ.get("GROQ_API_KEY"):
@@ -110,13 +115,24 @@ class InboxRouter:
     def __init__(self, gmail_client: GmailClientBase, profile: PatternProfile,
                  rule_layer: RuleLayer, llm_classifier: LLMClassifier,
                  history_path: str = HISTORY_PATH,
-                 poll_interval_s: float = DEFAULT_POLL_INTERVAL_S) -> None:
+                 poll_interval_s: float = DEFAULT_POLL_INTERVAL_S,
+                 inbox_checkpoint_path: str = DEFAULT_CHECKPOINT_PATH,
+                 examples_path: str = DEFAULT_EXAMPLES_PATH,
+                 reply_examples_path: str = DEFAULT_REPLY_EXAMPLES_PATH,
+                 schedule_log_path: str = DEFAULT_SCHEDULE_LOG_PATH,
+                 calendar_client: Optional[CalendarClientBase] = None) -> None:
         self._gmail = gmail_client
         self._profile = profile
         self._rules = rule_layer
         self._llm = llm_classifier
+        self._agent = InboxAgent(profile, rule_layer, llm_classifier,
+                                  checkpoint_path=inbox_checkpoint_path)
         self._history_path = history_path
         self._poll_interval_s = poll_interval_s
+        self._examples_path = examples_path
+        self._reply_examples_path = reply_examples_path
+        self._schedule_log_path = schedule_log_path
+        self._calendar = calendar_client if calendar_client is not None else get_calendar_client()
         self._stop = False
         # In-memory cache of what this process has routed, so confirm/
         # override don't need a disk round-trip in the common case --
@@ -128,7 +144,7 @@ class InboxRouter:
         self._session_start_ts = time.time()
         self._routed_count = 0
         self._decision_counts: dict[str, int] = {}
-        self._layer_counts = {"rule": 0, "llm": 0}
+        self._layer_counts = {"rule": 0, "llm": 0, "fast_fill": 0}
         self._confirmed_count = 0
         self._overridden_count = 0
         self._confidence_sum = 0.0
@@ -158,30 +174,15 @@ class InboxRouter:
         return routed
 
     def _classify_and_record(self, message: EmailMessage) -> dict:
-        rule_result = self._rules.classify(message)
-        if rule_result.decision:
-            decision, confidence, rationale = rule_result.decision, rule_result.confidence, rule_result.rationale
-            capsule_name, forward_to, layer = rule_result.capsule_name, rule_result.forward_to, "rule"
-        else:
-            pattern = self._profile.pattern_for(message.sender_email)
-            llm_result = self._llm.classify(message, pattern, rule_result, self._rules.load_capsules())
-            decision, confidence, rationale = llm_result.decision, llm_result.confidence, llm_result.rationale
-            capsule_name, forward_to, layer = llm_result.capsule_name, llm_result.forward_to, "llm"
-
-        # Defensive guard against a hallucinated capsule name -- never
-        # surface a route_scope1/2 suggestion the UI couldn't actually act
-        # on because window.capsulesAPI.run() would just fail on it.
-        if decision in ("route_scope1", "route_scope2"):
-            valid_names = {c.get("name") for c in self._rules.load_capsules()}
-            if capsule_name not in valid_names:
-                capsule_name = ""
-                decision = "flag"
-                rationale = (rationale + " (capsule name could not be verified — flagged instead)").strip()
+        result = self._agent.decide(message)
+        decision, confidence, rationale = result.decision, result.confidence, result.rationale
+        capsule_name, forward_to, layer = result.capsule_name, result.forward_to, result.layer
 
         entry = {
             "message_id": message.id, "thread_id": message.thread_id,
             "subject": message.subject, "sender": message.sender,
             "sender_email": message.sender_email, "received_at": message.received_at,
+            "body_text": message.body_text,
             "decision": decision, "capsule_name": capsule_name, "confidence": confidence,
             "rationale": rationale, "layer": layer, "forward_to": forward_to,
             "status": "pending", "draft_id": "",
@@ -200,7 +201,23 @@ class InboxRouter:
         return entry
 
     # ── confirm / override -- the only place create_draft() is ever called ──
-    def confirm_suggestion(self, message_id: str, decision: str) -> None:
+    def confirm_suggestion(self, message_id: str, decision: str, reply_body: str = "",
+                            event_start: str = "", event_end: str = "", forward_to: str = "") -> None:
+        """reply_body is real text a human actually typed -- never
+        generated. When decision is "reply"/"forward" and reply_body is
+        given, that's the draft's real content, and it's saved as a real
+        example for the reply model to learn from later. When no
+        reply_body is given, the draft is created empty rather than
+        asking the LLM to invent content -- this project doesn't put
+        AI-authored words in front of anyone as if they were the user's
+        own.
+
+        forward_to: the human's own typed recipient for a "forward"
+        decision. Takes priority over entry["forward_to"] (the AI
+        pipeline's own guess, from a sender-pattern match) when given --
+        a human explicitly typing a recipient is a stronger signal than a
+        pattern guess. Falls back to the AI's guess only when the human
+        left this blank, e.g. confirming an AI-suggested forward as-is."""
         entry = self._pending.get(message_id) or self._find_history_entry(message_id)
         if entry is None:
             emit("inbox_error", message=f"Unknown message id: {message_id}")
@@ -208,38 +225,96 @@ class InboxRouter:
         message = self._gmail.get_message(message_id)
         draft_id = ""
         if decision in ("reply", "forward") and message is not None:
-            body = self._llm.draft_message(message, decision, entry.get("forward_to", ""))
-            to = entry.get("forward_to", "") if decision == "forward" else message.sender_email
+            to = (forward_to.strip() or entry.get("forward_to", "")) if decision == "forward" else message.sender_email
             subject = ("Fwd: " if decision == "forward" else "Re: ") + message.subject
-            draft_id = self._gmail.create_draft(to=to, subject=subject, body=body, thread_id=message.thread_id)
+            draft_id = self._gmail.create_draft(to=to, subject=subject, body=reply_body, thread_id=message.thread_id)
             emit("inbox_draft_created", message_id=message_id, draft_id=draft_id, decision=decision)
-        # route_scope1/route_scope2: nothing Gmail-side happens here at all
-        # -- the real capsule run already happened client-side (see
-        # renderer.js's onInboxConfirmClick -> window.capsulesAPI.run())
-        # before this command was ever sent. flag/leave_alone need no
-        # Gmail action either.
+            if reply_body.strip():
+                try:
+                    record_reply_example(message, reply_body, source="live", path=self._reply_examples_path)
+                except Exception as exc:
+                    emit("inbox_log", line=f"Failed to record reply example: {exc}", level="err")
+        elif decision == "schedule" and message is not None:
+            if reply_body.strip():
+                try:
+                    record_schedule_entry(message, reply_body, path=self._schedule_log_path)
+                except Exception as exc:
+                    emit("inbox_log", line=f"Failed to record schedule entry: {exc}", level="err")
+            if event_start.strip() and event_end.strip():
+                try:
+                    self._calendar.create_event(summary=message.subject, description=reply_body,
+                                                 start_iso=event_start, end_iso=event_end)
+                except Exception as exc:
+                    emit("inbox_log", line=f"Failed to create calendar event: {exc}", level="err")
+        elif decision == "cold_email":
+            emit("inbox_log", line="Cold Email is handled on its own page -- no action taken here.", level="info")
+        # leave_alone needs no Gmail-side action at all.
         entry["status"] = "confirmed"
         entry["decision"] = decision
         entry["draft_id"] = draft_id
         self._update_history_entry(entry)
         if message is not None:
             self._profile.record_confirmed_decision(message, decision)
+            try:
+                record_example(message, decision, source="live", path=self._examples_path)
+            except Exception as exc:
+                emit("inbox_log", line=f"Failed to record training example: {exc}", level="err")
         self._confirmed_count += 1
         emit("inbox_confirm_applied", message_id=message_id, decision=decision, draft_id=draft_id)
 
-    def override_decision(self, message_id: str, new_decision: str, reason: str = "") -> None:
+    def override_decision(self, message_id: str, new_decision: str, reason: str = "",
+                           reply_body: str = "", event_start: str = "", event_end: str = "",
+                           forward_to: str = "") -> None:
+        """reply_body: same contract as confirm_suggestion() -- real
+        human-typed text only. Overriding TO "reply"/"forward" now
+        creates a real draft (it didn't before -- there was no way to
+        override into a reply and actually get a draft out of it), and
+        saves reply_body as a real example when it's given.
+
+        forward_to: same contract as confirm_suggestion()'s -- the
+        human's own typed recipient, preferred over the AI's guess."""
         entry = self._pending.get(message_id) or self._find_history_entry(message_id)
         if entry is None:
             emit("inbox_error", message=f"Unknown message id: {message_id}")
             return
         old_decision = entry.get("decision", "")
         message = self._gmail.get_message(message_id)
+        draft_id = ""
+        if new_decision in ("reply", "forward") and message is not None:
+            to = (forward_to.strip() or entry.get("forward_to", "")) if new_decision == "forward" else message.sender_email
+            subject = ("Fwd: " if new_decision == "forward" else "Re: ") + message.subject
+            draft_id = self._gmail.create_draft(to=to, subject=subject, body=reply_body, thread_id=message.thread_id)
+            emit("inbox_draft_created", message_id=message_id, draft_id=draft_id, decision=new_decision)
+            if reply_body.strip():
+                try:
+                    record_reply_example(message, reply_body, source="live", path=self._reply_examples_path)
+                except Exception as exc:
+                    emit("inbox_log", line=f"Failed to record reply example: {exc}", level="err")
+        elif new_decision == "schedule" and message is not None:
+            if reply_body.strip():
+                try:
+                    record_schedule_entry(message, reply_body, path=self._schedule_log_path)
+                except Exception as exc:
+                    emit("inbox_log", line=f"Failed to record schedule entry: {exc}", level="err")
+            if event_start.strip() and event_end.strip():
+                try:
+                    self._calendar.create_event(summary=message.subject, description=reply_body,
+                                                 start_iso=event_start, end_iso=event_end)
+                except Exception as exc:
+                    emit("inbox_log", line=f"Failed to create calendar event: {exc}", level="err")
+        elif new_decision == "cold_email":
+            emit("inbox_log", line="Cold Email is handled on its own page -- no action taken here.", level="info")
         entry["decision"] = new_decision
         entry["status"] = "overridden"
         entry["override_reason"] = reason
+        entry["draft_id"] = draft_id
         self._update_history_entry(entry)
         if message is not None:
             self._profile.record_override(message, old_decision, new_decision)
+            try:
+                record_example(message, new_decision, source="live", path=self._examples_path)
+            except Exception as exc:
+                emit("inbox_log", line=f"Failed to record training example: {exc}", level="err")
         self._overridden_count += 1
         emit("inbox_override_applied", message_id=message_id, old_decision=old_decision,
              new_decision=new_decision, reason=reason)
@@ -251,20 +326,128 @@ class InboxRouter:
         self._save_history(history)
 
     def _update_history_entry(self, entry: dict) -> None:
+        """Updates the LATEST history row for this message_id -- matching
+        pending_entries()'s own "latest wins" dedup exactly. A message can
+        end up with more than one history row for the same id (routed,
+        never confirmed, then re-polled and routed again on a later
+        restart); updating only the FIRST match (the old behavior) meant
+        confirming/overriding silently patched a stale, possibly
+        already-confirmed row while the actually-current one -- the one
+        pending_entries() reports -- never changed, so a message could
+        never actually be confirmed once duplicate rows existed. Found
+        live: confirming mock-001 kept "succeeding" while it stayed
+        pending forever, traced to 6 history rows for that one id."""
         history = self._load_history()
+        last_match_index = None
         for i, existing in enumerate(history):
             if existing.get("message_id") == entry.get("message_id"):
-                history[i] = entry
-                self._save_history(history)
-                return
+                last_match_index = i
+        if last_match_index is not None:
+            history[last_match_index] = entry
+            self._save_history(history)
+            return
         history.append(entry)
         self._save_history(history)
 
     def _find_history_entry(self, message_id: str) -> Optional[dict]:
+        """Returns the LATEST history row for this message_id, same
+        "latest wins" rule as _update_history_entry()/pending_entries() --
+        see _update_history_entry()'s docstring for why returning the
+        first match (the old behavior) was wrong whenever duplicate rows
+        exist for one message."""
+        match = None
         for entry in self._load_history():
             if entry.get("message_id") == message_id:
-                return entry
-        return None
+                match = entry
+        return match
+
+    def pending_entries(self) -> list:
+        """Every history entry still awaiting a Confirm/Override -- exposed
+        as a real public method (rather than reaching into the private
+        _load_history()) for local_server.py, a second driver of this same
+        class outside router.py's own stdin/stdout protocol.
+
+        Deduplicated by message_id, keeping only the latest history row per
+        message -- a message can end up with more than one "pending" row on
+        disk (e.g. it was routed, never confirmed, then later re-polled and
+        routed again), and it should only ever appear once here. The most
+        recent row for a given id also correctly wins over an older one:
+        if the latest row is "confirmed"/"overridden", the message is gone
+        from this list even if an earlier abandoned "pending" row for the
+        same id is still sitting in history."""
+        latest_by_id: dict = {}
+        for e in self._load_history():
+            latest_by_id[e.get("message_id")] = e
+        return [e for e in latest_by_id.values() if e.get("status") == "pending"]
+
+    def list_unprocessed_stubs(self) -> list:
+        """What's waiting to be triaged, before any reasoning has happened --
+        sender/subject only, no decision. A non-destructive peek: unlike
+        poll_once()/process_next_unprocessed(), this never marks anything
+        processed. Lets a UI show "N emails waiting" the way a human would
+        glance at an inbox before reading anything in it."""
+        return [
+            {"message_id": m.id, "subject": m.subject, "sender": m.sender,
+             "sender_email": m.sender_email}
+            for m in self._gmail.list_inbox_unprocessed()
+        ]
+
+    def process_next_unprocessed(self) -> Optional[dict]:
+        """Classify exactly one waiting message through the real pipeline
+        (rule layer -> trained agent -> LLM fallback -- the same
+        _classify_and_record() poll_once() already calls per message) and
+        mark it processed. Returns None once nothing is left. Exists so a
+        UI can drive the pipeline one visible step at a time instead of
+        poll_once()'s all-at-once loop, without changing what the pipeline
+        actually decides or why."""
+        unprocessed = self._gmail.list_inbox_unprocessed()
+        if not unprocessed:
+            return None
+        message = unprocessed[0]
+        entry = self._classify_and_record(message)
+        self._gmail.mark_processed(message.id)
+        emit("inbox_routed", **entry)
+        return entry
+
+    def list_practice_inbox(self) -> list:
+        """Every mock inbox message available to practice-demonstrate on,
+        unfiltered by processed state -- unlike poll_once()'s
+        list_inbox_unprocessed(), practice mode is meant to be repeatable,
+        not a one-shot triage queue. Wraps the same list_recent_inbox()
+        bootstrap() already uses for a wide lookback window."""
+        since_iso = "2020-01-01T00:00:00+00:00"  # effectively "everything" for the mock fixture
+        return self._gmail.list_recent_inbox(since_iso)
+
+    def record_practice_decision(self, message_id: str, decision: str, reply_body: str = "") -> None:
+        """A raw human demonstration -- no AI suggestion involved anywhere,
+        the opposite of confirm_suggestion()/override_decision(). Fetches
+        the real message and records it exactly like every other recorded
+        example, via the same decision_recorder.record_example() call.
+        Also folds into the sender-pattern profile the same way a real
+        confirm does, since a genuine demonstration is at least as strong
+        a signal as a confirm.
+
+        reply_body: same contract as confirm_suggestion()'s -- real
+        human-typed text only, never invented. When given for a
+        reply/forward/schedule decision, it's recorded as real content
+        the same way confirm_suggestion()/override_decision() do, via the
+        same record_reply_example()/record_schedule_entry() calls. A
+        blank reply_body records nothing extra -- the decision label
+        alone still gets recorded either way."""
+        message = self._gmail.get_message(message_id)
+        if message is None:
+            emit("inbox_error", message=f"Unknown message id: {message_id}")
+            return
+        if reply_body.strip():
+            try:
+                if decision in ("reply", "forward"):
+                    record_reply_example(message, reply_body, source="live", path=self._reply_examples_path)
+                elif decision == "schedule":
+                    record_schedule_entry(message, reply_body, path=self._schedule_log_path)
+            except Exception as exc:
+                emit("inbox_log", line=f"Failed to record practice reply/schedule content: {exc}", level="err")
+        record_example(message, decision, source="live", path=self._examples_path)
+        self._profile.record_confirmed_decision(message, decision)
 
     def _load_history(self) -> list:
         if not os.path.exists(self._history_path):
@@ -342,10 +525,11 @@ class InboxRouter:
             cmd = msg.get("cmd")
             try:
                 if cmd == "confirm":
-                    self.confirm_suggestion(msg.get("message_id", ""), msg.get("decision", ""))
+                    self.confirm_suggestion(msg.get("message_id", ""), msg.get("decision", ""),
+                                             reply_body=msg.get("reply_body", ""))
                 elif cmd == "override":
                     self.override_decision(msg.get("message_id", ""), msg.get("new_decision", ""),
-                                            msg.get("reason", ""))
+                                            msg.get("reason", ""), reply_body=msg.get("reply_body", ""))
                 elif cmd == "shutdown":
                     self._stop = True
                     break
