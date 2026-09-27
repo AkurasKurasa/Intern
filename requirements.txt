@@ -57,5 +57,21 @@ xlwings>=0.30.0
 # Metrics — statistical significance testing (scripts/compare_baseline.py)
 scipy>=1.10.0
 
+# Browser control (Scope #2 web source, Scope #3 inbox pages).
+# After pip install, also run: playwright install chromium
+playwright>=1.40.0
+
+# Spreadsheet + tabular data (Scope #2)
+pandas>=2.0.0
+openpyxl>=3.1.0
+
+# Clipboard (execution paths that paste rather than type)
+pyperclip>=1.8.2
+
+# Reporting — figures and thesis document generation
+# (scripts/thesis_figures/*)
+matplotlib>=3.7.0
+python-docx>=1.1.0
+
 # Tests
 pytest>=8.0.0
