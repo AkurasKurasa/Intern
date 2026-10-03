@@ -413,10 +413,25 @@ class _FakeInboxPage:
     def wait_for_timeout(self, ms): pass
     def expect_response(self, predicate, timeout=None): return _FakeInboxExpectResponseCtx()
 
+    def locator(self, sel):
+        # A disabled Pointer clicks through page.locator(sel).click();
+        # route that back to click() so existing click tracking still sees it.
+        page = self
+
+        class _Loc:
+            def click(self_inner, **kwargs):
+                page.click(sel)
+        return _Loc()
+
 
 class _FakeInboxBrowser:
     def new_page(self):
         return _FakeInboxPage()
+
+    def new_context(self, **kwargs):
+        # The scripts open the page through a no-viewport context so it
+        # fills a maximised window; the browser itself stands in for it.
+        return self
 
     def close(self):
         pass
@@ -426,7 +441,7 @@ class _FakeInboxChromium:
     def __init__(self, browser):
         self._browser = browser
 
-    def launch(self, headless=False):
+    def launch(self, headless=False, **kwargs):
         return self._browser
 
 
@@ -452,7 +467,7 @@ class TestMainRecoversFromMidRunBrowserClosure:
 
         calls = []
 
-        def _fake_process_one(page, commit, index, skipped, dwell_ms=0, auto_draft_reply=False):
+        def _fake_process_one(page, commit, index, skipped, dwell_ms=0, auto_draft_reply=False, pointer=None):
             calls.append((index, skipped))
             if len(calls) <= 2:
                 return {"sender": "s", "subject": f"m{len(calls)}", "decision": "leave_alone",

@@ -44,9 +44,10 @@ if str(REPO) not in sys.path:
 
 from automate_inbox import ensure_server_running, print_countdown, banner, SERVER_URL
 from cold_email_llm import generate_cold_email
+from pointer import Pointer
 
 
-def process_one(page, commit: bool, index: int):
+def process_one(page, commit: bool, index: int, pointer=None):
     """Reads one target row off the real DOM, opens it, prints the real
     name/email and the pre-filled subject.
 
@@ -63,11 +64,14 @@ def process_one(page, commit: bool, index: int):
     list just got shorter.
 
     Returns a result dict, or None once the task list is exhausted."""
+    # See automate_inbox.process_one: a real Pointer moves the mouse to
+    # each target; without one, Playwright clicks invisibly as before.
+    pointer = pointer or Pointer(page, enabled=False)
     row = page.locator("#coldEmailRowList .row-item").nth(index)
     if row.count() == 0:
         return None
 
-    row.click()
+    pointer.click(row)
     page.wait_for_selector("#coldEmailDetailView:not([hidden])")
 
     name = page.locator("#coldEmailTargetName").inner_text()
@@ -79,23 +83,26 @@ def process_one(page, commit: bool, index: int):
     if not commit:
         print(f"    pre-filled subject: {prefilled_subject!r}")
         print("    -> left pending -- needs a real message typed by a human")
-        page.click("#coldEmailBackBtn")
+        pointer.click("#coldEmailBackBtn")
         return {"name": name, "email": email, "subject": prefilled_subject, "body": "",
                 "outcome": "left pending -- needs a real message typed by a human"}
 
     subject, body = generate_cold_email(name, prefilled_subject)
     if not subject or not body:
         print("    -> LM Studio unavailable (or gave an empty response) -- left pending")
-        page.click("#coldEmailBackBtn")
+        pointer.click("#coldEmailBackBtn")
         return {"name": name, "email": email, "subject": prefilled_subject, "body": "",
                 "outcome": "left pending -- LM Studio unavailable"}
 
     print(f"    LM Studio subject: {subject!r}")
     print(f"    LM Studio body: {body!r}")
 
-    page.fill("#coldEmailSubjectInput", subject)
-    page.fill("#coldEmailBodyInput", body)
-    page.click("#coldEmailSendBtn")
+    # Typed one keystroke at a time, not filled in a single write, so a
+    # person watching sees the message being written.
+    page.fill("#coldEmailSubjectInput", "")
+    page.locator("#coldEmailSubjectInput").press_sequentially(subject, delay=35)
+    page.locator("#coldEmailBodyInput").press_sequentially(body, delay=35)
+    pointer.click("#coldEmailSendBtn")
     page.wait_for_selector("#coldEmailListView:not([hidden])")
     # "drafted", not "sent" -- gmail_client.py deliberately has no
     # send()/send_message() method anywhere in this project. Clicking
@@ -118,6 +125,9 @@ def main():
                     help="seconds to pause on each target so a human can follow it (default: 1.5)")
     ap.add_argument("--headless", action="store_true",
                     help="run without a visible browser window (default: visible)")
+    ap.add_argument("--no-pointer", action="store_true",
+                    help="click through the page invisibly instead of moving the real mouse pointer "
+                         "(the pointer is always off when --headless)")
     ap.add_argument("--log", type=Path, default=None,
                     help="where to write the run log (default: data/runs/)")
     args = ap.parse_args()
@@ -131,9 +141,12 @@ def main():
 
     results = []
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=args.headless)
-        page = browser.new_page()
+        # Maximised, with the page filling the whole window, so every target
+        # the pointer moves to is large and already on screen.
+        browser = p.chromium.launch(headless=args.headless, args=["--start-maximized"])
+        page = browser.new_context(no_viewport=True).new_page()
         page.goto(SERVER_URL)
+        pointer = Pointer(page, enabled=not (args.headless or args.no_pointer))
         # There's no button or tab for Cold Email anywhere in this page's
         # markup at all -- direct instruction: "if it's a cold email I
         # want the Agent to reply on its own without a need for the Cold
@@ -156,7 +169,7 @@ def main():
         try:
             while args.limit is None or len(results) < args.limit:
                 row_index = skipped if args.commit else len(results)
-                result = process_one(page, args.commit, row_index)
+                result = process_one(page, args.commit, row_index, pointer=pointer)
                 if result is None:
                     break
                 results.append(result)

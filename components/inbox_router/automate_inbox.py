@@ -51,6 +51,9 @@ if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 REPO = Path(__file__).resolve().parent
+if str(REPO) not in sys.path:
+    sys.path.insert(0, str(REPO))
+from pointer import Pointer
 # 127.0.0.1, not "localhost" -- local_server.py's HTTPServer binds only
 # IPv4 (127.0.0.1). Found live: Chromium's own resolution of "localhost"
 # can try IPv6 (::1) first depending on the environment, which nothing
@@ -171,7 +174,7 @@ IMMEDIATE_ICON = {"leave_alone": "#archiveBtn"}
 
 
 def process_one(page, commit: bool, index: int, skipped: int = 0, dwell_ms: int = 0,
-                 auto_draft_reply: bool = False):
+                 auto_draft_reply: bool = False, pointer: "Pointer | None" = None):
     """Reads one pending row off the real DOM, opens it, prints the real
     decision + rationale, then clicks the real icon for that decision
     (Archive for leave_alone) if --commit. Returns a result dict, or
@@ -205,6 +208,10 @@ def process_one(page, commit: bool, index: int, skipped: int = 0, dwell_ms: int 
     Schedule is still untouched by this flag -- a fabricated date would
     create a genuinely wrong calendar event, a materially worse mistake
     than an unreviewed forward note on mock data."""
+    # Every click below goes through the pointer: with a real Pointer the
+    # mouse visibly glides to the element and clicks it; with none, the
+    # disabled Pointer falls back to Playwright's own invisible click.
+    pointer = pointer or Pointer(page, enabled=False)
     row_index = skipped if commit else index
     row = page.locator(".row-item").nth(row_index)
     if row.count() == 0:
@@ -218,7 +225,7 @@ def process_one(page, commit: bool, index: int, skipped: int = 0, dwell_ms: int 
     row.evaluate("el => el.classList.add('row-agent-active')")
     page.wait_for_timeout(500)
 
-    row.click()
+    pointer.click(row)
     page.wait_for_selector("#detailView:not([hidden])")
     # openMessage() holds the real rationale text back behind a ~0.5s
     # "thinking" shimmer (a CSS class, not a text change) before
@@ -249,7 +256,7 @@ def process_one(page, commit: bool, index: int, skipped: int = 0, dwell_ms: int 
         from inbox_reply_llm import generate_reply
         reply_text = generate_reply(sender, subject, body_text)
         if reply_text:
-            page.click("#replyPillBtn")
+            pointer.click("#replyPillBtn")
             page.wait_for_selector("#replyBoxWrap:not([hidden])")
             # press_sequentially(), not fill() -- fill() sets the value in
             # one instant DOM write, nothing visible actually happens on
@@ -258,11 +265,11 @@ def process_one(page, commit: bool, index: int, skipped: int = 0, dwell_ms: int 
             # real browser window actually sees it being typed.
             page.locator("#replyBody").press_sequentially(reply_text, delay=35)
             print(f"    AI-drafted reply: {reply_text!r}")
-            page.click("#sendBtn")
+            pointer.click("#sendBtn")
             page.wait_for_selector("#listView:not([hidden])")
             outcome = "confirmed (AI-drafted reply -- draft created, not sent)"
         else:
-            page.click("#backBtn")
+            pointer.click("#backBtn")
             outcome = "left pending -- LM Studio unavailable for auto-draft"
     elif decision == "forward" and commit and auto_draft_reply:
         body_text = page.locator("#detailBody").inner_text()
@@ -274,7 +281,7 @@ def process_one(page, commit: bool, index: int, skipped: int = 0, dwell_ms: int 
         note = generate_forward_note(sender, subject, body_text)
         recipient = forward_recipient(sender_email)
         if note:
-            page.click("#forwardPillBtn")
+            pointer.click("#forwardPillBtn")
             page.wait_for_selector("#replyBoxWrap:not([hidden])")
             # press_sequentially(), not fill() -- see the reply branch
             # above for why: a person watching the real browser window
@@ -282,22 +289,22 @@ def process_one(page, commit: bool, index: int, skipped: int = 0, dwell_ms: int 
             page.locator("#forwardTo").press_sequentially(recipient, delay=35)
             page.locator("#replyBody").press_sequentially(note, delay=35)
             print(f"    AI-drafted forward to {recipient!r}: {note!r}")
-            page.click("#sendBtn")
+            pointer.click("#sendBtn")
             page.wait_for_selector("#listView:not([hidden])")
             outcome = "confirmed (AI-drafted forward -- draft created, not sent)"
         else:
-            page.click("#backBtn")
+            pointer.click("#backBtn")
             outcome = "left pending -- LM Studio unavailable for auto-draft"
     elif decision in NEEDS_HUMAN_TEXT:
-        page.click("#backBtn")
+        pointer.click("#backBtn")
         outcome = ("left pending -- needs a real reply typed by a human" if decision in ("reply", "forward")
                     else "left pending -- needs real content typed by a human")
     elif commit:
-        page.click(IMMEDIATE_ICON[decision])
+        pointer.click(IMMEDIATE_ICON[decision])
         page.wait_for_selector("#listView:not([hidden])")
         outcome = "confirmed"
     else:
-        page.click("#backBtn")
+        pointer.click("#backBtn")
         outcome = "skipped (dry run)"
     print(f"    -> {_color(outcome, _outcome_color(outcome))}")
 
@@ -316,6 +323,9 @@ def main():
                     help="seconds to pause on each email so a human can follow it (default: 1.5)")
     ap.add_argument("--headless", action="store_true",
                     help="run without a visible browser window (default: visible)")
+    ap.add_argument("--no-pointer", action="store_true",
+                    help="click through the page invisibly instead of moving the real mouse pointer "
+                         "(the pointer is always off when --headless)")
     ap.add_argument("--log", type=Path, default=None,
                     help="where to write the run log (default: data/runs/)")
     ap.add_argument("--auto-draft-reply", action="store_true",
@@ -334,9 +344,12 @@ def main():
 
     results = []
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=args.headless)
-        page = browser.new_page()
+        # Maximised, with the page filling the whole window, so every target
+        # the pointer moves to is large and already on screen.
+        browser = p.chromium.launch(headless=args.headless, args=["--start-maximized"])
+        page = browser.new_context(no_viewport=True).new_page()
         page.goto(SERVER_URL)
+        pointer = Pointer(page, enabled=not (args.headless or args.no_pointer))
         # A fixed short wait here used to be enough when /api/inbox only
         # ever read already-cached decisions, but a real LLM classify()
         # call can take a couple of seconds per email and this endpoint
@@ -346,7 +359,7 @@ def main():
         # guessing how long it takes.
         with page.expect_response(lambda r: "/api/inbox" in r.url and r.request.method == "GET",
                                    timeout=60_000):
-            page.click("#toolbarRefreshBtn")
+            pointer.click("#toolbarRefreshBtn")
         page.wait_for_timeout(200)  # let the synchronous DOM render after the fetch settle
 
         banner(1, "Working through the inbox")
@@ -355,7 +368,8 @@ def main():
             while args.limit is None or len(results) < args.limit:
                 result = process_one(page, args.commit, len(results), skipped,
                                       dwell_ms=int(args.pace * 1000),
-                                      auto_draft_reply=args.auto_draft_reply)
+                                      auto_draft_reply=args.auto_draft_reply,
+                                      pointer=pointer)
                 if result is None:
                     break
                 results.append(result)

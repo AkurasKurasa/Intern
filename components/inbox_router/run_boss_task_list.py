@@ -58,6 +58,7 @@ from automate_inbox import (
     _color, _BLUE, _RED, _BOLD,
 )
 from automate_cold_email import process_one as cold_email_process_one
+from pointer import Pointer
 
 
 def main() -> int:
@@ -71,6 +72,9 @@ def main() -> int:
                     help="seconds to pause on each item so a human can follow it (default: 1.5)")
     ap.add_argument("--headless", action="store_true",
                     help="run without a visible browser window (default: visible)")
+    ap.add_argument("--no-pointer", action="store_true",
+                    help="click through the page invisibly instead of moving the real mouse pointer "
+                         "(the pointer is always off when --headless)")
     ap.add_argument("--auto-draft-reply", action="store_true",
                     help="for 'reply'/'forward' inbox decisions, generate real text via LM Studio and "
                          "draft it for real -- see automate_inbox.py's own --help for the full contract. "
@@ -89,9 +93,12 @@ def main() -> int:
     cold_email_results: list = []
     inbox_results: list = []
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=args.headless)
-        page = browser.new_page()
+        # Maximised, with the page filling the whole window, so every target
+        # the pointer moves to is large and already on screen.
+        browser = p.chromium.launch(headless=args.headless, args=["--start-maximized"])
+        page = browser.new_context(no_viewport=True).new_page()
         page.goto(SERVER_URL)
+        pointer = Pointer(page, enabled=not (args.headless or args.no_pointer))
 
         # ---- Phase 1: Cold Email (the boss' own task list) --------------
         banner(1, "Cold Email -- the boss' own task list")
@@ -104,7 +111,7 @@ def main() -> int:
         try:
             while args.limit is None or len(cold_email_results) < args.limit:
                 row_index = skipped if args.commit else len(cold_email_results)
-                result = cold_email_process_one(page, args.commit, row_index)
+                result = cold_email_process_one(page, args.commit, row_index, pointer=pointer)
                 if result is None:
                     break
                 cold_email_results.append(result)
@@ -124,7 +131,7 @@ def main() -> int:
         page.evaluate("setView('inbox')")
         with page.expect_response(lambda r: "/api/inbox" in r.url and r.request.method == "GET",
                                    timeout=60_000):
-            page.click("#toolbarRefreshBtn")
+            pointer.click("#toolbarRefreshBtn")
         page.wait_for_timeout(200)
 
         skipped = 0
@@ -132,7 +139,8 @@ def main() -> int:
             while args.limit is None or len(inbox_results) < args.limit:
                 result = inbox_process_one(page, args.commit, len(inbox_results), skipped,
                                             dwell_ms=int(args.pace * 1000),
-                                            auto_draft_reply=args.auto_draft_reply)
+                                            auto_draft_reply=args.auto_draft_reply,
+                                            pointer=pointer)
                 if result is None:
                     break
                 inbox_results.append(result)

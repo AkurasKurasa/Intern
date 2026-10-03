@@ -36,6 +36,16 @@ class _FakePage:
     def expect_response(self, predicate, timeout=None):
         return _FakeExpectResponseCtx()
 
+    def locator(self, sel):
+        # A disabled Pointer clicks through page.locator(sel).click();
+        # route that back to click() so existing click tracking still sees it.
+        page = self
+
+        class _Loc:
+            def click(self_inner, **kwargs):
+                page.click(sel)
+        return _Loc()
+
 
 class _FakeBrowser:
     def __init__(self):
@@ -46,6 +56,11 @@ class _FakeBrowser:
         self.new_page_calls += 1
         return self._page
 
+    def new_context(self, **kwargs):
+        # The scripts open the page through a no-viewport context so it
+        # fills a maximised window; the browser itself stands in for it.
+        return self
+
     def close(self):
         pass
 
@@ -55,7 +70,7 @@ class _FakeChromium:
         self._browser = browser
         self.launch_calls = 0
 
-    def launch(self, headless=False):
+    def launch(self, headless=False, **kwargs):
         self.launch_calls += 1
         return self._browser
 
@@ -94,7 +109,7 @@ def test_only_one_browser_and_one_page_for_both_phases(tmp_path, monkeypatch, fa
     # it can't open the web browser again and again." One launch(), one
     # new_page() -- not one pair per phase.
     monkeypatch.setattr(run_boss_task_list, "REPO", tmp_path)
-    monkeypatch.setattr(run_boss_task_list, "cold_email_process_one", lambda page, commit, index: None)
+    monkeypatch.setattr(run_boss_task_list, "cold_email_process_one", lambda page, commit, index, pointer=None: None)
     monkeypatch.setattr(run_boss_task_list, "inbox_process_one", lambda *a, **kw: None)
     monkeypatch.setattr(sys, "argv", ["run_boss_task_list.py", "--pace", "0", "--headless"])
 
@@ -106,11 +121,11 @@ def test_only_one_browser_and_one_page_for_both_phases(tmp_path, monkeypatch, fa
 def test_both_phases_use_the_exact_same_page_object(tmp_path, monkeypatch, fake_playwright):
     seen_pages = []
 
-    def _fake_cold_email(page, commit, index):
+    def _fake_cold_email(page, commit, index, pointer=None):
         seen_pages.append(page)
         return None
 
-    def _fake_inbox(page, commit, index, skipped, dwell_ms=0, auto_draft_reply=False):
+    def _fake_inbox(page, commit, index, skipped, dwell_ms=0, auto_draft_reply=False, pointer=None):
         seen_pages.append(page)
         return None
 
@@ -133,12 +148,12 @@ def test_no_limit_by_default_walks_until_none_in_both_phases(tmp_path, monkeypat
     cold_email_calls = []
     inbox_calls = []
 
-    def _fake_cold_email(page, commit, index):
+    def _fake_cold_email(page, commit, index, pointer=None):
         cold_email_calls.append(index)
         return {"name": f"T{index}", "email": f"t{index}@x.com", "subject": "s", "body": "",
                 "outcome": "left pending -- needs a real message typed by a human"} if len(cold_email_calls) <= 7 else None
 
-    def _fake_inbox(page, commit, index, skipped, dwell_ms=0, auto_draft_reply=False):
+    def _fake_inbox(page, commit, index, skipped, dwell_ms=0, auto_draft_reply=False, pointer=None):
         inbox_calls.append(index)
         return {"sender": "s", "subject": f"m{index}", "decision": "leave_alone",
                 "rationale": "r", "outcome": "confirmed"} if len(inbox_calls) <= 12 else None
@@ -160,11 +175,11 @@ def test_explicit_limit_still_caps_each_phase_when_given(tmp_path, monkeypatch, 
     cold_email_calls = []
     inbox_calls = []
 
-    def _fake_cold_email(page, commit, index):
+    def _fake_cold_email(page, commit, index, pointer=None):
         cold_email_calls.append(index)
         return {"name": "T", "email": "t@x.com", "subject": "s", "body": "", "outcome": "drafted"}
 
-    def _fake_inbox(page, commit, index, skipped, dwell_ms=0, auto_draft_reply=False):
+    def _fake_inbox(page, commit, index, skipped, dwell_ms=0, auto_draft_reply=False, pointer=None):
         inbox_calls.append(index)
         return {"sender": "s", "subject": "m", "decision": "leave_alone", "rationale": "r", "outcome": "confirmed"}
 
@@ -183,12 +198,12 @@ def test_a_crash_in_cold_email_still_lets_the_inbox_phase_run(tmp_path, monkeypa
     # The real point of Cold Email being first: a crash there must not
     # take down the inbox phase too -- "everything the boss needs done"
     # means the rest still happens.
-    def _fake_cold_email(page, commit, index):
+    def _fake_cold_email(page, commit, index, pointer=None):
         raise _FakePlaywrightError("Target page, context or browser has been closed")
 
     inbox_calls = []
 
-    def _fake_inbox(page, commit, index, skipped, dwell_ms=0, auto_draft_reply=False):
+    def _fake_inbox(page, commit, index, skipped, dwell_ms=0, auto_draft_reply=False, pointer=None):
         inbox_calls.append(index)
         return None
 

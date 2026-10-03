@@ -241,6 +241,16 @@ class _FakePage:
     def evaluate(self, script): pass
     def expect_response(self, predicate, timeout=None): return _FakeExpectResponseCtx()
 
+    def locator(self, sel):
+        # A disabled Pointer clicks through page.locator(sel).click();
+        # route that back to click() so existing click tracking still sees it.
+        page = self
+
+        class _Loc:
+            def click(self_inner, **kwargs):
+                page.click(sel)
+        return _Loc()
+
 
 class _FakeBrowser:
     def __init__(self):
@@ -248,6 +258,11 @@ class _FakeBrowser:
 
     def new_page(self):
         return _FakePage()
+
+    def new_context(self, **kwargs):
+        # The scripts open the page through a no-viewport context so it
+        # fills a maximised window; the browser itself stands in for it.
+        return self
 
     def close(self):
         self.closed = True
@@ -257,7 +272,7 @@ class _FakeChromium:
     def __init__(self, browser):
         self._browser = browser
 
-    def launch(self, headless=False):
+    def launch(self, headless=False, **kwargs):
         return self._browser
 
 
@@ -297,7 +312,7 @@ class TestMainRecoversFromMidRunBrowserClosure:
 
         calls = []
 
-        def _fake_process_one(page, commit, index):
+        def _fake_process_one(page, commit, index, pointer=None):
             calls.append(index)
             if len(calls) <= 2:
                 return {"name": f"Target {len(calls)}", "email": f"t{len(calls)}@x.example.com",
@@ -327,7 +342,7 @@ class TestMainRecoversFromMidRunBrowserClosure:
         monkeypatch.setattr(automate_cold_email, "REPO", tmp_path)
         monkeypatch.setattr(automate_cold_email, "ensure_server_running", lambda: None)
         monkeypatch.setattr(automate_cold_email, "process_one",
-                             lambda page, commit, index: (_ for _ in ()).throw(_FakePlaywrightError("closed")))
+                             lambda page, commit, index, pointer=None: (_ for _ in ()).throw(_FakePlaywrightError("closed")))
 
         def _close_raises_again():
             raise _FakePlaywrightError("Target page, context or browser has been closed")
