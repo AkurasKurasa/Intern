@@ -487,3 +487,97 @@ class TestMainRecoversFromMidRunBrowserClosure:
         saved = json.loads(log_path.read_text(encoding="utf-8"))
         assert len(saved["results"]) == 2
         assert saved["results"][0]["outcome"] == "confirmed"
+
+
+# ── schedule completed from the email's own stated time ─────────────────────
+# Found live 2026-10-03: every "schedule" decision ended "left pending", so a
+# demo run showed Intern deciding schedule and then doing nothing. When the
+# email states a date AND a time, process_one now completes it through the
+# page; when it does not, the email still stays pending.
+
+@pytest.fixture
+def real_page_with_schedule(tmp_path):
+    pytest.importorskip("playwright.sync_api")
+    from playwright.sync_api import sync_playwright
+    from calendar_client import MockCalendarClient
+    from inbox_agent import InboxDecision
+
+    data_dir = tmp_path / "data"
+    os.makedirs(data_dir, exist_ok=True)
+    inbox = [
+        _msg("s1", "dana@northline.com", "Vendor call - proposing Sept 3rd, 2pm",
+             "Can we set up a call for September 3rd at 2pm to walk through the proposal?"),
+        _msg("s2", "contracts@meyer.com", "Reminder: contract deadline is Sept 5th",
+             "The signed contract is due back to us by September 5th."),
+    ]
+    (data_dir / "mock_inbox.json").write_text(json.dumps({"inbox": inbox, "sent": []}), encoding="utf-8")
+    profile = PatternProfile(path=str(data_dir / "profile.json"))
+    registry_path = tmp_path / "registry.json"
+    registry_path.write_text(json.dumps({"capsules": []}), encoding="utf-8")
+    calendar = MockCalendarClient(data_dir=str(data_dir))
+    router = InboxRouter(MockGmailClient(data_dir=str(data_dir)), profile,
+                         RuleLayer(profile, registry_path=str(registry_path)),
+                         LLMClassifier(provider="none"),
+                         history_path=str(data_dir / "routed_history.json"),
+                         inbox_checkpoint_path=str(tmp_path / "no_checkpoint.pt"),
+                         examples_path=str(data_dir / "training_examples.jsonl"),
+                         reply_examples_path=str(data_dir / "reply_examples.jsonl"),
+                         schedule_log_path=str(data_dir / "schedule.txt"),
+                         calendar_client=calendar)
+    # Decide "schedule" for every message without a model or LLM call.
+    router._agent.decide = lambda message: InboxDecision(
+        decision="schedule", confidence=0.95, rationale="It proposes a meeting time.", layer="rule")
+
+    httpd = HTTPServer(("127.0.0.1", 0), ls.make_handler(router))
+    thread = threading.Thread(target=httpd.serve_forever, daemon=True)
+    thread.start()
+    try:
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=True)
+            page = browser.new_page()
+            page.goto(f"http://127.0.0.1:{httpd.server_address[1]}/")
+            page.click("#toolbarRefreshBtn")
+            page.wait_for_timeout(500)
+            yield page, data_dir
+            browser.close()
+    finally:
+        httpd.shutdown()
+        thread.join(timeout=5)
+
+
+def _row_subjects(page):
+    return page.locator(".row-item").all_inner_texts()
+
+
+class TestScheduleFromTheEmailsOwnTime:
+    def test_a_stated_date_and_time_is_scheduled_through_the_page(self, real_page_with_schedule):
+        page, data_dir = real_page_with_schedule
+        result = automate_inbox.process_one(page, commit=True, index=0, skipped=0)
+
+        assert result["decision"] == "schedule"
+        assert result["outcome"].startswith("confirmed")
+        assert not any("Vendor call" in r for r in _row_subjects(page)), "the scheduled row should be gone"
+
+        events = json.loads((data_dir / "mock_calendar_events.json").read_text(encoding="utf-8"))
+        events = events if isinstance(events, list) else events.get("events", events)
+        starts = json.dumps(events)
+        assert "2026-09-03T14:00" in starts, f"calendar event at the email's own time, got {events}"
+
+        log = (data_dir / "schedule.txt").read_text(encoding="utf-8")
+        assert "September 3rd at 2pm" in log, "the note quotes the email's own words"
+
+    def test_a_date_without_a_time_stays_pending(self, real_page_with_schedule):
+        page, data_dir = real_page_with_schedule
+        automate_inbox.process_one(page, commit=True, index=0, skipped=0)        # the timed one
+        result = automate_inbox.process_one(page, commit=True, index=1, skipped=0)
+
+        assert result["decision"] == "schedule"
+        assert result["outcome"].startswith("left pending"), result["outcome"]
+        assert any("contract deadline" in r for r in _row_subjects(page))
+
+    def test_a_dry_run_never_schedules(self, real_page_with_schedule):
+        page, data_dir = real_page_with_schedule
+        result = automate_inbox.process_one(page, commit=False, index=0)
+        assert not result["outcome"].startswith("confirmed"), result["outcome"]
+        assert not (data_dir / "mock_calendar_events.json").exists()
+        assert any("Vendor call" in r for r in _row_subjects(page)), "nothing is removed in a dry run"

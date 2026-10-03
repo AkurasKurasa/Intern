@@ -54,6 +54,7 @@ REPO = Path(__file__).resolve().parent
 if str(REPO) not in sys.path:
     sys.path.insert(0, str(REPO))
 from pointer import Pointer
+from schedule_extract import extract_event_time
 # 127.0.0.1, not "localhost" -- local_server.py's HTTPServer binds only
 # IPv4 (127.0.0.1). Found live: Chromium's own resolution of "localhost"
 # can try IPv6 (::1) first depending on the environment, which nothing
@@ -194,9 +195,14 @@ def process_one(page, commit: bool, index: int, skipped: int = 0, dwell_ms: int 
     removes or skips anything, so it reads row `index` instead, advancing
     through the list without ever changing it.
 
-    Forward/schedule/cold_email are never auto-confirmed here, commit or
-    not -- see NEEDS_HUMAN_TEXT above. Those are left pending, in place,
-    for a human to actually open and answer themselves.
+    Forward/schedule/cold_email are not auto-confirmed by default -- see
+    NEEDS_HUMAN_TEXT above. Those are left pending, in place, for a human
+    to actually open and answer themselves. One exception for schedule:
+    when committing and the email itself states both a date and a time
+    ("September 3rd at 2pm"), that time is read from the email's own words
+    by schedule_extract.py and the schedule is completed through the page
+    like a person would. A date with no time, or no date at all, still
+    stays pending -- a time is never invented.
 
     auto_draft_reply=True is a deliberate, explicitly authorized
     exception (see inbox_reply_llm.py's own docstring) for "reply" and
@@ -207,7 +213,8 @@ def process_one(page, commit: bool, index: int, skipped: int = 0, dwell_ms: int 
     so only the note text is AI-generated, not the address itself.
     Schedule is still untouched by this flag -- a fabricated date would
     create a genuinely wrong calendar event, a materially worse mistake
-    than an unreviewed forward note on mock data."""
+    than an unreviewed forward note on mock data. (Schedule's own,
+    separate exception above only ever uses a time the email states.)"""
     # Every click below goes through the pointer: with a real Pointer the
     # mouse visibly glides to the element and clicks it; with none, the
     # disabled Pointer falls back to Playwright's own invisible click.
@@ -295,6 +302,26 @@ def process_one(page, commit: bool, index: int, skipped: int = 0, dwell_ms: int 
         else:
             pointer.click("#backBtn")
             outcome = "left pending -- LM Studio unavailable for auto-draft"
+    elif decision == "schedule" and commit and (
+            when := extract_event_time(subject, page.locator("#detailBody").inner_text())):
+        # The email itself states when -- "September 3rd at 2pm" -- so the
+        # schedule can be completed the way a person would: open Schedule,
+        # write a note, set When, Send. The time is read from the email's
+        # own words by schedule_extract.py, never generated: an email that
+        # gives only a date, or no time at all, returns nothing and falls
+        # through to the left-pending branch below, unchanged.
+        print(f"    when: {_color(when.describe(), _BLUE)}  "
+              f"{_color('read from the email:', _DIM)} {when.quote!r}")
+        pointer.click("#scheduleBtn")
+        page.wait_for_selector("#replyBoxWrap:not([hidden])")
+        note = f"{subject} ({when.quote})"
+        page.locator("#replyBody").press_sequentially(note, delay=35)
+        pointer.click("#eventWhen")
+        page.locator("#eventWhen").fill(when.as_input_value())
+        page.wait_for_timeout(400)   # let the filled-in time be seen before Send
+        pointer.click("#sendBtn")
+        page.wait_for_selector("#listView:not([hidden])")
+        outcome = f"confirmed (scheduled for {when.describe()}, from the email's own words)"
     elif decision in NEEDS_HUMAN_TEXT:
         pointer.click("#backBtn")
         outcome = ("left pending -- needs a real reply typed by a human" if decision in ("reply", "forward")
