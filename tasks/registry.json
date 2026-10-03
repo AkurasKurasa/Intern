@@ -49,9 +49,7 @@
       "kind": "script",
       "entrypoint": "components/inbox_router/automate_inbox.py",
       "args": [
-        "--commit",
-        "--limit",
-        "5"
+        "--commit"
       ],
       "cwd": "",
       "url": "http://localhost:8765/",
