@@ -464,6 +464,8 @@ class TestMainRecoversFromMidRunBrowserClosure:
         monkeypatch.setattr(psa, "Error", _FakeInboxPlaywrightError)
         monkeypatch.setattr(automate_inbox, "REPO", tmp_path)
         monkeypatch.setattr(automate_inbox, "ensure_server_running", lambda: None)
+        # No server in this test; the mode request would have nowhere to go.
+        monkeypatch.setattr(automate_inbox, "set_decision_mode", lambda mode: 0)
 
         calls = []
 

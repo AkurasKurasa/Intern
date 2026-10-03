@@ -161,6 +161,34 @@ def ensure_server_running(timeout_s: float = 45.0) -> subprocess.Popen | None:
     raise SystemExit(f"local_server.py didn't come up within {timeout_s:.0f}s")
 
 
+MODE_LABELS = {
+    "habits": "Habits only -- your learned patterns; unsure emails are left for you",
+    "hybrid": "Habits + reasoning -- habits first, the LLM thinks about the rest",
+    "reasoning": "Reasoning only -- the LLM reads and decides every email",
+}
+
+
+def set_decision_mode(mode: str) -> int:
+    """Tell the inbox server how to decide, and have it re-decide every email
+    still pending under that mode. Returns how many were re-decided.
+
+    A server left running from before decision modes existed has no
+    /api/mode endpoint; that is reported plainly rather than letting the run
+    carry on silently in the wrong mode."""
+    req = urllib.request.Request(
+        SERVER_URL + "api/mode", data=json.dumps({"mode": mode}).encode("utf-8"),
+        headers={"Content-Type": "application/json"}, method="POST")
+    try:
+        with urllib.request.urlopen(req, timeout=180) as resp:
+            return int(json.loads(resp.read() or b"{}").get("redecided", 0))
+    except urllib.error.HTTPError as exc:
+        if exc.code == 404:
+            raise SystemExit(
+                "The inbox server running on 127.0.0.1:8765 predates decision modes. "
+                "Close it (or restart the Intern app) and press Play again.")
+        raise
+
+
 # Decisions that need real human-typed content (a reply, a forward, a
 # schedule note) can never be auto-confirmed here -- this script has no
 # real text to type, and confirming with none would either create an
@@ -322,6 +350,11 @@ def process_one(page, commit: bool, index: int, skipped: int = 0, dwell_ms: int 
         pointer.click("#sendBtn")
         page.wait_for_selector("#listView:not([hidden])")
         outcome = f"confirmed (scheduled for {when.describe()}, from the email's own words)"
+    elif decision == "undecided":
+        # Habits-only mode, with no habit confident enough to act on. Left
+        # for a person, exactly as a pending email would be -- never guessed.
+        pointer.click("#backBtn")
+        outcome = "left pending -- no confident habit, left for you to decide"
     elif decision in NEEDS_HUMAN_TEXT:
         pointer.click("#backBtn")
         outcome = ("left pending -- needs a real reply typed by a human" if decision in ("reply", "forward")
@@ -350,6 +383,10 @@ def main():
                     help="seconds to pause on each email so a human can follow it (default: 1.5)")
     ap.add_argument("--headless", action="store_true",
                     help="run without a visible browser window (default: visible)")
+    ap.add_argument("--mode", choices=list(MODE_LABELS), default="hybrid",
+                    help="how each email is decided: habits (learned patterns only), hybrid "
+                         "(habits, then the LLM for the rest -- the default) or reasoning "
+                         "(the LLM decides every email)")
     ap.add_argument("--no-pointer", action="store_true",
                     help="click through the page invisibly instead of moving the real mouse pointer "
                          "(the pointer is always off when --headless)")
@@ -368,6 +405,10 @@ def main():
     print_countdown()
 
     started_server = ensure_server_running()
+    print(f"  deciding  {MODE_LABELS[args.mode]}")
+    redecided = set_decision_mode(args.mode)
+    if redecided:
+        print(f"            re-decided {redecided} pending email(s) under this mode")
 
     results = []
     with sync_playwright() as p:

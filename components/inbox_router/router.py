@@ -361,6 +361,33 @@ class InboxRouter:
                 match = entry
         return match
 
+    @property
+    def decision_mode(self) -> str:
+        return self._agent.mode
+
+    def set_decision_mode(self, mode: str) -> int:
+        """Switch how decisions are reached (see inbox_agent.DECISION_MODES)
+        and re-decide every email still pending under the new mode.
+
+        Decisions are made once per email and saved, so without the
+        re-decide step a mode chosen at Play would only ever apply to mail
+        that arrived afterwards, and the run would show the old mode's
+        answers. History is append-only and pending_entries() keeps only
+        the newest row per message, so each re-decided email simply gains a
+        newer pending row; nothing already confirmed is touched. Returns how
+        many emails were re-decided."""
+        self._agent.mode = mode          # validates; raises on an unknown mode
+        redecided = 0
+        for entry in self.pending_entries():
+            message = self._gmail.get_message(entry["message_id"])
+            if message is None:
+                continue
+            self._classify_and_record(message)
+            redecided += 1
+        emit("inbox_log", line=f"Decision mode set to {mode!r}; re-decided {redecided} pending email(s).",
+             level="info")
+        return redecided
+
     def pending_entries(self) -> list:
         """Every history entry still awaiting a Confirm/Override -- exposed
         as a real public method (rather than reaching into the private

@@ -28,9 +28,11 @@ from inbox_features import DECISIONS_ORDER, extract
 from inbox_model import FeaturesMismatch, InboxDecisionNet, load as load_model
 from llm_classifier import LLMClassifier
 from pattern_profile import PatternProfile
-from routing_rules import RuleLayer
+from routing_rules import RuleDecision, RuleLayer
 
 DEFAULT_CHECKPOINT_PATH = os.path.join(_THIS_DIR, "data", "inbox_model.pt")
+
+from decision_modes import DECISION_MODES, DEFAULT_DECISION_MODE, UNDECIDED  # noqa: E402
 
 
 @dataclass
@@ -47,7 +49,9 @@ class InboxAgent:
     def __init__(self, profile: PatternProfile, rule_layer: RuleLayer,
                  llm_classifier: LLMClassifier,
                  checkpoint_path: str = DEFAULT_CHECKPOINT_PATH,
-                 high_confidence: float = 0.75) -> None:
+                 high_confidence: float = 0.75,
+                 mode: str = DEFAULT_DECISION_MODE) -> None:
+        self.mode = mode
         self._profile = profile
         self._rules = rule_layer
         self._llm = llm_classifier
@@ -73,11 +77,39 @@ class InboxAgent:
         self._model = model
         self._centroids = artifact.get("centroids", {})
 
+    @property
+    def mode(self) -> str:
+        return self._mode
+
+    @mode.setter
+    def mode(self, value: str) -> None:
+        if value not in DECISION_MODES:
+            raise ValueError(f"unknown decision mode {value!r}; expected one of {DECISION_MODES}")
+        self._mode = value
+
     def decide(self, message: EmailMessage) -> InboxDecision:
+        if self._mode == "reasoning":
+            return self._llm_decision(message, pattern=None, rule_hint=RuleDecision())
+
         fast = self._try_fast_fill(message)
         if fast is not None:
             return fast
-        return self._reason(message)
+
+        rule_result = self._rules.classify(message)
+        if rule_result.decision:
+            return InboxDecision(
+                decision=rule_result.decision, confidence=rule_result.confidence,
+                rationale=rule_result.rationale, layer="rule",
+                capsule_name=rule_result.capsule_name, forward_to=rule_result.forward_to,
+            )
+
+        if self._mode == "habits":
+            return InboxDecision(
+                decision=UNDECIDED, confidence=0.0,
+                rationale="No confident habit for this sender yet, so it is left for you to decide.",
+                layer="none",
+            )
+        return self._llm_decision(message, self._profile.pattern_for(message.sender_email), rule_result)
 
     def _try_fast_fill(self, message: EmailMessage) -> Optional[InboxDecision]:
         if self._model is None:
@@ -106,16 +138,8 @@ class InboxAgent:
             logger.warning(f"Fast-fill scoring failed: {exc}")
             return None
 
-    def _reason(self, message: EmailMessage) -> InboxDecision:
-        rule_result = self._rules.classify(message)
-        if rule_result.decision:
-            return InboxDecision(
-                decision=rule_result.decision, confidence=rule_result.confidence,
-                rationale=rule_result.rationale, layer="rule",
-                capsule_name=rule_result.capsule_name, forward_to=rule_result.forward_to,
-            )
-        pattern = self._profile.pattern_for(message.sender_email)
-        llm_result = self._llm.classify(message, pattern, rule_result)
+    def _llm_decision(self, message: EmailMessage, pattern, rule_hint: RuleDecision) -> InboxDecision:
+        llm_result = self._llm.classify(message, pattern, rule_hint)
         decision, capsule_name, rationale = llm_result.decision, llm_result.capsule_name, llm_result.rationale
         return InboxDecision(
             decision=decision, confidence=llm_result.confidence,

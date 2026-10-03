@@ -892,6 +892,30 @@ const RUN_OPTIONS = {
     ],
   },
 
+  // Scope #3 decides each email in layers: what it learned from you (the
+  // trained model, then the sender's history) and, when those cannot settle
+  // it, the LLM reading the email. Which layers run is a per-run choice, the
+  // same way Scope #1's fill mode is.
+  "Inbox Dispatch": {
+    title: "How should it decide each email?",
+    subtitle: "Same inbox either way. This only changes where each decision "
+            + "comes from.",
+    choices: [
+      { dot: "fm-source", name: "Habits only",
+        desc: "Only what it learned from you: the trained model, then each sender's "
+            + "history. Anything it isn't confident about is left for you.",
+        args: ["--mode", "habits"] },
+      { dot: "fm-hybrid", name: "Habits + reasoning",
+        desc: "Your habits first; the LLM reads and decides whatever they can't "
+            + "settle. The usual behaviour.",
+        args: ["--mode", "hybrid"] },
+      { dot: "fm-transformer", name: "Reasoning only",
+        desc: "The LLM reads and decides every email, ignoring sender history and "
+            + "the trained model. Slower, and needs LM Studio running.",
+        args: ["--mode", "reasoning"] },
+    ],
+  },
+
   // The mocksite ships eight portals that differ by one thing each -- that IS
   // the Scope #2 experiment, so every one needs to be reachable. The variant
   // was previously pinned to v0_base in registry.json, which made the other

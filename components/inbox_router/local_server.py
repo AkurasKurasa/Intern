@@ -40,6 +40,8 @@ if os.path.exists(_env_path):
                 os.environ.setdefault(_k.strip(), _v.strip())
 
 from gmail_client import get_gmail_client
+from decision_modes import DECISION_MODES
+from routing_rules import DECISIONS
 
 DEFAULT_PORT = 8765
 _ALLOWED_ORIGIN_HOSTS = {"localhost", "127.0.0.1"}
@@ -149,6 +151,21 @@ def handle_request(method: str, path: str, body: bytes, router: InboxRouter, ori
         payload = json.dumps({"pending": router.pending_entries()}).encode("utf-8")
         return 200, {}, payload, "application/json"
 
+    if method == "POST" and path == "/api/mode":
+        # How decisions are reached -- habits / hybrid / reasoning -- chosen at
+        # Play and sent here by automate_inbox.py before it refreshes the
+        # inbox. Pending emails are re-decided under the new mode.
+        data, error = _parse_action_body(body, ("mode",))
+        if error:
+            return error
+        mode = data["mode"]
+        if mode not in DECISION_MODES:
+            err = json.dumps({"error": f"Unknown mode {mode!r}; expected one of {list(DECISION_MODES)}"})
+            return 400, {}, err.encode("utf-8"), "application/json"
+        redecided = router.set_decision_mode(mode)
+        payload = json.dumps({"ok": True, "mode": mode, "redecided": redecided}).encode("utf-8")
+        return 200, {}, payload, "application/json"
+
     if method == "GET" and path == "/api/inbox/unprocessed":
         payload = json.dumps({"waiting": router.list_unprocessed_stubs()}).encode("utf-8")
         return 200, {}, payload, "application/json"
@@ -165,6 +182,12 @@ def handle_request(method: str, path: str, body: bytes, router: InboxRouter, ori
         if error:
             return error
         message_id, decision = data["message_id"], data["decision"]
+        # Only a real decision can be confirmed. "undecided" -- what habits-only
+        # mode returns when no habit is confident -- would otherwise be saved
+        # as a training example by the page's bulk Confirm.
+        if decision not in DECISIONS:
+            err = json.dumps({"error": f"Not a decision that can be confirmed: {decision!r}"}).encode("utf-8")
+            return 400, {}, err, "application/json"
         # confirm_suggestion() itself returns None either way -- it can't
         # tell the caller whether message_id was actually found, it just
         # logs and returns on an unknown one. Check pending_entries() (the
@@ -186,6 +209,9 @@ def handle_request(method: str, path: str, body: bytes, router: InboxRouter, ori
         if error:
             return error
         message_id, new_decision = data["message_id"], data["new_decision"]
+        if new_decision not in DECISIONS:
+            err = json.dumps({"error": f"Not a decision that can be applied: {new_decision!r}"}).encode("utf-8")
+            return 400, {}, err, "application/json"
         reason = data.get("reason", "")
         reply_body = data.get("reply_body", "")
         event_start = data.get("event_start", "")
