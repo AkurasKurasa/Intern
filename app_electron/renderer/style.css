@@ -833,6 +833,8 @@ textarea.field { resize: vertical; font-family: var(--font-ui); }
 }
 .fillmode-dot.fm-source { background: #3fb950; }
 .fillmode-dot.fm-transformer { background: #4da3ff; }
+/* Fast fill + reasoning: both halves, so a split of the two colours. */
+.fillmode-dot.fm-hybrid { background: linear-gradient(135deg, #3fb950 50%, #4da3ff 50%); }
 
 .fillmode-body { display: flex; flex-direction: column; gap: 3px; }
 .fillmode-body strong { font-size: 14px; font-weight: 650; color: var(--ink); }

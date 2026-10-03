@@ -1033,6 +1033,18 @@ class LLMAgent:
         #     be supplied by the LLM.
         disable_batch_fill: bool          = False,
         disable_source_lookup: bool       = False,
+        # fast_fill_text_only -- the "Fast fill + reasoning" mode. Fast-fill
+        #   still writes plain text fields whose value the source lookup is
+        #   sure of, but dropdowns and checkboxes are left for the normal
+        #   pipeline: the TRANSFORMER picks the click and the lookup / LLM
+        #   supplies the value (the [TRANSFORMER] -> [MERGE] steps), with the
+        #   reasoning ladder's deep prompt when the model is unsure. This
+        #   makes deliberate what the 2026-09-16 run did by accident, when
+        #   the coverage dropdowns' option text did not match and fell
+        #   through; once fast-fill learned to write dropdowns and
+        #   checkboxes directly it absorbed the whole form, and the
+        #   transformer and reasoning tier stopped appearing in a run.
+        fast_fill_text_only: bool         = False,
         disable_transformer: bool         = False,  # ablation test: skip the model, force the SAME
                                                      # low-confidence fallback it already uses when unsure
         start_tab_idx:     int            = 0,      # start agent at this tab index (drill testing)
@@ -1282,6 +1294,7 @@ class LLMAgent:
         self._pure_transformer: bool = pure_transformer
         self._no_autohandlers:  bool = disable_auto_handlers
         self._no_batch_fill:    bool = disable_batch_fill
+        self._fast_fill_text_only: bool = fast_fill_text_only
         self._no_source_lookup: bool = disable_source_lookup
         # Ablation test flag, added 2026-08-14 ("I have to verify that if
         # we don't have the model we're using right now the performance
@@ -2678,7 +2691,7 @@ class LLMAgent:
                         self._executor.execute({"action_type": "keyboard",
                                                 "key_count": 1, "keystrokes": ["tab"]})
                         _bf_filled += 1
-                    elif _bf_ty == "comboboxcontrol":
+                    elif _bf_ty == "comboboxcontrol" and not self._fast_fill_text_only:
                         if (_bf_key in self._leave_blank_keys
                                 or _bf_key in self._typed_keys):
                             continue
@@ -2761,7 +2774,7 @@ class LLMAgent:
                         self._executor.execute({"action_type": "keyboard",
                                                 "key_count": 1, "keystrokes": ["tab"]})
                         _bf_filled += 1
-                    elif _bf_ty in ("checkboxcontrol", "checkbox"):
+                    elif _bf_ty in ("checkboxcontrol", "checkbox") and not self._fast_fill_text_only:
                         if _bf_label in self._checked_fields:
                             continue
                         _bf_should_check = self._lookup_checkbox_should_check(_bf_label)
@@ -2858,7 +2871,9 @@ class LLMAgent:
                 _ff_sec = self._detect_section(state, _ff_fel) if _ff_fel else ""
                 _ff_key = (self._attempt_key(_ff_fel, elements=state.get("elements", []), section=_ff_sec)
                            if _ff_fel else None)
-                if (_ff_fel and _ff_ty in ("editcontrol", "comboboxcontrol") and not _ff_val
+                _ff_types = (("editcontrol",) if self._fast_fill_text_only
+                             else ("editcontrol", "comboboxcontrol"))
+                if (_ff_fel and _ff_ty in _ff_types and not _ff_val
                         and _ff_key not in self._leave_blank_keys
                         and _ff_key not in self._typed_keys):
                     _ff_label = (_ff_fel.get("label") or _ff_fel.get("text") or "").strip()
@@ -2922,6 +2937,7 @@ class LLMAgent:
                             # today's existing click-based open+select path
                             # below, unchanged.
                 elif (_ff_fel and _ff_ty in ("checkboxcontrol", "checkbox")
+                      and not self._fast_fill_text_only
                       and (_ff_fel.get("label") or _ff_fel.get("text") or "").strip()
                           not in self._checked_fields):
                     # ── OPT2 CHECKBOX FAST-FILL: added 2026-08-14, same

@@ -870,7 +870,7 @@ class TestBatchFastFillUsesSectionAwareAttemptKeys:
 
     def _batch_window(self):
         idx = _SOURCE.index("OPT2 BATCH FAST-FILL")
-        return _SOURCE[idx:idx + 21500]
+        return _SOURCE[idx:idx + 23000]  # widened 2026-10-03: the fast_fill_text_only gate on the dropdown line pushed the checkbox branch past 21500
 
     def test_bf_sec_is_computed_before_bf_key_not_after(self):
         """_bf_sec must be available BEFORE _bf_key is computed, so the key

@@ -262,6 +262,12 @@ if __name__ == "__main__":
                               "a normal run can finish with the model never consulted. Use "
                               "this to measure what the transformer contributes, or to see "
                               "it work in the decision HUD.")
+    _parser.add_argument("--fast_fill_text_only", action="store_true",
+                         help="'Fast fill + reasoning' mode: fast-fill only plain text "
+                              "fields whose value is known for sure, and leave dropdowns "
+                              "and checkboxes to the transformer (where to click) and the "
+                              "lookup/LLM (what to choose), so both halves are used in one "
+                              "run.")
     _parser.add_argument("--force_llm_values", action="store_true",
                          help="Ablation: turn off the direct lookup, so every value has to "
                               "come from the LLM instead of being matched out of the intake "
@@ -347,6 +353,7 @@ if __name__ == "__main__":
             disable_auto_handlers = True,   # kill legacy heuristics — transformer(WHERE)+LLM(WHAT) merge drives
             disable_transformer = _args.disable_transformer,  # ablation test, off by default
             disable_batch_fill    = _args.no_batch_fill,      # ablation, off by default
+            fast_fill_text_only   = _args.fast_fill_text_only,  # Fast fill + reasoning mode
             disable_source_lookup = _args.force_llm_values,   # ablation, off by default
             observer         = _observer,   # None → agent defaults to UIA; else vision
             visual_reader    = visual_reader,

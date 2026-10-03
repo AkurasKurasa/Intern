@@ -858,7 +858,7 @@ function refreshChipEmojis() {
 }
 
 // ── Fill-mode chooser ────────────────────────────────────────────────────
-// Scope #1 can fill the form two genuinely different ways over the same data:
+// Scope #1 can fill the form three ways over the same data. The first two:
 // writing each value straight into the control and tabbing on, or turning that
 // path off so every field is reached by a real click and the trained pointer
 // picks the target. That is a per-run choice, not a property of the task, so it
@@ -879,6 +879,12 @@ const RUN_OPTIONS = {
         desc: "Writes each value straight into the field and presses Tab. No mouse, "
             + "no clicking — so the transformer is never asked anything. Fast.",
         args: [] },
+      { dot: "fm-hybrid", name: "Fast fill + reasoning",
+        desc: "Both together. Text fields whose value is known for sure are written "
+            + "straight in; dropdowns and checkboxes are left to the transformer, which "
+            + "picks where to click, and the lookup or LLM chooses the value, thinking "
+            + "harder when the model is unsure.",
+        args: ["--fast_fill_text_only"] },
       { dot: "fm-transformer", name: "Transformer",
         desc: "Turns the direct-write path off, so every field has to be reached by a "
             + "real click and the learned pointer picks the target. Slower.",
