@@ -319,3 +319,54 @@ class TestLocalServerField:
         registry = CapsuleRegistry(registry_path=str(registry_path))
         capsule = registry.list_capsules()[0]
         assert capsule.local_server == "components/inbox_router/local_server.py"
+
+
+# -- registry follows the file, not its startup memory -----------------------
+# Found live 2026-10-03: removing Inbox Dispatch's "--limit 5" from
+# registry.json had no effect on the next Play, because the app's single,
+# long-lived CapsuleRegistry had read the file once at startup.
+
+import json as _json
+import os as _os
+import time as _time
+
+from components.agent.capsule import CapsuleRegistry as _Registry, WorkflowCapsule as _Capsule
+
+
+def _write_registry(path, args):
+    path.write_text(_json.dumps({"capsules": [{
+        "name": "Inbox Dispatch", "description": "", "model_path": "",
+        "trigger_keywords": [], "trigger_apps": [], "trace_dir": "", "created": "",
+        "kind": "script", "entrypoint": "x.py", "args": args, "cwd": "",
+    }]}), encoding="utf8")
+    # bump mtime explicitly so the change is visible even on coarse clocks
+    st = _os.stat(path)
+    _os.utime(path, (st.st_atime, st.st_mtime + 5))
+
+
+def test_edit_to_registry_file_is_seen_without_restart(tmp_path):
+    path = tmp_path / "registry.json"
+    _write_registry(path, ["--commit", "--limit", "5"])
+    reg = _Registry(str(path))
+    assert reg.list_capsules()[0].args == ["--commit", "--limit", "5"]
+
+    _write_registry(path, ["--commit"])          # edited outside the app
+    assert reg.list_capsules()[0].args == ["--commit"]
+
+
+def test_saving_never_puts_back_a_stale_copy(tmp_path):
+    path = tmp_path / "registry.json"
+    _write_registry(path, ["--commit", "--limit", "5"])
+    reg = _Registry(str(path))
+    _write_registry(path, ["--commit"])          # outside edit after load
+
+    reg.register(_Capsule(name="New Task", description="", model_path="",
+                          trigger_keywords=[], trigger_apps=[], trace_dir="", created=""))
+    saved = {c["name"]: c for c in _json.loads(path.read_text(encoding="utf8"))["capsules"]}
+    assert saved["Inbox Dispatch"]["args"] == ["--commit"], "register() overwrote the newer edit"
+    assert "New Task" in saved
+
+
+def test_missing_registry_file_reads_as_empty(tmp_path):
+    reg = _Registry(str(tmp_path / "nope" / "registry.json"))
+    assert reg.list_capsules() == []

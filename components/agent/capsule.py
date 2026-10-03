@@ -127,25 +127,56 @@ class WorkflowCapsule:
 
 
 class CapsuleRegistry:
+    """The task list, backed by tasks/registry.json.
+
+    The file is the source of truth, not this object's memory. The app keeps
+    one registry alive for its whole session, so a registry that read the
+    file only at startup ignored every later edit -- found live: removing
+    Inbox Dispatch's "--limit 5" from registry.json had no effect on the next
+    Play until the app was restarted. Every read therefore re-checks the
+    file's modification time and size and reloads when either changed, and every write
+    reloads first, so a save can never put back a stale copy over a newer
+    edit made outside the app.
+    """
+
     def __init__(self, registry_path: str = REGISTRY_PATH):
         self._path = os.path.abspath(registry_path)
         os.makedirs(os.path.dirname(self._path), exist_ok=True)
         self._capsules: List[WorkflowCapsule] = []
+        self._stamp: Optional[tuple] = None
         self._load()
 
+    def _current_stamp(self) -> Optional[tuple]:
+        """(modification time in ns, size). Size is included because two
+        edits can share a timestamp on coarse-clock filesystems, but an edit
+        that changes the task list almost always changes the length too."""
+        try:
+            st = os.stat(self._path)
+        except OSError:
+            return None
+        return (st.st_mtime_ns, st.st_size)
+
     def _load(self) -> None:
-        if not os.path.exists(self._path):
+        self._stamp = self._current_stamp()
+        if self._stamp is None:
             self._capsules = []
             return
         with open(self._path) as f:
             data = json.load(f)
         self._capsules = [WorkflowCapsule(**c) for c in data.get("capsules", [])]
 
+    def _refresh(self) -> None:
+        """Reload if the file changed on disk since it was last read."""
+        if self._current_stamp() != self._stamp:
+            self._load()
+
     def _save(self) -> None:
         with open(self._path, "w") as f:
             json.dump({"capsules": [asdict(c) for c in self._capsules]}, f, indent=2)
+        self._stamp = self._current_stamp()
 
     def register(self, capsule: WorkflowCapsule) -> None:
+        self._refresh()
         self._capsules = [c for c in self._capsules if c.name != capsule.name]
         self._capsules.append(capsule)
         self._save()
@@ -162,6 +193,7 @@ class CapsuleRegistry:
         future script capsule that happens to declare real triggers still
         can't be routed into LLMAgent by mistake.
         """
+        self._refresh()
         goal_lower  = goal.lower()
         title_lower = window_title.lower()
         for capsule in self._capsules:
@@ -174,4 +206,5 @@ class CapsuleRegistry:
         return fallback
 
     def list_capsules(self) -> List[WorkflowCapsule]:
+        self._refresh()
         return list(self._capsules)
