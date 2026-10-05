@@ -11,8 +11,10 @@ handled, so Play had almost nothing left to show.
 
 What is reset is only what a run USES UP. What Intern learned from the user
 is never touched -- pattern_profile.json, reply_examples.jsonl,
-training_examples.jsonl, schedule.txt, and routed_history.json (recorded
-sessions are labelled from it by reply_trace_translator.py). Everything
+training_examples.jsonl, routed_history.json (recorded sessions are
+labelled from it by reply_trace_translator.py), and task_list.txt -- which,
+since 2026-10-05, also holds the "Scheduled:" log that used to be
+schedule.txt (kept in NEVER_RESET for older checkouts). Everything
 reset is copied to data/demo_backups/<timestamp>/ first, so a Launch pressed
 by mistake loses nothing.
 """

@@ -949,15 +949,20 @@ ipcMain.handle("launch-test-tools", async (_evt, capsuleName) => {
     }
     opened.push("inbox");
 
-    const scheduleDir = path.join(REPO_ROOT, "components", "inbox_router", "data");
-    const schedulePath = path.join(scheduleDir, "schedule.txt");
-    if (!fs.existsSync(schedulePath)) {
-      fs.mkdirSync(scheduleDir, { recursive: true });
-      fs.writeFileSync(schedulePath, "");
+    // One Notepad file: the boss' task list (cold emails, checks) with a
+    // "Scheduled:" section at the end that the schedule decision appends to
+    // (schedule_recorder.py). Direct request: "Can you please unify both
+    // into one" -- before, Launch opened only schedule.txt, so the
+    // instructions themselves were never on screen.
+    const taskListDir = path.join(REPO_ROOT, "components", "inbox_router", "data");
+    const taskListPath = path.join(taskListDir, "task_list.txt");
+    if (!fs.existsSync(taskListPath)) {
+      fs.mkdirSync(taskListDir, { recursive: true });
+      fs.writeFileSync(taskListPath, "");
     }
-    const scheduleChild = spawn("notepad.exe", [schedulePath], { detached: true, stdio: "ignore" });
-    scheduleChild.unref();
-    opened.push("schedule.txt");
+    const taskListChild = spawn("notepad.exe", [taskListPath], { detached: true, stdio: "ignore" });
+    taskListChild.unref();
+    opened.push("task_list.txt");
 
     return { ok: true, opened };
   }

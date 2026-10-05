@@ -29,3 +29,11 @@ Check inbox: purchase order
 Check schedule: October 14th at 2pm
 Check schedule: October 16th at 10am
 Check schedule: next Friday
+
+Scheduled:
+[2026-10-03T09:37:52.500566+00:00] 'Scheduled maintenance window - Aug 20' (it-alerts@thirdpartyvendor.com): Scheduled maintenance window - Aug 20 (Aug 20, 11pm)
+[2026-10-03T09:38:03.868656+00:00] 'Scheduled maintenance window - Aug 6' (it-alerts@thirdpartyvendor.com): Scheduled maintenance window - Aug 6 (Aug 6, 11pm)
+[2026-10-03T09:38:15.372536+00:00] 'Scheduled maintenance window - Jul 23' (it-alerts@thirdpartyvendor.com): Scheduled maintenance window - Jul 23 (Jul 23, 11pm)
+[2026-10-03T09:38:33.376675+00:00] 'Vendor call - proposing Sept 3rd, 2pm' (dana.whitfield@northline.example.com): Vendor call - proposing Sept 3rd, 2pm (September 3rd at 2pm)
+[2026-10-03T09:38:51.918082+00:00] 'Kickoff call for the Q3 partnership - your availability?' (priya@ramaswami-consulting.example.com): Kickoff call for the Q3 partnership - your availability? (September 4th at 10am)
+[2026-10-03T09:39:03.721884+00:00] 'Procurement review meeting - Sept 8, 11am' (m.oyelaran@delridge.example.com): Procurement review meeting - Sept 8, 11am (September 8th at 11am)

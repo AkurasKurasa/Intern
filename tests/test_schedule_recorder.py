@@ -41,7 +41,7 @@ class TestRecordScheduleEntry:
         sr.record_schedule_entry(_msg(mid="m2"), "second note", path=path)
 
         with open(path, "r", encoding="utf-8") as f:
-            lines = f.readlines()
+            lines = [l for l in f.readlines() if l.startswith("[")]   # entries, not the "Scheduled:" heading
         assert len(lines) == 2
         assert "first note" in lines[0]
         assert "second note" in lines[1]
@@ -51,10 +51,12 @@ class TestRecordScheduleEntry:
         sr.record_schedule_entry(_msg(), "Aug 30 -- vendor call\nre: pricing, confirm time", path=path)
 
         with open(path, "r", encoding="utf-8") as f:
-            lines = f.readlines()
+            lines = [l for l in f.readlines() if l.startswith("[")]   # entries, not the "Scheduled:" heading
         assert len(lines) == 1
         assert "Aug 30 -- vendor call re: pricing, confirm time" in lines[0]
 
     def test_default_path_is_under_data_dir(self):
         assert "data" in sr.DEFAULT_SCHEDULE_LOG_PATH
-        assert sr.DEFAULT_SCHEDULE_LOG_PATH.endswith("schedule.txt")
+        # 2026-10-05: one Notepad file -- entries go under "Scheduled:" in
+        # the boss' task list, not a separate schedule.txt.
+        assert sr.DEFAULT_SCHEDULE_LOG_PATH.endswith("task_list.txt")

@@ -1131,6 +1131,16 @@ waiting on them.
 
   TESTS: tests/test_inbox_sorting_wait.py (3) -- real page against a deliberately slow server shows the sorting message then the emails; Play waits >= 180 s; Electron keeps the server output. Scope #3: 407 passed.
 
+- [x] `scope3_one_notepad_file` -- 2026-10-05, direct request: 'Give me the exact instructions present in the Notepad' (for Scope #3), then 'Can you please unify both into one' / 'Put it all in one txt file please'. Found: the Notepad Launch opened was schedule.txt -- a log of scheduled meetings with no instructions in it; the boss' instructions lived in task_list.txt, which Launch never opened, so the audience never saw what was asked.
+
+  DECISION: one file, data/task_list.txt -- the instructions (Cold email / Check sections) on top, and a 'Scheduled:' section at the end that the schedule decision appends to. schedule_recorder.DEFAULT_SCHEDULE_LOG_PATH now points at the task list and adds the heading once, after a blank line. Every write already went through record_schedule_entry() and nothing READ schedule.txt as data, so no other module changed. The 6 existing log lines were moved into the new section (the old gitignored schedule.txt is left on disk, unused). Launch opens only task_list.txt.
+
+  SAFETY: task_list_parser treats 'Scheduled:' like any unknown heading, so entries are never read as cold-email targets or checks -- tested even with an entry containing 'Name <email>'. The real file still parses to 10 targets in 3 sections and 12 checks.
+
+  OPEN (asked the user): the Scheduled section is not cleared by Launch's reset (it was treated as learned data, like schedule.txt before), so it grows across rehearsals.
+
+  TESTS: tests/test_inbox_unified_notepad.py (7).
+
 - [ ] `scope3_email_triage` *(superseded framing — predates the concrete
   shape above)*: the very original bare stub, a GUI-demonstration-based
   triage system (watch UIA/screen state the way Scope #1/#2 do). Still a
