@@ -61,6 +61,7 @@ from automate_inbox import (
 from automate_cold_email import process_one as cold_email_process_one
 from automate_checks import open_checks_view, process_one as checks_process_one, POSITIVE
 from pointer import Pointer
+from workspace import open_page
 
 
 def main() -> int:
@@ -96,10 +97,9 @@ def main() -> int:
     inbox_results: list = []
     check_results: list = []
     with sync_playwright() as p:
-        # Maximised, with the page filling the whole window, so every target
-        # the pointer moves to is large and already on screen.
-        browser = p.chromium.launch(headless=args.headless, args=["--start-maximized"])
-        page = browser.new_context(no_viewport=True).new_page()
+        # The window Launch opened when there is one (workspace.py), else a
+        # fresh maximised browser as before.
+        browser, page, _attached = open_page(p, SERVER_URL, args.headless)
         page.goto(SERVER_URL)
         pointer = Pointer(page, enabled=not (args.headless or args.no_pointer))
 

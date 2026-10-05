@@ -105,8 +105,14 @@ def test_open_workspace_does_not_stack_a_second_window(monkeypatch):
 
 
 def test_open_workspace_launches_detached_on_the_portal(monkeypatch, tmp_path):
+    import workspace_browser as wb
+    seen = {"tabs": [], "closed": []}
+    states = iter([False, True])      # not open yet -> port answers after launch
     monkeypatch.setattr(workspace, "is_open", lambda port=None, timeout=0.5: False)
-    seen = {}
+    monkeypatch.setattr(wb, "is_open", lambda port, timeout=0.5: next(states, True))
+    monkeypatch.setattr(wb, "_targets", lambda port: [{"id": "b1", "type": "page", "url": "about:blank"}])
+    monkeypatch.setattr(wb, "_new_tab", lambda port, url: seen["tabs"].append(url))
+    monkeypatch.setattr(wb, "_close_tab", lambda port, tid: seen["closed"].append(tid))
 
     def fake_popen(args, **kwargs):
         seen["args"], seen["kwargs"] = args, kwargs
@@ -115,7 +121,11 @@ def test_open_workspace_launches_detached_on_the_portal(monkeypatch, tmp_path):
     status, proc = workspace.open_workspace("v2_relabeled", port=9555, profile=tmp_path,
                                             chromium=Path(sys.executable), popen=fake_popen)
     assert (status, proc) == ("launched", "proc")
-    assert seen["args"][-1] == variant_url("v2_relabeled")
+    # Started blank; the portal arrives as a DevTools tab (see open_url's
+    # docstring: a command-line http page hangs connect_over_cdp).
+    assert seen["args"][-1] == "about:blank"
+    assert seen["tabs"] == [variant_url("v2_relabeled")]
+    assert seen["closed"] == ["b1"]
     assert "--remote-debugging-port=9555" in seen["args"]
     assert seen["kwargs"]["stdin"] == subprocess.DEVNULL
 
@@ -163,6 +173,7 @@ def headless_workspace(tmp_path, monkeypatch):
     while not portal_tab_ready(port) and time.time() < deadline:
         time.sleep(0.2)
     monkeypatch.setattr(workspace, "CDP_PORT", port)
+    monkeypatch.delenv("INTERN_NO_WORKSPACE_ATTACH", raising=False)
     yield port
     # Chromium is a process tree; kill all of it, not just the parent.
     if sys.platform == "win32":

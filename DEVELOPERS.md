@@ -1091,6 +1091,18 @@ waiting on them.
 
   NEXT (user, same day): redo the Scope #3 UI -- the Checks view is deliberately plain until then.
 
+- [x] `scope3_launch_opens_the_agent_workspace` -- 2026-10-05, direct request: 'Same changes for Scope #2 to Scope #3 in regards to launching and playing.' Before: Launch opened the PRACTICE inbox (/practice/, the recording page) in the default browser, while Play's automate_inbox.py launched its own Chromium on the main page -- two windows, and the one Launch opened was never the one the agent used.
+
+  DECISION 1 -- one shared mechanism, not a copy: components/workspace_browser.py (open_url / attach / pick_page / is_open / chromium_path), used by Scope #2's executor/workspace.py (now a thin wrapper, same API) and the new components/inbox_router/workspace.py. Each scope has its own DevTools port (9333 / 9334) and profile, so both windows can be open at once.
+
+  DECISION 2 -- Scope #3 wiring: Launch (main.js, Inbox Dispatch branch) runs inbox_router/open_workspace.py, which starts the local server if needed and opens the MAIN page. automate_inbox.py, automate_cold_email.py and run_boss_task_list.py all get their page through workspace.open_page(): the user's window when one is open (never when --headless), else a fresh browser as before. Attach prefers the server's root page, never /practice/. Schedule.txt still opens in Notepad.
+
+  ROOT CAUSE FOUND WHILE TESTING (would have broken real use): on Chromium 151 / Playwright 1.62, a page passed on Chromium's COMMAND LINE makes connect_over_cdp hang forever once it is http:// (Playwright attaches to a target reporting an empty URL and waits on it); about:blank and file:// are fine, which is why Scope #2's file:// portal never showed it. Isolated step by step: blank page attaches in 0.6 s; in-process server, separate-process server, trivial static page and a visible off-screen window all hang; the same page opened AFTER start attaches in ~1 s. DECISION: open_url starts Chromium on about:blank, opens the page as a new tab through DevTools (/json/new), closes the blank tab. Bonus: pressing Launch again after closing the tab reopens it without a second window.
+
+  SAFETY FIX: with the user's real Scope #2 window open, a show-mode Scope #2 test attached to it and filled a row there. tests/conftest.py now sets INTERN_NO_WORKSPACE_ATTACH for every test; attach() refuses while it is set; only the attach tests clear it, on their own private headless windows.
+
+  TESTS: tests/test_inbox_workspace.py (15: shared helpers, main-page vs practice vs other server, separate ports, blank-then-tab launch, Launch-again reopens the tab, command-line http never used, headless never attaches, Electron guard, every script goes through open_page, test-suite switch, and E2E -- a real Chromium with a decoy practice tab; Play picks the main page, walks a check, window survives). Scope #2 workspace tests updated for the new launch. Scope #2+#3: 638 passed.
+
 - [ ] `scope3_email_triage` *(superseded framing — predates the concrete
   shape above)*: the very original bare stub, a GUI-demonstration-based
   triage system (watch UIA/screen state the way Scope #1/#2 do). Still a

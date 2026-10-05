@@ -45,6 +45,7 @@ if str(REPO) not in sys.path:
 from automate_inbox import ensure_server_running, print_countdown, banner, SERVER_URL
 from cold_email_llm import generate_cold_email
 from pointer import Pointer
+from workspace import open_page
 
 
 def process_one(page, commit: bool, index: int, pointer=None):
@@ -141,10 +142,9 @@ def main():
 
     results = []
     with sync_playwright() as p:
-        # Maximised, with the page filling the whole window, so every target
-        # the pointer moves to is large and already on screen.
-        browser = p.chromium.launch(headless=args.headless, args=["--start-maximized"])
-        page = browser.new_context(no_viewport=True).new_page()
+        # The window Launch opened when there is one (workspace.py), else a
+        # fresh maximised browser as before.
+        browser, page, _attached = open_page(p, SERVER_URL, args.headless)
         page.goto(SERVER_URL)
         pointer = Pointer(page, enabled=not (args.headless or args.no_pointer))
         # There's no button or tab for Cold Email anywhere in this page's

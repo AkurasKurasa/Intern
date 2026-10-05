@@ -54,6 +54,7 @@ REPO = Path(__file__).resolve().parent
 if str(REPO) not in sys.path:
     sys.path.insert(0, str(REPO))
 from pointer import Pointer
+from workspace import open_page
 from schedule_extract import extract_event_time
 # 127.0.0.1, not "localhost" -- local_server.py's HTTPServer binds only
 # IPv4 (127.0.0.1). Found live: Chromium's own resolution of "localhost"
@@ -412,10 +413,9 @@ def main():
 
     results = []
     with sync_playwright() as p:
-        # Maximised, with the page filling the whole window, so every target
-        # the pointer moves to is large and already on screen.
-        browser = p.chromium.launch(headless=args.headless, args=["--start-maximized"])
-        page = browser.new_context(no_viewport=True).new_page()
+        # The window Launch opened when there is one (workspace.py), else a
+        # fresh maximised browser as before.
+        browser, page, _attached = open_page(p, SERVER_URL, args.headless)
         page.goto(SERVER_URL)
         pointer = Pointer(page, enabled=not (args.headless or args.no_pointer))
         # A fixed short wait here used to be enough when /api/inbox only

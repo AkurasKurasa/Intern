@@ -927,8 +927,18 @@ ipcMain.handle("launch-test-tools", async (_evt, capsuleName) => {
     await ensureLocalServerRunning(capsule.local_server, capsule.url);
     const opened = [];
 
-    shell.openExternal(`${capsule.url}practice/`);
-    opened.push("practice inbox");
+    // The inbox page Play then works in -- not the practice page in the
+    // default browser, which the agent never touched. Direct request:
+    // "Same changes for Scope #2 to Scope #3 in regards to launching and
+    // playing." open_workspace.py opens a Chromium with a DevTools port that
+    // automate_inbox.py / automate_cold_email.py / run_boss_task_list.py
+    // attach to (components/inbox_router/workspace.py).
+    const ws = await runPython(
+      [path.join(REPO_ROOT, "components", "inbox_router", "open_workspace.py")], 60000);
+    if (!ws.ok) {
+      return { ok: false, error: `Could not open the inbox window.\n\n${ws.stderr.split("\n").pop() || ws.error}` };
+    }
+    opened.push("inbox");
 
     const scheduleDir = path.join(REPO_ROOT, "components", "inbox_router", "data");
     const schedulePath = path.join(scheduleDir, "schedule.txt");
