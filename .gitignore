@@ -93,6 +93,7 @@ Thesis.docx
 components/scope2/data/cache/
 components/scope2/data/workspace_profile/
 components/inbox_router/data/workspace_profile/
+components/inbox_router/data/demo_backups/
 
 # Excel's own transient lock file, created whenever a workbook is open --
 # appears now that the Play panel's "Test" section can open grade_sheet.xlsx.

@@ -1113,6 +1113,16 @@ waiting on them.
 
   STILL OPEN for the demo: resetting the demo data (27 of 30 mock emails already handled; contacted cold-email targets drop off the list) -- asked the user how; the Agent window and the inbox page UI -- to be designed together.
 
+- [x] `scope3_demo_reset_on_launch` -- 2026-10-05. Explained to the user what a reset is, then asked; they chose 'Automatically on Launch' over a button or no reset. Before: 27 of 30 mock emails were marked handled and contacted cold-email targets drop off the list, so Play had almost nothing left to show.
+
+  DECISION -- what is reset: only what a run USES UP: mock_state.json (handled emails), cold_email_state.json (contacted), mock_drafts.json and mock_calendar_events.json (drafts/events a run created -- so 'Am I free Oct 14 2pm?' starts free each time). NEVER reset -- what Intern learned from the user: pattern_profile.json, reply_examples.jsonl, training_examples.jsonl, schedule.txt, routed_history.json (recorded sessions are labelled from it by reply_trace_translator.py), plus mock_inbox.json and task_list.txt. Everything reset is first copied to data/demo_backups/<timestamp>/ (gitignored), so a Launch pressed by mistake loses nothing.
+
+  DECISION -- real Gmail guard: with credentials/client_secret.json present (the same switch get_gmail_client() uses) the reset is skipped -- resetting the contacted list would make Intern draft to real people again.
+
+  Wiring: components/inbox_router/demo_reset.py; open_workspace.py (what Launch runs) resets first, then starts the server, then opens the window. Note: after a reset the first inbox load re-decides the restored emails, so it can take a little longer.
+
+  TESTS: tests/test_inbox_demo_reset.py (7) -- every consumable restored, learned files byte-identical, backup made first, missing files left missing, integration with the real mock Gmail client and cold-email sender (all emails waiting, targets back), real-Gmail detection, and Launch order reset -> server -> window with the reset skipped under real Gmail.
+
 - [ ] `scope3_email_triage` *(superseded framing — predates the concrete
   shape above)*: the very original bare stub, a GUI-demonstration-based
   triage system (watch UIA/screen state the way Scope #1/#2 do). Still a
