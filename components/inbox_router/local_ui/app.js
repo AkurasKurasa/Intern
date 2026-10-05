@@ -158,14 +158,16 @@ function setView(view) {
   // different section.
   closeMessage();
   closeColdEmailTarget();
+  closeCheck();
 
+  listView.hidden = view === "cold_email" || view === "checks";
+  coldEmailListView.hidden = view !== "cold_email";
+  checksListView.hidden = view !== "checks";
   if (view === "cold_email") {
-    listView.hidden = true;
-    coldEmailListView.hidden = false;
     loadColdEmailTargets();
+  } else if (view === "checks") {
+    loadChecks();
   } else {
-    listView.hidden = false;
-    coldEmailListView.hidden = true;
     renderList();
   }
 }
@@ -332,6 +334,85 @@ function openColdEmailDetail(email) {
   coldEmailListView.hidden = true;
   coldEmailDetailView.hidden = false;
 }
+
+// ── Checks (task list "Check ..." lines) ── read-only; the server answers
+// each one from the mailbox and calendar (checker.py), this only shows it.
+const checksListView = document.getElementById("checksListView");
+const checksDetailView = document.getElementById("checksDetailView");
+const checksRowList = document.getElementById("checksRowList");
+const checksEmptyState = document.getElementById("checksEmptyState");
+const checksToolbarCount = document.getElementById("checksToolbarCount");
+let checks = [];
+
+async function loadChecks() {
+  try {
+    const resp = await fetch("/checks/api/list");
+    if (!resp.ok) throw new Error(`Server returned ${resp.status}`);
+    checks = (await resp.json()).checks || [];
+    renderChecks();
+  } catch (e) {
+    checks = [];
+    checksRowList.innerHTML = "";
+    checksEmptyState.hidden = false;
+    checksEmptyState.textContent = "Can't reach the local server -- is it running? Try refreshing in a few seconds.";
+  }
+}
+
+function renderChecks() {
+  checksRowList.innerHTML = "";
+  checksToolbarCount.textContent = checks.length > 0 ? `1-${checks.length} of ${checks.length}` : "";
+  checksEmptyState.hidden = checks.length > 0;
+  if (checks.length === 0) {
+    checksEmptyState.textContent = 'No checks on the task list. Add "Check ..." lines to data/task_list.txt.';
+  }
+  checks.forEach((check) => {
+    const li = document.createElement("li");
+    li.className = "row-item";
+    li.dataset.answer = check.answer;
+    li.innerHTML = `
+      <span class="row-sender">${escapeHtml(check.answer.toUpperCase())}</span>
+      <span class="row-snippet">
+        <span class="row-subject">${escapeHtml(check.label)}</span>
+        <span class="row-preview"> - ${escapeHtml(check.detail)}</span>
+      </span>
+    `;
+    li.addEventListener("click", () => openCheck(check.index));
+    checksRowList.appendChild(li);
+  });
+}
+
+function openCheck(index) {
+  const check = checks.find((c) => c.index === index);
+  if (!check) return;
+  document.getElementById("checkLabel").textContent = check.label;
+  document.getElementById("checkAnswer").textContent = check.answer.toUpperCase();
+  document.getElementById("checkDetail").textContent = check.detail;
+  const list = document.getElementById("checkEvidence");
+  list.innerHTML = "";
+  (check.evidence || []).forEach((ev) => {
+    const li = document.createElement("li");
+    li.className = "row-item";
+    const title = ev.subject || ev.summary || "";
+    const meta = ev.sender ? `${ev.sender} · ${ev.received_at || ""}` : `${ev.start || ""} – ${ev.end || ""}`;
+    li.innerHTML = `
+      <span class="row-snippet">
+        <span class="row-subject">${escapeHtml(title)}</span>
+        <span class="row-preview"> - ${escapeHtml(meta)}</span>
+      </span>
+    `;
+    list.appendChild(li);
+  });
+  checksListView.hidden = true;
+  checksDetailView.hidden = false;
+}
+
+function closeCheck() {
+  checksListView.hidden = false;
+  checksDetailView.hidden = true;
+}
+
+document.getElementById("checksBackBtn").addEventListener("click", closeCheck);
+document.getElementById("checksRefreshBtn").addEventListener("click", loadChecks);
 
 function closeColdEmailTarget() {
   openColdEmailTarget = null;

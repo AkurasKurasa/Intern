@@ -101,6 +101,9 @@ def fake_playwright(monkeypatch):
     monkeypatch.setattr(psa, "sync_playwright", lambda: _FakePlaywrightContext(browser))
     monkeypatch.setattr(psa, "Error", _FakePlaywrightError)
     monkeypatch.setattr(run_boss_task_list, "ensure_server_running", lambda: None)
+    # Phase 3 (checks) reads rows the fake page cannot produce; default it
+    # to "no checks" so the tests above keep exercising phases 1-2 only.
+    monkeypatch.setattr(run_boss_task_list, "checks_process_one", lambda *a, **kw: None)
     return browser
 
 
@@ -138,6 +141,41 @@ def test_both_phases_use_the_exact_same_page_object(tmp_path, monkeypatch, fake_
 
     assert len(seen_pages) == 2
     assert seen_pages[0] is seen_pages[1]  # cold email and inbox shared the one real page
+
+
+def test_checks_run_last_on_the_same_page_and_land_in_the_log(tmp_path, monkeypatch, fake_playwright):
+    # Direct request 2026-10-05: "general checking" on the boss' task list.
+    # The checks phase runs after the inbox (so a reply check sees the mail
+    # as this run left it), on the same page, until process_one says None.
+    import json
+    order = []
+    answers = iter([{"label": "Did Hannah Cole reply?", "answer": "yes", "detail": "", "evidence_count": 1},
+                    {"label": "Am I free next Friday?", "answer": "unclear", "detail": "", "evidence_count": 0}])
+
+    def _fake_cold_email(page, commit, index, pointer=None):
+        order.append(("cold", page))
+        return None
+
+    def _fake_inbox(page, commit, index, skipped, dwell_ms=0, auto_draft_reply=False, pointer=None):
+        order.append(("inbox", page))
+        return None
+
+    def _fake_check(page, index, pointer=None):
+        order.append(("check", page))
+        return next(answers, None)
+
+    monkeypatch.setattr(run_boss_task_list, "REPO", tmp_path)
+    monkeypatch.setattr(run_boss_task_list, "cold_email_process_one", _fake_cold_email)
+    monkeypatch.setattr(run_boss_task_list, "inbox_process_one", _fake_inbox)
+    monkeypatch.setattr(run_boss_task_list, "checks_process_one", _fake_check)
+    monkeypatch.setattr(sys, "argv", ["run_boss_task_list.py", "--pace", "0", "--headless"])
+
+    run_boss_task_list.main()
+
+    assert [o[0] for o in order] == ["cold", "inbox", "check", "check", "check"]
+    assert len({id(o[1]) for o in order}) == 1
+    log = json.loads(next((tmp_path / "data" / "runs").glob("*.json")).read_text(encoding="utf-8"))
+    assert [r["answer"] for r in log["check_results"]] == ["yes", "unclear"]
 
 
 def test_no_limit_by_default_walks_until_none_in_both_phases(tmp_path, monkeypatch, fake_playwright):

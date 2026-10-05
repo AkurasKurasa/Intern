@@ -2,9 +2,10 @@
 components/inbox_router/run_boss_task_list.py
 ==================================================
 The single combined entry point for "everything the boss needs done":
-walks the boss' task list (Cold Email) and then works the WHOLE
-regular inbox (Reply/Forward/Schedule/Leave alone), in ONE real
-browser session -- one window, opened once, not two.
+walks the boss' task list (Cold Email), works the WHOLE regular inbox
+(Reply/Forward/Schedule/Leave alone), then answers the task list's
+checks (replies, topics, schedule) -- in ONE real browser session, one
+window, opened once.
 
 Direct requests, in order:
 1. "I need the boss' task list to contain all we need to do: cold
@@ -58,6 +59,7 @@ from automate_inbox import (
     _color, _BLUE, _RED, _BOLD,
 )
 from automate_cold_email import process_one as cold_email_process_one
+from automate_checks import open_checks_view, process_one as checks_process_one, POSITIVE
 from pointer import Pointer
 
 
@@ -92,6 +94,7 @@ def main() -> int:
 
     cold_email_results: list = []
     inbox_results: list = []
+    check_results: list = []
     with sync_playwright() as p:
         # Maximised, with the page filling the whole window, so every target
         # the pointer moves to is large and already on screen.
@@ -151,6 +154,22 @@ def main() -> int:
             print(f"\n  Browser closed unexpectedly during the inbox ({exc.__class__.__name__}) -- "
                   f"stopping here with what was already completed.")
 
+        # ---- Phase 3: the boss' checks, same page, same window ----------
+        # Last, so a reply check sees the mailbox as this run left it.
+        # Read-only in every mode -- nothing here drafts, sends or schedules.
+        banner(3, "Checks -- replies, topics, schedule")
+        try:
+            open_checks_view(page)
+            while args.limit is None or len(check_results) < args.limit:
+                result = checks_process_one(page, len(check_results), pointer=pointer)
+                if result is None:
+                    break
+                check_results.append(result)
+                time.sleep(args.pace)
+        except PlaywrightError as exc:
+            print(f"\n  Browser closed unexpectedly during the checks ({exc.__class__.__name__}) -- "
+                  f"stopping here with what was already completed.")
+
         try:
             if not args.headless:
                 page.wait_for_timeout(1500)
@@ -161,13 +180,17 @@ def main() -> int:
     if started_server is not None:
         started_server.terminate()
 
-    banner(3, "Combined Result")
+    banner(4, "Combined Result")
     drafted = sum(1 for r in cold_email_results if r["outcome"] == "drafted")
     confirmed = sum(1 for r in inbox_results if r["outcome"].startswith("confirmed"))
     print(f"  Cold Email   {_color(str(len(cold_email_results)), _BOLD)} walked, "
           f"{_color(str(drafted), _BLUE)} drafted")
     print(f"  Inbox        {_color(str(len(inbox_results)), _BOLD)} processed, "
           f"{_color(str(confirmed), _BLUE)} completed for real")
+    positive = sum(1 for r in check_results if r["answer"] in POSITIVE)
+    unclear = sum(1 for r in check_results if r["answer"] == "unclear")
+    print(f"  Checks       {_color(str(len(check_results)), _BOLD)} answered, "
+          f"{_color(str(positive), _BLUE)} yes/free, {unclear} unclear")
 
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     log_path = args.log or (REPO / "data" / "runs" / f"run_boss_task_list_{stamp}.json")
@@ -177,6 +200,7 @@ def main() -> int:
     log_path.write_text(json.dumps({
         "commit": args.commit, "processed_at": datetime.now(timezone.utc).isoformat(),
         "cold_email_results": cold_email_results, "inbox_results": inbox_results,
+        "check_results": check_results,
     }, indent=2), encoding="utf-8")
     print(f"  run log      {log_path.relative_to(REPO)}")
 

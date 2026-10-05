@@ -114,6 +114,34 @@ def build_cold_email_sender(gmail_client=None):
     return ColdEmailSender(gmail_client)
 
 
+class ChecksService:
+    """Answers the task list's "Check ..." lines on demand (checker.py).
+    Re-reads the task list and the mailbox on every request, so an edited
+    task_list.txt or newly arrived mail shows on the next Refresh without
+    restarting the server. Read-only: nothing here writes anything."""
+
+    def __init__(self, gmail_client, calendar_client, task_list_path=None):
+        self._gmail = gmail_client
+        self._calendar = calendar_client
+        self._path = task_list_path
+
+    def run_all(self) -> list:
+        from checker import run_check
+        from task_list_parser import DEFAULT_TASK_LIST_PATH, parse_check_tasks
+
+        tasks = parse_check_tasks(self._path or DEFAULT_TASK_LIST_PATH)
+        return [dict(run_check(t, self._gmail, self._calendar).to_dict(), index=i)
+                for i, t in enumerate(tasks)]
+
+
+def build_checks_service(gmail_client=None):
+    from calendar_client import get_calendar_client
+
+    if gmail_client is None:
+        gmail_client = get_gmail_client()
+    return ChecksService(gmail_client, get_calendar_client())
+
+
 def _parse_action_body(body: bytes, required_keys) -> Tuple[dict, tuple]:
     """Parse a POST body as JSON and confirm it has every key in
     required_keys. Returns (data, None) on success, or (None, error_tuple)
@@ -130,7 +158,7 @@ def _parse_action_body(body: bytes, required_keys) -> Tuple[dict, tuple]:
 
 
 def handle_request(method: str, path: str, body: bytes, router: InboxRouter, origin: str = None,
-                    cold_email_sender=None) -> Tuple[int, dict, bytes, str]:
+                    cold_email_sender=None, checks_service=None) -> Tuple[int, dict, bytes, str]:
     """Pure request handler, separated from BaseHTTPRequestHandler so it's
     testable without opening a real socket. Returns
     (status_code, extra_headers, response_body_bytes, content_type)."""
@@ -273,10 +301,21 @@ def handle_request(method: str, path: str, body: bytes, router: InboxRouter, ori
             return 400, {}, err, "application/json"
         return 200, {}, json.dumps({"ok": True}).encode("utf-8"), "application/json"
 
+    if method == "GET" and path == "/checks/api/list":
+        if checks_service is None:
+            err = json.dumps({"error": "Checks are not available on this server."}).encode("utf-8")
+            return 503, {}, err, "application/json"
+        try:
+            checks = checks_service.run_all()
+        except Exception as exc:
+            err = json.dumps({"error": f"Could not run checks: {exc}"}).encode("utf-8")
+            return 500, {}, err, "application/json"
+        return 200, {}, json.dumps({"checks": checks}).encode("utf-8"), "application/json"
+
     return 404, {}, json.dumps({"error": "Not found"}).encode("utf-8"), "application/json"
 
 
-def make_handler(router: InboxRouter, cold_email_sender=None):
+def make_handler(router: InboxRouter, cold_email_sender=None, checks_service=None):
     class Handler(BaseHTTPRequestHandler):
         def log_message(self, format, *args):
             pass  # keep stdout quiet -- this is a background helper process
@@ -291,7 +330,8 @@ def make_handler(router: InboxRouter, cold_email_sender=None):
 
         def _respond(self, method, path, body, origin=None):
             status, headers, payload, content_type = handle_request(
-                method, path, body, router, origin=origin, cold_email_sender=cold_email_sender)
+                method, path, body, router, origin=origin, cold_email_sender=cold_email_sender,
+                checks_service=checks_service)
             self.send_response(status)
             self.send_header("Content-Type", content_type)
             for k, v in headers.items():
@@ -318,7 +358,8 @@ def serve(port: int = DEFAULT_PORT) -> None:
     gmail_client = get_gmail_client()
     router = build_router(gmail_client)
     cold_email_sender = build_cold_email_sender(gmail_client)
-    httpd.RequestHandlerClass = make_handler(router, cold_email_sender)
+    checks_service = build_checks_service(gmail_client)
+    httpd.RequestHandlerClass = make_handler(router, cold_email_sender, checks_service)
     httpd.serve_forever()
 
 

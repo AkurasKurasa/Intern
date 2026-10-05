@@ -1,4 +1,31 @@
-Cold email:
+Cold email: Partnership intro - automating data entry for your team
 Dana Whitfield <dana.whitfield@northline.example.com>
 Marcus Oyelaran <m.oyelaran@delridge.example.com>
 Priya Ramaswami <priya@ramaswami-consulting.example.com>
+Hannah Cole <hannah.cole@brightpath.example.com>
+
+Cold email: Following up from the InsurTech Summit
+Tomas Lindqvist <tomas@lindqvist-advisory.example.com>
+Grace Okafor <g.okafor@meridianmutual.example.com>
+Ethan Park <ethan.park@harborline.example.com>
+
+Cold email: Introducing our claims-intake service
+Sofia Marchetti <sofia.marchetti@vantagebrokers.example.com>
+Daniel Reyes-Ortiz <d.reyesortiz@clearwater-ins.example.com>
+Aisha Rahman <aisha@rahmanpartners.example.com>
+
+Check replies:
+Dana Whitfield <dana.whitfield@northline.example.com>
+Marcus Oyelaran <m.oyelaran@delridge.example.com>
+Hannah Cole <hannah.cole@brightpath.example.com>
+Tomas Lindqvist <tomas@lindqvist-advisory.example.com>
+Grace Okafor <g.okafor@meridianmutual.example.com>
+Sofia Marchetti <sofia.marchetti@vantagebrokers.example.com>
+
+Check inbox: invoice
+Check inbox: contract renewal
+Check inbox: purchase order
+
+Check schedule: October 14th at 2pm
+Check schedule: October 16th at 10am
+Check schedule: next Friday

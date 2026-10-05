@@ -377,6 +377,48 @@
         "INBOX",
         "UNREAD"
       ]
+    },
+    {
+      "id": "mock-311",
+      "thread_id": "thread-311",
+      "sender": "Hannah Cole <hannah.cole@brightpath.example.com>",
+      "sender_email": "hannah.cole@brightpath.example.com",
+      "subject": "Re: Partnership intro - automating data entry for your team",
+      "snippet": "Thanks for reaching out - this is timely for us.",
+      "body_text": "Hi,\n\nThanks for reaching out - this is timely for us. Our intake team re-keys a lot of forms by hand. Could you send a short overview of how the pilot works and what you'd need from our side?\n\nBest,\nHannah",
+      "received_at": "2026-10-02T10:20:00-07:00",
+      "labels": [
+        "INBOX",
+        "UNREAD"
+      ]
+    },
+    {
+      "id": "mock-312",
+      "thread_id": "thread-312",
+      "sender": "Grace Okafor <g.okafor@meridianmutual.example.com>",
+      "sender_email": "g.okafor@meridianmutual.example.com",
+      "subject": "Re: Following up from the InsurTech Summit",
+      "snippet": "Good to hear from you. Could we do a call on October 14th at 2pm?",
+      "body_text": "Hi,\n\nGood to hear from you after the Summit. Happy to talk - could we do a 30-minute call on October 14th at 2pm?\n\nRegards,\nGrace",
+      "received_at": "2026-10-03T08:05:00-07:00",
+      "labels": [
+        "INBOX",
+        "UNREAD"
+      ]
+    },
+    {
+      "id": "mock-313",
+      "thread_id": "thread-313",
+      "sender": "Priya Raman <priya.raman@vendorco.com>",
+      "sender_email": "priya.raman@vendorco.com",
+      "subject": "October invoice attached",
+      "snippet": "Please find the October invoice attached.",
+      "body_text": "Hi,\n\nPlease find the October invoice attached. Payment terms are unchanged from the current contract.\n\nThanks,\nPriya",
+      "received_at": "2026-10-04T09:30:00-07:00",
+      "labels": [
+        "INBOX",
+        "UNREAD"
+      ]
     }
   ],
   "sent": [

@@ -73,3 +73,74 @@ def parse_cold_email_targets(path: str = DEFAULT_TASK_LIST_PATH) -> List[ColdEma
             name, email = target_match.group(1).strip(), target_match.group(2).strip()
             targets.append(ColdEmailTarget(name=name, email=email, context_line=context_line))
     return targets
+
+
+# ---------------------------------------------------------------- checks
+#
+# Direct request (2026-10-05): "Add more tasks for the Scope #3, more cold
+# emails and general checking." Three kinds of check, each written as a
+# plain line the boss can type, parsed by the same never-guess rules as
+# Cold email above -- a line that does not match is skipped, never
+# interpreted:
+#
+#     Check replies:                      did these people write back?
+#     Name <email@example.com>
+#
+#     Check inbox: <topic words>          any mail about this?
+#     Check schedule: <date and time>     am I free then?
+#
+# The topic and the time are kept as the literal text the boss wrote;
+# checker.py decides what they mean, with rules, and says "unclear" rather
+# than guessing when it cannot.
+
+CHECK_REPLY = "reply"
+CHECK_TOPIC = "topic"
+CHECK_SCHEDULE = "schedule"
+
+_CHECK_REPLIES_RE = re.compile(r"^Check replies:\s*$", re.IGNORECASE)
+_CHECK_INLINE_RE = re.compile(r"^Check (inbox|schedule):\s*(\S.*)$", re.IGNORECASE)
+
+
+@dataclass
+class CheckTask:
+    kind: str           # CHECK_REPLY / CHECK_TOPIC / CHECK_SCHEDULE
+    query: str          # the topic or time as written; the email for a reply check
+    name: str = ""      # reply checks only
+
+    @property
+    def label(self) -> str:
+        if self.kind == CHECK_REPLY:
+            return f"Did {self.name} reply?"
+        if self.kind == CHECK_TOPIC:
+            return f"Any mail about \"{self.query}\"?"
+        return f"Am I free {self.query}?"
+
+
+def parse_check_tasks(path: str = DEFAULT_TASK_LIST_PATH) -> List[CheckTask]:
+    """Every check on the task list, in the order written."""
+    if not os.path.isfile(path):
+        return []
+    tasks: List[CheckTask] = []
+    in_replies = False
+    with open(path, "r", encoding="utf-8") as f:
+        for raw_line in f:
+            stripped = raw_line.strip()
+            if _CHECK_REPLIES_RE.match(stripped):
+                in_replies = True
+                continue
+            inline = _CHECK_INLINE_RE.match(stripped)
+            if inline:
+                in_replies = False
+                kind = CHECK_TOPIC if inline.group(1).lower() == "inbox" else CHECK_SCHEDULE
+                tasks.append(CheckTask(kind=kind, query=inline.group(2).strip()))
+                continue
+            if not stripped or _ANY_HEADING_RE.match(stripped) or _HEADING_RE.match(stripped):
+                in_replies = False
+                continue
+            if not in_replies:
+                continue
+            target = _TARGET_RE.match(stripped)
+            if target:
+                tasks.append(CheckTask(kind=CHECK_REPLY, query=target.group(2).strip(),
+                                       name=target.group(1).strip()))
+    return tasks

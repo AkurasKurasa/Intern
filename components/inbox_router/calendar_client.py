@@ -44,6 +44,13 @@ class CalendarClientBase(ABC):
         time -- never with a blank date."""
         ...
 
+    def list_events(self, start_iso: str, end_iso: str) -> list:
+        """Events overlapping [start, end), as dicts with summary/start/end.
+        Read-only -- what a "Check schedule:" task looks at. Not abstract,
+        so an older client (or a test fake) that never reads the calendar
+        keeps working; callers treat NotImplementedError as "cannot tell"."""
+        raise NotImplementedError
+
 
 class MockCalendarClient(CalendarClientBase):
     """Backs onto a gitignored generated file (mock_calendar_events.json),
@@ -67,6 +74,12 @@ class MockCalendarClient(CalendarClientBase):
         with open(self._events_path, "w", encoding="utf-8") as f:
             json.dump({"events": events}, f, indent=2)
         return event_id
+
+    def list_events(self, start_iso: str, end_iso: str) -> list:
+        # Same-format ISO strings ("YYYY-MM-DDTHH:MM") compare correctly as
+        # text, the convention MockGmailClient.list_sent already relies on.
+        return [e for e in self._load_events()
+                if e.get("start", "") < end_iso and e.get("end", e.get("start", "")) > start_iso]
 
     def _load_events(self) -> list:
         if not os.path.exists(self._events_path):
@@ -126,6 +139,16 @@ class RealCalendarClient(CalendarClientBase):
             },
         ).execute()
         return event["id"]
+
+    def list_events(self, start_iso: str, end_iso: str) -> list:
+        items = self._service.events().list(
+            calendarId="primary", timeMin=_to_rfc3339(start_iso), timeMax=_to_rfc3339(end_iso),
+            singleEvents=True, orderBy="startTime",
+        ).execute().get("items", [])
+        return [{"event_id": e.get("id", ""), "summary": e.get("summary", ""),
+                 "start": e.get("start", {}).get("dateTime", e.get("start", {}).get("date", "")),
+                 "end": e.get("end", {}).get("dateTime", e.get("end", {}).get("date", ""))}
+                for e in items]
 
 
 def get_calendar_client(root: str = _THIS_DIR) -> CalendarClientBase:

@@ -1079,6 +1079,18 @@ waiting on them.
 
   Full suite: 1625 passed, 9 skipped, 0 failed (1 known-flaky, unrelated `test_ghost_overlay.py` failure during the concurrent run, confirmed transient in isolation immediately after -- same pattern documented earlier this session).
 
+- [x] `scope3_more_cold_emails_and_checks` -- 2026-10-05, direct request: 'Add more tasks for the Scope #3, more cold emails and general checking.' The user chose all three kinds of checking (replies, inbox topic, schedule) plus more test data, and ~10 cold-email people in 3 sections.
+
+  MORE COLD EMAILS: data/task_list.txt grew from 1 section / 3 people to 3 sections / 10 people, each section with its own context line (it pre-fills the subject).
+
+  CHECKS -- DECISIONS: (1) New task-list lines, parsed by the same never-guess rules as Cold email (task_list_parser.parse_check_tasks): 'Check replies:' + Name <email> lines, 'Check inbox: <topic>', 'Check schedule: <date and time>'. Check lines can never become cold-email targets (tested). (2) Answered by rules, not an LLM (new checker.py): reply = any inbox mail from that address; topic = every topic word (filler dropped) appears in subject+body; schedule = schedule_extract reads the time (needs a date AND a clock time, as the schedule flow already requires), then the calendar is read for a 30-minute slot. Every answer carries its evidence (the emails/events). Anything that cannot be read literally -- 'next Friday', a calendar that cannot be listed -- is 'unclear', never a guess. (3) Read-only by construction: checks never draft, send, label or schedule (a test compares the data files byte-for-byte before and after). (4) Same reach as Cold Email: a Checks list/detail view in the Inbox Dispatch page with no nav button (the user's earlier no-tab decision for Cold Email), served by GET /checks/api/list, which re-reads the task list and mailbox per request. (5) run_boss_task_list.py gained Phase 3, after the inbox, so a reply/schedule check sees the mailbox and calendar as the run left them -- e.g. Grace's new email proposes Oct 14 2pm; if the inbox phase schedules it, that check turns from free to busy in the same run. Needed: calendar clients gained a read-only list_events() (mock + real Google Calendar); the base method is not abstract so existing write-only fakes keep working.
+
+  TEST DATA: mock_inbox.json gained replies from 2 of the new cold-email people (Hannah Cole, Grace Okafor) and an October invoice, so reply checks give yes AND no, topic checks find and miss.
+
+  TESTS: tests/test_inbox_checks.py (13) -- unit (parser kinds/order/junk, no leakage into cold targets, the real task list's shape, every answer kind, newest-first evidence, overlap at a slot edge, unreadable calendar -> unclear, nothing written, filler words), integration (the server route on a real mock mailbox; 503 without a service), E2E (a real headless Chromium on the real page walks every check with automate_checks.process_one). tests/test_run_boss_task_list.py: checks run last, on the same page, into the run log. 364 Scope #3 tests pass.
+
+  NEXT (user, same day): redo the Scope #3 UI -- the Checks view is deliberately plain until then.
+
 - [ ] `scope3_email_triage` *(superseded framing — predates the concrete
   shape above)*: the very original bare stub, a GUI-demonstration-based
   triage system (watch UIA/screen state the way Scope #1/#2 do). Still a
