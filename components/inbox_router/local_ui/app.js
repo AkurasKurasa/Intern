@@ -122,6 +122,14 @@ function _playActionBurst(container) {
 
 async function loadInbox() {
   detailStatus.textContent = "";
+  // The server sorts every new email before it answers -- after Launch
+  // resets the practice data that is all 30, about 45 s. Say so, instead of
+  // a blank list that reads as "no emails" (found 2026-10-05).
+  if (pendingEmails.length === 0) {
+    rowList.innerHTML = "";
+    emptyState.hidden = false;
+    emptyState.textContent = "Intern is sorting your inbox... This can take up to a minute right after Launch.";
+  }
   try {
     const resp = await fetch("/api/inbox");
     if (!resp.ok) throw new Error(`Server returned ${resp.status}`);

@@ -1123,6 +1123,14 @@ waiting on them.
 
   TESTS: tests/test_inbox_demo_reset.py (7) -- every consumable restored, learned files byte-identical, backup made first, missing files left missing, integration with the real mock Gmail client and cold-email sender (all emails waiting, targets back), real-Gmail detection, and Launch order reset -> server -> window with the reset skipped under real Gmail.
 
+- [x] `scope3_first_sort_after_reset_looked_empty` -- 2026-10-05, reported right after the reset shipped: 'There are no pending emails whatsoever'. Measured from routed_history.json, not guessed: Launch reset at 22:48:43; the server then re-sorted all 27 restored emails one by one (fast_fill/rule instantly, the LLM for the harder ones) from 22:49:15 to 22:50:00 -- ~45 s during which the page showed nothing useful -- and afterwards the inbox server was no longer running. Why it stopped could not be confirmed: Electron spawned it with stdio 'ignore', so there was no trace. Restarted by hand: 27 pending, answering instantly.
+
+  DECISIONS: (1) the page says 'Intern is sorting your inbox...' while the first load is in flight, instead of a blank list that reads as 'no emails'; (2) Electron now writes the server's output to logs/inbox_server.log, so the next stop is diagnosable; (3) Play's wait for the inbox load (automate_inbox.py and run_boss_task_list.py) raised from 60 s to 180 s (INBOX_LOAD_TIMEOUT_MS) -- 45 s measured, more with a slow LLM, and a timeout there skips the entire inbox phase.
+
+  OPEN: the cause of the server stopping (now logged); the ~45 s first sort itself (speed).
+
+  TESTS: tests/test_inbox_sorting_wait.py (3) -- real page against a deliberately slow server shows the sorting message then the emails; Play waits >= 180 s; Electron keeps the server output. Scope #3: 407 passed.
+
 - [ ] `scope3_email_triage` *(superseded framing — predates the concrete
   shape above)*: the very original bare stub, a GUI-demonstration-based
   triage system (watch UIA/screen state the way Scope #1/#2 do). Still a

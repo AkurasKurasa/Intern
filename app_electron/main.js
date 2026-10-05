@@ -248,8 +248,17 @@ async function ensureLocalServerRunning(scriptPath, url) {
   }
   const pythonExe = resolvePython();
   const fullPath = path.join(REPO_ROOT, scriptPath);
-  localServerProcess = spawn(pythonExe, [fullPath], {
-    cwd: REPO_ROOT, detached: true, stdio: "ignore", windowsHide: true,
+  // Output goes to logs/inbox_server.log, not "ignore": found 2026-10-05,
+  // the server stopped mid-demo and there was no trace of why.
+  let out = "ignore";
+  try {
+    fs.mkdirSync(path.join(REPO_ROOT, "logs"), { recursive: true });
+    out = fs.openSync(path.join(REPO_ROOT, "logs", "inbox_server.log"), "a");
+  } catch (e) {
+    out = "ignore";
+  }
+  localServerProcess = spawn(pythonExe, ["-u", fullPath], {
+    cwd: REPO_ROOT, detached: true, stdio: ["ignore", out, out], windowsHide: true,
   });
   localServerProcess.unref();
 }

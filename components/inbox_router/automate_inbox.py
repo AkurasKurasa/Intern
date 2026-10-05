@@ -64,6 +64,7 @@ from schedule_extract import extract_event_time
 # up and curl reaches it instantly. Using the literal IP removes the
 # resolution step, and therefore the ambiguity, entirely.
 SERVER_URL = "http://127.0.0.1:8765/"
+INBOX_LOAD_TIMEOUT_MS = 180_000
 RULE = "-" * 74
 
 # os.system("") is a well-known, dependency-free trick that forces the
@@ -425,8 +426,12 @@ def main():
         # wait raced ahead of the real response and read an empty list.
         # Wait for the actual response the click causes instead of
         # guessing how long it takes.
+        # 3 minutes, not 1: the server sorts every new email before it
+        # answers, and right after Launch's reset that is all 30 (~45 s
+        # measured, more with a slow LLM) -- a 60 s wait could time out and
+        # skip the whole inbox phase.
         with page.expect_response(lambda r: "/api/inbox" in r.url and r.request.method == "GET",
-                                   timeout=60_000):
+                                   timeout=INBOX_LOAD_TIMEOUT_MS):
             pointer.click("#toolbarRefreshBtn")
         page.wait_for_timeout(200)  # let the synchronous DOM render after the fetch settle
 

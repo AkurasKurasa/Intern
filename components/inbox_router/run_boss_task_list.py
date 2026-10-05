@@ -55,7 +55,7 @@ if str(REPO) not in sys.path:
 
 from automate_inbox import (
     ensure_server_running, print_countdown, banner, SERVER_URL,
-    MODE_LABELS, set_decision_mode,
+    MODE_LABELS, set_decision_mode, INBOX_LOAD_TIMEOUT_MS,
     process_one as inbox_process_one,
     _color, _BLUE, _RED, _BOLD,
 )
@@ -144,8 +144,12 @@ def main() -> int:
         # same as automate_inbox.py's own main() does on its own.
         banner(2, "Regular Inbox -- Reply / Forward / Schedule / Leave alone")
         page.evaluate("setView('inbox')")
+        # 3 minutes, not 1: the server sorts every new email before it
+        # answers, and right after Launch's reset that is all 30 (~45 s
+        # measured, more with a slow LLM) -- a 60 s wait could time out and
+        # skip the whole inbox phase.
         with page.expect_response(lambda r: "/api/inbox" in r.url and r.request.method == "GET",
-                                   timeout=60_000):
+                                   timeout=INBOX_LOAD_TIMEOUT_MS):
             pointer.click("#toolbarRefreshBtn")
         page.wait_for_timeout(200)
 
