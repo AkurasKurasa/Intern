@@ -55,6 +55,7 @@ if str(REPO) not in sys.path:
 
 from automate_inbox import (
     ensure_server_running, print_countdown, banner, SERVER_URL,
+    MODE_LABELS, set_decision_mode,
     process_one as inbox_process_one,
     _color, _BLUE, _RED, _BOLD,
 )
@@ -82,6 +83,9 @@ def main() -> int:
                     help="for 'reply'/'forward' inbox decisions, generate real text via LM Studio and "
                          "draft it for real -- see automate_inbox.py's own --help for the full contract. "
                          "Has no effect on the Cold Email phase, which already always drafts under --commit.")
+    ap.add_argument("--mode", choices=list(MODE_LABELS), default="hybrid",
+                    help="how the inbox phase decides each email (same as automate_inbox.py --mode); "
+                         "the Electron Play button asks for it")
     ap.add_argument("--log", type=Path, default=None,
                     help="where to write the combined run log (default: data/runs/)")
     args = ap.parse_args()
@@ -92,6 +96,14 @@ def main() -> int:
     print_countdown(message="Starting the boss' full task list -- one browser: Cold Email, then the whole inbox.")
 
     started_server = ensure_server_running()
+    # Same as automate_inbox.py: tell the server how to decide, before the
+    # inbox phase reads any decision. This entry point is what Electron's
+    # Play runs for Inbox Dispatch (direct request 2026-10-05: "Always
+    # everything"), so the mode the user picks has to reach it.
+    print(f"  deciding  {MODE_LABELS[args.mode]}")
+    redecided = set_decision_mode(args.mode)
+    if redecided:
+        print(f"            re-decided {redecided} pending email(s) under this mode")
 
     cold_email_results: list = []
     inbox_results: list = []

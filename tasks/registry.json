@@ -39,7 +39,7 @@
     },
     {
       "name": "Inbox Dispatch",
-      "description": "Intern reads each pending email off the real page and clicks the real decision itself (Scope #3)",
+      "description": "Intern works through the boss' whole task list in one window: drafts the cold emails, decides and acts on every inbox email, then answers the checks (replies, topics, schedule) (Scope #3)",
       "model_path": "",
       "trigger_keywords": [],
       "trigger_apps": [],
@@ -47,7 +47,7 @@
       "created": "2026-08-23T00:00:00",
       "emoji": "\ud83d\udcec",
       "kind": "script",
-      "entrypoint": "components/inbox_router/automate_inbox.py",
+      "entrypoint": "components/inbox_router/run_boss_task_list.py",
       "args": [
         "--commit"
       ],

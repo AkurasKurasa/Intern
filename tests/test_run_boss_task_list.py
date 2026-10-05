@@ -104,6 +104,8 @@ def fake_playwright(monkeypatch):
     # Phase 3 (checks) reads rows the fake page cannot produce; default it
     # to "no checks" so the tests above keep exercising phases 1-2 only.
     monkeypatch.setattr(run_boss_task_list, "checks_process_one", lambda *a, **kw: None)
+    # The mode is posted to the live inbox server; these tests have none.
+    monkeypatch.setattr(run_boss_task_list, "set_decision_mode", lambda mode: 0)
     return browser
 
 
@@ -253,3 +255,26 @@ def test_a_crash_in_cold_email_still_lets_the_inbox_phase_run(tmp_path, monkeypa
     run_boss_task_list.main()  # must not raise
 
     assert len(inbox_calls) == 1  # the inbox phase still ran
+
+
+def test_play_runs_the_whole_task_list_with_the_chosen_mode(tmp_path, monkeypatch, fake_playwright):
+    """Direct request 2026-10-05: Play on Inbox Dispatch must run everything
+    (cold emails, inbox, checks) -- before, it ran only the inbox step, so
+    the cold emails and checks never happened in a demo. The decision-mode
+    choice Play asks for must reach the inbox phase."""
+    import json
+    from pathlib import Path
+    modes = []
+    monkeypatch.setattr(run_boss_task_list, "set_decision_mode", lambda mode: modes.append(mode) or 0)
+    monkeypatch.setattr(run_boss_task_list, "REPO", tmp_path)
+    monkeypatch.setattr(run_boss_task_list, "cold_email_process_one", lambda *a, **k: None)
+    monkeypatch.setattr(run_boss_task_list, "inbox_process_one", lambda *a, **k: None)
+    monkeypatch.setattr(sys, "argv", ["run_boss_task_list.py", "--pace", "0", "--headless", "--mode", "habits"])
+    run_boss_task_list.main()
+    assert modes == ["habits"]
+
+    registry = json.loads((Path(_ROOT) / "tasks" / "registry.json").read_text(encoding="utf-8"))
+    caps = registry if isinstance(registry, list) else registry.get("capsules", registry)
+    caps = caps if isinstance(caps, list) else list(caps.values())
+    inbox = next(c for c in caps if c["name"] == "Inbox Dispatch")
+    assert inbox["entrypoint"] == "components/inbox_router/run_boss_task_list.py"

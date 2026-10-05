@@ -1105,6 +1105,14 @@ waiting on them.
 
   FOLLOW-UP, same day: automate_inbox.py located rows with a page-wide '.row-item', but the Cold Email phase leaves its hidden rows on the same page, so once the inbox ran out Play could try to click a hidden cold-email row and stall. DECISION: rows come from '#rowList .row-item' only (guard: test_play_only_picks_rows_from_the_inbox_list). Also: a UI redesign was started here without agreement and reverted at the user's request ('We were gonna design the UI together') -- kept only as a local git stash; the Scope #3 UI is to be designed together, not yet decided.
 
+- [x] `scope3_play_runs_whole_task_list` -- 2026-10-05, reported by the user: 'Scope #3 is a bit lackluster, did you finish what I asked you to do?' Honest answer: not for the demo. The new cold emails and checks only ran from a terminal (run_boss_task_list.py); Electron's Play on Inbox Dispatch ran automate_inbox.py, the inbox step alone, so in a demo none of the new work happened.
+
+  DECISION (user chose 'Always everything' over asking each time): the Inbox Dispatch capsule's entrypoint is now run_boss_task_list.py -- cold emails, then the inbox, then the checks, in the window Launch opened. run_boss_task_list.py gained --mode (habits / hybrid / reasoning), posted to the server exactly like automate_inbox.py does, so the decision-mode question Play already asks still reaches the inbox phase.
+
+  TEST: test_play_runs_the_whole_task_list_with_the_chosen_mode -- the chosen mode reaches set_decision_mode, and the registry points Play at the full run.
+
+  STILL OPEN for the demo: resetting the demo data (27 of 30 mock emails already handled; contacted cold-email targets drop off the list) -- asked the user how; the Agent window and the inbox page UI -- to be designed together.
+
 - [ ] `scope3_email_triage` *(superseded framing — predates the concrete
   shape above)*: the very original bare stub, a GUI-demonstration-based
   triage system (watch UIA/screen state the way Scope #1/#2 do). Still a
