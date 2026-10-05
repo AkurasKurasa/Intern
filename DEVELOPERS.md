@@ -1141,6 +1141,14 @@ waiting on them.
 
   TESTS: tests/test_inbox_unified_notepad.py (7).
 
+- [x] `scope3_cold_email_signed_as_sender` -- 2026-10-05, direct request: 'Put [My Name] as Kevin'. Found in the saved drafts (mock_drafts.json): the cold-email LLM wrote '[Your Name]', '[Your Full Name]', '[Your Company]', or invented a sender ('Alex Thompson', 'GreenTech Solutions') -- it was never told who is writing.
+
+  DECISIONS: (1) the sender's name is a setting, data/sender_profile.json {"name": "Kevin"}, not code; (2) the prompt says the email is written on behalf of that person, signed with that name, and forbids placeholders and invented names, companies, titles or facts; (3) safety net -- a name placeholder that still slips through ([Your Name], [My Name], [Your Full Name]) is filled with the real name; any other bracketed blank (e.g. [Your Company]) gets one retry, then the draft is refused and the person is left for a human, rather than saving a draft with a hole in it (same never-invent rule as the rest of Scope #3). Reply/forward prompts already say 'no signature block' and were not changed.
+
+  Live check against LM Studio (qwen2.5-7b): two real drafts, both signed 'Kevin', no placeholders.
+
+  TESTS: tests/test_cold_email_llm.py +5 -- prompt names the sender, name placeholders filled, other blanks retried then refused, a clean retry accepted, the real profile says Kevin.
+
 - [ ] `scope3_email_triage` *(superseded framing — predates the concrete
   shape above)*: the very original bare stub, a GUI-demonstration-based
   triage system (watch UIA/screen state the way Scope #1/#2 do). Still a

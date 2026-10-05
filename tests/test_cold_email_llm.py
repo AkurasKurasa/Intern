@@ -119,3 +119,58 @@ def test_generate_cold_email_fails_closed_when_lm_studio_is_unreachable(monkeypa
     monkeypatch.setattr(openai, "OpenAI", _boom)
 
     assert cold_email_llm.generate_cold_email("Dana Whitfield", "Q3 outreach") == ("", "")
+
+
+# ── who is writing (2026-10-05: "Put [My Name] as Kevin") ────────────────
+
+import json  # noqa: E402
+
+
+def _profile(tmp_path, name="Kevin"):
+    p = tmp_path / "sender_profile.json"
+    p.write_text(json.dumps({"name": name}), encoding="utf-8")
+    return str(p)
+
+
+def test_the_prompt_names_the_sender_and_forbids_placeholders(tmp_path):
+    seen = {}
+
+    def ask(system, user):
+        seen["system"] = system
+        return "Subject: Hi\nHello Ann,\nShort note.\nBest,\nKevin"
+
+    cold_email_llm.generate_cold_email("Ann", "Intro", profile_path=_profile(tmp_path), ask=ask)
+    assert "on behalf of Kevin" in seen["system"]
+    assert "[Your Name]" in seen["system"]          # named as forbidden
+    assert "never invent" in seen["system"]
+
+
+def test_name_placeholders_are_filled_with_the_real_name(tmp_path):
+    reply = "Subject: Hello from [Your Name]\nHi Ann,\nI'm [My Name].\nBest,\n[Your Full Name]"
+    subject, body = cold_email_llm.generate_cold_email(
+        "Ann", "Intro", profile_path=_profile(tmp_path), ask=lambda s, u: reply)
+    assert subject == "Hello from Kevin"
+    assert body == "Hi Ann,\nI'm Kevin.\nBest,\nKevin"
+
+
+def test_other_blanks_get_one_retry_then_the_draft_is_refused(tmp_path):
+    calls = []
+
+    def ask(system, user):
+        calls.append(user)
+        return "Subject: Hi\nI work at [Your Company].\nKevin"
+
+    assert cold_email_llm.generate_cold_email(
+        "Ann", "Intro", profile_path=_profile(tmp_path), ask=ask) == ("", "")
+    assert len(calls) == 2 and "square-bracket" in calls[1]
+
+
+def test_a_clean_retry_is_accepted(tmp_path):
+    replies = iter(["Subject: Hi\nI work at [Your Company].", "Subject: Hi\nA short note.\nKevin"])
+    assert cold_email_llm.generate_cold_email(
+        "Ann", "Intro", profile_path=_profile(tmp_path), ask=lambda s, u: next(replies)) \
+        == ("Hi", "A short note.\nKevin")
+
+
+def test_real_profile_says_kevin():
+    assert cold_email_llm.sender_name() == "Kevin"
