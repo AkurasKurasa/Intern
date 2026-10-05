@@ -91,6 +91,7 @@ Thesis.docx
 # regenerable, invalidated whenever the underlying sentence-transformer
 # model or feature set changes.
 components/scope2/data/cache/
+components/scope2/data/workspace_profile/
 
 # Excel's own transient lock file, created whenever a workbook is open --
 # appears now that the Play panel's "Test" section can open grade_sheet.xlsx.

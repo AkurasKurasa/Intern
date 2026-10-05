@@ -38,6 +38,7 @@ from executor.scanner import (  # noqa: E402
     header_index, variant_url,
 )
 from executor.sheet_reader import read_sheet  # noqa: E402
+from executor import workspace  # noqa: E402
 
 RUNS_DIR = REPO / "data" / "runs"
 
@@ -486,11 +487,22 @@ def run(variant, mapping_path, dry_run=True, base_url=None, limit=None,
         # `show` is for demonstrating the result to a person: the portal has no
         # backend, so once the browser closes the filled sheet is gone. Holding
         # the window open is the only way to look at it.
-        browser = p.chromium.launch(
-            executable_path=str(CHROMIUM) if CHROMIUM.exists() else None,
-            headless=not show,
-        )
-        page = browser.new_page(no_viewport=True) if show else browser.new_page()
+        #
+        # Under `show`, the window the user opened with Launch (Test Tools)
+        # is the one to work in -- direct request, so Play never opens a
+        # second portal beside it. None open: launch our own, as before.
+        # A measurement run (show=False) never attaches, so it stays
+        # headless and isolated from whatever the user has on screen.
+        attached = workspace.attach(p) if show else None
+        if attached:
+            browser, page = attached
+            print("  working in the portal window you opened")
+        else:
+            browser = p.chromium.launch(
+                executable_path=str(CHROMIUM) if CHROMIUM.exists() else None,
+                headless=not show,
+            )
+            page = browser.new_page(no_viewport=True) if show else browser.new_page()
         try:
             url = variant_url(variant, base_url)
             descriptors = group_columns(extract_contexts(page, url))
@@ -621,7 +633,11 @@ def run(variant, mapping_path, dry_run=True, base_url=None, limit=None,
                     "() => window.__portal ? window.__portal.records : []"
                 )
 
-            if show:
+            if show and attached:
+                # The user's own window: it stays open by itself once we
+                # disconnect, so there is nothing to wait for.
+                print("\n  The filled portal is on screen in your window.")
+            elif show:
                 print("\n  The filled portal is on screen - scroll through it.")
                 print("  Press Enter here to close it...")
                 try:
@@ -663,6 +679,8 @@ def run(variant, mapping_path, dry_run=True, base_url=None, limit=None,
                           " or until Stop is pressed)")
                     time.sleep(600)
         finally:
+            # Launched: closes our browser. Attached over CDP: only
+            # disconnects, leaving the user's window and its tab as they are.
             browser.close()
 
     return log

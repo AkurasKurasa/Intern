@@ -889,19 +889,21 @@ const FORM_FILLING_TOOLS = (intakeFile) => [
 const TEST_MOCKUPS = {
   form_filling: FORM_FILLING_TOOLS("data_entry_intake.txt"),
 
-  // Scope #2 gets the SOURCE only -- the spreadsheet the run reads from.
+  // Scope #2: the spreadsheet the run reads from AND the portal it fills --
+  // the same window Play then works in.
   //
-  // The mock portal used to be opened here too, and that was the bug: Play
-  // runs automate.py with --show, which opens its OWN Playwright browser on
-  // the portal. Opening it here as well left two browser windows showing the
-  // same page, and the one this button opened was the dead one -- the agent
-  // never touches it. Reported directly: "launch test tools is opened and then
-  // when 'play' button is clicked another one is opened".
-  //
-  // The spreadsheet is the half Play does NOT open, so it is the half worth
-  // having a button for.
+  // History: the portal was once opened here with shell.openExternal, and
+  // Play's automate.py --show opened its OWN Playwright browser beside it, so
+  // the window this button opened was a dead one ("another one is opened").
+  // Dropping the portal from here fixed the duplicate but left Launch showing
+  // only Excel. Direct request: "When I press Launch Mockups I want that
+  // specific part to where the Agent will work over once I click Play."
+  // open_workspace.py starts Chromium with a DevTools port; the runner
+  // attaches to it over CDP (components/scope2/executor/workspace.py), so
+  // there is one portal window and it is the one the agent fills.
   "Sheet-to-Portal Matcher": [
     { type: "open", target: path.join(REPO_ROOT, "components", "scope2", "data", "sheets", "grade_sheet.xlsx") },
+    { type: "python", script: path.join(REPO_ROOT, "components", "scope2", "open_workspace.py") },
   ],
 };
 
