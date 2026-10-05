@@ -249,7 +249,7 @@ def process_one(page, commit: bool, index: int, skipped: int = 0, dwell_ms: int 
     # disabled Pointer falls back to Playwright's own invisible click.
     pointer = pointer or Pointer(page, enabled=False)
     row_index = skipped if commit else index
-    row = page.locator(".row-item").nth(row_index)
+    row = page.locator("#rowList .row-item").nth(row_index)
     if row.count() == 0:
         return None
 

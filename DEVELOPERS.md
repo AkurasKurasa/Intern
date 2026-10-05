@@ -1103,6 +1103,8 @@ waiting on them.
 
   TESTS: tests/test_inbox_workspace.py (15: shared helpers, main-page vs practice vs other server, separate ports, blank-then-tab launch, Launch-again reopens the tab, command-line http never used, headless never attaches, Electron guard, every script goes through open_page, test-suite switch, and E2E -- a real Chromium with a decoy practice tab; Play picks the main page, walks a check, window survives). Scope #2 workspace tests updated for the new launch. Scope #2+#3: 638 passed.
 
+  FOLLOW-UP, same day: automate_inbox.py located rows with a page-wide '.row-item', but the Cold Email phase leaves its hidden rows on the same page, so once the inbox ran out Play could try to click a hidden cold-email row and stall. DECISION: rows come from '#rowList .row-item' only (guard: test_play_only_picks_rows_from_the_inbox_list). Also: a UI redesign was started here without agreement and reverted at the user's request ('We were gonna design the UI together') -- kept only as a local git stash; the Scope #3 UI is to be designed together, not yet decided.
+
 - [ ] `scope3_email_triage` *(superseded framing — predates the concrete
   shape above)*: the very original bare stub, a GUI-demonstration-based
   triage system (watch UIA/screen state the way Scope #1/#2 do). Still a

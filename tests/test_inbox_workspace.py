@@ -256,3 +256,13 @@ def test_the_test_suite_can_never_attach_to_a_users_window(monkeypatch):
     assert os.environ.get(wb.NO_ATTACH_ENV)
     monkeypatch.setattr(wb, "is_open", lambda port, timeout=0.5: True)
     assert wb.attach(playwright=None, port=1, prefer="x") is None
+
+
+def test_play_only_picks_rows_from_the_inbox_list():
+    """Found 2026-10-05: automate_inbox.py located rows with a page-wide
+    '.row-item', but the Cold Email phase leaves its (hidden) rows on the
+    same page, so once the inbox ran out the agent could try to click a
+    hidden cold-email row and stall. Rows must come from #rowList only."""
+    src = Path(_INBOX_DIR, "automate_inbox.py").read_text(encoding="utf-8")
+    assert 'page.locator("#rowList .row-item")' in src
+    assert 'page.locator(".row-item")' not in src
