@@ -36,6 +36,15 @@ from objective_metrics import collect_all  # noqa: E402
 OUT = os.path.join(ROOT, "docs", "defense_questions.pdf")
 
 
+def wilson(p: float, n: int, z: float = 1.96):
+    """Wilson score interval -- behaves at small n and near 0/100%, where the
+    usual p +/- z*sqrt(p(1-p)/n) does not."""
+    denom = 1 + z * z / n
+    centre = (p + z * z / (2 * n)) / denom
+    half = z * ((p * (1 - p) / n + z * z / (4 * n * n)) ** 0.5) / denom
+    return max(0.0, centre - half), min(1.0, centre + half)
+
+
 def figures():
     """Every number the answers quote, read live from the metric files."""
     o = collect_all()
@@ -47,9 +56,22 @@ def figures():
         n = f"{c.n:,}" if c.n is not None else "?"
         return f"{c.display()} (n={n})"
 
+    def ci(key, scope):
+        """95% Wilson interval for a measured rate, as 'a%-b%'."""
+        c = o[key].scopes.get(scope)
+        if c is None or c.value is None or not c.n:
+            return "not measured"
+        lo, hi = wilson(c.value, c.n)
+        return f"{lo * 100:.0f}%-{hi * 100:.0f}%"
+
     verdicts = {o[k].number: o[k].verdict() for k in o}
     count = lambda v: sum(1 for x in verdicts.values() if x == v)  # noqa: E731
     return {
+        "ci_adapt2": ci("obj6", "S2"),
+        "ci_amb": ci("obj2", "S1"),
+        "ci_trans": ci("obj4", "S1"),
+        "ci_acc": ci("obj3", "S1"),
+        "ci_e2e3": ci("obj8", "S3"),
         "acc": cell("obj3", "S1"),
         "amb": cell("obj2", "S1"),
         "trans": cell("obj4", "S1"),
@@ -135,7 +157,7 @@ def questions(f):
              f"not evaluated (Objectives {f['noteval_list']}). Every number comes straight from the logs; "
              "none were adjusted.",
              "Don't get defensive. Lead with what works, then say what doesn't and why."),
-            (True, f"Your action-prediction accuracy is {f['acc']} against a 90% target. Why so low?",
+            (True, f"Your prediction accuracy (validation click accuracy) is {f['acc']} against a 90% target. Why so low?",
              "The model was trained on a limited number of demonstrations of a long form with eight "
              "tabs, where tab switches are rare events. Rare steps are exactly what cloning learns "
              "worst. The plan is a larger recording campaign and retraining.",
@@ -274,6 +296,199 @@ def questions(f):
     ]
 
 
+def technical_questions(f):
+    """Deeper questions for a technical panel member. Facts are taken from
+    the code: components/intelligence/model/transformer.py,
+    components/scope2/{features,resolver,rules}, components/inbox_router."""
+    return [
+        ("Technical: the model", [
+            (True, "Walk us through the Transformer's architecture.",
+             "Each on-screen element becomes one vector: 11 structured features (real or padding, "
+             "bounding box, confidence, which window, focused, control type, filled) plus a "
+             "384-dimensional text embedding of its label from all-MiniLM-L6-v2. A linear layer with "
+             "LayerNorm projects each element to 128 dimensions. The elements of one screen are "
+             "mean-pooled (ignoring padding) into a single token. The last 4 screens and the actions "
+             "between them are interleaved into a sequence with learned position embeddings, then "
+             "passed through a 4-layer causal Transformer encoder (4 heads, feed-forward 256, dropout "
+             "0.1). The final token cross-attends back to the current screen's elements, and separate "
+             "heads predict the action type, which element to click (a pointer), which source element "
+             "holds the value, hotkeys and scrolling.",
+             "Know the numbers cold: 128-d, 4 layers, 4 heads, 4 steps of history, up to 128 elements."),
+            (True, "Why a pointer head instead of predicting a class like 'click field 7'?",
+             "The number and order of elements change from screen to screen, so a fixed list of "
+             "classes would not mean the same thing twice. A pointer scores every element on the "
+             "current screen (a query from the sequence against a key per element) and picks the "
+             "best one, so it works for any number of elements.",
+             ""),
+            (False, "Why LayerNorm on the pointer head's query and key?",
+             "The pointer score is a dot product of two learned vectors. Without normalization their "
+             "size grew during training and the scores diverged. Normalizing both keeps the scores "
+             "in a stable range.",
+             ""),
+            (False, "Why mean-pool each screen and then cross-attend, instead of feeding every element in?",
+             "Pooling keeps the sequence short and fast (one token per screen). But a pooled token "
+             "can't point at a specific element, so the final token cross-attends to the current "
+             "screen's elements. That is what lets the pointer pick a specific field.",
+             ""),
+            (False, "Why causal masking?",
+             "The model predicts the next action, so each position may only see what came before it, "
+             "the same as at run time. Otherwise training would peek at the answer.",
+             ""),
+            (False, "Why such a small model?",
+             "There are only thousands of training samples, and every step must be fast on a normal "
+             "laptop. A larger model would overfit this data and slow every step. More model size "
+             "also did not fix the hardest failure, the very first click from a blank screen.",
+             ""),
+            (False, "How do you handle a different number of elements on each screen?",
+             "Every screen is padded to 128 elements. Feature 0 is an 'is this real' flag that "
+             "becomes a mask, so padding is ignored when pooling and can never be picked by the pointer.",
+             ""),
+            (False, "Why all-MiniLM-L6-v2 for text?",
+             "It is small and fast, runs locally, and gives a 384-dimensional embedding where similar "
+             "labels ('DOB', 'Date of Birth') land close together, so the model copes with different wording.",
+             ""),
+        ]),
+        ("Technical: training and data", [
+            (True, "What is your loss function, and how do you handle class imbalance?",
+             "Cross-entropy on each head. Rare targets are up-weighted by the inverse frequency of the "
+             "specific field clicked, normalized so the average weight is about 1 and capped to avoid "
+             "blow-ups. Rarity is detected automatically, so no field name is hardcoded. The rare "
+             "'form complete, click Submit' step was also oversampled in the data.",
+             ""),
+            (True, "Is your validation set really separate from training?",
+             "Know your answer before the defense: whether the split is by individual step or by "
+             "whole demonstration session.",
+             "Classic trap. A step-level split puts near-identical neighboring screens in both sets "
+             "and inflates accuracy. If your split is by step, say so and call it a limitation."),
+            (True, "Behavioral cloning suffers from compounding error. What did you do about it?",
+             "That is exactly the Scope #1 long-form failure. The standard fix is DAgger: run the "
+             "policy, have the user correct its mistakes, add those corrections to the training data, "
+             "retrain. A correction hook exists, but it captured no steps in live runs, so it is the "
+             "next thing to fix.",
+             "Don't claim DAgger is implemented. It is designed, not working."),
+            (False, f"Your accuracy metric is validation click accuracy ({f['acc']}). Why that one?",
+             "Which element to click is the personal part of the workflow (the order and the "
+             "navigation), measured on held-out data. End-to-end completion is reported separately "
+             "(Objective 8), because a policy can be locally accurate and still fail a long task.",
+             f"Its 95% range is {f['ci_acc']}: with that many samples the uncertainty is in the method, not the sample size."),
+            (False, "How did you stop test runs from polluting your reported metrics?",
+             "The training log is shared with the test suite, which writes tiny synthetic runs. Those "
+             "are filtered out explicitly before any number is reported, and a test checks it: a "
+             "4-sample test run logging 99% would otherwise have become the headline.",
+             ""),
+        ]),
+        ("Technical: perception and execution", [
+            (False, "What happens with apps that have no accessibility tree (games, canvases, remote desktops)?",
+             "UI Automation returns nothing useful there. There is an OCR fallback for text, but real "
+             "support needs the vision adapter (Objective 1), which is future work. The adapter seam is "
+             "built: every perception source must produce the same element schema, and the agent "
+             "rejects one that doesn't.",
+             ""),
+            (False, "How do actions actually happen on screen?",
+             "Mouse and keyboard through pyautogui by default. For speed, known text values can be "
+             "written straight into a field with a Windows message (WM_SETTEXT), and buttons can be "
+             "pressed through accessibility 'invoke' or a Windows click message, falling back to a "
+             "real click. Every written value is read back and checked.",
+             "Expect: 'isn't writing directly into fields cheating the human-only rule?' Answer: it is "
+             "a speed mode you can switch off; Transformer mode reaches every field by real clicks."),
+            (False, f"What do 'encoding ambiguity' ({f['amb']}) and 'transition mapping' ({f['trans']}) measure?",
+             "Ambiguity: the share of recorded screens whose encoding is identical to another screen "
+             "that needed a different action, so the model literally cannot tell them apart. Transition "
+             "mapping: the share of recorded interactions that could be tied to one specific element.",
+             f"Both rest on only 19 audited sessions; the 95% ranges are {f['ci_amb']} and {f['ci_trans']}."),
+        ]),
+        ("Technical: Scope #2 (sheet to portal)", [
+            (True, "How does the column-to-field matcher work?",
+             "Each (column, field) pair gets 17 features: semantic similarity of the field's label, "
+             "name and placeholder to the column header (MiniLM); lexical overlap (edit distance, "
+             "Jaccard, containment, abbreviations); whether the column's values fit the field's type, "
+             "pattern, range and length; structural fit; position; and option overlap for dropdowns. "
+             "A one-to-one assignment is solved with the Hungarian algorithm, padded so a column can be "
+             "assigned to nothing.",
+             "Be precise about what runs in the demo: the live path matches labels first and asks the "
+             "local LLM about the rest, because loading the embedding model added about 9 seconds per "
+             "run. The 17-feature matcher is kept and measured in the evaluation."),
+            (True, "How does it learn the pass/fail rule instead of being told?",
+             "From the demonstration it finds which numeric column drives Remarks, which direction "
+             "passes (higher or lower), and the interval the cutoff must lie in (the demonstrations "
+             "narrowed it to between 74 and 85). It snaps the cutoff to the most plausible round value "
+             "in that interval: a multiple of 5 first, then a whole number, then the midpoint. That "
+             "gives 75. On the 1.00-5.00 portal the direction flips.",
+             ""),
+            (False, "Why let the system leave fields empty?",
+             "Some columns are deliberate decoys. A wrong value in a grade portal is worse than an "
+             "empty one a person fills in. The LLM may only answer with an exact column name or "
+             "'NONE', and if two fields claim the same column, one tie-break question is asked from "
+             "the column's side.",
+             ""),
+            (False, "Your LLM runs at temperature 0. Are its answers deterministic?",
+             "Not fully. Asking the same questions repeatedly through LM Studio gave different answers "
+             "on some runs. That is one reason every LLM answer is checked against strict rules rather "
+             "than trusted.",
+             ""),
+        ]),
+        ("Technical: Scope #3 (inbox)", [
+            (True, "What is the 'habits' model in Scope #3?",
+             "A deliberately small network: one hidden layer of 16 units (ReLU, dropout 0.2). Its "
+             "inputs are how similar the email's text embedding is to the average of the user's past "
+             "emails for each decision (reply, forward, schedule, leave alone), plus the sender's "
+             "history ratios. It only acts when at least 75% confident; otherwise the next layer decides.",
+             "Why so small: one user gives few examples, and comparing to per-decision averages makes "
+             "it data-efficient."),
+            (False, "Where does the sender history come from?",
+             "It is built automatically from the Sent folder, matched against recent inbox threads "
+             "(who you replied to, who you forwarded), so no manual labelling is needed. It is updated "
+             "every time the user accepts or changes a decision.",
+             ""),
+            (False, "How is a meeting time extracted, and why not with the LLM?",
+             "With fixed patterns that only fire when a calendar date and a clock time appear next to "
+             "each other in the email. The year comes from when the email arrived. An LLM asked 'when "
+             "is this?' always produces an answer, even when the email gives none, and a wrong "
+             "calendar entry is worse than none.",
+             ""),
+            (False, "How do you know Intern's decision was right, if the user just clicks the action they want?",
+             "Each action is recorded as either confirming Intern's suggestion or overriding it. That "
+             "difference feeds the accuracy metrics and the sender-history updates.",
+             ""),
+        ]),
+        ("Technical: evaluation and statistics", [
+            (True, f"What are the confidence intervals on your key results? For example, adaptability {f['adapt2']}.",
+             f"Using the Wilson interval, which behaves well at small samples: adaptability's 95% range "
+             f"is {f['ci_adapt2']}, and Scope #3 completion's is {f['ci_e2e3']}. So the adaptability "
+             "'pass' is consistent with anything from clearly failing to clearly passing.",
+             "Offer the interval before they ask. It shows you understand your own numbers."),
+            (False, "Which statistical test will you use against RPA, and why?",
+             "Welch's t-test at the 0.05 level, per metric. Welch's version doesn't assume both tools "
+             "have the same spread of results, which is unlikely for a learning agent compared with a "
+             "fixed script.",
+             "Be ready for 'what about multiple comparisons?': testing four metrics at 0.05 raises the "
+             "chance of one false positive. A Holm or Bonferroni correction is the fix."),
+            (False, "Why is an objective MET only if every measured scope met it, rather than averaging?",
+             "An average lets one strong scope hide two failing ones. The first version did exactly "
+             "that and reported end-to-end completion as met off Scope #2 alone. Mixed results are now "
+             "reported as 'partially met'.",
+             ""),
+        ]),
+        ("Technical: systems and engineering", [
+            (False, "Why a local LLM (Qwen 2.5 7B in LM Studio) instead of a stronger cloud model?",
+             "Privacy (emails and form data never leave the machine), no cost per call, and it works "
+             "offline. The price is weaker reasoning, which is why every LLM answer is constrained and checked.",
+             ""),
+            (False, "How does the agent work inside a window the user already opened?",
+             "Launch starts Chromium with a remote-debugging port; Play connects to it over the Chrome "
+             "DevTools Protocol and works in that tab. If none is open, Play opens its own. On this "
+             "Chromium version a page opened from the command line made the connection hang, so the "
+             "page is opened as a new tab after the browser starts.",
+             ""),
+            (False, "How many tests are there, and what do they not cover?",
+             "Hundreds of unit, integration and end-to-end tests, including real (hidden) browsers "
+             "driving the real pages. They don't replace a live run: the LLM is mostly stubbed, and "
+             "the full Launch-to-Play flow in the app is checked by hand.",
+             ""),
+        ]),
+    ]
+
+
 CSS = """
 @page { size: A4; margin: 18mm 18mm 20mm; }
 * { box-sizing: border-box; }
@@ -303,7 +518,7 @@ def build_html(f) -> str:
                "<p>The shaded <b>Watch out</b> notes flag questions that are traps, or where "
                "overclaiming would cost you.</p></div>")
     n = 0
-    for section, qs in questions(f):
+    for section, qs in questions(f) + technical_questions(f):
         out.append(f"<h2>{html.escape(section)}</h2>")
         for likely, q, a, w in qs:
             n += 1
@@ -314,7 +529,7 @@ def build_html(f) -> str:
                 out.append(f"<p class='w'><b>Watch out:</b> {html.escape(w)}</p>")
             out.append("</div>")
     out.append("<p class='foot'>Generated by scripts/thesis_figures/make_defense_questions.py from "
-               "objective_metrics.py. The clone-test figures (74% / 93%) come from test_clone.py, "
+               "objective_metrics.py. Ranges are 95% Wilson intervals. The clone-test figures (74% / 93%) come from test_clone.py, "
                "June 2026, an earlier version of the system.</p>")
     out.append("</body></html>")
     return "".join(out)
