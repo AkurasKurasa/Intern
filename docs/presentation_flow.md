@@ -4,7 +4,7 @@
 **I**ntroduction → **M**ethods → **R**esults → **a**nd **D**iscussion.
 
 > **Where the numbers come from.** Every number in the Results section comes from
-> `scripts/thesis_figures/objective_metrics.py`, as run on 2026-10-02. **Run it
+> `scripts/thesis_figures/objective_metrics.py`, as run on 2026-10-06. **Run it
 > again the day before the defense** and update the slides. Don't type any number
 > into a slide by hand. Practice values still in `Final Document.docx` Chapter 4
 > are **not** measured. Never present them as results.
@@ -64,9 +64,12 @@ tools don't solve it, and exactly what we promised (the 12 objectives).**
    (e.g. ≥ 90% action accuracy, ≥ 85% end-to-end completion).
 10. **Scope: the three study cases.** Why these three: together they cover
     *data entry*, *cross-app transfer* and *conditional judgment*.
-    - Scope #1: car-insurance data-entry form (Notepad → form)
-    - Scope #2: web form → Excel
-    - Scope #3: email triage (Inbox Router: reply / forward / schedule / flag)
+    - Scope #1: car-insurance data-entry form (Notepad intake file → form)
+    - Scope #2: grade spreadsheet → web portal, tested on 8 portal versions that
+      each change one thing (labels, order, extra fields, scales…)
+    - Scope #3: the boss's task list in one Notepad file — cold emails, inbox
+      triage (reply / forward / schedule / leave alone) and checks (did someone
+      reply, any mail about a topic, am I free) — drafts only, never auto-send
 11. **Significance & limitations up front.** Who benefits. State what's out of
     scope (Windows only, three bounded tasks, no auto-send email).
 
@@ -89,6 +92,10 @@ it**, well enough to judge the results.
     order) and WHAT action (click / type). The LLM gives the value. The widget
     type decides HOW (a recorded design decision; explain why: click-vs-type is
     universal plumbing, not personalization).
+    For Scope #3 the same idea, in words: **habits first** (a trained model of
+    how the user handled similar emails, then their history with that sender),
+    and the LLM only for what habits can't settle. Play offers Habits only /
+    Habits + reasoning / Reasoning only, so the panel can see the difference.
 
 **Pipeline, step by step (15 min)**
 
@@ -147,23 +154,31 @@ first, then the details. Use the figures in `scripts/thesis_figures/output/`
 29. **Proof of cloning.** Top-down order → 74% exact match; bottom-up order →
     93%. Same architecture learned two opposite orders, so it's genuinely
     cloning.
-30. **Recorded demo clip (3–4 min).** Scope #1 fill + Submit, Scope #2 web → Excel,
-    Scope #3 triage on mock data. **Use a pre-recorded video, not a live run.**
-    A live run on the defense laptop is risky, and only you decide when to run
-    live tasks.
+30. **Demo (3–4 min).** Every scope works the same way in the app: **Launch**
+    opens the real target (form, portal, inbox + task list), **Play** works in
+    that same window.
+    - Scope #1: intake file → car-insurance form.
+    - Scope #2: grade sheet → portal, every field and the pass/fail rule filled.
+    - Scope #3: Launch resets the practice data and opens the inbox and
+      `task_list.txt`; Play drafts the cold emails (signed Kevin), handles every
+      inbox email, then answers the checks; new "Scheduled" lines appear at
+      the end of the task list.
+    **Have a pre-recorded video ready as a backup.** Press Scope #3's Launch
+    about a minute early (the first sort takes ~45 s), and make sure LM Studio
+    is running with a model loaded.
 
 **Objective by objective (one slide each, ~1.5 min)**
 
-| Slide | Objective | Target | Measured (2026-10-02) | Verdict |
+| Slide | Objective | Target | Measured (2026-10-06) | Verdict |
 |---|---|---|---|---|
 | 31 | 1 Vision perception | ≥ 95% detection | — | NOT EVALUATED |
 | 32 | 2 Encoding ambiguity | < 5% | S1 10.9% (n=19) | NOT MET |
 | 33 | 3 & 5 Action prediction | ≥ 90% | S1 52.2% (n=6,401) | NOT MET |
 | 34 | 4 State-transition mapping | ≥ 90% | S1 81.7% (n=19) | NOT MET |
-| 35 | 6 Adaptability | ≥ 75% | S2 75.0% (n=24), S3 82.7% (n=277) | MET (zero margin on S2) |
+| 35 | 6 Adaptability | ≥ 75% | S2 75.0% (n=24), S3 83.6% (n=292) | MET (zero margin on S2) |
 | 36 | 7 Scalability | ≥ 90% maintained | — | NOT EVALUATED |
-| 37 | 8 End-to-end completion | ≥ 85% | S1 0.0%, S2 100%, S3 54.5% | PARTIALLY MET |
-| 38 | 9 Execution error | ≤ 10% | S1 20.8%, S2 0.0%, S3 43.7% | PARTIALLY MET |
+| 37 | 8 End-to-end completion | ≥ 85% | S1 0.0% (n=197), S2 100% (n=210), S3 51.7% (n=292) | PARTIALLY MET |
+| 38 | 9 Execution error | ≤ 10% | S1 21.3% (n=8), S2 0.0% (n=210), S3 46.6% (n=292) | PARTIALLY MET |
 | 39 | 10 Integration | qualitative | all three scopes | MET |
 | 40 | 11 & 12 vs RPA + significance | > 10–20%, p < .05 | — (tool ready, no RPA runs yet) | NOT EVALUATED |
 
@@ -227,6 +242,11 @@ Goal: **explain what the results mean**, own the weak spots, and close strong.
 - "How much is hardcoded?" → ScopeConfig + widget→action rules; navigation is 100% learned.
 - "Why use an LLM at all?" → it reads the source data and gives the value; the
   Transformer gives the personal workflow.
+- "What are 'habits' in Scope #3?" → what Intern learned from how *you* handled
+  email: a trained model of similar past emails, then your history with that
+  sender. Habits only = pure cloning; anything unsure is left for you.
+- "Does it send email on its own?" → no. Everything is a draft or a calendar
+  entry; there is no send function anywhere in the code.
 
 **Speaker split (if presenting as a group):** assign one person per IMRaD block
 so handoffs happen at block boundaries, not mid-section.
