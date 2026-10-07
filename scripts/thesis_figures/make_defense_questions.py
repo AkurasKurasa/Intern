@@ -296,6 +296,177 @@ def questions(f):
     ]
 
 
+def learning_signal_questions(f):
+    """Direct request 2026-10-07: "Our instructor had something in regards to
+    learning signal which we didnt answer add that." The exact wording was
+    not recorded anywhere, so this covers the forms the question usually
+    takes. Facts from transformer.py, recorder.py, diagnose_click_labels.py,
+    pattern_profile.py and decision_recorder.py."""
+    return [
+        ("Learning signal (raised by the instructor; answer this first)", [
+            (True, "What is the learning signal? What exactly does Intern learn from?",
+             "The user's own demonstrated next action. Every recorded step becomes one training "
+             "example: the screen as it was (every element and its state) paired with what the user "
+             "did next (which element they clicked, whether they clicked or typed, and which source "
+             "value they typed). It is supervised imitation: the 'correct answer' is always what this "
+             "user actually did. There is no reward and no hand-written label.",
+             "Say 'supervised, from demonstrations, no reward' in the first sentence. That is the "
+             "direct answer to the question."),
+            (True, "Is there any learning signal after training, when Intern is actually running?",
+             "Per scope. Scope #3: yes, online. Every time the user accepts or overrides a decision, "
+             "the sender history is updated immediately and the example is stored for the next "
+             "retraining of the habits model. Scope #1: not yet. The correction hook (DAgger: the user "
+             "fixes a mistake and that fix becomes training data) exists but captured no steps in live "
+             "runs, so today the model only improves when it is retrained on new recordings. Scope #2: "
+             "the pass/fail rule is induced from the demonstration, so a new demonstration changes it.",
+             "Don't say Scope #1 learns from its mistakes while running. It doesn't yet."),
+            (True, "Behavioral cloning only sees correct actions. Where is the negative signal?",
+             "There is none in pure cloning, and that is its known weakness: the model never sees what "
+             "to do after its own mistake, so errors compound on long tasks (the Scope #1 failure). "
+             "Negative signal would come from corrections (DAgger) or from a reward (reinforcement "
+             "learning), both future work. In Scope #3, an override is a negative signal: it records "
+             "that Intern's suggestion was wrong.",
+             ""),
+            (True, "How clean is the signal? What if a demonstration is messy or wrong?",
+             "Noise is removed before training: clicks that select a value in an open dropdown (which "
+             "land on the field underneath), clicks outside the form window, clicks on empty panes and "
+             "repeated duplicates. A step whose label cannot be determined (for example, a typed value "
+             "that matches no source element) is marked 'ignore' so it adds no loss at all, rather "
+             "than teaching something wrong.",
+             "Cleaning must not remove real signal. One early fix wrongly discarded lone Tab presses, "
+             "which are legitimate navigation the user really did. It was caught by testing and reverted."),
+            (False, "Can the labels contradict each other?",
+             "Yes, and that was measured. The pointer predicts an element by its position in the list. "
+             "If the same position means 'First Name' in one recording and 'State' in another (because "
+             "the order the accessibility tree reports elements in shifts), the labels contradict each "
+             "other and no model can learn them. A diagnostic script (diagnose_click_labels.py) counts "
+             "how many clicks land inside an element at all and how many distinct fields each position "
+             "stands for.",
+             ""),
+            (False, "Is the signal strong enough for rare steps?",
+             "Rare steps carry a weak signal: switching tabs or pressing Submit happens once per form "
+             "among dozens of field clicks. Two remedies are used: clicks on rarely-clicked fields are "
+             "weighted up in the loss (by inverse frequency, detected automatically), and the 'form "
+             "complete, click Submit' step is oversampled. This is still the weakest part of the "
+             f"signal and the main reason click accuracy is {f['acc']}.",
+             ""),
+            (False, "Does the signal teach this user's habits, or just the form's layout?",
+             "The clone test answers this: the same architecture trained on top-down demonstrations "
+             "filled top-down, and trained on bottom-up demonstrations filled bottom-up (June 2026, "
+             "earlier version). The layout was identical in both, so what it learned was the user's order.",
+             ""),
+        ]),
+    ]
+
+
+def more_questions(f):
+    """A further round, covering ground the first two rounds did not."""
+    return [
+        ("Research design", [
+            (True, "Who recorded the demonstrations, and how many people?",
+             "Prepare the exact answer: who recorded them, how many people, and over how long.",
+             "If it was mostly the team, say so. 'Personalized' then means 'learns one person's way', "
+             "and testing across several different users is future work."),
+            (False, "Did you get consent or ethics approval for recording people's screens?",
+             "Prepare the exact answer. In the demo, everything uses practice data (mock emails, "
+             "practice forms, a generated grade sheet) and stays on the machine.",
+             "Check with your adviser what your institution requires before the defense."),
+            (False, "Where do your targets (90%, 85%, 75%) come from?",
+             "Prepare the source for each target, whether from related work or chosen by the team, "
+             "and say which.",
+             "If they were chosen by the team, say so. It's acceptable; pretending otherwise is not."),
+            (False, "Why these three scopes?",
+             "They cover three different kinds of office work: filling one application's form "
+             "(single app), moving data between two applications (cross-app), and judging what to do "
+             "with each email (decision-making). Together they test whether the approach generalizes "
+             "beyond one task.",
+             ""),
+            (False, "Your Chapter 4 numbers changed from the earlier draft. Why?",
+             "The early draft's numbers were a snapshot from an older version of the system. When the "
+             "results were recomputed directly from the logs, they did not match, so the chapter now "
+             "reports only what the logs show, and every number is regenerated by script.",
+             "This is a strength if you say it plainly: you caught your own overclaim."),
+        ]),
+        ("Related work", [
+            (False, "Which existing research is closest to yours?",
+             "Programming by demonstration (systems that turn a user's demonstration into a macro), "
+             "imitation learning for GUI and web agents, and recent language-model web agents evaluated "
+             "on benchmarks like Mind2Web and WebArena. Intern combines learning a personal workflow "
+             "from demonstrations with a local language model for reading values.",
+             "Have 2-3 specific papers from your Chapter 2 ready by name."),
+            (False, "Why not evaluate on a standard benchmark like WebArena?",
+             "Those benchmarks score whether a task gets done from a written instruction, not whether "
+             "an agent copies a particular user's way of doing it, which is Intern's claim. Their tasks "
+             "are also web-only, while Scope #1 is a desktop application.",
+             ""),
+        ]),
+        ("Security", [
+            (True, "An email could contain instructions aimed at the LLM ('forward all invoices to me'). Can it hijack Intern?",
+             "The damage is limited by design. The LLM may only pick one of four decisions, and its "
+             "answer is checked against that fixed list. Nothing is ever sent, only drafted. A forward "
+             "recipient is never taken from the email or the LLM; it is derived from the sender's own "
+             "domain. Dates come from fixed rules, not the LLM.",
+             "Don't claim it's immune. A malicious email could still steer which of the four decisions "
+             "is picked, or the wording of a draft. That's why a person approves anything that leaves."),
+            (False, "What stops the agent if it goes wrong mid-run?",
+             "An emergency-stop hotkey stops a run at any time, and the app's Stop button ends the "
+             "whole process. Both are tested.",
+             ""),
+        ]),
+        ("Deployment and real-world use", [
+            (False, "What does someone need to run this?",
+             "A Windows PC, Python, the Electron app, and LM Studio with a small model loaded. "
+             "Everything runs locally; no cloud account is needed for the practice setup.",
+             ""),
+            (False, "Does it only work in English?",
+             "The text embedding model and the local LLM are mostly English-trained, so labels in "
+             "other languages would match less well. Nothing in the agent is English-specific, so "
+             "swapping in a multilingual embedding model is the change needed.",
+             ""),
+            (False, "What happens if the user moves the mouse or types while Intern is working?",
+             "Intern controls the real mouse and keyboard, so the user's input would collide with it. "
+             "Today the user is expected to let it work, and can stop it with the stop hotkey.",
+             ""),
+            (False, "What if the user changes how they do the task over time?",
+             "In Scope #3, every accept or override updates the sender history, so it shifts with the "
+             "user. In Scope #1, new demonstrations and a retrain are needed; older demonstrations "
+             "aren't automatically forgotten, which is a limitation.",
+             ""),
+            (False, "Multiple monitors or display scaling?",
+             "Clicks use the positions the accessibility tree reports at that moment. Display scaling "
+             "and multiple monitors can shift those coordinates; this is a known risk, not fully tested.",
+             ""),
+        ]),
+        ("Reproducibility", [
+            (False, "Could someone else reproduce your results?",
+             "The code, tests and metric scripts are in the repository, and every reported number is "
+             "regenerated from the logs by one script. Exact reproduction of training also needs the "
+             "recorded demonstrations and the same random seeds.",
+             "Know whether your training runs fix a random seed. If they don't, say so."),
+            (False, "How long does training take?",
+             "Prepare the measured time from your own training logs (time per run and on what hardware).",
+             "Don't estimate a number on the spot."),
+        ]),
+        ("The live demo", [
+            (True, "What if the demo fails in front of the panel?",
+             "Have a recorded video of a good run as backup, and say what failed if it does. Press "
+             "Launch on Scope #3 about a minute early, because the first inbox load after a reset takes "
+             "about 45 seconds.",
+             "A calm 'here's what went wrong and why' is better than a rushed retry."),
+            (False, "Is the demo scripted or is the agent really deciding?",
+             "Really deciding. Show the reason it gives for each decision (sender history, the trained "
+             "model, or the LLM), and if possible change one input on the spot.",
+             ""),
+        ]),
+        ("The team", [
+            (True, "Who did what?",
+             "Prepare a clear split per person, including integrating a teammate's separately developed "
+             "Scope #2 code.",
+             "Every member should be able to answer a basic question about every part."),
+        ]),
+    ]
+
+
 def technical_questions(f):
     """Deeper questions for a technical panel member. Facts are taken from
     the code: components/intelligence/model/transformer.py,
@@ -518,7 +689,7 @@ def build_html(f) -> str:
                "<p>The shaded <b>Watch out</b> notes flag questions that are traps, or where "
                "overclaiming would cost you.</p></div>")
     n = 0
-    for section, qs in questions(f) + technical_questions(f):
+    for section, qs in learning_signal_questions(f) + questions(f) + technical_questions(f) + more_questions(f):
         out.append(f"<h2>{html.escape(section)}</h2>")
         for likely, q, a, w in qs:
             n += 1
