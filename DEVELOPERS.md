@@ -1149,6 +1149,12 @@ waiting on them.
 
   TESTS: tests/test_cold_email_llm.py +5 -- prompt names the sender, name placeholders filled, other blanks retried then refused, a clean retry accepted, the real profile says Kevin.
 
+- [x] `synthetic_state_action_all_scopes` -- 2026-10-08, direct request: make the Scope #2 and Scope #3 data in data/synthetic/ 'similar to Scope #1 in terms of State-Action'. Before: a Scope #1 synthetic file was one state -> action -> next_state step, but a Scope #2 file was a finished-row RESULT (what ended up in the portal, no screen, no action) and a Scope #3 file was a bare incoming email (no screen, not even the decision).
+
+  DECISION: every file in every scope is now one step in the same shape as a real Scope #1 trace step (same top-level keys, same UIA element schema). Scope #2: the student's portal row (Course, Year, Grade, Remarks; earlier fields already filled) as the active window plus that student's sheet cells as the background window -- the same pattern as Scope #1's form plus background Notepad -- with decoy grade columns (MIDTERM, FINAL). Action: type a value into one field, pointing at the sheet cell it came from (source_element_id, the counterpart of Scope #1's source pointer); for Remarks, a select derived from the grade by the pass mark, with no source cell. Four steps build one student's row in order. Scope #3: the opened email (subject, sender, body) plus the four decision buttons; action = click the button for the decision (decided per kind of email: invoice question -> reply, meeting or maintenance -> schedule, 'please forward' -> forward, newsletter -> leave alone); next_state shows the result. Elements carry window_role/window_title. File names unchanged; still marked synthetic, gitignored, and never read by the thesis metrics.
+
+  TESTS: tests/test_generate_synthetic_data.py -- every scope has the step shape and the target is on screen; Scope #2 typed values equal the named sheet cell and Remarks follows the pass mark; Scope #2 steps build each row in order; Scope #3 clicks the button for its decision and the status shows the result; integration -- the real Scope #1 encoder (encode_state) turns a Scope #2 and #3 state into the same 128 x 395 table.
+
 - [ ] `scope3_email_triage` *(superseded framing — predates the concrete
   shape above)*: the very original bare stub, a GUI-demonstration-based
   triage system (watch UIA/screen state the way Scope #1/#2 do). Still a
