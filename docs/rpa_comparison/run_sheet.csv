@@ -1,0 +1,13 @@
+system,form_version,run,finished_without_help,fields_total,fields_wrong,minutes,notes
+UI.Vision,normal,setup,,,,,"setup time: stopwatch from recording start to first successful replay (cap 45 min)"
+UI.Vision,normal,1,,,,,
+UI.Vision,normal,2,,,,,
+UI.Vision,normal,3,,,,,
+UI.Vision,normal,4,,,,,
+UI.Vision,normal,5,,,,,
+UI.Vision,modified,1,,,,,
+UI.Vision,modified,2,,,,,
+UI.Vision,modified,3,,,,,
+UI.Vision,modified,4,,,,,
+UI.Vision,modified,5,,,,,
+Intern,normal,setup,,,,,"setup time: demo recording + training + first successful run"
