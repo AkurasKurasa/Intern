@@ -1,0 +1,31 @@
+{
+  "_about": "Reference routing for the Scope 3 mock inbox (components/inbox_router/data/mock_inbox.json), written and committed BEFORE either system was run. Labels follow the system's own outcome definitions (components/inbox_router/llm_classifier.py): reply = the user should reply directly; forward = forward to someone else; schedule = about a meeting, appointment or deadline that belongs on a calendar; cold_email = unsolicited outreach from someone with no prior relationship; leave_alone = no action needed. 'primary' is the single best outcome; 'acceptable' adds outcomes a reasonable person could also choose for a genuinely ambiguous message. Assigned by an AI annotator (Claude) from the message text alone, blind to both systems' outputs; not an independent human validation. mock-101..105 are excluded: they are the user's already-answered history from which both systems learn.",
+  "labeled_on": "2026-11-01",
+  "labels": {
+    "mock-001": {"primary": "reply",       "acceptable": ["reply", "forward"],          "why": "broker asks the user to process an application"},
+    "mock-002": {"primary": "reply",       "acceptable": ["reply", "forward"],          "why": "registrar asks to be told once grades are posted"},
+    "mock-003": {"primary": "reply",       "acceptable": ["reply"],                     "why": "direct question from a vendor contact the user always answers"},
+    "mock-004": {"primary": "forward",     "acceptable": ["forward", "schedule"],       "why": "maintenance notice; the user forwards these to ops"},
+    "mock-005": {"primary": "forward",     "acceptable": ["forward", "reply"],          "why": "formal legal notice needing a response from the right person"},
+    "mock-006": {"primary": "leave_alone", "acceptable": ["leave_alone"],               "why": "newsletter"},
+    "mock-201": {"primary": "reply",       "acceptable": ["reply"],                     "why": "colleague asks a direct question"},
+    "mock-202": {"primary": "forward",     "acceptable": ["forward", "schedule"],       "why": "HR asks the user to make the team act before a deadline"},
+    "mock-203": {"primary": "schedule",    "acceptable": ["schedule", "reply"],         "why": "proposes a call at a set time"},
+    "mock-204": {"primary": "schedule",    "acceptable": ["schedule", "reply"],         "why": "contract deadline reminder"},
+    "mock-205": {"primary": "reply",       "acceptable": ["reply", "forward"],          "why": "compliance explicitly needs the user's review"},
+    "mock-206": {"primary": "leave_alone", "acceptable": ["leave_alone"],               "why": "automated summary"},
+    "mock-301": {"primary": "schedule",    "acceptable": ["schedule", "reply"],         "why": "proposes a kickoff call at a set time"},
+    "mock-302": {"primary": "schedule",    "acceptable": ["schedule", "reply"],         "why": "meeting invitation needing confirmation"},
+    "mock-303": {"primary": "leave_alone", "acceptable": ["leave_alone", "schedule"],   "why": "promotional registration deadline"},
+    "mock-304": {"primary": "schedule",    "acceptable": ["schedule", "leave_alone"],   "why": "dated window the user must act within"},
+    "mock-305": {"primary": "schedule",    "acceptable": ["schedule", "reply"],         "why": "proposes a walkthrough at a set time"},
+    "mock-306": {"primary": "schedule",    "acceptable": ["schedule", "reply"],         "why": "proposes a call on a set date"},
+    "mock-307": {"primary": "schedule",    "acceptable": ["schedule", "reply"],         "why": "reschedules a call"},
+    "mock-308": {"primary": "schedule",    "acceptable": ["schedule"],                  "why": "meeting put on the calendar"},
+    "mock-309": {"primary": "schedule",    "acceptable": ["schedule", "leave_alone"],   "why": "timesheet deadline"},
+    "mock-310": {"primary": "schedule",    "acceptable": ["schedule", "reply"],         "why": "proposes a pricing call on a set date"},
+    "mock-311": {"primary": "reply",       "acceptable": ["reply", "cold_email"],       "why": "prospect answers the user's own outreach and asks for an overview"},
+    "mock-312": {"primary": "schedule",    "acceptable": ["schedule", "reply"],         "why": "prospect proposes a call at a set time"},
+    "mock-313": {"primary": "reply",       "acceptable": ["reply", "forward", "leave_alone"], "why": "routine invoice from a known vendor; acknowledgement or pass to accounts"}
+  }
+}
