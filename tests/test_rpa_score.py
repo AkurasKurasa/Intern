@@ -11,14 +11,18 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "scripts"))
 
 from bc_fidelity import _parse_intake_record  # noqa: E402
-from rpa_score import fisher_two_sided, score_submission  # noqa: E402
+from rpa_score import fisher_two_sided, is_blank_instruction, score_submission  # noqa: E402
 
 INTAKE = (ROOT / "data_entry_tasks" / "data_entry_intake.txt").read_text(encoding="utf-8")
 POLICY_KEYS = ["policy_type", "policy_term", "effective_date", "expiration_date"]
 
 
 def _gold(record: int = 1) -> dict:
-    return dict(_parse_intake_record(INTAKE, record))
+    """Record `record` as a perfect fill would save it: fields whose intake
+    value is a leave-blank instruction ("(leave blank)", "(none -- ...)") are
+    left EMPTY, exactly as the form saves an untouched box."""
+    return {k: ("" if is_blank_instruction(v) else v)
+            for k, v in _parse_intake_record(INTAKE, record).items()}
 
 
 def test_perfect_fill_is_fully_correct():
@@ -60,6 +64,24 @@ def test_values_in_wrong_fields_are_caught():
     s = score_submission(sub, 1, INTAKE)
     assert set(POLICY_KEYS) <= set(s["wrong_fields"])
     assert s["policy_correct"] == s["policy_total"] - len(POLICY_KEYS)
+
+
+def test_leave_blank_instruction_left_empty_is_correct():
+    """Gate 3 finding (2026-11-01): the intake writes "(leave blank)" etc.
+    where the box must stay empty. Leaving it empty is correct; typing the
+    instruction into the box is wrong."""
+    raw = dict(_parse_intake_record(INTAKE, 1))
+    k = next(k for k, v in raw.items() if is_blank_instruction(v))
+    assert score_submission(_gold(), 1, INTAKE)["fully_correct"] is True
+    typed = dict(_gold(), **{k: raw[k]})
+    assert k in score_submission(typed, 1, INTAKE)["wrong_fields"]
+
+
+def test_phone_numbers_in_brackets_are_real_values():
+    assert not is_blank_instruction("(909) 334-7820")
+    assert is_blank_instruction("(N/A — no collision coverage)")
+    assert is_blank_instruction("(none — owned outright)")
+    assert not is_blank_instruction("(nonexistent)")
 
 
 def test_fisher_matches_known_values():

@@ -29,12 +29,20 @@ value is empty / unchecked (False) is CORRECT when the submission is also empty
 / unchecked. expected_vs_actual.py counts those as "missing", so a perfect fill
 of record 1 scores only 146/171 (85.4%) there and no run could ever count as
 fully correct.
+
+Second difference, found by Gate 3 (2026-11-01): the intake packet writes an
+instruction instead of a value for fields that must stay empty -- "(leave
+blank)", "(none -- owned outright)", "(N/A -- no collision coverage)". The
+right fill is an EMPTY box, so those expectations are treated as empty. Without
+this, a perfect fill of record 1 that leaves those boxes empty is scored wrong.
+Phone numbers such as "(909) 334-7820" also start with "(" and are NOT affected.
 """
 from __future__ import annotations
 
 import argparse
 import csv
 import json
+import re
 import sys
 from math import comb
 from pathlib import Path
@@ -55,6 +63,12 @@ from bc_fidelity import (  # noqa: E402
 DEFAULT_SHEET = ROOT / "docs" / "rpa_comparison" / "run_sheet.csv"
 DEFAULT_INTAKE = ROOT / "data_entry_tasks" / "data_entry_intake.txt"
 EMPTY = ("", None, False)
+_BLANK_INSTRUCTION = re.compile(r"^\(\s*(leave blank|none|n/a)(?![a-z])", re.IGNORECASE)
+
+
+def is_blank_instruction(v) -> bool:
+    """True for intake values that tell the operator to leave the field empty."""
+    return isinstance(v, str) and bool(_BLANK_INSTRUCTION.match(v.strip()))
 
 
 def _load_json(path: Path):
@@ -76,7 +90,7 @@ def score_submission(submission: dict, record_num: int, intake_text: str) -> dic
         if key in _SKIP_FIELDS:
             continue
         actual = submission.get(key)
-        if expected in EMPTY:
+        if expected in EMPTY or is_blank_instruction(expected):
             ok = actual in EMPTY
         else:
             ok = actual not in EMPTY and _normalize(actual) == _normalize(expected)

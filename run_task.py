@@ -157,7 +157,9 @@ def _flush_safe_print(text: str) -> None:
 
 # ── config ────────────────────────────────────────────────────────────────────
 GOAL          = "Fill the car insurance form using data from the open text file"
-PROVIDER      = "lmstudio"    # anthropic | groq | gemini | lmstudio | none
+PROVIDER      = os.environ.get("INTERN_PROVIDER", "lmstudio")  # anthropic | groq | gemini | lmstudio | none
+                              # INTERN_PROVIDER=none runs without any LLM (direct lookup + transformer
+                              # only) -- used for the Objective 7 comparison on a machine with no LM Studio.
 API_KEY       = os.environ.get("ANTHROPIC_API_KEY", "")
 GROQ_API_KEY  = os.environ.get("GROQ_API_KEY", "")
 SOURCE_WINDOW = "Notepad"     # title fragment of the data source window

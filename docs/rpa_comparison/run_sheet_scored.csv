@@ -1,0 +1,23 @@
+system,form_version,run,record,submission,finished_without_help,minutes,notes,fields_total,fields_wrong,field_correctness,policy_correct,fully_correct,outcome
+PyAutoGUI,normal,setup,,,,,"No human setup time. Script written by an AI coding assistant (authoring time not measured). Live debugging on the normal form took 3 replays, 02:12:58-02:18:11 (5.2 min): attempt 1 = 71 wrong (section bars are Tab stops), attempt 2 = 5 wrong (dropdown type-ahead), attempt 3 = 0 wrong. Macro generation itself: 4 s.",,,,,,
+PyAutoGUI,normal,1,1,PyAutoGUI_normal_1__PAI-2026-00441_20261101_021908_658666.json,yes,0.28,reached Submit,171,0,1.0000,11/11,yes,correct
+PyAutoGUI,normal,2,1,PyAutoGUI_normal_2__PAI-2026-00441_20261101_021929_769492.json,yes,0.28,reached Submit,171,0,1.0000,11/11,yes,correct
+PyAutoGUI,normal,3,1,PyAutoGUI_normal_3__PAI-2026-00441_20261101_021950_880055.json,yes,0.28,reached Submit,171,0,1.0000,11/11,yes,correct
+PyAutoGUI,normal,4,1,PyAutoGUI_normal_4__PAI-2026-00441_20261101_022011_750846.json,yes,0.28,reached Submit,171,0,1.0000,11/11,yes,correct
+PyAutoGUI,normal,5,1,PyAutoGUI_normal_5__PAI-2026-00441_20261101_022032_591225.json,yes,0.28,reached Submit,171,0,1.0000,11/11,yes,correct
+PyAutoGUI,modified,1,1,PyAutoGUI_modified_1___20261101_022053_421987.json,yes,0.28,reached Submit,171,2,0.9883,9/11,no,"finished, wrong fields"
+PyAutoGUI,modified,2,1,PyAutoGUI_modified_2___20261101_022114_262532.json,yes,0.28,reached Submit,171,2,0.9883,9/11,no,"finished, wrong fields"
+PyAutoGUI,modified,3,1,PyAutoGUI_modified_3___20261101_022135_093024.json,yes,0.28,reached Submit,171,2,0.9883,9/11,no,"finished, wrong fields"
+PyAutoGUI,modified,4,1,PyAutoGUI_modified_4___20261101_022155_923777.json,yes,0.28,reached Submit,171,2,0.9883,9/11,no,"finished, wrong fields"
+PyAutoGUI,modified,5,1,PyAutoGUI_modified_5___20261101_022217_004315.json,yes,0.28,reached Submit,171,2,0.9883,9/11,no,"finished, wrong fields"
+Intern,normal,setup,,,,,"Historical, not re-measured: 19 demonstration sessions in tasks/form_filling/traces, 10,405 steps, 260.9 min of recording (first-to-last step timestamps per session); plus an 'unorganized' pool of 657 steps with no usable duration. Training time not available (transformer_training_log.jsonl absent; model.pt stores epoch 78, val click acc 0.830, no time). Setup >= 261 min.",,,,,,
+Intern,normal,1,1,Intern_normal_1__PAI-2026-00441_20261101_022329_727798.json,yes,1.07,reached Submit; exit code 0,171,25,0.8538,9/11,no,"finished, wrong fields"
+Intern,normal,2,1,Intern_normal_2__PAI-2026-00441_20261101_022435_414844.json,yes,1.02,reached Submit; exit code 0,171,25,0.8538,9/11,no,"finished, wrong fields"
+Intern,normal,3,1,Intern_normal_3__PAI-2026-00441_20261101_022540_748684.json,yes,1.02,reached Submit; exit code 0,171,25,0.8538,9/11,no,"finished, wrong fields"
+Intern,normal,4,1,Intern_normal_4__PAI-2026-00441_20261101_022646_223379.json,yes,1.02,reached Submit; exit code 0,171,25,0.8538,9/11,no,"finished, wrong fields"
+Intern,normal,5,1,Intern_normal_5__PAI-2026-00441_20261101_022751_676060.json,yes,1.02,reached Submit; exit code 0,171,25,0.8538,9/11,no,"finished, wrong fields"
+Intern,modified,1,1,Intern_modified_1__PAI-2026-00441_20261101_022857_254783.json,yes,1.02,reached Submit; exit code 0,171,25,0.8538,9/11,no,"finished, wrong fields"
+Intern,modified,2,1,Intern_modified_2__PAI-2026-00441_20261101_023002_891158.json,yes,1.02,reached Submit; exit code 0,171,25,0.8538,9/11,no,"finished, wrong fields"
+Intern,modified,3,1,Intern_modified_3__PAI-2026-00441_20261101_023108_554636.json,yes,1.02,reached Submit; exit code 0,171,25,0.8538,9/11,no,"finished, wrong fields"
+Intern,modified,4,1,Intern_modified_4__PAI-2026-00441_20261101_023213_838335.json,yes,1.02,reached Submit; exit code 0,171,25,0.8538,9/11,no,"finished, wrong fields"
+Intern,modified,5,1,Intern_modified_5__PAI-2026-00441_20261101_023319_145871.json,yes,1.02,reached Submit; exit code 0,171,25,0.8538,9/11,no,"finished, wrong fields"
