@@ -1,0 +1,439 @@
+{
+  "conditions": {
+    "baseline_original": {
+      "n": 25,
+      "strict": 12,
+      "lenient": 12,
+      "handoff": 13,
+      "wrong_action": 0
+    },
+    "baseline_changed": {
+      "n": 25,
+      "strict": 1,
+      "lenient": 1,
+      "handoff": 24,
+      "wrong_action": 0
+    },
+    "baseline_stability": {
+      "same": 14,
+      "n": 25
+    },
+    "intern_original": {
+      "n": 25,
+      "strict": 4,
+      "lenient": 4,
+      "handoff": 21,
+      "wrong_action": 0
+    },
+    "intern_changed": {
+      "n": 25,
+      "strict": 4,
+      "lenient": 4,
+      "handoff": 21,
+      "wrong_action": 0
+    },
+    "intern_stability": {
+      "same": 25,
+      "n": 25
+    },
+    "mcnemar_original": {
+      "intern_only_correct": 0,
+      "baseline_only_correct": 8,
+      "p": 0.0078125
+    },
+    "mcnemar_changed": {
+      "intern_only_correct": 4,
+      "baseline_only_correct": 1,
+      "p": 0.375
+    }
+  },
+  "per_message": {
+    "mock-001": {
+      "label": "reply",
+      "acceptable": [
+        "reply",
+        "forward"
+      ],
+      "changed_subject": "[EXTERNAL] New policy application - Delgado, James",
+      "changed_sender": "j.reyes@acmebroker.com",
+      "baseline_original": "handoff",
+      "intern_original": "handoff",
+      "intern_original_layer": "none",
+      "baseline_changed": "handoff",
+      "intern_changed": "handoff",
+      "intern_changed_layer": "none"
+    },
+    "mock-002": {
+      "label": "reply",
+      "acceptable": [
+        "reply",
+        "forward"
+      ],
+      "changed_subject": "[EXTERNAL] Grades ready for portal upload - Section 4B",
+      "changed_sender": "registrar.team@campusportal.edu",
+      "baseline_original": "handoff",
+      "intern_original": "handoff",
+      "intern_original_layer": "none",
+      "baseline_changed": "handoff",
+      "intern_changed": "handoff",
+      "intern_changed_layer": "none"
+    },
+    "mock-003": {
+      "label": "reply",
+      "acceptable": [
+        "reply"
+      ],
+      "changed_subject": "[EXTERNAL] Quick question about the March bill",
+      "changed_sender": "p.raman@vendorco.com",
+      "baseline_original": "reply",
+      "intern_original": "reply",
+      "intern_original_layer": "fast_fill",
+      "baseline_changed": "handoff",
+      "intern_changed": "reply",
+      "intern_changed_layer": "fast_fill"
+    },
+    "mock-004": {
+      "label": "forward",
+      "acceptable": [
+        "forward",
+        "schedule"
+      ],
+      "changed_subject": "[EXTERNAL] Scheduled maintenance window - Aug 20",
+      "changed_sender": "i.alerts@thirdpartyvendor.com",
+      "baseline_original": "forward",
+      "intern_original": "forward",
+      "intern_original_layer": "fast_fill",
+      "baseline_changed": "handoff",
+      "intern_changed": "forward",
+      "intern_changed_layer": "fast_fill"
+    },
+    "mock-005": {
+      "label": "forward",
+      "acceptable": [
+        "forward",
+        "reply"
+      ],
+      "changed_subject": "[EXTERNAL] Formal notice regarding account #48213",
+      "changed_sender": "notices.team@somefirm-legal.com",
+      "baseline_original": "handoff",
+      "intern_original": "handoff",
+      "intern_original_layer": "none",
+      "baseline_changed": "handoff",
+      "intern_changed": "handoff",
+      "intern_changed_layer": "none"
+    },
+    "mock-006": {
+      "label": "leave_alone",
+      "acceptable": [
+        "leave_alone"
+      ],
+      "changed_subject": "[EXTERNAL] This Week in InsurTech",
+      "changed_sender": "newsletter.team@industrynews.com",
+      "baseline_original": "leave_alone",
+      "intern_original": "leave_alone",
+      "intern_original_layer": "fast_fill",
+      "baseline_changed": "handoff",
+      "intern_changed": "leave_alone",
+      "intern_changed_layer": "fast_fill"
+    },
+    "mock-201": {
+      "label": "reply",
+      "acceptable": [
+        "reply"
+      ],
+      "changed_subject": "[EXTERNAL] Question on the Delgado policy coverage limits",
+      "changed_sender": "m.chen@acmebroker.com",
+      "baseline_original": "handoff",
+      "intern_original": "handoff",
+      "intern_original_layer": "none",
+      "baseline_changed": "handoff",
+      "intern_changed": "handoff",
+      "intern_changed_layer": "none"
+    },
+    "mock-202": {
+      "label": "forward",
+      "acceptable": [
+        "forward",
+        "schedule"
+      ],
+      "changed_subject": "[EXTERNAL] Open enrollment starts Monday -- action needed for your team",
+      "changed_sender": "benefits.team@companyhr.example.com",
+      "baseline_original": "handoff",
+      "intern_original": "handoff",
+      "intern_original_layer": "none",
+      "baseline_changed": "handoff",
+      "intern_changed": "handoff",
+      "intern_changed_layer": "none"
+    },
+    "mock-203": {
+      "label": "schedule",
+      "acceptable": [
+        "schedule",
+        "reply"
+      ],
+      "changed_subject": "[EXTERNAL] Vendor chat - proposing Sept 3rd, 2pm",
+      "changed_sender": "d.whitfield@northline.example.com",
+      "baseline_original": "schedule",
+      "intern_original": "handoff",
+      "intern_original_layer": "none",
+      "baseline_changed": "handoff",
+      "intern_changed": "handoff",
+      "intern_changed_layer": "none"
+    },
+    "mock-204": {
+      "label": "schedule",
+      "acceptable": [
+        "schedule",
+        "reply"
+      ],
+      "changed_subject": "[EXTERNAL] heads-up: Meyer contract due date is Sept 5th",
+      "changed_sender": "contracts.team@meyerlegal.example.com",
+      "baseline_original": "handoff",
+      "intern_original": "handoff",
+      "intern_original_layer": "none",
+      "baseline_changed": "handoff",
+      "intern_changed": "handoff",
+      "intern_changed_layer": "none"
+    },
+    "mock-205": {
+      "label": "reply",
+      "acceptable": [
+        "reply",
+        "forward"
+      ],
+      "changed_subject": "[EXTERNAL] Discrepancy flagged in Q2 filing -- needs review",
+      "changed_sender": "compliance.team@internalaudit.example.com",
+      "baseline_original": "handoff",
+      "intern_original": "handoff",
+      "intern_original_layer": "none",
+      "baseline_changed": "handoff",
+      "intern_changed": "handoff",
+      "intern_changed_layer": "none"
+    },
+    "mock-206": {
+      "label": "leave_alone",
+      "acceptable": [
+        "leave_alone"
+      ],
+      "changed_subject": "[EXTERNAL] Your week's activity summary",
+      "changed_sender": "n.reply@teamcollab.example.com",
+      "baseline_original": "leave_alone",
+      "intern_original": "handoff",
+      "intern_original_layer": "none",
+      "baseline_changed": "leave_alone",
+      "intern_changed": "handoff",
+      "intern_changed_layer": "none"
+    },
+    "mock-301": {
+      "label": "schedule",
+      "acceptable": [
+        "schedule",
+        "reply"
+      ],
+      "changed_subject": "[EXTERNAL] kick-off chat for the Q3 partnership - your availability?",
+      "changed_sender": "priya.team@ramaswami-consulting.example.com",
+      "baseline_original": "schedule",
+      "intern_original": "handoff",
+      "intern_original_layer": "none",
+      "baseline_changed": "handoff",
+      "intern_changed": "handoff",
+      "intern_changed_layer": "none"
+    },
+    "mock-302": {
+      "label": "schedule",
+      "acceptable": [
+        "schedule",
+        "reply"
+      ],
+      "changed_subject": "[EXTERNAL] Procurement review sync - Sept 8, 11am",
+      "changed_sender": "m.oyelaran@delridge.example.com",
+      "baseline_original": "schedule",
+      "intern_original": "handoff",
+      "intern_original_layer": "none",
+      "baseline_changed": "handoff",
+      "intern_changed": "handoff",
+      "intern_changed_layer": "none"
+    },
+    "mock-303": {
+      "label": "leave_alone",
+      "acceptable": [
+        "leave_alone",
+        "schedule"
+      ],
+      "changed_subject": "[EXTERNAL] Registration due date for InsurTech Summit - Sept 10",
+      "changed_sender": "events.team@insurtechconf.example.com",
+      "baseline_original": "handoff",
+      "intern_original": "handoff",
+      "intern_original_layer": "none",
+      "baseline_changed": "handoff",
+      "intern_changed": "handoff",
+      "intern_changed_layer": "none"
+    },
+    "mock-304": {
+      "label": "schedule",
+      "acceptable": [
+        "schedule",
+        "leave_alone"
+      ],
+      "changed_subject": "[EXTERNAL] Grade appeal window opens Sept 2, closes Sept 12",
+      "changed_sender": "registrar.team@campusportal.edu",
+      "baseline_original": "handoff",
+      "intern_original": "handoff",
+      "intern_original_layer": "none",
+      "baseline_changed": "handoff",
+      "intern_changed": "handoff",
+      "intern_changed_layer": "none"
+    },
+    "mock-305": {
+      "label": "schedule",
+      "acceptable": [
+        "schedule",
+        "reply"
+      ],
+      "changed_subject": "[EXTERNAL] Client session - can we do Monday Sept 1st, 3pm?",
+      "changed_sender": "j.reyes@acmebroker.com",
+      "baseline_original": "schedule",
+      "intern_original": "handoff",
+      "intern_original_layer": "none",
+      "baseline_changed": "handoff",
+      "intern_changed": "handoff",
+      "intern_changed_layer": "none"
+    },
+    "mock-306": {
+      "label": "schedule",
+      "acceptable": [
+        "schedule",
+        "reply"
+      ],
+      "changed_subject": "[EXTERNAL] Follow-up chat on Meyer contract terms - propose Sept 4th",
+      "changed_sender": "contracts.team@meyerlegal.example.com",
+      "baseline_original": "schedule",
+      "intern_original": "handoff",
+      "intern_original_layer": "none",
+      "baseline_changed": "handoff",
+      "intern_changed": "handoff",
+      "intern_changed_layer": "none"
+    },
+    "mock-307": {
+      "label": "schedule",
+      "acceptable": [
+        "schedule",
+        "reply"
+      ],
+      "changed_subject": "[EXTERNAL] Follow-up: can we push the Sept 3rd chat to Sept 9th, 1pm?",
+      "changed_sender": "d.whitfield@northline.example.com",
+      "baseline_original": "schedule",
+      "intern_original": "handoff",
+      "intern_original_layer": "none",
+      "baseline_changed": "handoff",
+      "intern_changed": "handoff",
+      "intern_changed_layer": "none"
+    },
+    "mock-308": {
+      "label": "schedule",
+      "acceptable": [
+        "schedule"
+      ],
+      "changed_subject": "[EXTERNAL] Team retrospective - Friday Sept 6th, 2:30pm",
+      "changed_sender": "a.rivera@teamcollab.example.com",
+      "baseline_original": "schedule",
+      "intern_original": "handoff",
+      "intern_original_layer": "none",
+      "baseline_changed": "handoff",
+      "intern_changed": "handoff",
+      "intern_changed_layer": "none"
+    },
+    "mock-309": {
+      "label": "schedule",
+      "acceptable": [
+        "schedule",
+        "leave_alone"
+      ],
+      "changed_subject": "[EXTERNAL] Timesheet submission due date - Sept 2, 5pm",
+      "changed_sender": "payroll.team@companyhr.example.com",
+      "baseline_original": "handoff",
+      "intern_original": "handoff",
+      "intern_original_layer": "none",
+      "baseline_changed": "handoff",
+      "intern_changed": "handoff",
+      "intern_changed_layer": "none"
+    },
+    "mock-310": {
+      "label": "schedule",
+      "acceptable": [
+        "schedule",
+        "reply"
+      ],
+      "changed_subject": "[EXTERNAL] Loved the proposal - let's talk pricing Sept 11th?",
+      "changed_sender": "priya.team@ramaswami-consulting.example.com",
+      "baseline_original": "handoff",
+      "intern_original": "handoff",
+      "intern_original_layer": "none",
+      "baseline_changed": "handoff",
+      "intern_changed": "handoff",
+      "intern_changed_layer": "none"
+    },
+    "mock-311": {
+      "label": "reply",
+      "acceptable": [
+        "reply",
+        "cold_email"
+      ],
+      "changed_subject": "[EXTERNAL] Re: Partnership intro - automating data entry for your team",
+      "changed_sender": "h.cole@brightpath.example.com",
+      "baseline_original": "handoff",
+      "intern_original": "handoff",
+      "intern_original_layer": "none",
+      "baseline_changed": "handoff",
+      "intern_changed": "handoff",
+      "intern_changed_layer": "none"
+    },
+    "mock-312": {
+      "label": "schedule",
+      "acceptable": [
+        "schedule",
+        "reply"
+      ],
+      "changed_subject": "[EXTERNAL] Re: Following up from the InsurTech Summit",
+      "changed_sender": "g.okafor@meridianmutual.example.com",
+      "baseline_original": "handoff",
+      "intern_original": "handoff",
+      "intern_original_layer": "none",
+      "baseline_changed": "handoff",
+      "intern_changed": "handoff",
+      "intern_changed_layer": "none"
+    },
+    "mock-313": {
+      "label": "reply",
+      "acceptable": [
+        "reply",
+        "forward",
+        "leave_alone"
+      ],
+      "changed_subject": "[EXTERNAL] October bill attached",
+      "changed_sender": "p.raman@vendorco.com",
+      "baseline_original": "reply",
+      "intern_original": "reply",
+      "intern_original_layer": "fast_fill",
+      "baseline_changed": "handoff",
+      "intern_changed": "reply",
+      "intern_changed_layer": "fast_fill"
+    }
+  },
+  "baseline_rules": {
+    "sender_rules": {
+      "priya.raman@vendorco.com": "reply",
+      "it-alerts@thirdpartyvendor.com": "forward"
+    },
+    "keyword_rules": [
+      [
+        "\\b(meeting|call|walkthrough|retro|kickoff|appointment)\\b",
+        "schedule"
+      ],
+      [
+        "\\b(newsletter|weekly|summary|unsubscribe)\\b",
+        "leave_alone"
+      ]
+    ]
+  }
+}
