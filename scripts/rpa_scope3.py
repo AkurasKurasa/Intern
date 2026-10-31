@@ -62,19 +62,28 @@ def load():
     return inbox, sent
 
 
-def perturb(m: EmailMessage) -> EmailMessage:
-    """Same message, same meaning, different surface."""
+CHANGES = ("sender", "tag", "synonyms")          # each tested alone, then together as "changed"
+
+
+def perturb(m: EmailMessage, changes=CHANGES) -> EmailMessage:
+    """Same message, same meaning, different surface.
+
+    sender    a different mailbox at the same organisation (and display name)
+    tag       an "[EXTERNAL] " subject tag
+    synonyms  common synonyms in the subject (call->chat, meeting->sync ...)"""
     p = copy.deepcopy(m)
-    local, domain = p.sender_email.split("@")
-    parts = re.split(r"[.\-_]", local)
-    new_local = (parts[0][0] + "." + parts[-1]) if len(parts) > 1 else (local + ".team")
-    p.sender_email = f"{new_local}@{domain}"
-    name = p.sender.split("<")[0].strip()
-    p.sender = f"{name.upper()} <{p.sender_email}>"
-    subj = p.subject
-    for pat, rep in SYNONYMS:
-        subj = re.sub(pat, rep, subj, flags=re.IGNORECASE)
-    p.subject = "[EXTERNAL] " + subj
+    if "sender" in changes:
+        local, domain = p.sender_email.split("@")
+        parts = re.split(r"[.\-_]", local)
+        new_local = (parts[0][0] + "." + parts[-1]) if len(parts) > 1 else (local + ".team")
+        p.sender_email = f"{new_local}@{domain}"
+        name = p.sender.split("<")[0].strip()
+        p.sender = f"{name.upper()} <{p.sender_email}>"
+    if "synonyms" in changes:
+        for pat, rep in SYNONYMS:
+            p.subject = re.sub(pat, rep, p.subject, flags=re.IGNORECASE)
+    if "tag" in changes:
+        p.subject = "[EXTERNAL] " + p.subject
     return p
 
 
@@ -151,10 +160,12 @@ def main():
     rules = build_baseline_rules(history, sent)
     agent = build_intern(history, sent)
     res = {"conditions": {}, "per_message": {}}
-    dec = {s: {c: {} for c in ("original", "changed")} for s in ("baseline", "intern")}
+    conds = ("original", "changed") + CHANGES               # "changed" = all three together
+    dec = {s: {c: {} for c in conds} for s in ("baseline", "intern")}
     for m in test:
         mp = perturb(m)
-        for cond, msg in (("original", m), ("changed", mp)):
+        variants = {"original": m, "changed": mp, **{c: perturb(m, (c,)) for c in CHANGES}}
+        for cond, msg in variants.items():
             dec["baseline"][cond][m.id] = baseline_decide(msg, rules)
             dec["intern"][cond][m.id], layer = intern_decide(agent, msg)
             res["per_message"].setdefault(m.id, {"label": labels[m.id]["primary"], "acceptable": labels[m.id]["acceptable"],
@@ -167,7 +178,9 @@ def main():
             res["conditions"][f"{s}_{cond}"] = metrics(dec[s][cond], labels)
         same = sum(dec[s]["original"][i] == dec[s]["changed"][i] for i in labels)
         res["conditions"][f"{s}_stability"] = {"same": same, "n": len(labels)}
-    for cond in ("original", "changed"):
+        for c in CHANGES:
+            res["conditions"][f"{s}_stability_{c}"] = {"same": sum(dec[s]["original"][i] == dec[s][c][i] for i in labels), "n": len(labels)}
+    for cond in conds:
         b = sum((dec["intern"][cond][i] in labels[i]["acceptable"]) and not (dec["baseline"][cond][i] in labels[i]["acceptable"]) for i in labels)
         c = sum(not (dec["intern"][cond][i] in labels[i]["acceptable"]) and (dec["baseline"][cond][i] in labels[i]["acceptable"]) for i in labels)
         res["conditions"][f"mcnemar_{cond}"] = {"intern_only_correct": b, "baseline_only_correct": c, "p": mcnemar_exact(b, c)}

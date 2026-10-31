@@ -14,8 +14,41 @@
       "handoff": 24,
       "wrong_action": 0
     },
+    "baseline_sender": {
+      "n": 25,
+      "strict": 8,
+      "lenient": 8,
+      "handoff": 17,
+      "wrong_action": 0
+    },
+    "baseline_tag": {
+      "n": 25,
+      "strict": 12,
+      "lenient": 12,
+      "handoff": 13,
+      "wrong_action": 0
+    },
+    "baseline_synonyms": {
+      "n": 25,
+      "strict": 5,
+      "lenient": 5,
+      "handoff": 20,
+      "wrong_action": 0
+    },
     "baseline_stability": {
       "same": 14,
+      "n": 25
+    },
+    "baseline_stability_sender": {
+      "same": 21,
+      "n": 25
+    },
+    "baseline_stability_tag": {
+      "same": 25,
+      "n": 25
+    },
+    "baseline_stability_synonyms": {
+      "same": 18,
       "n": 25
     },
     "intern_original": {
@@ -32,7 +65,40 @@
       "handoff": 21,
       "wrong_action": 0
     },
+    "intern_sender": {
+      "n": 25,
+      "strict": 4,
+      "lenient": 4,
+      "handoff": 21,
+      "wrong_action": 0
+    },
+    "intern_tag": {
+      "n": 25,
+      "strict": 4,
+      "lenient": 4,
+      "handoff": 21,
+      "wrong_action": 0
+    },
+    "intern_synonyms": {
+      "n": 25,
+      "strict": 4,
+      "lenient": 4,
+      "handoff": 21,
+      "wrong_action": 0
+    },
     "intern_stability": {
+      "same": 25,
+      "n": 25
+    },
+    "intern_stability_sender": {
+      "same": 25,
+      "n": 25
+    },
+    "intern_stability_tag": {
+      "same": 25,
+      "n": 25
+    },
+    "intern_stability_synonyms": {
       "same": 25,
       "n": 25
     },
@@ -45,6 +111,21 @@
       "intern_only_correct": 4,
       "baseline_only_correct": 1,
       "p": 0.375
+    },
+    "mcnemar_sender": {
+      "intern_only_correct": 4,
+      "baseline_only_correct": 8,
+      "p": 0.3876953125
+    },
+    "mcnemar_tag": {
+      "intern_only_correct": 0,
+      "baseline_only_correct": 8,
+      "p": 0.0078125
+    },
+    "mcnemar_synonyms": {
+      "intern_only_correct": 0,
+      "baseline_only_correct": 1,
+      "p": 1.0
     }
   },
   "per_message": {
@@ -61,7 +142,16 @@
       "intern_original_layer": "none",
       "baseline_changed": "handoff",
       "intern_changed": "handoff",
-      "intern_changed_layer": "none"
+      "intern_changed_layer": "none",
+      "baseline_sender": "handoff",
+      "intern_sender": "handoff",
+      "intern_sender_layer": "none",
+      "baseline_tag": "handoff",
+      "intern_tag": "handoff",
+      "intern_tag_layer": "none",
+      "baseline_synonyms": "handoff",
+      "intern_synonyms": "handoff",
+      "intern_synonyms_layer": "none"
     },
     "mock-002": {
       "label": "reply",
@@ -76,7 +166,16 @@
       "intern_original_layer": "none",
       "baseline_changed": "handoff",
       "intern_changed": "handoff",
-      "intern_changed_layer": "none"
+      "intern_changed_layer": "none",
+      "baseline_sender": "handoff",
+      "intern_sender": "handoff",
+      "intern_sender_layer": "none",
+      "baseline_tag": "handoff",
+      "intern_tag": "handoff",
+      "intern_tag_layer": "none",
+      "baseline_synonyms": "handoff",
+      "intern_synonyms": "handoff",
+      "intern_synonyms_layer": "none"
     },
     "mock-003": {
       "label": "reply",
@@ -90,7 +189,16 @@
       "intern_original_layer": "fast_fill",
       "baseline_changed": "handoff",
       "intern_changed": "reply",
-      "intern_changed_layer": "fast_fill"
+      "intern_changed_layer": "fast_fill",
+      "baseline_sender": "handoff",
+      "intern_sender": "reply",
+      "intern_sender_layer": "fast_fill",
+      "baseline_tag": "reply",
+      "intern_tag": "reply",
+      "intern_tag_layer": "fast_fill",
+      "baseline_synonyms": "reply",
+      "intern_synonyms": "reply",
+      "intern_synonyms_layer": "fast_fill"
     },
     "mock-004": {
       "label": "forward",
@@ -105,7 +213,16 @@
       "intern_original_layer": "fast_fill",
       "baseline_changed": "handoff",
       "intern_changed": "forward",
-      "intern_changed_layer": "fast_fill"
+      "intern_changed_layer": "fast_fill",
+      "baseline_sender": "handoff",
+      "intern_sender": "forward",
+      "intern_sender_layer": "fast_fill",
+      "baseline_tag": "forward",
+      "intern_tag": "forward",
+      "intern_tag_layer": "fast_fill",
+      "baseline_synonyms": "forward",
+      "intern_synonyms": "forward",
+      "intern_synonyms_layer": "fast_fill"
     },
     "mock-005": {
       "label": "forward",
@@ -120,7 +237,16 @@
       "intern_original_layer": "none",
       "baseline_changed": "handoff",
       "intern_changed": "handoff",
-      "intern_changed_layer": "none"
+      "intern_changed_layer": "none",
+      "baseline_sender": "handoff",
+      "intern_sender": "handoff",
+      "intern_sender_layer": "none",
+      "baseline_tag": "handoff",
+      "intern_tag": "handoff",
+      "intern_tag_layer": "none",
+      "baseline_synonyms": "handoff",
+      "intern_synonyms": "handoff",
+      "intern_synonyms_layer": "none"
     },
     "mock-006": {
       "label": "leave_alone",
@@ -134,7 +260,16 @@
       "intern_original_layer": "fast_fill",
       "baseline_changed": "handoff",
       "intern_changed": "leave_alone",
-      "intern_changed_layer": "fast_fill"
+      "intern_changed_layer": "fast_fill",
+      "baseline_sender": "handoff",
+      "intern_sender": "leave_alone",
+      "intern_sender_layer": "fast_fill",
+      "baseline_tag": "leave_alone",
+      "intern_tag": "leave_alone",
+      "intern_tag_layer": "fast_fill",
+      "baseline_synonyms": "leave_alone",
+      "intern_synonyms": "leave_alone",
+      "intern_synonyms_layer": "fast_fill"
     },
     "mock-201": {
       "label": "reply",
@@ -148,7 +283,16 @@
       "intern_original_layer": "none",
       "baseline_changed": "handoff",
       "intern_changed": "handoff",
-      "intern_changed_layer": "none"
+      "intern_changed_layer": "none",
+      "baseline_sender": "handoff",
+      "intern_sender": "handoff",
+      "intern_sender_layer": "none",
+      "baseline_tag": "handoff",
+      "intern_tag": "handoff",
+      "intern_tag_layer": "none",
+      "baseline_synonyms": "handoff",
+      "intern_synonyms": "handoff",
+      "intern_synonyms_layer": "none"
     },
     "mock-202": {
       "label": "forward",
@@ -163,7 +307,16 @@
       "intern_original_layer": "none",
       "baseline_changed": "handoff",
       "intern_changed": "handoff",
-      "intern_changed_layer": "none"
+      "intern_changed_layer": "none",
+      "baseline_sender": "handoff",
+      "intern_sender": "handoff",
+      "intern_sender_layer": "none",
+      "baseline_tag": "handoff",
+      "intern_tag": "handoff",
+      "intern_tag_layer": "none",
+      "baseline_synonyms": "handoff",
+      "intern_synonyms": "handoff",
+      "intern_synonyms_layer": "none"
     },
     "mock-203": {
       "label": "schedule",
@@ -178,7 +331,16 @@
       "intern_original_layer": "none",
       "baseline_changed": "handoff",
       "intern_changed": "handoff",
-      "intern_changed_layer": "none"
+      "intern_changed_layer": "none",
+      "baseline_sender": "schedule",
+      "intern_sender": "handoff",
+      "intern_sender_layer": "none",
+      "baseline_tag": "schedule",
+      "intern_tag": "handoff",
+      "intern_tag_layer": "none",
+      "baseline_synonyms": "handoff",
+      "intern_synonyms": "handoff",
+      "intern_synonyms_layer": "none"
     },
     "mock-204": {
       "label": "schedule",
@@ -193,7 +355,16 @@
       "intern_original_layer": "none",
       "baseline_changed": "handoff",
       "intern_changed": "handoff",
-      "intern_changed_layer": "none"
+      "intern_changed_layer": "none",
+      "baseline_sender": "handoff",
+      "intern_sender": "handoff",
+      "intern_sender_layer": "none",
+      "baseline_tag": "handoff",
+      "intern_tag": "handoff",
+      "intern_tag_layer": "none",
+      "baseline_synonyms": "handoff",
+      "intern_synonyms": "handoff",
+      "intern_synonyms_layer": "none"
     },
     "mock-205": {
       "label": "reply",
@@ -208,7 +379,16 @@
       "intern_original_layer": "none",
       "baseline_changed": "handoff",
       "intern_changed": "handoff",
-      "intern_changed_layer": "none"
+      "intern_changed_layer": "none",
+      "baseline_sender": "handoff",
+      "intern_sender": "handoff",
+      "intern_sender_layer": "none",
+      "baseline_tag": "handoff",
+      "intern_tag": "handoff",
+      "intern_tag_layer": "none",
+      "baseline_synonyms": "handoff",
+      "intern_synonyms": "handoff",
+      "intern_synonyms_layer": "none"
     },
     "mock-206": {
       "label": "leave_alone",
@@ -222,7 +402,16 @@
       "intern_original_layer": "none",
       "baseline_changed": "leave_alone",
       "intern_changed": "handoff",
-      "intern_changed_layer": "none"
+      "intern_changed_layer": "none",
+      "baseline_sender": "leave_alone",
+      "intern_sender": "handoff",
+      "intern_sender_layer": "none",
+      "baseline_tag": "leave_alone",
+      "intern_tag": "handoff",
+      "intern_tag_layer": "none",
+      "baseline_synonyms": "leave_alone",
+      "intern_synonyms": "handoff",
+      "intern_synonyms_layer": "none"
     },
     "mock-301": {
       "label": "schedule",
@@ -237,7 +426,16 @@
       "intern_original_layer": "none",
       "baseline_changed": "handoff",
       "intern_changed": "handoff",
-      "intern_changed_layer": "none"
+      "intern_changed_layer": "none",
+      "baseline_sender": "schedule",
+      "intern_sender": "handoff",
+      "intern_sender_layer": "none",
+      "baseline_tag": "schedule",
+      "intern_tag": "handoff",
+      "intern_tag_layer": "none",
+      "baseline_synonyms": "handoff",
+      "intern_synonyms": "handoff",
+      "intern_synonyms_layer": "none"
     },
     "mock-302": {
       "label": "schedule",
@@ -252,7 +450,16 @@
       "intern_original_layer": "none",
       "baseline_changed": "handoff",
       "intern_changed": "handoff",
-      "intern_changed_layer": "none"
+      "intern_changed_layer": "none",
+      "baseline_sender": "schedule",
+      "intern_sender": "handoff",
+      "intern_sender_layer": "none",
+      "baseline_tag": "schedule",
+      "intern_tag": "handoff",
+      "intern_tag_layer": "none",
+      "baseline_synonyms": "handoff",
+      "intern_synonyms": "handoff",
+      "intern_synonyms_layer": "none"
     },
     "mock-303": {
       "label": "leave_alone",
@@ -267,7 +474,16 @@
       "intern_original_layer": "none",
       "baseline_changed": "handoff",
       "intern_changed": "handoff",
-      "intern_changed_layer": "none"
+      "intern_changed_layer": "none",
+      "baseline_sender": "handoff",
+      "intern_sender": "handoff",
+      "intern_sender_layer": "none",
+      "baseline_tag": "handoff",
+      "intern_tag": "handoff",
+      "intern_tag_layer": "none",
+      "baseline_synonyms": "handoff",
+      "intern_synonyms": "handoff",
+      "intern_synonyms_layer": "none"
     },
     "mock-304": {
       "label": "schedule",
@@ -282,7 +498,16 @@
       "intern_original_layer": "none",
       "baseline_changed": "handoff",
       "intern_changed": "handoff",
-      "intern_changed_layer": "none"
+      "intern_changed_layer": "none",
+      "baseline_sender": "handoff",
+      "intern_sender": "handoff",
+      "intern_sender_layer": "none",
+      "baseline_tag": "handoff",
+      "intern_tag": "handoff",
+      "intern_tag_layer": "none",
+      "baseline_synonyms": "handoff",
+      "intern_synonyms": "handoff",
+      "intern_synonyms_layer": "none"
     },
     "mock-305": {
       "label": "schedule",
@@ -297,7 +522,16 @@
       "intern_original_layer": "none",
       "baseline_changed": "handoff",
       "intern_changed": "handoff",
-      "intern_changed_layer": "none"
+      "intern_changed_layer": "none",
+      "baseline_sender": "schedule",
+      "intern_sender": "handoff",
+      "intern_sender_layer": "none",
+      "baseline_tag": "schedule",
+      "intern_tag": "handoff",
+      "intern_tag_layer": "none",
+      "baseline_synonyms": "handoff",
+      "intern_synonyms": "handoff",
+      "intern_synonyms_layer": "none"
     },
     "mock-306": {
       "label": "schedule",
@@ -312,7 +546,16 @@
       "intern_original_layer": "none",
       "baseline_changed": "handoff",
       "intern_changed": "handoff",
-      "intern_changed_layer": "none"
+      "intern_changed_layer": "none",
+      "baseline_sender": "schedule",
+      "intern_sender": "handoff",
+      "intern_sender_layer": "none",
+      "baseline_tag": "schedule",
+      "intern_tag": "handoff",
+      "intern_tag_layer": "none",
+      "baseline_synonyms": "handoff",
+      "intern_synonyms": "handoff",
+      "intern_synonyms_layer": "none"
     },
     "mock-307": {
       "label": "schedule",
@@ -327,7 +570,16 @@
       "intern_original_layer": "none",
       "baseline_changed": "handoff",
       "intern_changed": "handoff",
-      "intern_changed_layer": "none"
+      "intern_changed_layer": "none",
+      "baseline_sender": "schedule",
+      "intern_sender": "handoff",
+      "intern_sender_layer": "none",
+      "baseline_tag": "schedule",
+      "intern_tag": "handoff",
+      "intern_tag_layer": "none",
+      "baseline_synonyms": "handoff",
+      "intern_synonyms": "handoff",
+      "intern_synonyms_layer": "none"
     },
     "mock-308": {
       "label": "schedule",
@@ -341,7 +593,16 @@
       "intern_original_layer": "none",
       "baseline_changed": "handoff",
       "intern_changed": "handoff",
-      "intern_changed_layer": "none"
+      "intern_changed_layer": "none",
+      "baseline_sender": "schedule",
+      "intern_sender": "handoff",
+      "intern_sender_layer": "none",
+      "baseline_tag": "schedule",
+      "intern_tag": "handoff",
+      "intern_tag_layer": "none",
+      "baseline_synonyms": "handoff",
+      "intern_synonyms": "handoff",
+      "intern_synonyms_layer": "none"
     },
     "mock-309": {
       "label": "schedule",
@@ -356,7 +617,16 @@
       "intern_original_layer": "none",
       "baseline_changed": "handoff",
       "intern_changed": "handoff",
-      "intern_changed_layer": "none"
+      "intern_changed_layer": "none",
+      "baseline_sender": "handoff",
+      "intern_sender": "handoff",
+      "intern_sender_layer": "none",
+      "baseline_tag": "handoff",
+      "intern_tag": "handoff",
+      "intern_tag_layer": "none",
+      "baseline_synonyms": "handoff",
+      "intern_synonyms": "handoff",
+      "intern_synonyms_layer": "none"
     },
     "mock-310": {
       "label": "schedule",
@@ -371,7 +641,16 @@
       "intern_original_layer": "none",
       "baseline_changed": "handoff",
       "intern_changed": "handoff",
-      "intern_changed_layer": "none"
+      "intern_changed_layer": "none",
+      "baseline_sender": "handoff",
+      "intern_sender": "handoff",
+      "intern_sender_layer": "none",
+      "baseline_tag": "handoff",
+      "intern_tag": "handoff",
+      "intern_tag_layer": "none",
+      "baseline_synonyms": "handoff",
+      "intern_synonyms": "handoff",
+      "intern_synonyms_layer": "none"
     },
     "mock-311": {
       "label": "reply",
@@ -386,7 +665,16 @@
       "intern_original_layer": "none",
       "baseline_changed": "handoff",
       "intern_changed": "handoff",
-      "intern_changed_layer": "none"
+      "intern_changed_layer": "none",
+      "baseline_sender": "handoff",
+      "intern_sender": "handoff",
+      "intern_sender_layer": "none",
+      "baseline_tag": "handoff",
+      "intern_tag": "handoff",
+      "intern_tag_layer": "none",
+      "baseline_synonyms": "handoff",
+      "intern_synonyms": "handoff",
+      "intern_synonyms_layer": "none"
     },
     "mock-312": {
       "label": "schedule",
@@ -401,7 +689,16 @@
       "intern_original_layer": "none",
       "baseline_changed": "handoff",
       "intern_changed": "handoff",
-      "intern_changed_layer": "none"
+      "intern_changed_layer": "none",
+      "baseline_sender": "handoff",
+      "intern_sender": "handoff",
+      "intern_sender_layer": "none",
+      "baseline_tag": "handoff",
+      "intern_tag": "handoff",
+      "intern_tag_layer": "none",
+      "baseline_synonyms": "handoff",
+      "intern_synonyms": "handoff",
+      "intern_synonyms_layer": "none"
     },
     "mock-313": {
       "label": "reply",
@@ -417,7 +714,16 @@
       "intern_original_layer": "fast_fill",
       "baseline_changed": "handoff",
       "intern_changed": "reply",
-      "intern_changed_layer": "fast_fill"
+      "intern_changed_layer": "fast_fill",
+      "baseline_sender": "handoff",
+      "intern_sender": "reply",
+      "intern_sender_layer": "fast_fill",
+      "baseline_tag": "reply",
+      "intern_tag": "reply",
+      "intern_tag_layer": "fast_fill",
+      "baseline_synonyms": "reply",
+      "intern_synonyms": "reply",
+      "intern_synonyms_layer": "fast_fill"
     }
   },
   "baseline_rules": {

@@ -29,6 +29,27 @@ def test_perturbation_keeps_domain_and_body_and_changes_surface():
     assert p.subject.startswith("[EXTERNAL] ") and "chat" in p.subject and "call" not in p.subject.lower()
 
 
+def test_each_single_change_alters_only_its_own_part():
+    inbox, _ = s3.load()
+    m = next(x for x in inbox if x.id == "mock-203")     # subject has "call"
+    snd = s3.perturb(m, ("sender",))
+    assert snd.sender_email != m.sender_email and snd.subject == m.subject
+    tag = s3.perturb(m, ("tag",))
+    assert tag.sender_email == m.sender_email and tag.subject == "[EXTERNAL] " + m.subject
+    syn = s3.perturb(m, ("synonyms",))
+    assert syn.sender_email == m.sender_email and "chat" in syn.subject and not syn.subject.startswith("[EXTERNAL]")
+    for p in (snd, tag, syn):
+        assert p.body_text == m.body_text
+        assert p.sender_email.split("@")[1] == m.sender_email.split("@")[1]
+
+
+def test_combined_change_equals_default_perturb():
+    inbox, _ = s3.load()
+    m = inbox[0]
+    a, b = s3.perturb(m), s3.perturb(m, s3.CHANGES)
+    assert (a.subject, a.sender_email) == (b.subject, b.sender_email)
+
+
 def test_baseline_rules_come_only_from_the_history():
     inbox, sent = s3.load()
     history = [m for m in inbox if m.id in s3.HISTORY]
