@@ -1,7 +1,7 @@
 {
-  "variant": "v6a_options",
-  "mapping": "C:\\Users\\DANIEL\\AppData\\Local\\Temp\\tmp6oyp7ccz\\induced_mapping.json",
-  "started": "2026-10-31T20:18:39+00:00",
+  "variant": "v4_unassociated",
+  "mapping": "C:\\Users\\DANIEL\\AppData\\Local\\Temp\\tmp2e043dik\\induced_mapping.json",
+  "started": "2026-10-31T20:47:27+00:00",
   "dry_run": true,
   "rows": [
     {
@@ -14,14 +14,14 @@
         "Midterm 0-100": "85",
         "Final 0-100": "85",
         "Grade 0-100": "85",
-        "Remarks": "PASSED"
+        "Remarks": "Passed"
       },
       "verified": {
         "Year 1-5": "2",
         "Midterm 0-100": "85",
         "Final 0-100": "85",
         "Grade 0-100": "85",
-        "Remarks": "PASSED"
+        "Remarks": "Passed"
       },
       "escalations": []
     },
@@ -35,14 +35,14 @@
         "Midterm 0-100": "95",
         "Final 0-100": "96",
         "Grade 0-100": "96",
-        "Remarks": "PASSED"
+        "Remarks": "Passed"
       },
       "verified": {
         "Year 1-5": "2",
         "Midterm 0-100": "95",
         "Final 0-100": "96",
         "Grade 0-100": "96",
-        "Remarks": "PASSED"
+        "Remarks": "Passed"
       },
       "escalations": []
     },
@@ -56,14 +56,14 @@
         "Midterm 0-100": "92",
         "Final 0-100": "98",
         "Grade 0-100": "95",
-        "Remarks": "PASSED"
+        "Remarks": "Passed"
       },
       "verified": {
         "Year 1-5": "3",
         "Midterm 0-100": "92",
         "Final 0-100": "98",
         "Grade 0-100": "95",
-        "Remarks": "PASSED"
+        "Remarks": "Passed"
       },
       "escalations": []
     },
@@ -77,14 +77,14 @@
         "Midterm 0-100": "89",
         "Final 0-100": "85",
         "Grade 0-100": "87",
-        "Remarks": "PASSED"
+        "Remarks": "Passed"
       },
       "verified": {
         "Year 1-5": "2",
         "Midterm 0-100": "89",
         "Final 0-100": "85",
         "Grade 0-100": "87",
-        "Remarks": "PASSED"
+        "Remarks": "Passed"
       },
       "escalations": []
     },
@@ -98,14 +98,14 @@
         "Midterm 0-100": "72",
         "Final 0-100": "73",
         "Grade 0-100": "72",
-        "Remarks": "FAILED"
+        "Remarks": "Failed"
       },
       "verified": {
         "Year 1-5": "1",
         "Midterm 0-100": "72",
         "Final 0-100": "73",
         "Grade 0-100": "72",
-        "Remarks": "FAILED"
+        "Remarks": "Failed"
       },
       "escalations": []
     },
@@ -119,14 +119,14 @@
         "Midterm 0-100": "85",
         "Final 0-100": "85",
         "Grade 0-100": "85",
-        "Remarks": "PASSED"
+        "Remarks": "Passed"
       },
       "verified": {
         "Year 1-5": "3",
         "Midterm 0-100": "85",
         "Final 0-100": "85",
         "Grade 0-100": "85",
-        "Remarks": "PASSED"
+        "Remarks": "Passed"
       },
       "escalations": []
     },
@@ -140,14 +140,14 @@
         "Midterm 0-100": "78",
         "Final 0-100": "86",
         "Grade 0-100": "82",
-        "Remarks": "PASSED"
+        "Remarks": "Passed"
       },
       "verified": {
         "Year 1-5": "4",
         "Midterm 0-100": "78",
         "Final 0-100": "86",
         "Grade 0-100": "82",
-        "Remarks": "PASSED"
+        "Remarks": "Passed"
       },
       "escalations": []
     },
@@ -161,14 +161,14 @@
         "Midterm 0-100": "74",
         "Final 0-100": "75",
         "Grade 0-100": "74",
-        "Remarks": "FAILED"
+        "Remarks": "Failed"
       },
       "verified": {
         "Year 1-5": "3",
         "Midterm 0-100": "74",
         "Final 0-100": "75",
         "Grade 0-100": "74",
-        "Remarks": "FAILED"
+        "Remarks": "Failed"
       },
       "escalations": []
     },
@@ -182,14 +182,14 @@
         "Midterm 0-100": "90",
         "Final 0-100": "89",
         "Grade 0-100": "90",
-        "Remarks": "PASSED"
+        "Remarks": "Passed"
       },
       "verified": {
         "Year 1-5": "1",
         "Midterm 0-100": "90",
         "Final 0-100": "89",
         "Grade 0-100": "90",
-        "Remarks": "PASSED"
+        "Remarks": "Passed"
       },
       "escalations": []
     },
@@ -203,14 +203,14 @@
         "Midterm 0-100": "92",
         "Final 0-100": "80",
         "Grade 0-100": "86",
-        "Remarks": "PASSED"
+        "Remarks": "Passed"
       },
       "verified": {
         "Year 1-5": "3",
         "Midterm 0-100": "92",
         "Final 0-100": "80",
         "Grade 0-100": "86",
-        "Remarks": "PASSED"
+        "Remarks": "Passed"
       },
       "escalations": []
     },
@@ -224,14 +224,14 @@
         "Midterm 0-100": "79",
         "Final 0-100": "81",
         "Grade 0-100": "80",
-        "Remarks": "PASSED"
+        "Remarks": "Passed"
       },
       "verified": {
         "Year 1-5": "3",
         "Midterm 0-100": "79",
         "Final 0-100": "81",
         "Grade 0-100": "80",
-        "Remarks": "PASSED"
+        "Remarks": "Passed"
       },
       "escalations": []
     },
@@ -245,14 +245,14 @@
         "Midterm 0-100": "97",
         "Final 0-100": "97",
         "Grade 0-100": "97",
-        "Remarks": "PASSED"
+        "Remarks": "Passed"
       },
       "verified": {
         "Year 1-5": "3",
         "Midterm 0-100": "97",
         "Final 0-100": "97",
         "Grade 0-100": "97",
-        "Remarks": "PASSED"
+        "Remarks": "Passed"
       },
       "escalations": []
     },
@@ -266,14 +266,14 @@
         "Midterm 0-100": "73",
         "Final 0-100": "72",
         "Grade 0-100": "72",
-        "Remarks": "FAILED"
+        "Remarks": "Failed"
       },
       "verified": {
         "Year 1-5": "1",
         "Midterm 0-100": "73",
         "Final 0-100": "72",
         "Grade 0-100": "72",
-        "Remarks": "FAILED"
+        "Remarks": "Failed"
       },
       "escalations": []
     },
@@ -287,14 +287,14 @@
         "Midterm 0-100": "91",
         "Final 0-100": "93",
         "Grade 0-100": "92",
-        "Remarks": "PASSED"
+        "Remarks": "Passed"
       },
       "verified": {
         "Year 1-5": "3",
         "Midterm 0-100": "91",
         "Final 0-100": "93",
         "Grade 0-100": "92",
-        "Remarks": "PASSED"
+        "Remarks": "Passed"
       },
       "escalations": []
     },
@@ -308,14 +308,14 @@
         "Midterm 0-100": "73",
         "Final 0-100": "73",
         "Grade 0-100": "73",
-        "Remarks": "FAILED"
+        "Remarks": "Failed"
       },
       "verified": {
         "Year 1-5": "4",
         "Midterm 0-100": "73",
         "Final 0-100": "73",
         "Grade 0-100": "73",
-        "Remarks": "FAILED"
+        "Remarks": "Failed"
       },
       "escalations": []
     },
@@ -329,14 +329,14 @@
         "Midterm 0-100": "72",
         "Final 0-100": "71",
         "Grade 0-100": "72",
-        "Remarks": "FAILED"
+        "Remarks": "Failed"
       },
       "verified": {
         "Year 1-5": "4",
         "Midterm 0-100": "72",
         "Final 0-100": "71",
         "Grade 0-100": "72",
-        "Remarks": "FAILED"
+        "Remarks": "Failed"
       },
       "escalations": []
     },
@@ -350,14 +350,14 @@
         "Midterm 0-100": "93",
         "Final 0-100": "94",
         "Grade 0-100": "94",
-        "Remarks": "PASSED"
+        "Remarks": "Passed"
       },
       "verified": {
         "Year 1-5": "3",
         "Midterm 0-100": "93",
         "Final 0-100": "94",
         "Grade 0-100": "94",
-        "Remarks": "PASSED"
+        "Remarks": "Passed"
       },
       "escalations": []
     },
@@ -371,14 +371,14 @@
         "Midterm 0-100": "74",
         "Final 0-100": "74",
         "Grade 0-100": "74",
-        "Remarks": "FAILED"
+        "Remarks": "Failed"
       },
       "verified": {
         "Year 1-5": "4",
         "Midterm 0-100": "74",
         "Final 0-100": "74",
         "Grade 0-100": "74",
-        "Remarks": "FAILED"
+        "Remarks": "Failed"
       },
       "escalations": []
     },
@@ -392,14 +392,14 @@
         "Midterm 0-100": "87",
         "Final 0-100": "83",
         "Grade 0-100": "85",
-        "Remarks": "PASSED"
+        "Remarks": "Passed"
       },
       "verified": {
         "Year 1-5": "4",
         "Midterm 0-100": "87",
         "Final 0-100": "83",
         "Grade 0-100": "85",
-        "Remarks": "PASSED"
+        "Remarks": "Passed"
       },
       "escalations": []
     },
@@ -413,14 +413,14 @@
         "Midterm 0-100": "91",
         "Final 0-100": "95",
         "Grade 0-100": "93",
-        "Remarks": "PASSED"
+        "Remarks": "Passed"
       },
       "verified": {
         "Year 1-5": "4",
         "Midterm 0-100": "91",
         "Final 0-100": "95",
         "Grade 0-100": "93",
-        "Remarks": "PASSED"
+        "Remarks": "Passed"
       },
       "escalations": []
     },
@@ -434,14 +434,14 @@
         "Midterm 0-100": "94",
         "Final 0-100": "91",
         "Grade 0-100": "92",
-        "Remarks": "PASSED"
+        "Remarks": "Passed"
       },
       "verified": {
         "Year 1-5": "1",
         "Midterm 0-100": "94",
         "Final 0-100": "91",
         "Grade 0-100": "92",
-        "Remarks": "PASSED"
+        "Remarks": "Passed"
       },
       "escalations": []
     },
@@ -455,14 +455,14 @@
         "Midterm 0-100": "96",
         "Final 0-100": "87",
         "Grade 0-100": "92",
-        "Remarks": "PASSED"
+        "Remarks": "Passed"
       },
       "verified": {
         "Year 1-5": "2",
         "Midterm 0-100": "96",
         "Final 0-100": "87",
         "Grade 0-100": "92",
-        "Remarks": "PASSED"
+        "Remarks": "Passed"
       },
       "escalations": []
     },
@@ -476,14 +476,14 @@
         "Midterm 0-100": "88",
         "Final 0-100": "89",
         "Grade 0-100": "88",
-        "Remarks": "PASSED"
+        "Remarks": "Passed"
       },
       "verified": {
         "Year 1-5": "1",
         "Midterm 0-100": "88",
         "Final 0-100": "89",
         "Grade 0-100": "88",
-        "Remarks": "PASSED"
+        "Remarks": "Passed"
       },
       "escalations": []
     },
@@ -497,14 +497,14 @@
         "Midterm 0-100": "88",
         "Final 0-100": "81",
         "Grade 0-100": "84",
-        "Remarks": "PASSED"
+        "Remarks": "Passed"
       },
       "verified": {
         "Year 1-5": "3",
         "Midterm 0-100": "88",
         "Final 0-100": "81",
         "Grade 0-100": "84",
-        "Remarks": "PASSED"
+        "Remarks": "Passed"
       },
       "escalations": []
     },
@@ -518,14 +518,14 @@
         "Midterm 0-100": "74",
         "Final 0-100": "76",
         "Grade 0-100": "75",
-        "Remarks": "PASSED"
+        "Remarks": "Passed"
       },
       "verified": {
         "Year 1-5": "2",
         "Midterm 0-100": "74",
         "Final 0-100": "76",
         "Grade 0-100": "75",
-        "Remarks": "PASSED"
+        "Remarks": "Passed"
       },
       "escalations": []
     },
@@ -539,14 +539,14 @@
         "Midterm 0-100": "73",
         "Final 0-100": "79",
         "Grade 0-100": "76",
-        "Remarks": "PASSED"
+        "Remarks": "Passed"
       },
       "verified": {
         "Year 1-5": "4",
         "Midterm 0-100": "73",
         "Final 0-100": "79",
         "Grade 0-100": "76",
-        "Remarks": "PASSED"
+        "Remarks": "Passed"
       },
       "escalations": []
     },
@@ -560,14 +560,14 @@
         "Midterm 0-100": "74",
         "Final 0-100": "74",
         "Grade 0-100": "74",
-        "Remarks": "FAILED"
+        "Remarks": "Failed"
       },
       "verified": {
         "Year 1-5": "1",
         "Midterm 0-100": "74",
         "Final 0-100": "74",
         "Grade 0-100": "74",
-        "Remarks": "FAILED"
+        "Remarks": "Failed"
       },
       "escalations": []
     },
@@ -581,14 +581,14 @@
         "Midterm 0-100": "99",
         "Final 0-100": "99",
         "Grade 0-100": "99",
-        "Remarks": "PASSED"
+        "Remarks": "Passed"
       },
       "verified": {
         "Year 1-5": "2",
         "Midterm 0-100": "99",
         "Final 0-100": "99",
         "Grade 0-100": "99",
-        "Remarks": "PASSED"
+        "Remarks": "Passed"
       },
       "escalations": []
     },
@@ -602,14 +602,14 @@
         "Midterm 0-100": "81",
         "Final 0-100": "86",
         "Grade 0-100": "84",
-        "Remarks": "PASSED"
+        "Remarks": "Passed"
       },
       "verified": {
         "Year 1-5": "3",
         "Midterm 0-100": "81",
         "Final 0-100": "86",
         "Grade 0-100": "84",
-        "Remarks": "PASSED"
+        "Remarks": "Passed"
       },
       "escalations": []
     },
@@ -623,14 +623,14 @@
         "Midterm 0-100": "91",
         "Final 0-100": "88",
         "Grade 0-100": "90",
-        "Remarks": "PASSED"
+        "Remarks": "Passed"
       },
       "verified": {
         "Year 1-5": "3",
         "Midterm 0-100": "91",
         "Final 0-100": "88",
         "Grade 0-100": "90",
-        "Remarks": "PASSED"
+        "Remarks": "Passed"
       },
       "escalations": []
     },
@@ -644,14 +644,14 @@
         "Midterm 0-100": "87",
         "Final 0-100": "90",
         "Grade 0-100": "88",
-        "Remarks": "PASSED"
+        "Remarks": "Passed"
       },
       "verified": {
         "Year 1-5": "4",
         "Midterm 0-100": "87",
         "Final 0-100": "90",
         "Grade 0-100": "88",
-        "Remarks": "PASSED"
+        "Remarks": "Passed"
       },
       "escalations": []
     },
@@ -665,14 +665,14 @@
         "Midterm 0-100": "73",
         "Final 0-100": "76",
         "Grade 0-100": "74",
-        "Remarks": "FAILED"
+        "Remarks": "Failed"
       },
       "verified": {
         "Year 1-5": "3",
         "Midterm 0-100": "73",
         "Final 0-100": "76",
         "Grade 0-100": "74",
-        "Remarks": "FAILED"
+        "Remarks": "Failed"
       },
       "escalations": []
     },
@@ -686,14 +686,14 @@
         "Midterm 0-100": "74",
         "Final 0-100": "72",
         "Grade 0-100": "73",
-        "Remarks": "FAILED"
+        "Remarks": "Failed"
       },
       "verified": {
         "Year 1-5": "1",
         "Midterm 0-100": "74",
         "Final 0-100": "72",
         "Grade 0-100": "73",
-        "Remarks": "FAILED"
+        "Remarks": "Failed"
       },
       "escalations": []
     },
@@ -707,14 +707,14 @@
         "Midterm 0-100": "77",
         "Final 0-100": "74",
         "Grade 0-100": "76",
-        "Remarks": "PASSED"
+        "Remarks": "Passed"
       },
       "verified": {
         "Year 1-5": "4",
         "Midterm 0-100": "77",
         "Final 0-100": "74",
         "Grade 0-100": "76",
-        "Remarks": "PASSED"
+        "Remarks": "Passed"
       },
       "escalations": []
     },
@@ -728,14 +728,14 @@
         "Midterm 0-100": "88",
         "Final 0-100": "81",
         "Grade 0-100": "84",
-        "Remarks": "PASSED"
+        "Remarks": "Passed"
       },
       "verified": {
         "Year 1-5": "2",
         "Midterm 0-100": "88",
         "Final 0-100": "81",
         "Grade 0-100": "84",
-        "Remarks": "PASSED"
+        "Remarks": "Passed"
       },
       "escalations": []
     },
@@ -749,14 +749,14 @@
         "Midterm 0-100": "84",
         "Final 0-100": "83",
         "Grade 0-100": "84",
-        "Remarks": "PASSED"
+        "Remarks": "Passed"
       },
       "verified": {
         "Year 1-5": "3",
         "Midterm 0-100": "84",
         "Final 0-100": "83",
         "Grade 0-100": "84",
-        "Remarks": "PASSED"
+        "Remarks": "Passed"
       },
       "escalations": []
     },
@@ -770,14 +770,14 @@
         "Midterm 0-100": "86",
         "Final 0-100": "92",
         "Grade 0-100": "89",
-        "Remarks": "PASSED"
+        "Remarks": "Passed"
       },
       "verified": {
         "Year 1-5": "2",
         "Midterm 0-100": "86",
         "Final 0-100": "92",
         "Grade 0-100": "89",
-        "Remarks": "PASSED"
+        "Remarks": "Passed"
       },
       "escalations": []
     },
@@ -791,14 +791,14 @@
         "Midterm 0-100": "78",
         "Final 0-100": "79",
         "Grade 0-100": "78",
-        "Remarks": "PASSED"
+        "Remarks": "Passed"
       },
       "verified": {
         "Year 1-5": "3",
         "Midterm 0-100": "78",
         "Final 0-100": "79",
         "Grade 0-100": "78",
-        "Remarks": "PASSED"
+        "Remarks": "Passed"
       },
       "escalations": []
     },
@@ -812,14 +812,14 @@
         "Midterm 0-100": "93",
         "Final 0-100": "87",
         "Grade 0-100": "90",
-        "Remarks": "PASSED"
+        "Remarks": "Passed"
       },
       "verified": {
         "Year 1-5": "4",
         "Midterm 0-100": "93",
         "Final 0-100": "87",
         "Grade 0-100": "90",
-        "Remarks": "PASSED"
+        "Remarks": "Passed"
       },
       "escalations": []
     },
@@ -833,14 +833,14 @@
         "Midterm 0-100": "96",
         "Final 0-100": "96",
         "Grade 0-100": "96",
-        "Remarks": "PASSED"
+        "Remarks": "Passed"
       },
       "verified": {
         "Year 1-5": "3",
         "Midterm 0-100": "96",
         "Final 0-100": "96",
         "Grade 0-100": "96",
-        "Remarks": "PASSED"
+        "Remarks": "Passed"
       },
       "escalations": []
     },
@@ -854,14 +854,14 @@
         "Midterm 0-100": "85",
         "Final 0-100": "87",
         "Grade 0-100": "86",
-        "Remarks": "PASSED"
+        "Remarks": "Passed"
       },
       "verified": {
         "Year 1-5": "3",
         "Midterm 0-100": "85",
         "Final 0-100": "87",
         "Grade 0-100": "86",
-        "Remarks": "PASSED"
+        "Remarks": "Passed"
       },
       "escalations": []
     },
@@ -875,14 +875,14 @@
         "Midterm 0-100": "80",
         "Final 0-100": "78",
         "Grade 0-100": "79",
-        "Remarks": "PASSED"
+        "Remarks": "Passed"
       },
       "verified": {
         "Year 1-5": "1",
         "Midterm 0-100": "80",
         "Final 0-100": "78",
         "Grade 0-100": "79",
-        "Remarks": "PASSED"
+        "Remarks": "Passed"
       },
       "escalations": []
     },
@@ -896,14 +896,14 @@
         "Midterm 0-100": "83",
         "Final 0-100": "76",
         "Grade 0-100": "80",
-        "Remarks": "PASSED"
+        "Remarks": "Passed"
       },
       "verified": {
         "Year 1-5": "3",
         "Midterm 0-100": "83",
         "Final 0-100": "76",
         "Grade 0-100": "80",
-        "Remarks": "PASSED"
+        "Remarks": "Passed"
       },
       "escalations": []
     },
@@ -917,14 +917,14 @@
         "Midterm 0-100": "97",
         "Final 0-100": "97",
         "Grade 0-100": "97",
-        "Remarks": "PASSED"
+        "Remarks": "Passed"
       },
       "verified": {
         "Year 1-5": "4",
         "Midterm 0-100": "97",
         "Final 0-100": "97",
         "Grade 0-100": "97",
-        "Remarks": "PASSED"
+        "Remarks": "Passed"
       },
       "escalations": []
     },
@@ -938,14 +938,14 @@
         "Midterm 0-100": "98",
         "Final 0-100": "95",
         "Grade 0-100": "96",
-        "Remarks": "PASSED"
+        "Remarks": "Passed"
       },
       "verified": {
         "Year 1-5": "1",
         "Midterm 0-100": "98",
         "Final 0-100": "95",
         "Grade 0-100": "96",
-        "Remarks": "PASSED"
+        "Remarks": "Passed"
       },
       "escalations": []
     },
@@ -959,14 +959,14 @@
         "Midterm 0-100": "85",
         "Final 0-100": "76",
         "Grade 0-100": "80",
-        "Remarks": "PASSED"
+        "Remarks": "Passed"
       },
       "verified": {
         "Year 1-5": "2",
         "Midterm 0-100": "85",
         "Final 0-100": "76",
         "Grade 0-100": "80",
-        "Remarks": "PASSED"
+        "Remarks": "Passed"
       },
       "escalations": []
     },
@@ -980,14 +980,14 @@
         "Midterm 0-100": "94",
         "Final 0-100": "91",
         "Grade 0-100": "92",
-        "Remarks": "PASSED"
+        "Remarks": "Passed"
       },
       "verified": {
         "Year 1-5": "4",
         "Midterm 0-100": "94",
         "Final 0-100": "91",
         "Grade 0-100": "92",
-        "Remarks": "PASSED"
+        "Remarks": "Passed"
       },
       "escalations": []
     },
@@ -1001,14 +1001,14 @@
         "Midterm 0-100": "74",
         "Final 0-100": "73",
         "Grade 0-100": "74",
-        "Remarks": "FAILED"
+        "Remarks": "Failed"
       },
       "verified": {
         "Year 1-5": "3",
         "Midterm 0-100": "74",
         "Final 0-100": "73",
         "Grade 0-100": "74",
-        "Remarks": "FAILED"
+        "Remarks": "Failed"
       },
       "escalations": []
     },
@@ -1022,14 +1022,14 @@
         "Midterm 0-100": "96",
         "Final 0-100": "93",
         "Grade 0-100": "94",
-        "Remarks": "PASSED"
+        "Remarks": "Passed"
       },
       "verified": {
         "Year 1-5": "2",
         "Midterm 0-100": "96",
         "Final 0-100": "93",
         "Grade 0-100": "94",
-        "Remarks": "PASSED"
+        "Remarks": "Passed"
       },
       "escalations": []
     },
@@ -1043,14 +1043,14 @@
         "Midterm 0-100": "85",
         "Final 0-100": "80",
         "Grade 0-100": "82",
-        "Remarks": "PASSED"
+        "Remarks": "Passed"
       },
       "verified": {
         "Year 1-5": "2",
         "Midterm 0-100": "85",
         "Final 0-100": "80",
         "Grade 0-100": "82",
-        "Remarks": "PASSED"
+        "Remarks": "Passed"
       },
       "escalations": []
     }

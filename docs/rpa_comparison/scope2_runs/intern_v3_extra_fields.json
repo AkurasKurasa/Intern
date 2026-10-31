@@ -1,7 +1,7 @@
 {
-  "variant": "v4_unassociated",
-  "mapping": "C:\\Users\\DANIEL\\AppData\\Local\\Temp\\tmpkv_oot15\\induced_mapping.json",
-  "started": "2026-10-31T20:18:08+00:00",
+  "variant": "v3_extra_fields",
+  "mapping": "C:\\Users\\DANIEL\\AppData\\Local\\Temp\\tmpl6a80pad\\induced_mapping.json",
+  "started": "2026-10-31T20:47:11+00:00",
   "dry_run": true,
   "rows": [
     {
@@ -1063,10 +1063,12 @@
       "student_name": "Abad, Andrea A.",
       "course": "",
       "year": "",
+      "section": "",
       "midterm": "",
       "final": "",
       "grade": "",
       "remarks": "",
+      "adviser": "",
       "recommendations": ""
     },
     {
@@ -1074,10 +1076,12 @@
       "student_name": "Aguilar, Benjamin L.",
       "course": "",
       "year": "",
+      "section": "",
       "midterm": "",
       "final": "",
       "grade": "",
       "remarks": "",
+      "adviser": "",
       "recommendations": ""
     },
     {
@@ -1085,10 +1089,12 @@
       "student_name": "Alonzo, Camille W.",
       "course": "",
       "year": "",
+      "section": "",
       "midterm": "",
       "final": "",
       "grade": "",
       "remarks": "",
+      "adviser": "",
       "recommendations": ""
     },
     {
@@ -1096,10 +1102,12 @@
       "student_name": "Bautista, Daniel H.",
       "course": "",
       "year": "",
+      "section": "",
       "midterm": "",
       "final": "",
       "grade": "",
       "remarks": "",
+      "adviser": "",
       "recommendations": ""
     },
     {
@@ -1107,10 +1115,12 @@
       "student_name": "Bernardo, Elaine S.",
       "course": "",
       "year": "",
+      "section": "",
       "midterm": "",
       "final": "",
       "grade": "",
       "remarks": "",
+      "adviser": "",
       "recommendations": ""
     },
     {
@@ -1118,10 +1128,12 @@
       "student_name": "Cabrera, Francis D.",
       "course": "",
       "year": "",
+      "section": "",
       "midterm": "",
       "final": "",
       "grade": "",
       "remarks": "",
+      "adviser": "",
       "recommendations": ""
     },
     {
@@ -1129,10 +1141,12 @@
       "student_name": "Castillo, Grace O.",
       "course": "",
       "year": "",
+      "section": "",
       "midterm": "",
       "final": "",
       "grade": "",
       "remarks": "",
+      "adviser": "",
       "recommendations": ""
     },
     {
@@ -1140,10 +1154,12 @@
       "student_name": "Concepcion, Hector Z.",
       "course": "",
       "year": "",
+      "section": "",
       "midterm": "",
       "final": "",
       "grade": "",
       "remarks": "",
+      "adviser": "",
       "recommendations": ""
     },
     {
@@ -1151,10 +1167,12 @@
       "student_name": "Cruz, Isabel K.",
       "course": "",
       "year": "",
+      "section": "",
       "midterm": "",
       "final": "",
       "grade": "",
       "remarks": "",
+      "adviser": "",
       "recommendations": ""
     },
     {
@@ -1162,10 +1180,12 @@
       "student_name": "Dacanay, Joaquin V.",
       "course": "",
       "year": "",
+      "section": "",
       "midterm": "",
       "final": "",
       "grade": "",
       "remarks": "",
+      "adviser": "",
       "recommendations": ""
     },
     {
@@ -1173,10 +1193,12 @@
       "student_name": "Dela Cruz, Katrina G.",
       "course": "",
       "year": "",
+      "section": "",
       "midterm": "",
       "final": "",
       "grade": "",
       "remarks": "",
+      "adviser": "",
       "recommendations": ""
     },
     {
@@ -1184,10 +1206,12 @@
       "student_name": "Domingo, Lorenzo R.",
       "course": "",
       "year": "",
+      "section": "",
       "midterm": "",
       "final": "",
       "grade": "",
       "remarks": "",
+      "adviser": "",
       "recommendations": ""
     },
     {
@@ -1195,10 +1219,12 @@
       "student_name": "Escobar, Marielle C.",
       "course": "",
       "year": "",
+      "section": "",
       "midterm": "",
       "final": "",
       "grade": "",
       "remarks": "",
+      "adviser": "",
       "recommendations": ""
     },
     {
@@ -1206,10 +1232,12 @@
       "student_name": "Espiritu, Nathaniel N.",
       "course": "",
       "year": "",
+      "section": "",
       "midterm": "",
       "final": "",
       "grade": "",
       "remarks": "",
+      "adviser": "",
       "recommendations": ""
     },
     {
@@ -1217,10 +1245,12 @@
       "student_name": "Fernandez, Odette Y.",
       "course": "",
       "year": "",
+      "section": "",
       "midterm": "",
       "final": "",
       "grade": "",
       "remarks": "",
+      "adviser": "",
       "recommendations": ""
     },
     {
@@ -1228,10 +1258,12 @@
       "student_name": "Flores, Patricia J.",
       "course": "",
       "year": "",
+      "section": "",
       "midterm": "",
       "final": "",
       "grade": "",
       "remarks": "",
+      "adviser": "",
       "recommendations": ""
     },
     {
@@ -1239,10 +1271,12 @@
       "student_name": "Gabriel, Quennie U.",
       "course": "",
       "year": "",
+      "section": "",
       "midterm": "",
       "final": "",
       "grade": "",
       "remarks": "",
+      "adviser": "",
       "recommendations": ""
     },
     {
@@ -1250,10 +1284,12 @@
       "student_name": "Garcia, Rafael F.",
       "course": "",
       "year": "",
+      "section": "",
       "midterm": "",
       "final": "",
       "grade": "",
       "remarks": "",
+      "adviser": "",
       "recommendations": ""
     },
     {
@@ -1261,10 +1297,12 @@
       "student_name": "Gonzales, Sofia Q.",
       "course": "",
       "year": "",
+      "section": "",
       "midterm": "",
       "final": "",
       "grade": "",
       "remarks": "",
+      "adviser": "",
       "recommendations": ""
     },
     {
@@ -1272,10 +1310,12 @@
       "student_name": "Hernandez, Teodoro B.",
       "course": "",
       "year": "",
+      "section": "",
       "midterm": "",
       "final": "",
       "grade": "",
       "remarks": "",
+      "adviser": "",
       "recommendations": ""
     },
     {
@@ -1283,10 +1323,12 @@
       "student_name": "Ilagan, Ursula M.",
       "course": "",
       "year": "",
+      "section": "",
       "midterm": "",
       "final": "",
       "grade": "",
       "remarks": "",
+      "adviser": "",
       "recommendations": ""
     },
     {
@@ -1294,10 +1336,12 @@
       "student_name": "Jimenez, Vicente X.",
       "course": "",
       "year": "",
+      "section": "",
       "midterm": "",
       "final": "",
       "grade": "",
       "remarks": "",
+      "adviser": "",
       "recommendations": ""
     },
     {
@@ -1305,10 +1349,12 @@
       "student_name": "Lacsamana, Wilma I.",
       "course": "",
       "year": "",
+      "section": "",
       "midterm": "",
       "final": "",
       "grade": "",
       "remarks": "",
+      "adviser": "",
       "recommendations": ""
     },
     {
@@ -1316,10 +1362,12 @@
       "student_name": "Lazaro, Xavier T.",
       "course": "",
       "year": "",
+      "section": "",
       "midterm": "",
       "final": "",
       "grade": "",
       "remarks": "",
+      "adviser": "",
       "recommendations": ""
     },
     {
@@ -1327,10 +1375,12 @@
       "student_name": "Legaspi, Yvonne E.",
       "course": "",
       "year": "",
+      "section": "",
       "midterm": "",
       "final": "",
       "grade": "",
       "remarks": "",
+      "adviser": "",
       "recommendations": ""
     },
     {
@@ -1338,10 +1388,12 @@
       "student_name": "Macaraeg, Zenaida P.",
       "course": "",
       "year": "",
+      "section": "",
       "midterm": "",
       "final": "",
       "grade": "",
       "remarks": "",
+      "adviser": "",
       "recommendations": ""
     },
     {
@@ -1349,10 +1401,12 @@
       "student_name": "Magsino, Arnel A.",
       "course": "",
       "year": "",
+      "section": "",
       "midterm": "",
       "final": "",
       "grade": "",
       "remarks": "",
+      "adviser": "",
       "recommendations": ""
     },
     {
@@ -1360,10 +1414,12 @@
       "student_name": "Manalo, Bianca L.",
       "course": "",
       "year": "",
+      "section": "",
       "midterm": "",
       "final": "",
       "grade": "",
       "remarks": "",
+      "adviser": "",
       "recommendations": ""
     },
     {
@@ -1371,10 +1427,12 @@
       "student_name": "Mendoza, Carlo W.",
       "course": "",
       "year": "",
+      "section": "",
       "midterm": "",
       "final": "",
       "grade": "",
       "remarks": "",
+      "adviser": "",
       "recommendations": ""
     },
     {
@@ -1382,10 +1440,12 @@
       "student_name": "Nacpil, Divina H.",
       "course": "",
       "year": "",
+      "section": "",
       "midterm": "",
       "final": "",
       "grade": "",
       "remarks": "",
+      "adviser": "",
       "recommendations": ""
     },
     {
@@ -1393,10 +1453,12 @@
       "student_name": "Navarro, Emilio S.",
       "course": "",
       "year": "",
+      "section": "",
       "midterm": "",
       "final": "",
       "grade": "",
       "remarks": "",
+      "adviser": "",
       "recommendations": ""
     },
     {
@@ -1404,10 +1466,12 @@
       "student_name": "Ocampo, Fatima D.",
       "course": "",
       "year": "",
+      "section": "",
       "midterm": "",
       "final": "",
       "grade": "",
       "remarks": "",
+      "adviser": "",
       "recommendations": ""
     },
     {
@@ -1415,10 +1479,12 @@
       "student_name": "Olivares, Gerald O.",
       "course": "",
       "year": "",
+      "section": "",
       "midterm": "",
       "final": "",
       "grade": "",
       "remarks": "",
+      "adviser": "",
       "recommendations": ""
     },
     {
@@ -1426,10 +1492,12 @@
       "student_name": "Padilla, Hazel Z.",
       "course": "",
       "year": "",
+      "section": "",
       "midterm": "",
       "final": "",
       "grade": "",
       "remarks": "",
+      "adviser": "",
       "recommendations": ""
     },
     {
@@ -1437,10 +1505,12 @@
       "student_name": "Pascual, Ignacio K.",
       "course": "",
       "year": "",
+      "section": "",
       "midterm": "",
       "final": "",
       "grade": "",
       "remarks": "",
+      "adviser": "",
       "recommendations": ""
     },
     {
@@ -1448,10 +1518,12 @@
       "student_name": "Quinto, Jasmine V.",
       "course": "",
       "year": "",
+      "section": "",
       "midterm": "",
       "final": "",
       "grade": "",
       "remarks": "",
+      "adviser": "",
       "recommendations": ""
     },
     {
@@ -1459,10 +1531,12 @@
       "student_name": "Ramos, Kevin G.",
       "course": "",
       "year": "",
+      "section": "",
       "midterm": "",
       "final": "",
       "grade": "",
       "remarks": "",
+      "adviser": "",
       "recommendations": ""
     },
     {
@@ -1470,10 +1544,12 @@
       "student_name": "Reyes, Liza R.",
       "course": "",
       "year": "",
+      "section": "",
       "midterm": "",
       "final": "",
       "grade": "",
       "remarks": "",
+      "adviser": "",
       "recommendations": ""
     },
     {
@@ -1481,10 +1557,12 @@
       "student_name": "Rivera, Miguel C.",
       "course": "",
       "year": "",
+      "section": "",
       "midterm": "",
       "final": "",
       "grade": "",
       "remarks": "",
+      "adviser": "",
       "recommendations": ""
     },
     {
@@ -1492,10 +1570,12 @@
       "student_name": "Salazar, Nadine N.",
       "course": "",
       "year": "",
+      "section": "",
       "midterm": "",
       "final": "",
       "grade": "",
       "remarks": "",
+      "adviser": "",
       "recommendations": ""
     },
     {
@@ -1503,10 +1583,12 @@
       "student_name": "Santiago, Oscar Y.",
       "course": "",
       "year": "",
+      "section": "",
       "midterm": "",
       "final": "",
       "grade": "",
       "remarks": "",
+      "adviser": "",
       "recommendations": ""
     },
     {
@@ -1514,10 +1596,12 @@
       "student_name": "Santos, Pamela J.",
       "course": "",
       "year": "",
+      "section": "",
       "midterm": "",
       "final": "",
       "grade": "",
       "remarks": "",
+      "adviser": "",
       "recommendations": ""
     },
     {
@@ -1525,10 +1609,12 @@
       "student_name": "Soriano, Ramon U.",
       "course": "",
       "year": "",
+      "section": "",
       "midterm": "",
       "final": "",
       "grade": "",
       "remarks": "",
+      "adviser": "",
       "recommendations": ""
     },
     {
@@ -1536,10 +1622,12 @@
       "student_name": "Tolentino, Sheila F.",
       "course": "",
       "year": "",
+      "section": "",
       "midterm": "",
       "final": "",
       "grade": "",
       "remarks": "",
+      "adviser": "",
       "recommendations": ""
     },
     {
@@ -1547,10 +1635,12 @@
       "student_name": "Torres, Tomas Q.",
       "course": "",
       "year": "",
+      "section": "",
       "midterm": "",
       "final": "",
       "grade": "",
       "remarks": "",
+      "adviser": "",
       "recommendations": ""
     },
     {
@@ -1558,10 +1648,12 @@
       "student_name": "Valdez, Ulysses B.",
       "course": "",
       "year": "",
+      "section": "",
       "midterm": "",
       "final": "",
       "grade": "",
       "remarks": "",
+      "adviser": "",
       "recommendations": ""
     },
     {
@@ -1569,10 +1661,12 @@
       "student_name": "Velasco, Veronica M.",
       "course": "",
       "year": "",
+      "section": "",
       "midterm": "",
       "final": "",
       "grade": "",
       "remarks": "",
+      "adviser": "",
       "recommendations": ""
     },
     {
@@ -1580,10 +1674,12 @@
       "student_name": "Villanueva, Warren X.",
       "course": "",
       "year": "",
+      "section": "",
       "midterm": "",
       "final": "",
       "grade": "",
       "remarks": "",
+      "adviser": "",
       "recommendations": ""
     },
     {
@@ -1591,10 +1687,12 @@
       "student_name": "Ybanez, Ysabel I.",
       "course": "",
       "year": "",
+      "section": "",
       "midterm": "",
       "final": "",
       "grade": "",
       "remarks": "",
+      "adviser": "",
       "recommendations": ""
     },
     {
@@ -1602,10 +1700,12 @@
       "student_name": "Zamora, Zoe T.",
       "course": "",
       "year": "",
+      "section": "",
       "midterm": "",
       "final": "",
       "grade": "",
       "remarks": "",
+      "adviser": "",
       "recommendations": ""
     }
   ]

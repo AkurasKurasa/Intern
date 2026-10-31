@@ -1,0 +1,72 @@
+{
+  "variant": "v2_relabeled",
+  "sheet": {
+    "path": "C:\\Users\\DANIEL\\Intern-Final\\Intern\\components\\scope2\\data\\sheets\\grade_sheet.xlsx",
+    "sheet_name": "SUMMARY",
+    "header_row": 11,
+    "key_column": "STUDENT NUMBER"
+  },
+  "abstained": [],
+  "unmapped_fields": [
+    "Course",
+    "Recommendations optional"
+  ],
+  "unmapped_columns": [
+    "No.",
+    "STUDENT NUMBER",
+    "NAME OF STUDENT",
+    "PROGRAM"
+  ],
+  "control_fields": [
+    "Select"
+  ],
+  "row_alignment": {
+    "key_column": "STUDENT NUMBER",
+    "key_field": "Student ID",
+    "verify_column": "NAME OF STUDENT",
+    "verify_field": "Student Name"
+  },
+  "assignments": [
+    {
+      "source_header": "YEAR LEVEL",
+      "target_label": "Year 1-5",
+      "score": null,
+      "margin": null,
+      "status": "auto",
+      "via": "source"
+    },
+    {
+      "source_header": "MIDTERM",
+      "target_label": "Final Rating 0-100",
+      "score": null,
+      "margin": null,
+      "status": "auto",
+      "via": "source"
+    },
+    {
+      "source_header": "FINAL",
+      "target_label": "Academic Standing",
+      "score": null,
+      "margin": null,
+      "status": "auto",
+      "via": "source"
+    },
+    {
+      "source_header": "FINAL GRADE",
+      "target_label": "Recommendations optional",
+      "score": null,
+      "margin": null,
+      "status": "auto",
+      "via": "source"
+    },
+    {
+      "source_header": "PROGRAM",
+      "target_label": "Degree Program",
+      "score": null,
+      "margin": null,
+      "status": "auto",
+      "via": "recorded"
+    }
+  ],
+  "derived_rules": []
+}

@@ -1,7 +1,7 @@
 {
-  "variant": "v5_near_duplicates",
-  "mapping": "C:\\Users\\DANIEL\\AppData\\Local\\Temp\\tmpqa6_w7ut\\induced_mapping.json",
-  "started": "2026-10-31T20:18:23+00:00",
+  "variant": "v6a_options",
+  "mapping": "C:\\Users\\DANIEL\\AppData\\Local\\Temp\\tmp2mgvruy8\\baseline_mapping.json",
+  "started": "2026-10-31T20:49:27+00:00",
   "dry_run": true,
   "rows": [
     {
@@ -14,14 +14,16 @@
         "Midterm 0-100": "85",
         "Final 0-100": "85",
         "Grade 0-100": "85",
-        "Remarks": "Passed"
+        "Course": "BS Information Systems",
+        "Remarks": "PASSED"
       },
       "verified": {
         "Year 1-5": "2",
         "Midterm 0-100": "85",
         "Final 0-100": "85",
         "Grade 0-100": "85",
-        "Remarks": "Passed"
+        "Course": "BS Information Systems",
+        "Remarks": "PASSED"
       },
       "escalations": []
     },
@@ -35,14 +37,16 @@
         "Midterm 0-100": "95",
         "Final 0-100": "96",
         "Grade 0-100": "96",
-        "Remarks": "Passed"
+        "Course": "BS Information Systems",
+        "Remarks": "PASSED"
       },
       "verified": {
         "Year 1-5": "2",
         "Midterm 0-100": "95",
         "Final 0-100": "96",
         "Grade 0-100": "96",
-        "Remarks": "Passed"
+        "Course": "BS Information Systems",
+        "Remarks": "PASSED"
       },
       "escalations": []
     },
@@ -56,14 +60,16 @@
         "Midterm 0-100": "92",
         "Final 0-100": "98",
         "Grade 0-100": "95",
-        "Remarks": "Passed"
+        "Course": "BS Information Systems",
+        "Remarks": "PASSED"
       },
       "verified": {
         "Year 1-5": "3",
         "Midterm 0-100": "92",
         "Final 0-100": "98",
         "Grade 0-100": "95",
-        "Remarks": "Passed"
+        "Course": "BS Information Systems",
+        "Remarks": "PASSED"
       },
       "escalations": []
     },
@@ -77,14 +83,16 @@
         "Midterm 0-100": "89",
         "Final 0-100": "85",
         "Grade 0-100": "87",
-        "Remarks": "Passed"
+        "Course": "BS Information Technology",
+        "Remarks": "PASSED"
       },
       "verified": {
         "Year 1-5": "2",
         "Midterm 0-100": "89",
         "Final 0-100": "85",
         "Grade 0-100": "87",
-        "Remarks": "Passed"
+        "Course": "BS Information Technology",
+        "Remarks": "PASSED"
       },
       "escalations": []
     },
@@ -98,14 +106,16 @@
         "Midterm 0-100": "72",
         "Final 0-100": "73",
         "Grade 0-100": "72",
-        "Remarks": "Failed"
+        "Course": "BS Information Systems",
+        "Remarks": "FAILED"
       },
       "verified": {
         "Year 1-5": "1",
         "Midterm 0-100": "72",
         "Final 0-100": "73",
         "Grade 0-100": "72",
-        "Remarks": "Failed"
+        "Course": "BS Information Systems",
+        "Remarks": "FAILED"
       },
       "escalations": []
     },
@@ -119,14 +129,16 @@
         "Midterm 0-100": "85",
         "Final 0-100": "85",
         "Grade 0-100": "85",
-        "Remarks": "Passed"
+        "Course": "BS Information Systems",
+        "Remarks": "PASSED"
       },
       "verified": {
         "Year 1-5": "3",
         "Midterm 0-100": "85",
         "Final 0-100": "85",
         "Grade 0-100": "85",
-        "Remarks": "Passed"
+        "Course": "BS Information Systems",
+        "Remarks": "PASSED"
       },
       "escalations": []
     },
@@ -140,14 +152,16 @@
         "Midterm 0-100": "78",
         "Final 0-100": "86",
         "Grade 0-100": "82",
-        "Remarks": "Passed"
+        "Course": "BS Information Technology",
+        "Remarks": "PASSED"
       },
       "verified": {
         "Year 1-5": "4",
         "Midterm 0-100": "78",
         "Final 0-100": "86",
         "Grade 0-100": "82",
-        "Remarks": "Passed"
+        "Course": "BS Information Technology",
+        "Remarks": "PASSED"
       },
       "escalations": []
     },
@@ -161,14 +175,16 @@
         "Midterm 0-100": "74",
         "Final 0-100": "75",
         "Grade 0-100": "74",
-        "Remarks": "Failed"
+        "Course": "BS Information Systems",
+        "Remarks": "FAILED"
       },
       "verified": {
         "Year 1-5": "3",
         "Midterm 0-100": "74",
         "Final 0-100": "75",
         "Grade 0-100": "74",
-        "Remarks": "Failed"
+        "Course": "BS Information Systems",
+        "Remarks": "FAILED"
       },
       "escalations": []
     },
@@ -182,14 +198,16 @@
         "Midterm 0-100": "90",
         "Final 0-100": "89",
         "Grade 0-100": "90",
-        "Remarks": "Passed"
+        "Course": "BS Computer Science",
+        "Remarks": "PASSED"
       },
       "verified": {
         "Year 1-5": "1",
         "Midterm 0-100": "90",
         "Final 0-100": "89",
         "Grade 0-100": "90",
-        "Remarks": "Passed"
+        "Course": "BS Computer Science",
+        "Remarks": "PASSED"
       },
       "escalations": []
     },
@@ -203,14 +221,16 @@
         "Midterm 0-100": "92",
         "Final 0-100": "80",
         "Grade 0-100": "86",
-        "Remarks": "Passed"
+        "Course": "BS Information Systems",
+        "Remarks": "PASSED"
       },
       "verified": {
         "Year 1-5": "3",
         "Midterm 0-100": "92",
         "Final 0-100": "80",
         "Grade 0-100": "86",
-        "Remarks": "Passed"
+        "Course": "BS Information Systems",
+        "Remarks": "PASSED"
       },
       "escalations": []
     },
@@ -224,14 +244,16 @@
         "Midterm 0-100": "79",
         "Final 0-100": "81",
         "Grade 0-100": "80",
-        "Remarks": "Passed"
+        "Course": "BS Information Systems",
+        "Remarks": "PASSED"
       },
       "verified": {
         "Year 1-5": "3",
         "Midterm 0-100": "79",
         "Final 0-100": "81",
         "Grade 0-100": "80",
-        "Remarks": "Passed"
+        "Course": "BS Information Systems",
+        "Remarks": "PASSED"
       },
       "escalations": []
     },
@@ -245,14 +267,16 @@
         "Midterm 0-100": "97",
         "Final 0-100": "97",
         "Grade 0-100": "97",
-        "Remarks": "Passed"
+        "Course": "BS Computer Science",
+        "Remarks": "PASSED"
       },
       "verified": {
         "Year 1-5": "3",
         "Midterm 0-100": "97",
         "Final 0-100": "97",
         "Grade 0-100": "97",
-        "Remarks": "Passed"
+        "Course": "BS Computer Science",
+        "Remarks": "PASSED"
       },
       "escalations": []
     },
@@ -266,14 +290,16 @@
         "Midterm 0-100": "73",
         "Final 0-100": "72",
         "Grade 0-100": "72",
-        "Remarks": "Failed"
+        "Course": "BS Computer Science",
+        "Remarks": "FAILED"
       },
       "verified": {
         "Year 1-5": "1",
         "Midterm 0-100": "73",
         "Final 0-100": "72",
         "Grade 0-100": "72",
-        "Remarks": "Failed"
+        "Course": "BS Computer Science",
+        "Remarks": "FAILED"
       },
       "escalations": []
     },
@@ -287,14 +313,16 @@
         "Midterm 0-100": "91",
         "Final 0-100": "93",
         "Grade 0-100": "92",
-        "Remarks": "Passed"
+        "Course": "BS Information Systems",
+        "Remarks": "PASSED"
       },
       "verified": {
         "Year 1-5": "3",
         "Midterm 0-100": "91",
         "Final 0-100": "93",
         "Grade 0-100": "92",
-        "Remarks": "Passed"
+        "Course": "BS Information Systems",
+        "Remarks": "PASSED"
       },
       "escalations": []
     },
@@ -308,14 +336,16 @@
         "Midterm 0-100": "73",
         "Final 0-100": "73",
         "Grade 0-100": "73",
-        "Remarks": "Failed"
+        "Course": "BS Information Systems",
+        "Remarks": "FAILED"
       },
       "verified": {
         "Year 1-5": "4",
         "Midterm 0-100": "73",
         "Final 0-100": "73",
         "Grade 0-100": "73",
-        "Remarks": "Failed"
+        "Course": "BS Information Systems",
+        "Remarks": "FAILED"
       },
       "escalations": []
     },
@@ -329,14 +359,16 @@
         "Midterm 0-100": "72",
         "Final 0-100": "71",
         "Grade 0-100": "72",
-        "Remarks": "Failed"
+        "Course": "BS Information Technology",
+        "Remarks": "FAILED"
       },
       "verified": {
         "Year 1-5": "4",
         "Midterm 0-100": "72",
         "Final 0-100": "71",
         "Grade 0-100": "72",
-        "Remarks": "Failed"
+        "Course": "BS Information Technology",
+        "Remarks": "FAILED"
       },
       "escalations": []
     },
@@ -350,14 +382,16 @@
         "Midterm 0-100": "93",
         "Final 0-100": "94",
         "Grade 0-100": "94",
-        "Remarks": "Passed"
+        "Course": "BS Computer Science",
+        "Remarks": "PASSED"
       },
       "verified": {
         "Year 1-5": "3",
         "Midterm 0-100": "93",
         "Final 0-100": "94",
         "Grade 0-100": "94",
-        "Remarks": "Passed"
+        "Course": "BS Computer Science",
+        "Remarks": "PASSED"
       },
       "escalations": []
     },
@@ -371,14 +405,16 @@
         "Midterm 0-100": "74",
         "Final 0-100": "74",
         "Grade 0-100": "74",
-        "Remarks": "Failed"
+        "Course": "BS Computer Science",
+        "Remarks": "FAILED"
       },
       "verified": {
         "Year 1-5": "4",
         "Midterm 0-100": "74",
         "Final 0-100": "74",
         "Grade 0-100": "74",
-        "Remarks": "Failed"
+        "Course": "BS Computer Science",
+        "Remarks": "FAILED"
       },
       "escalations": []
     },
@@ -392,14 +428,16 @@
         "Midterm 0-100": "87",
         "Final 0-100": "83",
         "Grade 0-100": "85",
-        "Remarks": "Passed"
+        "Course": "BS Information Technology",
+        "Remarks": "PASSED"
       },
       "verified": {
         "Year 1-5": "4",
         "Midterm 0-100": "87",
         "Final 0-100": "83",
         "Grade 0-100": "85",
-        "Remarks": "Passed"
+        "Course": "BS Information Technology",
+        "Remarks": "PASSED"
       },
       "escalations": []
     },
@@ -413,14 +451,16 @@
         "Midterm 0-100": "91",
         "Final 0-100": "95",
         "Grade 0-100": "93",
-        "Remarks": "Passed"
+        "Course": "BS Information Systems",
+        "Remarks": "PASSED"
       },
       "verified": {
         "Year 1-5": "4",
         "Midterm 0-100": "91",
         "Final 0-100": "95",
         "Grade 0-100": "93",
-        "Remarks": "Passed"
+        "Course": "BS Information Systems",
+        "Remarks": "PASSED"
       },
       "escalations": []
     },
@@ -434,14 +474,16 @@
         "Midterm 0-100": "94",
         "Final 0-100": "91",
         "Grade 0-100": "92",
-        "Remarks": "Passed"
+        "Course": "BS Information Technology",
+        "Remarks": "PASSED"
       },
       "verified": {
         "Year 1-5": "1",
         "Midterm 0-100": "94",
         "Final 0-100": "91",
         "Grade 0-100": "92",
-        "Remarks": "Passed"
+        "Course": "BS Information Technology",
+        "Remarks": "PASSED"
       },
       "escalations": []
     },
@@ -455,14 +497,16 @@
         "Midterm 0-100": "96",
         "Final 0-100": "87",
         "Grade 0-100": "92",
-        "Remarks": "Passed"
+        "Course": "BS Information Systems",
+        "Remarks": "PASSED"
       },
       "verified": {
         "Year 1-5": "2",
         "Midterm 0-100": "96",
         "Final 0-100": "87",
         "Grade 0-100": "92",
-        "Remarks": "Passed"
+        "Course": "BS Information Systems",
+        "Remarks": "PASSED"
       },
       "escalations": []
     },
@@ -476,14 +520,16 @@
         "Midterm 0-100": "88",
         "Final 0-100": "89",
         "Grade 0-100": "88",
-        "Remarks": "Passed"
+        "Course": "BS Computer Science",
+        "Remarks": "PASSED"
       },
       "verified": {
         "Year 1-5": "1",
         "Midterm 0-100": "88",
         "Final 0-100": "89",
         "Grade 0-100": "88",
-        "Remarks": "Passed"
+        "Course": "BS Computer Science",
+        "Remarks": "PASSED"
       },
       "escalations": []
     },
@@ -497,14 +543,16 @@
         "Midterm 0-100": "88",
         "Final 0-100": "81",
         "Grade 0-100": "84",
-        "Remarks": "Passed"
+        "Course": "BS Computer Science",
+        "Remarks": "PASSED"
       },
       "verified": {
         "Year 1-5": "3",
         "Midterm 0-100": "88",
         "Final 0-100": "81",
         "Grade 0-100": "84",
-        "Remarks": "Passed"
+        "Course": "BS Computer Science",
+        "Remarks": "PASSED"
       },
       "escalations": []
     },
@@ -518,14 +566,16 @@
         "Midterm 0-100": "74",
         "Final 0-100": "76",
         "Grade 0-100": "75",
-        "Remarks": "Passed"
+        "Course": "BS Information Systems",
+        "Remarks": "PASSED"
       },
       "verified": {
         "Year 1-5": "2",
         "Midterm 0-100": "74",
         "Final 0-100": "76",
         "Grade 0-100": "75",
-        "Remarks": "Passed"
+        "Course": "BS Information Systems",
+        "Remarks": "PASSED"
       },
       "escalations": []
     },
@@ -539,14 +589,16 @@
         "Midterm 0-100": "73",
         "Final 0-100": "79",
         "Grade 0-100": "76",
-        "Remarks": "Passed"
+        "Course": "BS Computer Science",
+        "Remarks": "PASSED"
       },
       "verified": {
         "Year 1-5": "4",
         "Midterm 0-100": "73",
         "Final 0-100": "79",
         "Grade 0-100": "76",
-        "Remarks": "Passed"
+        "Course": "BS Computer Science",
+        "Remarks": "PASSED"
       },
       "escalations": []
     },
@@ -560,14 +612,16 @@
         "Midterm 0-100": "74",
         "Final 0-100": "74",
         "Grade 0-100": "74",
-        "Remarks": "Failed"
+        "Course": "BS Information Systems",
+        "Remarks": "FAILED"
       },
       "verified": {
         "Year 1-5": "1",
         "Midterm 0-100": "74",
         "Final 0-100": "74",
         "Grade 0-100": "74",
-        "Remarks": "Failed"
+        "Course": "BS Information Systems",
+        "Remarks": "FAILED"
       },
       "escalations": []
     },
@@ -581,14 +635,16 @@
         "Midterm 0-100": "99",
         "Final 0-100": "99",
         "Grade 0-100": "99",
-        "Remarks": "Passed"
+        "Course": "BS Computer Science",
+        "Remarks": "PASSED"
       },
       "verified": {
         "Year 1-5": "2",
         "Midterm 0-100": "99",
         "Final 0-100": "99",
         "Grade 0-100": "99",
-        "Remarks": "Passed"
+        "Course": "BS Computer Science",
+        "Remarks": "PASSED"
       },
       "escalations": []
     },
@@ -602,14 +658,16 @@
         "Midterm 0-100": "81",
         "Final 0-100": "86",
         "Grade 0-100": "84",
-        "Remarks": "Passed"
+        "Course": "BS Information Systems",
+        "Remarks": "PASSED"
       },
       "verified": {
         "Year 1-5": "3",
         "Midterm 0-100": "81",
         "Final 0-100": "86",
         "Grade 0-100": "84",
-        "Remarks": "Passed"
+        "Course": "BS Information Systems",
+        "Remarks": "PASSED"
       },
       "escalations": []
     },
@@ -623,14 +681,16 @@
         "Midterm 0-100": "91",
         "Final 0-100": "88",
         "Grade 0-100": "90",
-        "Remarks": "Passed"
+        "Course": "BS Information Technology",
+        "Remarks": "PASSED"
       },
       "verified": {
         "Year 1-5": "3",
         "Midterm 0-100": "91",
         "Final 0-100": "88",
         "Grade 0-100": "90",
-        "Remarks": "Passed"
+        "Course": "BS Information Technology",
+        "Remarks": "PASSED"
       },
       "escalations": []
     },
@@ -644,14 +704,16 @@
         "Midterm 0-100": "87",
         "Final 0-100": "90",
         "Grade 0-100": "88",
-        "Remarks": "Passed"
+        "Course": "BS Computer Science",
+        "Remarks": "PASSED"
       },
       "verified": {
         "Year 1-5": "4",
         "Midterm 0-100": "87",
         "Final 0-100": "90",
         "Grade 0-100": "88",
-        "Remarks": "Passed"
+        "Course": "BS Computer Science",
+        "Remarks": "PASSED"
       },
       "escalations": []
     },
@@ -665,14 +727,16 @@
         "Midterm 0-100": "73",
         "Final 0-100": "76",
         "Grade 0-100": "74",
-        "Remarks": "Failed"
+        "Course": "BS Computer Science",
+        "Remarks": "FAILED"
       },
       "verified": {
         "Year 1-5": "3",
         "Midterm 0-100": "73",
         "Final 0-100": "76",
         "Grade 0-100": "74",
-        "Remarks": "Failed"
+        "Course": "BS Computer Science",
+        "Remarks": "FAILED"
       },
       "escalations": []
     },
@@ -686,14 +750,16 @@
         "Midterm 0-100": "74",
         "Final 0-100": "72",
         "Grade 0-100": "73",
-        "Remarks": "Failed"
+        "Course": "BS Computer Science",
+        "Remarks": "FAILED"
       },
       "verified": {
         "Year 1-5": "1",
         "Midterm 0-100": "74",
         "Final 0-100": "72",
         "Grade 0-100": "73",
-        "Remarks": "Failed"
+        "Course": "BS Computer Science",
+        "Remarks": "FAILED"
       },
       "escalations": []
     },
@@ -707,14 +773,16 @@
         "Midterm 0-100": "77",
         "Final 0-100": "74",
         "Grade 0-100": "76",
-        "Remarks": "Passed"
+        "Course": "BS Computer Science",
+        "Remarks": "PASSED"
       },
       "verified": {
         "Year 1-5": "4",
         "Midterm 0-100": "77",
         "Final 0-100": "74",
         "Grade 0-100": "76",
-        "Remarks": "Passed"
+        "Course": "BS Computer Science",
+        "Remarks": "PASSED"
       },
       "escalations": []
     },
@@ -728,14 +796,16 @@
         "Midterm 0-100": "88",
         "Final 0-100": "81",
         "Grade 0-100": "84",
-        "Remarks": "Passed"
+        "Course": "BS Computer Science",
+        "Remarks": "PASSED"
       },
       "verified": {
         "Year 1-5": "2",
         "Midterm 0-100": "88",
         "Final 0-100": "81",
         "Grade 0-100": "84",
-        "Remarks": "Passed"
+        "Course": "BS Computer Science",
+        "Remarks": "PASSED"
       },
       "escalations": []
     },
@@ -749,14 +819,16 @@
         "Midterm 0-100": "84",
         "Final 0-100": "83",
         "Grade 0-100": "84",
-        "Remarks": "Passed"
+        "Course": "BS Information Systems",
+        "Remarks": "PASSED"
       },
       "verified": {
         "Year 1-5": "3",
         "Midterm 0-100": "84",
         "Final 0-100": "83",
         "Grade 0-100": "84",
-        "Remarks": "Passed"
+        "Course": "BS Information Systems",
+        "Remarks": "PASSED"
       },
       "escalations": []
     },
@@ -770,14 +842,16 @@
         "Midterm 0-100": "86",
         "Final 0-100": "92",
         "Grade 0-100": "89",
-        "Remarks": "Passed"
+        "Course": "BS Computer Science",
+        "Remarks": "PASSED"
       },
       "verified": {
         "Year 1-5": "2",
         "Midterm 0-100": "86",
         "Final 0-100": "92",
         "Grade 0-100": "89",
-        "Remarks": "Passed"
+        "Course": "BS Computer Science",
+        "Remarks": "PASSED"
       },
       "escalations": []
     },
@@ -791,14 +865,16 @@
         "Midterm 0-100": "78",
         "Final 0-100": "79",
         "Grade 0-100": "78",
-        "Remarks": "Passed"
+        "Course": "BS Information Technology",
+        "Remarks": "PASSED"
       },
       "verified": {
         "Year 1-5": "3",
         "Midterm 0-100": "78",
         "Final 0-100": "79",
         "Grade 0-100": "78",
-        "Remarks": "Passed"
+        "Course": "BS Information Technology",
+        "Remarks": "PASSED"
       },
       "escalations": []
     },
@@ -812,14 +888,16 @@
         "Midterm 0-100": "93",
         "Final 0-100": "87",
         "Grade 0-100": "90",
-        "Remarks": "Passed"
+        "Course": "BS Computer Science",
+        "Remarks": "PASSED"
       },
       "verified": {
         "Year 1-5": "4",
         "Midterm 0-100": "93",
         "Final 0-100": "87",
         "Grade 0-100": "90",
-        "Remarks": "Passed"
+        "Course": "BS Computer Science",
+        "Remarks": "PASSED"
       },
       "escalations": []
     },
@@ -833,14 +911,16 @@
         "Midterm 0-100": "96",
         "Final 0-100": "96",
         "Grade 0-100": "96",
-        "Remarks": "Passed"
+        "Course": "BS Information Technology",
+        "Remarks": "PASSED"
       },
       "verified": {
         "Year 1-5": "3",
         "Midterm 0-100": "96",
         "Final 0-100": "96",
         "Grade 0-100": "96",
-        "Remarks": "Passed"
+        "Course": "BS Information Technology",
+        "Remarks": "PASSED"
       },
       "escalations": []
     },
@@ -854,14 +934,16 @@
         "Midterm 0-100": "85",
         "Final 0-100": "87",
         "Grade 0-100": "86",
-        "Remarks": "Passed"
+        "Course": "BS Information Technology",
+        "Remarks": "PASSED"
       },
       "verified": {
         "Year 1-5": "3",
         "Midterm 0-100": "85",
         "Final 0-100": "87",
         "Grade 0-100": "86",
-        "Remarks": "Passed"
+        "Course": "BS Information Technology",
+        "Remarks": "PASSED"
       },
       "escalations": []
     },
@@ -875,14 +957,16 @@
         "Midterm 0-100": "80",
         "Final 0-100": "78",
         "Grade 0-100": "79",
-        "Remarks": "Passed"
+        "Course": "BS Computer Science",
+        "Remarks": "PASSED"
       },
       "verified": {
         "Year 1-5": "1",
         "Midterm 0-100": "80",
         "Final 0-100": "78",
         "Grade 0-100": "79",
-        "Remarks": "Passed"
+        "Course": "BS Computer Science",
+        "Remarks": "PASSED"
       },
       "escalations": []
     },
@@ -896,14 +980,16 @@
         "Midterm 0-100": "83",
         "Final 0-100": "76",
         "Grade 0-100": "80",
-        "Remarks": "Passed"
+        "Course": "BS Information Technology",
+        "Remarks": "PASSED"
       },
       "verified": {
         "Year 1-5": "3",
         "Midterm 0-100": "83",
         "Final 0-100": "76",
         "Grade 0-100": "80",
-        "Remarks": "Passed"
+        "Course": "BS Information Technology",
+        "Remarks": "PASSED"
       },
       "escalations": []
     },
@@ -917,14 +1003,16 @@
         "Midterm 0-100": "97",
         "Final 0-100": "97",
         "Grade 0-100": "97",
-        "Remarks": "Passed"
+        "Course": "BS Information Technology",
+        "Remarks": "PASSED"
       },
       "verified": {
         "Year 1-5": "4",
         "Midterm 0-100": "97",
         "Final 0-100": "97",
         "Grade 0-100": "97",
-        "Remarks": "Passed"
+        "Course": "BS Information Technology",
+        "Remarks": "PASSED"
       },
       "escalations": []
     },
@@ -938,14 +1026,16 @@
         "Midterm 0-100": "98",
         "Final 0-100": "95",
         "Grade 0-100": "96",
-        "Remarks": "Passed"
+        "Course": "BS Information Systems",
+        "Remarks": "PASSED"
       },
       "verified": {
         "Year 1-5": "1",
         "Midterm 0-100": "98",
         "Final 0-100": "95",
         "Grade 0-100": "96",
-        "Remarks": "Passed"
+        "Course": "BS Information Systems",
+        "Remarks": "PASSED"
       },
       "escalations": []
     },
@@ -959,14 +1049,16 @@
         "Midterm 0-100": "85",
         "Final 0-100": "76",
         "Grade 0-100": "80",
-        "Remarks": "Passed"
+        "Course": "BS Computer Science",
+        "Remarks": "PASSED"
       },
       "verified": {
         "Year 1-5": "2",
         "Midterm 0-100": "85",
         "Final 0-100": "76",
         "Grade 0-100": "80",
-        "Remarks": "Passed"
+        "Course": "BS Computer Science",
+        "Remarks": "PASSED"
       },
       "escalations": []
     },
@@ -980,14 +1072,16 @@
         "Midterm 0-100": "94",
         "Final 0-100": "91",
         "Grade 0-100": "92",
-        "Remarks": "Passed"
+        "Course": "BS Information Technology",
+        "Remarks": "PASSED"
       },
       "verified": {
         "Year 1-5": "4",
         "Midterm 0-100": "94",
         "Final 0-100": "91",
         "Grade 0-100": "92",
-        "Remarks": "Passed"
+        "Course": "BS Information Technology",
+        "Remarks": "PASSED"
       },
       "escalations": []
     },
@@ -1001,14 +1095,16 @@
         "Midterm 0-100": "74",
         "Final 0-100": "73",
         "Grade 0-100": "74",
-        "Remarks": "Failed"
+        "Course": "BS Computer Science",
+        "Remarks": "FAILED"
       },
       "verified": {
         "Year 1-5": "3",
         "Midterm 0-100": "74",
         "Final 0-100": "73",
         "Grade 0-100": "74",
-        "Remarks": "Failed"
+        "Course": "BS Computer Science",
+        "Remarks": "FAILED"
       },
       "escalations": []
     },
@@ -1022,14 +1118,16 @@
         "Midterm 0-100": "96",
         "Final 0-100": "93",
         "Grade 0-100": "94",
-        "Remarks": "Passed"
+        "Course": "BS Computer Science",
+        "Remarks": "PASSED"
       },
       "verified": {
         "Year 1-5": "2",
         "Midterm 0-100": "96",
         "Final 0-100": "93",
         "Grade 0-100": "94",
-        "Remarks": "Passed"
+        "Course": "BS Computer Science",
+        "Remarks": "PASSED"
       },
       "escalations": []
     },
@@ -1043,14 +1141,16 @@
         "Midterm 0-100": "85",
         "Final 0-100": "80",
         "Grade 0-100": "82",
-        "Remarks": "Passed"
+        "Course": "BS Information Systems",
+        "Remarks": "PASSED"
       },
       "verified": {
         "Year 1-5": "2",
         "Midterm 0-100": "85",
         "Final 0-100": "80",
         "Grade 0-100": "82",
-        "Remarks": "Passed"
+        "Course": "BS Information Systems",
+        "Remarks": "PASSED"
       },
       "escalations": []
     }
@@ -1063,11 +1163,9 @@
       "student_name": "Abad, Andrea A.",
       "course": "",
       "year": "",
-      "year_enrolled": "",
       "midterm": "",
       "final": "",
       "grade": "",
-      "grade_recomputed": "",
       "remarks": "",
       "recommendations": ""
     },
@@ -1076,11 +1174,9 @@
       "student_name": "Aguilar, Benjamin L.",
       "course": "",
       "year": "",
-      "year_enrolled": "",
       "midterm": "",
       "final": "",
       "grade": "",
-      "grade_recomputed": "",
       "remarks": "",
       "recommendations": ""
     },
@@ -1089,11 +1185,9 @@
       "student_name": "Alonzo, Camille W.",
       "course": "",
       "year": "",
-      "year_enrolled": "",
       "midterm": "",
       "final": "",
       "grade": "",
-      "grade_recomputed": "",
       "remarks": "",
       "recommendations": ""
     },
@@ -1102,11 +1196,9 @@
       "student_name": "Bautista, Daniel H.",
       "course": "",
       "year": "",
-      "year_enrolled": "",
       "midterm": "",
       "final": "",
       "grade": "",
-      "grade_recomputed": "",
       "remarks": "",
       "recommendations": ""
     },
@@ -1115,11 +1207,9 @@
       "student_name": "Bernardo, Elaine S.",
       "course": "",
       "year": "",
-      "year_enrolled": "",
       "midterm": "",
       "final": "",
       "grade": "",
-      "grade_recomputed": "",
       "remarks": "",
       "recommendations": ""
     },
@@ -1128,11 +1218,9 @@
       "student_name": "Cabrera, Francis D.",
       "course": "",
       "year": "",
-      "year_enrolled": "",
       "midterm": "",
       "final": "",
       "grade": "",
-      "grade_recomputed": "",
       "remarks": "",
       "recommendations": ""
     },
@@ -1141,11 +1229,9 @@
       "student_name": "Castillo, Grace O.",
       "course": "",
       "year": "",
-      "year_enrolled": "",
       "midterm": "",
       "final": "",
       "grade": "",
-      "grade_recomputed": "",
       "remarks": "",
       "recommendations": ""
     },
@@ -1154,11 +1240,9 @@
       "student_name": "Concepcion, Hector Z.",
       "course": "",
       "year": "",
-      "year_enrolled": "",
       "midterm": "",
       "final": "",
       "grade": "",
-      "grade_recomputed": "",
       "remarks": "",
       "recommendations": ""
     },
@@ -1167,11 +1251,9 @@
       "student_name": "Cruz, Isabel K.",
       "course": "",
       "year": "",
-      "year_enrolled": "",
       "midterm": "",
       "final": "",
       "grade": "",
-      "grade_recomputed": "",
       "remarks": "",
       "recommendations": ""
     },
@@ -1180,11 +1262,9 @@
       "student_name": "Dacanay, Joaquin V.",
       "course": "",
       "year": "",
-      "year_enrolled": "",
       "midterm": "",
       "final": "",
       "grade": "",
-      "grade_recomputed": "",
       "remarks": "",
       "recommendations": ""
     },
@@ -1193,11 +1273,9 @@
       "student_name": "Dela Cruz, Katrina G.",
       "course": "",
       "year": "",
-      "year_enrolled": "",
       "midterm": "",
       "final": "",
       "grade": "",
-      "grade_recomputed": "",
       "remarks": "",
       "recommendations": ""
     },
@@ -1206,11 +1284,9 @@
       "student_name": "Domingo, Lorenzo R.",
       "course": "",
       "year": "",
-      "year_enrolled": "",
       "midterm": "",
       "final": "",
       "grade": "",
-      "grade_recomputed": "",
       "remarks": "",
       "recommendations": ""
     },
@@ -1219,11 +1295,9 @@
       "student_name": "Escobar, Marielle C.",
       "course": "",
       "year": "",
-      "year_enrolled": "",
       "midterm": "",
       "final": "",
       "grade": "",
-      "grade_recomputed": "",
       "remarks": "",
       "recommendations": ""
     },
@@ -1232,11 +1306,9 @@
       "student_name": "Espiritu, Nathaniel N.",
       "course": "",
       "year": "",
-      "year_enrolled": "",
       "midterm": "",
       "final": "",
       "grade": "",
-      "grade_recomputed": "",
       "remarks": "",
       "recommendations": ""
     },
@@ -1245,11 +1317,9 @@
       "student_name": "Fernandez, Odette Y.",
       "course": "",
       "year": "",
-      "year_enrolled": "",
       "midterm": "",
       "final": "",
       "grade": "",
-      "grade_recomputed": "",
       "remarks": "",
       "recommendations": ""
     },
@@ -1258,11 +1328,9 @@
       "student_name": "Flores, Patricia J.",
       "course": "",
       "year": "",
-      "year_enrolled": "",
       "midterm": "",
       "final": "",
       "grade": "",
-      "grade_recomputed": "",
       "remarks": "",
       "recommendations": ""
     },
@@ -1271,11 +1339,9 @@
       "student_name": "Gabriel, Quennie U.",
       "course": "",
       "year": "",
-      "year_enrolled": "",
       "midterm": "",
       "final": "",
       "grade": "",
-      "grade_recomputed": "",
       "remarks": "",
       "recommendations": ""
     },
@@ -1284,11 +1350,9 @@
       "student_name": "Garcia, Rafael F.",
       "course": "",
       "year": "",
-      "year_enrolled": "",
       "midterm": "",
       "final": "",
       "grade": "",
-      "grade_recomputed": "",
       "remarks": "",
       "recommendations": ""
     },
@@ -1297,11 +1361,9 @@
       "student_name": "Gonzales, Sofia Q.",
       "course": "",
       "year": "",
-      "year_enrolled": "",
       "midterm": "",
       "final": "",
       "grade": "",
-      "grade_recomputed": "",
       "remarks": "",
       "recommendations": ""
     },
@@ -1310,11 +1372,9 @@
       "student_name": "Hernandez, Teodoro B.",
       "course": "",
       "year": "",
-      "year_enrolled": "",
       "midterm": "",
       "final": "",
       "grade": "",
-      "grade_recomputed": "",
       "remarks": "",
       "recommendations": ""
     },
@@ -1323,11 +1383,9 @@
       "student_name": "Ilagan, Ursula M.",
       "course": "",
       "year": "",
-      "year_enrolled": "",
       "midterm": "",
       "final": "",
       "grade": "",
-      "grade_recomputed": "",
       "remarks": "",
       "recommendations": ""
     },
@@ -1336,11 +1394,9 @@
       "student_name": "Jimenez, Vicente X.",
       "course": "",
       "year": "",
-      "year_enrolled": "",
       "midterm": "",
       "final": "",
       "grade": "",
-      "grade_recomputed": "",
       "remarks": "",
       "recommendations": ""
     },
@@ -1349,11 +1405,9 @@
       "student_name": "Lacsamana, Wilma I.",
       "course": "",
       "year": "",
-      "year_enrolled": "",
       "midterm": "",
       "final": "",
       "grade": "",
-      "grade_recomputed": "",
       "remarks": "",
       "recommendations": ""
     },
@@ -1362,11 +1416,9 @@
       "student_name": "Lazaro, Xavier T.",
       "course": "",
       "year": "",
-      "year_enrolled": "",
       "midterm": "",
       "final": "",
       "grade": "",
-      "grade_recomputed": "",
       "remarks": "",
       "recommendations": ""
     },
@@ -1375,11 +1427,9 @@
       "student_name": "Legaspi, Yvonne E.",
       "course": "",
       "year": "",
-      "year_enrolled": "",
       "midterm": "",
       "final": "",
       "grade": "",
-      "grade_recomputed": "",
       "remarks": "",
       "recommendations": ""
     },
@@ -1388,11 +1438,9 @@
       "student_name": "Macaraeg, Zenaida P.",
       "course": "",
       "year": "",
-      "year_enrolled": "",
       "midterm": "",
       "final": "",
       "grade": "",
-      "grade_recomputed": "",
       "remarks": "",
       "recommendations": ""
     },
@@ -1401,11 +1449,9 @@
       "student_name": "Magsino, Arnel A.",
       "course": "",
       "year": "",
-      "year_enrolled": "",
       "midterm": "",
       "final": "",
       "grade": "",
-      "grade_recomputed": "",
       "remarks": "",
       "recommendations": ""
     },
@@ -1414,11 +1460,9 @@
       "student_name": "Manalo, Bianca L.",
       "course": "",
       "year": "",
-      "year_enrolled": "",
       "midterm": "",
       "final": "",
       "grade": "",
-      "grade_recomputed": "",
       "remarks": "",
       "recommendations": ""
     },
@@ -1427,11 +1471,9 @@
       "student_name": "Mendoza, Carlo W.",
       "course": "",
       "year": "",
-      "year_enrolled": "",
       "midterm": "",
       "final": "",
       "grade": "",
-      "grade_recomputed": "",
       "remarks": "",
       "recommendations": ""
     },
@@ -1440,11 +1482,9 @@
       "student_name": "Nacpil, Divina H.",
       "course": "",
       "year": "",
-      "year_enrolled": "",
       "midterm": "",
       "final": "",
       "grade": "",
-      "grade_recomputed": "",
       "remarks": "",
       "recommendations": ""
     },
@@ -1453,11 +1493,9 @@
       "student_name": "Navarro, Emilio S.",
       "course": "",
       "year": "",
-      "year_enrolled": "",
       "midterm": "",
       "final": "",
       "grade": "",
-      "grade_recomputed": "",
       "remarks": "",
       "recommendations": ""
     },
@@ -1466,11 +1504,9 @@
       "student_name": "Ocampo, Fatima D.",
       "course": "",
       "year": "",
-      "year_enrolled": "",
       "midterm": "",
       "final": "",
       "grade": "",
-      "grade_recomputed": "",
       "remarks": "",
       "recommendations": ""
     },
@@ -1479,11 +1515,9 @@
       "student_name": "Olivares, Gerald O.",
       "course": "",
       "year": "",
-      "year_enrolled": "",
       "midterm": "",
       "final": "",
       "grade": "",
-      "grade_recomputed": "",
       "remarks": "",
       "recommendations": ""
     },
@@ -1492,11 +1526,9 @@
       "student_name": "Padilla, Hazel Z.",
       "course": "",
       "year": "",
-      "year_enrolled": "",
       "midterm": "",
       "final": "",
       "grade": "",
-      "grade_recomputed": "",
       "remarks": "",
       "recommendations": ""
     },
@@ -1505,11 +1537,9 @@
       "student_name": "Pascual, Ignacio K.",
       "course": "",
       "year": "",
-      "year_enrolled": "",
       "midterm": "",
       "final": "",
       "grade": "",
-      "grade_recomputed": "",
       "remarks": "",
       "recommendations": ""
     },
@@ -1518,11 +1548,9 @@
       "student_name": "Quinto, Jasmine V.",
       "course": "",
       "year": "",
-      "year_enrolled": "",
       "midterm": "",
       "final": "",
       "grade": "",
-      "grade_recomputed": "",
       "remarks": "",
       "recommendations": ""
     },
@@ -1531,11 +1559,9 @@
       "student_name": "Ramos, Kevin G.",
       "course": "",
       "year": "",
-      "year_enrolled": "",
       "midterm": "",
       "final": "",
       "grade": "",
-      "grade_recomputed": "",
       "remarks": "",
       "recommendations": ""
     },
@@ -1544,11 +1570,9 @@
       "student_name": "Reyes, Liza R.",
       "course": "",
       "year": "",
-      "year_enrolled": "",
       "midterm": "",
       "final": "",
       "grade": "",
-      "grade_recomputed": "",
       "remarks": "",
       "recommendations": ""
     },
@@ -1557,11 +1581,9 @@
       "student_name": "Rivera, Miguel C.",
       "course": "",
       "year": "",
-      "year_enrolled": "",
       "midterm": "",
       "final": "",
       "grade": "",
-      "grade_recomputed": "",
       "remarks": "",
       "recommendations": ""
     },
@@ -1570,11 +1592,9 @@
       "student_name": "Salazar, Nadine N.",
       "course": "",
       "year": "",
-      "year_enrolled": "",
       "midterm": "",
       "final": "",
       "grade": "",
-      "grade_recomputed": "",
       "remarks": "",
       "recommendations": ""
     },
@@ -1583,11 +1603,9 @@
       "student_name": "Santiago, Oscar Y.",
       "course": "",
       "year": "",
-      "year_enrolled": "",
       "midterm": "",
       "final": "",
       "grade": "",
-      "grade_recomputed": "",
       "remarks": "",
       "recommendations": ""
     },
@@ -1596,11 +1614,9 @@
       "student_name": "Santos, Pamela J.",
       "course": "",
       "year": "",
-      "year_enrolled": "",
       "midterm": "",
       "final": "",
       "grade": "",
-      "grade_recomputed": "",
       "remarks": "",
       "recommendations": ""
     },
@@ -1609,11 +1625,9 @@
       "student_name": "Soriano, Ramon U.",
       "course": "",
       "year": "",
-      "year_enrolled": "",
       "midterm": "",
       "final": "",
       "grade": "",
-      "grade_recomputed": "",
       "remarks": "",
       "recommendations": ""
     },
@@ -1622,11 +1636,9 @@
       "student_name": "Tolentino, Sheila F.",
       "course": "",
       "year": "",
-      "year_enrolled": "",
       "midterm": "",
       "final": "",
       "grade": "",
-      "grade_recomputed": "",
       "remarks": "",
       "recommendations": ""
     },
@@ -1635,11 +1647,9 @@
       "student_name": "Torres, Tomas Q.",
       "course": "",
       "year": "",
-      "year_enrolled": "",
       "midterm": "",
       "final": "",
       "grade": "",
-      "grade_recomputed": "",
       "remarks": "",
       "recommendations": ""
     },
@@ -1648,11 +1658,9 @@
       "student_name": "Valdez, Ulysses B.",
       "course": "",
       "year": "",
-      "year_enrolled": "",
       "midterm": "",
       "final": "",
       "grade": "",
-      "grade_recomputed": "",
       "remarks": "",
       "recommendations": ""
     },
@@ -1661,11 +1669,9 @@
       "student_name": "Velasco, Veronica M.",
       "course": "",
       "year": "",
-      "year_enrolled": "",
       "midterm": "",
       "final": "",
       "grade": "",
-      "grade_recomputed": "",
       "remarks": "",
       "recommendations": ""
     },
@@ -1674,11 +1680,9 @@
       "student_name": "Villanueva, Warren X.",
       "course": "",
       "year": "",
-      "year_enrolled": "",
       "midterm": "",
       "final": "",
       "grade": "",
-      "grade_recomputed": "",
       "remarks": "",
       "recommendations": ""
     },
@@ -1687,11 +1691,9 @@
       "student_name": "Ybanez, Ysabel I.",
       "course": "",
       "year": "",
-      "year_enrolled": "",
       "midterm": "",
       "final": "",
       "grade": "",
-      "grade_recomputed": "",
       "remarks": "",
       "recommendations": ""
     },
@@ -1700,11 +1702,9 @@
       "student_name": "Zamora, Zoe T.",
       "course": "",
       "year": "",
-      "year_enrolled": "",
       "midterm": "",
       "final": "",
       "grade": "",
-      "grade_recomputed": "",
       "remarks": "",
       "recommendations": ""
     }

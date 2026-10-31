@@ -1,0 +1,45 @@
+{
+  "variant": "v6b_scale",
+  "sheet": {
+    "path": "C:\\Users\\DANIEL\\Intern-Final\\Intern\\components\\scope2\\data\\sheets\\grade_sheet.xlsx",
+    "sheet_name": "SUMMARY",
+    "header_row": 11,
+    "key_column": "STUDENT NUMBER"
+  },
+  "assignments": [
+    {
+      "source_header": "YEAR LEVEL",
+      "target_label": "Year 1-5",
+      "score": null,
+      "margin": null,
+      "status": "auto",
+      "via": "source"
+    }
+  ],
+  "abstained": [],
+  "derived_rules": [],
+  "unmapped_fields": [
+    "Course",
+    "Grade 1.00-5.00",
+    "Recommendations optional",
+    "Remarks"
+  ],
+  "unmapped_columns": [
+    "No.",
+    "STUDENT NUMBER",
+    "NAME OF STUDENT",
+    "MIDTERM",
+    "FINAL",
+    "PROGRAM",
+    "FINAL GRADE"
+  ],
+  "control_fields": [
+    "Select"
+  ],
+  "row_alignment": {
+    "key_column": "STUDENT NUMBER",
+    "key_field": "Student ID",
+    "verify_column": "NAME OF STUDENT",
+    "verify_field": "Student Name"
+  }
+}

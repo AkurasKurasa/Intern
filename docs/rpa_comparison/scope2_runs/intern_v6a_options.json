@@ -1,7 +1,7 @@
 {
-  "variant": "v1_reordered",
-  "mapping": "C:\\Users\\DANIEL\\AppData\\Local\\Temp\\tmps32wz_ei\\induced_mapping.json",
-  "started": "2026-10-31T20:17:27+00:00",
+  "variant": "v6a_options",
+  "mapping": "C:\\Users\\DANIEL\\AppData\\Local\\Temp\\tmppor3oruw\\induced_mapping.json",
+  "started": "2026-10-31T20:47:58+00:00",
   "dry_run": true,
   "rows": [
     {
@@ -10,18 +10,18 @@
       "status": "filled",
       "reason": "",
       "filled": {
+        "Year 1-5": "2",
         "Midterm 0-100": "85",
         "Final 0-100": "85",
         "Grade 0-100": "85",
-        "Year 1-5": "2",
-        "Remarks": "Passed"
+        "Remarks": "PASSED"
       },
       "verified": {
+        "Year 1-5": "2",
         "Midterm 0-100": "85",
         "Final 0-100": "85",
         "Grade 0-100": "85",
-        "Year 1-5": "2",
-        "Remarks": "Passed"
+        "Remarks": "PASSED"
       },
       "escalations": []
     },
@@ -31,18 +31,18 @@
       "status": "filled",
       "reason": "",
       "filled": {
+        "Year 1-5": "2",
         "Midterm 0-100": "95",
         "Final 0-100": "96",
         "Grade 0-100": "96",
-        "Year 1-5": "2",
-        "Remarks": "Passed"
+        "Remarks": "PASSED"
       },
       "verified": {
+        "Year 1-5": "2",
         "Midterm 0-100": "95",
         "Final 0-100": "96",
         "Grade 0-100": "96",
-        "Year 1-5": "2",
-        "Remarks": "Passed"
+        "Remarks": "PASSED"
       },
       "escalations": []
     },
@@ -52,18 +52,18 @@
       "status": "filled",
       "reason": "",
       "filled": {
+        "Year 1-5": "3",
         "Midterm 0-100": "92",
         "Final 0-100": "98",
         "Grade 0-100": "95",
-        "Year 1-5": "3",
-        "Remarks": "Passed"
+        "Remarks": "PASSED"
       },
       "verified": {
+        "Year 1-5": "3",
         "Midterm 0-100": "92",
         "Final 0-100": "98",
         "Grade 0-100": "95",
-        "Year 1-5": "3",
-        "Remarks": "Passed"
+        "Remarks": "PASSED"
       },
       "escalations": []
     },
@@ -73,18 +73,18 @@
       "status": "filled",
       "reason": "",
       "filled": {
+        "Year 1-5": "2",
         "Midterm 0-100": "89",
         "Final 0-100": "85",
         "Grade 0-100": "87",
-        "Year 1-5": "2",
-        "Remarks": "Passed"
+        "Remarks": "PASSED"
       },
       "verified": {
+        "Year 1-5": "2",
         "Midterm 0-100": "89",
         "Final 0-100": "85",
         "Grade 0-100": "87",
-        "Year 1-5": "2",
-        "Remarks": "Passed"
+        "Remarks": "PASSED"
       },
       "escalations": []
     },
@@ -94,18 +94,18 @@
       "status": "filled",
       "reason": "",
       "filled": {
+        "Year 1-5": "1",
         "Midterm 0-100": "72",
         "Final 0-100": "73",
         "Grade 0-100": "72",
-        "Year 1-5": "1",
-        "Remarks": "Failed"
+        "Remarks": "FAILED"
       },
       "verified": {
+        "Year 1-5": "1",
         "Midterm 0-100": "72",
         "Final 0-100": "73",
         "Grade 0-100": "72",
-        "Year 1-5": "1",
-        "Remarks": "Failed"
+        "Remarks": "FAILED"
       },
       "escalations": []
     },
@@ -115,18 +115,18 @@
       "status": "filled",
       "reason": "",
       "filled": {
+        "Year 1-5": "3",
         "Midterm 0-100": "85",
         "Final 0-100": "85",
         "Grade 0-100": "85",
-        "Year 1-5": "3",
-        "Remarks": "Passed"
+        "Remarks": "PASSED"
       },
       "verified": {
+        "Year 1-5": "3",
         "Midterm 0-100": "85",
         "Final 0-100": "85",
         "Grade 0-100": "85",
-        "Year 1-5": "3",
-        "Remarks": "Passed"
+        "Remarks": "PASSED"
       },
       "escalations": []
     },
@@ -136,18 +136,18 @@
       "status": "filled",
       "reason": "",
       "filled": {
+        "Year 1-5": "4",
         "Midterm 0-100": "78",
         "Final 0-100": "86",
         "Grade 0-100": "82",
-        "Year 1-5": "4",
-        "Remarks": "Passed"
+        "Remarks": "PASSED"
       },
       "verified": {
+        "Year 1-5": "4",
         "Midterm 0-100": "78",
         "Final 0-100": "86",
         "Grade 0-100": "82",
-        "Year 1-5": "4",
-        "Remarks": "Passed"
+        "Remarks": "PASSED"
       },
       "escalations": []
     },
@@ -157,18 +157,18 @@
       "status": "filled",
       "reason": "",
       "filled": {
+        "Year 1-5": "3",
         "Midterm 0-100": "74",
         "Final 0-100": "75",
         "Grade 0-100": "74",
-        "Year 1-5": "3",
-        "Remarks": "Failed"
+        "Remarks": "FAILED"
       },
       "verified": {
+        "Year 1-5": "3",
         "Midterm 0-100": "74",
         "Final 0-100": "75",
         "Grade 0-100": "74",
-        "Year 1-5": "3",
-        "Remarks": "Failed"
+        "Remarks": "FAILED"
       },
       "escalations": []
     },
@@ -178,18 +178,18 @@
       "status": "filled",
       "reason": "",
       "filled": {
+        "Year 1-5": "1",
         "Midterm 0-100": "90",
         "Final 0-100": "89",
         "Grade 0-100": "90",
-        "Year 1-5": "1",
-        "Remarks": "Passed"
+        "Remarks": "PASSED"
       },
       "verified": {
+        "Year 1-5": "1",
         "Midterm 0-100": "90",
         "Final 0-100": "89",
         "Grade 0-100": "90",
-        "Year 1-5": "1",
-        "Remarks": "Passed"
+        "Remarks": "PASSED"
       },
       "escalations": []
     },
@@ -199,18 +199,18 @@
       "status": "filled",
       "reason": "",
       "filled": {
+        "Year 1-5": "3",
         "Midterm 0-100": "92",
         "Final 0-100": "80",
         "Grade 0-100": "86",
-        "Year 1-5": "3",
-        "Remarks": "Passed"
+        "Remarks": "PASSED"
       },
       "verified": {
+        "Year 1-5": "3",
         "Midterm 0-100": "92",
         "Final 0-100": "80",
         "Grade 0-100": "86",
-        "Year 1-5": "3",
-        "Remarks": "Passed"
+        "Remarks": "PASSED"
       },
       "escalations": []
     },
@@ -220,18 +220,18 @@
       "status": "filled",
       "reason": "",
       "filled": {
+        "Year 1-5": "3",
         "Midterm 0-100": "79",
         "Final 0-100": "81",
         "Grade 0-100": "80",
-        "Year 1-5": "3",
-        "Remarks": "Passed"
+        "Remarks": "PASSED"
       },
       "verified": {
+        "Year 1-5": "3",
         "Midterm 0-100": "79",
         "Final 0-100": "81",
         "Grade 0-100": "80",
-        "Year 1-5": "3",
-        "Remarks": "Passed"
+        "Remarks": "PASSED"
       },
       "escalations": []
     },
@@ -241,18 +241,18 @@
       "status": "filled",
       "reason": "",
       "filled": {
+        "Year 1-5": "3",
         "Midterm 0-100": "97",
         "Final 0-100": "97",
         "Grade 0-100": "97",
-        "Year 1-5": "3",
-        "Remarks": "Passed"
+        "Remarks": "PASSED"
       },
       "verified": {
+        "Year 1-5": "3",
         "Midterm 0-100": "97",
         "Final 0-100": "97",
         "Grade 0-100": "97",
-        "Year 1-5": "3",
-        "Remarks": "Passed"
+        "Remarks": "PASSED"
       },
       "escalations": []
     },
@@ -262,18 +262,18 @@
       "status": "filled",
       "reason": "",
       "filled": {
+        "Year 1-5": "1",
         "Midterm 0-100": "73",
         "Final 0-100": "72",
         "Grade 0-100": "72",
-        "Year 1-5": "1",
-        "Remarks": "Failed"
+        "Remarks": "FAILED"
       },
       "verified": {
+        "Year 1-5": "1",
         "Midterm 0-100": "73",
         "Final 0-100": "72",
         "Grade 0-100": "72",
-        "Year 1-5": "1",
-        "Remarks": "Failed"
+        "Remarks": "FAILED"
       },
       "escalations": []
     },
@@ -283,18 +283,18 @@
       "status": "filled",
       "reason": "",
       "filled": {
+        "Year 1-5": "3",
         "Midterm 0-100": "91",
         "Final 0-100": "93",
         "Grade 0-100": "92",
-        "Year 1-5": "3",
-        "Remarks": "Passed"
+        "Remarks": "PASSED"
       },
       "verified": {
+        "Year 1-5": "3",
         "Midterm 0-100": "91",
         "Final 0-100": "93",
         "Grade 0-100": "92",
-        "Year 1-5": "3",
-        "Remarks": "Passed"
+        "Remarks": "PASSED"
       },
       "escalations": []
     },
@@ -304,18 +304,18 @@
       "status": "filled",
       "reason": "",
       "filled": {
+        "Year 1-5": "4",
         "Midterm 0-100": "73",
         "Final 0-100": "73",
         "Grade 0-100": "73",
-        "Year 1-5": "4",
-        "Remarks": "Failed"
+        "Remarks": "FAILED"
       },
       "verified": {
+        "Year 1-5": "4",
         "Midterm 0-100": "73",
         "Final 0-100": "73",
         "Grade 0-100": "73",
-        "Year 1-5": "4",
-        "Remarks": "Failed"
+        "Remarks": "FAILED"
       },
       "escalations": []
     },
@@ -325,18 +325,18 @@
       "status": "filled",
       "reason": "",
       "filled": {
+        "Year 1-5": "4",
         "Midterm 0-100": "72",
         "Final 0-100": "71",
         "Grade 0-100": "72",
-        "Year 1-5": "4",
-        "Remarks": "Failed"
+        "Remarks": "FAILED"
       },
       "verified": {
+        "Year 1-5": "4",
         "Midterm 0-100": "72",
         "Final 0-100": "71",
         "Grade 0-100": "72",
-        "Year 1-5": "4",
-        "Remarks": "Failed"
+        "Remarks": "FAILED"
       },
       "escalations": []
     },
@@ -346,18 +346,18 @@
       "status": "filled",
       "reason": "",
       "filled": {
+        "Year 1-5": "3",
         "Midterm 0-100": "93",
         "Final 0-100": "94",
         "Grade 0-100": "94",
-        "Year 1-5": "3",
-        "Remarks": "Passed"
+        "Remarks": "PASSED"
       },
       "verified": {
+        "Year 1-5": "3",
         "Midterm 0-100": "93",
         "Final 0-100": "94",
         "Grade 0-100": "94",
-        "Year 1-5": "3",
-        "Remarks": "Passed"
+        "Remarks": "PASSED"
       },
       "escalations": []
     },
@@ -367,18 +367,18 @@
       "status": "filled",
       "reason": "",
       "filled": {
+        "Year 1-5": "4",
         "Midterm 0-100": "74",
         "Final 0-100": "74",
         "Grade 0-100": "74",
-        "Year 1-5": "4",
-        "Remarks": "Failed"
+        "Remarks": "FAILED"
       },
       "verified": {
+        "Year 1-5": "4",
         "Midterm 0-100": "74",
         "Final 0-100": "74",
         "Grade 0-100": "74",
-        "Year 1-5": "4",
-        "Remarks": "Failed"
+        "Remarks": "FAILED"
       },
       "escalations": []
     },
@@ -388,18 +388,18 @@
       "status": "filled",
       "reason": "",
       "filled": {
+        "Year 1-5": "4",
         "Midterm 0-100": "87",
         "Final 0-100": "83",
         "Grade 0-100": "85",
-        "Year 1-5": "4",
-        "Remarks": "Passed"
+        "Remarks": "PASSED"
       },
       "verified": {
+        "Year 1-5": "4",
         "Midterm 0-100": "87",
         "Final 0-100": "83",
         "Grade 0-100": "85",
-        "Year 1-5": "4",
-        "Remarks": "Passed"
+        "Remarks": "PASSED"
       },
       "escalations": []
     },
@@ -409,18 +409,18 @@
       "status": "filled",
       "reason": "",
       "filled": {
+        "Year 1-5": "4",
         "Midterm 0-100": "91",
         "Final 0-100": "95",
         "Grade 0-100": "93",
-        "Year 1-5": "4",
-        "Remarks": "Passed"
+        "Remarks": "PASSED"
       },
       "verified": {
+        "Year 1-5": "4",
         "Midterm 0-100": "91",
         "Final 0-100": "95",
         "Grade 0-100": "93",
-        "Year 1-5": "4",
-        "Remarks": "Passed"
+        "Remarks": "PASSED"
       },
       "escalations": []
     },
@@ -430,18 +430,18 @@
       "status": "filled",
       "reason": "",
       "filled": {
+        "Year 1-5": "1",
         "Midterm 0-100": "94",
         "Final 0-100": "91",
         "Grade 0-100": "92",
-        "Year 1-5": "1",
-        "Remarks": "Passed"
+        "Remarks": "PASSED"
       },
       "verified": {
+        "Year 1-5": "1",
         "Midterm 0-100": "94",
         "Final 0-100": "91",
         "Grade 0-100": "92",
-        "Year 1-5": "1",
-        "Remarks": "Passed"
+        "Remarks": "PASSED"
       },
       "escalations": []
     },
@@ -451,18 +451,18 @@
       "status": "filled",
       "reason": "",
       "filled": {
+        "Year 1-5": "2",
         "Midterm 0-100": "96",
         "Final 0-100": "87",
         "Grade 0-100": "92",
-        "Year 1-5": "2",
-        "Remarks": "Passed"
+        "Remarks": "PASSED"
       },
       "verified": {
+        "Year 1-5": "2",
         "Midterm 0-100": "96",
         "Final 0-100": "87",
         "Grade 0-100": "92",
-        "Year 1-5": "2",
-        "Remarks": "Passed"
+        "Remarks": "PASSED"
       },
       "escalations": []
     },
@@ -472,18 +472,18 @@
       "status": "filled",
       "reason": "",
       "filled": {
+        "Year 1-5": "1",
         "Midterm 0-100": "88",
         "Final 0-100": "89",
         "Grade 0-100": "88",
-        "Year 1-5": "1",
-        "Remarks": "Passed"
+        "Remarks": "PASSED"
       },
       "verified": {
+        "Year 1-5": "1",
         "Midterm 0-100": "88",
         "Final 0-100": "89",
         "Grade 0-100": "88",
-        "Year 1-5": "1",
-        "Remarks": "Passed"
+        "Remarks": "PASSED"
       },
       "escalations": []
     },
@@ -493,18 +493,18 @@
       "status": "filled",
       "reason": "",
       "filled": {
+        "Year 1-5": "3",
         "Midterm 0-100": "88",
         "Final 0-100": "81",
         "Grade 0-100": "84",
-        "Year 1-5": "3",
-        "Remarks": "Passed"
+        "Remarks": "PASSED"
       },
       "verified": {
+        "Year 1-5": "3",
         "Midterm 0-100": "88",
         "Final 0-100": "81",
         "Grade 0-100": "84",
-        "Year 1-5": "3",
-        "Remarks": "Passed"
+        "Remarks": "PASSED"
       },
       "escalations": []
     },
@@ -514,18 +514,18 @@
       "status": "filled",
       "reason": "",
       "filled": {
+        "Year 1-5": "2",
         "Midterm 0-100": "74",
         "Final 0-100": "76",
         "Grade 0-100": "75",
-        "Year 1-5": "2",
-        "Remarks": "Passed"
+        "Remarks": "PASSED"
       },
       "verified": {
+        "Year 1-5": "2",
         "Midterm 0-100": "74",
         "Final 0-100": "76",
         "Grade 0-100": "75",
-        "Year 1-5": "2",
-        "Remarks": "Passed"
+        "Remarks": "PASSED"
       },
       "escalations": []
     },
@@ -535,18 +535,18 @@
       "status": "filled",
       "reason": "",
       "filled": {
+        "Year 1-5": "4",
         "Midterm 0-100": "73",
         "Final 0-100": "79",
         "Grade 0-100": "76",
-        "Year 1-5": "4",
-        "Remarks": "Passed"
+        "Remarks": "PASSED"
       },
       "verified": {
+        "Year 1-5": "4",
         "Midterm 0-100": "73",
         "Final 0-100": "79",
         "Grade 0-100": "76",
-        "Year 1-5": "4",
-        "Remarks": "Passed"
+        "Remarks": "PASSED"
       },
       "escalations": []
     },
@@ -556,18 +556,18 @@
       "status": "filled",
       "reason": "",
       "filled": {
+        "Year 1-5": "1",
         "Midterm 0-100": "74",
         "Final 0-100": "74",
         "Grade 0-100": "74",
-        "Year 1-5": "1",
-        "Remarks": "Failed"
+        "Remarks": "FAILED"
       },
       "verified": {
+        "Year 1-5": "1",
         "Midterm 0-100": "74",
         "Final 0-100": "74",
         "Grade 0-100": "74",
-        "Year 1-5": "1",
-        "Remarks": "Failed"
+        "Remarks": "FAILED"
       },
       "escalations": []
     },
@@ -577,18 +577,18 @@
       "status": "filled",
       "reason": "",
       "filled": {
+        "Year 1-5": "2",
         "Midterm 0-100": "99",
         "Final 0-100": "99",
         "Grade 0-100": "99",
-        "Year 1-5": "2",
-        "Remarks": "Passed"
+        "Remarks": "PASSED"
       },
       "verified": {
+        "Year 1-5": "2",
         "Midterm 0-100": "99",
         "Final 0-100": "99",
         "Grade 0-100": "99",
-        "Year 1-5": "2",
-        "Remarks": "Passed"
+        "Remarks": "PASSED"
       },
       "escalations": []
     },
@@ -598,18 +598,18 @@
       "status": "filled",
       "reason": "",
       "filled": {
+        "Year 1-5": "3",
         "Midterm 0-100": "81",
         "Final 0-100": "86",
         "Grade 0-100": "84",
-        "Year 1-5": "3",
-        "Remarks": "Passed"
+        "Remarks": "PASSED"
       },
       "verified": {
+        "Year 1-5": "3",
         "Midterm 0-100": "81",
         "Final 0-100": "86",
         "Grade 0-100": "84",
-        "Year 1-5": "3",
-        "Remarks": "Passed"
+        "Remarks": "PASSED"
       },
       "escalations": []
     },
@@ -619,18 +619,18 @@
       "status": "filled",
       "reason": "",
       "filled": {
+        "Year 1-5": "3",
         "Midterm 0-100": "91",
         "Final 0-100": "88",
         "Grade 0-100": "90",
-        "Year 1-5": "3",
-        "Remarks": "Passed"
+        "Remarks": "PASSED"
       },
       "verified": {
+        "Year 1-5": "3",
         "Midterm 0-100": "91",
         "Final 0-100": "88",
         "Grade 0-100": "90",
-        "Year 1-5": "3",
-        "Remarks": "Passed"
+        "Remarks": "PASSED"
       },
       "escalations": []
     },
@@ -640,18 +640,18 @@
       "status": "filled",
       "reason": "",
       "filled": {
+        "Year 1-5": "4",
         "Midterm 0-100": "87",
         "Final 0-100": "90",
         "Grade 0-100": "88",
-        "Year 1-5": "4",
-        "Remarks": "Passed"
+        "Remarks": "PASSED"
       },
       "verified": {
+        "Year 1-5": "4",
         "Midterm 0-100": "87",
         "Final 0-100": "90",
         "Grade 0-100": "88",
-        "Year 1-5": "4",
-        "Remarks": "Passed"
+        "Remarks": "PASSED"
       },
       "escalations": []
     },
@@ -661,18 +661,18 @@
       "status": "filled",
       "reason": "",
       "filled": {
+        "Year 1-5": "3",
         "Midterm 0-100": "73",
         "Final 0-100": "76",
         "Grade 0-100": "74",
-        "Year 1-5": "3",
-        "Remarks": "Failed"
+        "Remarks": "FAILED"
       },
       "verified": {
+        "Year 1-5": "3",
         "Midterm 0-100": "73",
         "Final 0-100": "76",
         "Grade 0-100": "74",
-        "Year 1-5": "3",
-        "Remarks": "Failed"
+        "Remarks": "FAILED"
       },
       "escalations": []
     },
@@ -682,18 +682,18 @@
       "status": "filled",
       "reason": "",
       "filled": {
+        "Year 1-5": "1",
         "Midterm 0-100": "74",
         "Final 0-100": "72",
         "Grade 0-100": "73",
-        "Year 1-5": "1",
-        "Remarks": "Failed"
+        "Remarks": "FAILED"
       },
       "verified": {
+        "Year 1-5": "1",
         "Midterm 0-100": "74",
         "Final 0-100": "72",
         "Grade 0-100": "73",
-        "Year 1-5": "1",
-        "Remarks": "Failed"
+        "Remarks": "FAILED"
       },
       "escalations": []
     },
@@ -703,18 +703,18 @@
       "status": "filled",
       "reason": "",
       "filled": {
+        "Year 1-5": "4",
         "Midterm 0-100": "77",
         "Final 0-100": "74",
         "Grade 0-100": "76",
-        "Year 1-5": "4",
-        "Remarks": "Passed"
+        "Remarks": "PASSED"
       },
       "verified": {
+        "Year 1-5": "4",
         "Midterm 0-100": "77",
         "Final 0-100": "74",
         "Grade 0-100": "76",
-        "Year 1-5": "4",
-        "Remarks": "Passed"
+        "Remarks": "PASSED"
       },
       "escalations": []
     },
@@ -724,18 +724,18 @@
       "status": "filled",
       "reason": "",
       "filled": {
+        "Year 1-5": "2",
         "Midterm 0-100": "88",
         "Final 0-100": "81",
         "Grade 0-100": "84",
-        "Year 1-5": "2",
-        "Remarks": "Passed"
+        "Remarks": "PASSED"
       },
       "verified": {
+        "Year 1-5": "2",
         "Midterm 0-100": "88",
         "Final 0-100": "81",
         "Grade 0-100": "84",
-        "Year 1-5": "2",
-        "Remarks": "Passed"
+        "Remarks": "PASSED"
       },
       "escalations": []
     },
@@ -745,18 +745,18 @@
       "status": "filled",
       "reason": "",
       "filled": {
+        "Year 1-5": "3",
         "Midterm 0-100": "84",
         "Final 0-100": "83",
         "Grade 0-100": "84",
-        "Year 1-5": "3",
-        "Remarks": "Passed"
+        "Remarks": "PASSED"
       },
       "verified": {
+        "Year 1-5": "3",
         "Midterm 0-100": "84",
         "Final 0-100": "83",
         "Grade 0-100": "84",
-        "Year 1-5": "3",
-        "Remarks": "Passed"
+        "Remarks": "PASSED"
       },
       "escalations": []
     },
@@ -766,18 +766,18 @@
       "status": "filled",
       "reason": "",
       "filled": {
+        "Year 1-5": "2",
         "Midterm 0-100": "86",
         "Final 0-100": "92",
         "Grade 0-100": "89",
-        "Year 1-5": "2",
-        "Remarks": "Passed"
+        "Remarks": "PASSED"
       },
       "verified": {
+        "Year 1-5": "2",
         "Midterm 0-100": "86",
         "Final 0-100": "92",
         "Grade 0-100": "89",
-        "Year 1-5": "2",
-        "Remarks": "Passed"
+        "Remarks": "PASSED"
       },
       "escalations": []
     },
@@ -787,18 +787,18 @@
       "status": "filled",
       "reason": "",
       "filled": {
+        "Year 1-5": "3",
         "Midterm 0-100": "78",
         "Final 0-100": "79",
         "Grade 0-100": "78",
-        "Year 1-5": "3",
-        "Remarks": "Passed"
+        "Remarks": "PASSED"
       },
       "verified": {
+        "Year 1-5": "3",
         "Midterm 0-100": "78",
         "Final 0-100": "79",
         "Grade 0-100": "78",
-        "Year 1-5": "3",
-        "Remarks": "Passed"
+        "Remarks": "PASSED"
       },
       "escalations": []
     },
@@ -808,18 +808,18 @@
       "status": "filled",
       "reason": "",
       "filled": {
+        "Year 1-5": "4",
         "Midterm 0-100": "93",
         "Final 0-100": "87",
         "Grade 0-100": "90",
-        "Year 1-5": "4",
-        "Remarks": "Passed"
+        "Remarks": "PASSED"
       },
       "verified": {
+        "Year 1-5": "4",
         "Midterm 0-100": "93",
         "Final 0-100": "87",
         "Grade 0-100": "90",
-        "Year 1-5": "4",
-        "Remarks": "Passed"
+        "Remarks": "PASSED"
       },
       "escalations": []
     },
@@ -829,18 +829,18 @@
       "status": "filled",
       "reason": "",
       "filled": {
+        "Year 1-5": "3",
         "Midterm 0-100": "96",
         "Final 0-100": "96",
         "Grade 0-100": "96",
-        "Year 1-5": "3",
-        "Remarks": "Passed"
+        "Remarks": "PASSED"
       },
       "verified": {
+        "Year 1-5": "3",
         "Midterm 0-100": "96",
         "Final 0-100": "96",
         "Grade 0-100": "96",
-        "Year 1-5": "3",
-        "Remarks": "Passed"
+        "Remarks": "PASSED"
       },
       "escalations": []
     },
@@ -850,18 +850,18 @@
       "status": "filled",
       "reason": "",
       "filled": {
+        "Year 1-5": "3",
         "Midterm 0-100": "85",
         "Final 0-100": "87",
         "Grade 0-100": "86",
-        "Year 1-5": "3",
-        "Remarks": "Passed"
+        "Remarks": "PASSED"
       },
       "verified": {
+        "Year 1-5": "3",
         "Midterm 0-100": "85",
         "Final 0-100": "87",
         "Grade 0-100": "86",
-        "Year 1-5": "3",
-        "Remarks": "Passed"
+        "Remarks": "PASSED"
       },
       "escalations": []
     },
@@ -871,18 +871,18 @@
       "status": "filled",
       "reason": "",
       "filled": {
+        "Year 1-5": "1",
         "Midterm 0-100": "80",
         "Final 0-100": "78",
         "Grade 0-100": "79",
-        "Year 1-5": "1",
-        "Remarks": "Passed"
+        "Remarks": "PASSED"
       },
       "verified": {
+        "Year 1-5": "1",
         "Midterm 0-100": "80",
         "Final 0-100": "78",
         "Grade 0-100": "79",
-        "Year 1-5": "1",
-        "Remarks": "Passed"
+        "Remarks": "PASSED"
       },
       "escalations": []
     },
@@ -892,18 +892,18 @@
       "status": "filled",
       "reason": "",
       "filled": {
+        "Year 1-5": "3",
         "Midterm 0-100": "83",
         "Final 0-100": "76",
         "Grade 0-100": "80",
-        "Year 1-5": "3",
-        "Remarks": "Passed"
+        "Remarks": "PASSED"
       },
       "verified": {
+        "Year 1-5": "3",
         "Midterm 0-100": "83",
         "Final 0-100": "76",
         "Grade 0-100": "80",
-        "Year 1-5": "3",
-        "Remarks": "Passed"
+        "Remarks": "PASSED"
       },
       "escalations": []
     },
@@ -913,18 +913,18 @@
       "status": "filled",
       "reason": "",
       "filled": {
+        "Year 1-5": "4",
         "Midterm 0-100": "97",
         "Final 0-100": "97",
         "Grade 0-100": "97",
-        "Year 1-5": "4",
-        "Remarks": "Passed"
+        "Remarks": "PASSED"
       },
       "verified": {
+        "Year 1-5": "4",
         "Midterm 0-100": "97",
         "Final 0-100": "97",
         "Grade 0-100": "97",
-        "Year 1-5": "4",
-        "Remarks": "Passed"
+        "Remarks": "PASSED"
       },
       "escalations": []
     },
@@ -934,18 +934,18 @@
       "status": "filled",
       "reason": "",
       "filled": {
+        "Year 1-5": "1",
         "Midterm 0-100": "98",
         "Final 0-100": "95",
         "Grade 0-100": "96",
-        "Year 1-5": "1",
-        "Remarks": "Passed"
+        "Remarks": "PASSED"
       },
       "verified": {
+        "Year 1-5": "1",
         "Midterm 0-100": "98",
         "Final 0-100": "95",
         "Grade 0-100": "96",
-        "Year 1-5": "1",
-        "Remarks": "Passed"
+        "Remarks": "PASSED"
       },
       "escalations": []
     },
@@ -955,18 +955,18 @@
       "status": "filled",
       "reason": "",
       "filled": {
+        "Year 1-5": "2",
         "Midterm 0-100": "85",
         "Final 0-100": "76",
         "Grade 0-100": "80",
-        "Year 1-5": "2",
-        "Remarks": "Passed"
+        "Remarks": "PASSED"
       },
       "verified": {
+        "Year 1-5": "2",
         "Midterm 0-100": "85",
         "Final 0-100": "76",
         "Grade 0-100": "80",
-        "Year 1-5": "2",
-        "Remarks": "Passed"
+        "Remarks": "PASSED"
       },
       "escalations": []
     },
@@ -976,18 +976,18 @@
       "status": "filled",
       "reason": "",
       "filled": {
+        "Year 1-5": "4",
         "Midterm 0-100": "94",
         "Final 0-100": "91",
         "Grade 0-100": "92",
-        "Year 1-5": "4",
-        "Remarks": "Passed"
+        "Remarks": "PASSED"
       },
       "verified": {
+        "Year 1-5": "4",
         "Midterm 0-100": "94",
         "Final 0-100": "91",
         "Grade 0-100": "92",
-        "Year 1-5": "4",
-        "Remarks": "Passed"
+        "Remarks": "PASSED"
       },
       "escalations": []
     },
@@ -997,18 +997,18 @@
       "status": "filled",
       "reason": "",
       "filled": {
+        "Year 1-5": "3",
         "Midterm 0-100": "74",
         "Final 0-100": "73",
         "Grade 0-100": "74",
-        "Year 1-5": "3",
-        "Remarks": "Failed"
+        "Remarks": "FAILED"
       },
       "verified": {
+        "Year 1-5": "3",
         "Midterm 0-100": "74",
         "Final 0-100": "73",
         "Grade 0-100": "74",
-        "Year 1-5": "3",
-        "Remarks": "Failed"
+        "Remarks": "FAILED"
       },
       "escalations": []
     },
@@ -1018,18 +1018,18 @@
       "status": "filled",
       "reason": "",
       "filled": {
+        "Year 1-5": "2",
         "Midterm 0-100": "96",
         "Final 0-100": "93",
         "Grade 0-100": "94",
-        "Year 1-5": "2",
-        "Remarks": "Passed"
+        "Remarks": "PASSED"
       },
       "verified": {
+        "Year 1-5": "2",
         "Midterm 0-100": "96",
         "Final 0-100": "93",
         "Grade 0-100": "94",
-        "Year 1-5": "2",
-        "Remarks": "Passed"
+        "Remarks": "PASSED"
       },
       "escalations": []
     },
@@ -1039,18 +1039,18 @@
       "status": "filled",
       "reason": "",
       "filled": {
+        "Year 1-5": "2",
         "Midterm 0-100": "85",
         "Final 0-100": "80",
         "Grade 0-100": "82",
-        "Year 1-5": "2",
-        "Remarks": "Passed"
+        "Remarks": "PASSED"
       },
       "verified": {
+        "Year 1-5": "2",
         "Midterm 0-100": "85",
         "Final 0-100": "80",
         "Grade 0-100": "82",
-        "Year 1-5": "2",
-        "Remarks": "Passed"
+        "Remarks": "PASSED"
       },
       "escalations": []
     }
@@ -1061,552 +1061,552 @@
     {
       "student_id": "2021-10001",
       "student_name": "Abad, Andrea A.",
-      "remarks": "",
-      "recommendations": "",
+      "course": "",
+      "year": "",
       "midterm": "",
       "final": "",
       "grade": "",
-      "course": "",
-      "year": ""
+      "remarks": "",
+      "recommendations": ""
     },
     {
       "student_id": "2021-10008",
       "student_name": "Aguilar, Benjamin L.",
-      "remarks": "",
-      "recommendations": "",
+      "course": "",
+      "year": "",
       "midterm": "",
       "final": "",
       "grade": "",
-      "course": "",
-      "year": ""
+      "remarks": "",
+      "recommendations": ""
     },
     {
       "student_id": "2021-10015",
       "student_name": "Alonzo, Camille W.",
-      "remarks": "",
-      "recommendations": "",
+      "course": "",
+      "year": "",
       "midterm": "",
       "final": "",
       "grade": "",
-      "course": "",
-      "year": ""
+      "remarks": "",
+      "recommendations": ""
     },
     {
       "student_id": "2021-10022",
       "student_name": "Bautista, Daniel H.",
-      "remarks": "",
-      "recommendations": "",
+      "course": "",
+      "year": "",
       "midterm": "",
       "final": "",
       "grade": "",
-      "course": "",
-      "year": ""
+      "remarks": "",
+      "recommendations": ""
     },
     {
       "student_id": "2021-10029",
       "student_name": "Bernardo, Elaine S.",
-      "remarks": "",
-      "recommendations": "",
+      "course": "",
+      "year": "",
       "midterm": "",
       "final": "",
       "grade": "",
-      "course": "",
-      "year": ""
+      "remarks": "",
+      "recommendations": ""
     },
     {
       "student_id": "2021-10036",
       "student_name": "Cabrera, Francis D.",
-      "remarks": "",
-      "recommendations": "",
+      "course": "",
+      "year": "",
       "midterm": "",
       "final": "",
       "grade": "",
-      "course": "",
-      "year": ""
+      "remarks": "",
+      "recommendations": ""
     },
     {
       "student_id": "2021-10043",
       "student_name": "Castillo, Grace O.",
-      "remarks": "",
-      "recommendations": "",
+      "course": "",
+      "year": "",
       "midterm": "",
       "final": "",
       "grade": "",
-      "course": "",
-      "year": ""
+      "remarks": "",
+      "recommendations": ""
     },
     {
       "student_id": "2021-10050",
       "student_name": "Concepcion, Hector Z.",
-      "remarks": "",
-      "recommendations": "",
+      "course": "",
+      "year": "",
       "midterm": "",
       "final": "",
       "grade": "",
-      "course": "",
-      "year": ""
+      "remarks": "",
+      "recommendations": ""
     },
     {
       "student_id": "2021-10057",
       "student_name": "Cruz, Isabel K.",
-      "remarks": "",
-      "recommendations": "",
+      "course": "",
+      "year": "",
       "midterm": "",
       "final": "",
       "grade": "",
-      "course": "",
-      "year": ""
+      "remarks": "",
+      "recommendations": ""
     },
     {
       "student_id": "2021-10064",
       "student_name": "Dacanay, Joaquin V.",
-      "remarks": "",
-      "recommendations": "",
+      "course": "",
+      "year": "",
       "midterm": "",
       "final": "",
       "grade": "",
-      "course": "",
-      "year": ""
+      "remarks": "",
+      "recommendations": ""
     },
     {
       "student_id": "2021-10071",
       "student_name": "Dela Cruz, Katrina G.",
-      "remarks": "",
-      "recommendations": "",
+      "course": "",
+      "year": "",
       "midterm": "",
       "final": "",
       "grade": "",
-      "course": "",
-      "year": ""
+      "remarks": "",
+      "recommendations": ""
     },
     {
       "student_id": "2021-10078",
       "student_name": "Domingo, Lorenzo R.",
-      "remarks": "",
-      "recommendations": "",
+      "course": "",
+      "year": "",
       "midterm": "",
       "final": "",
       "grade": "",
-      "course": "",
-      "year": ""
+      "remarks": "",
+      "recommendations": ""
     },
     {
       "student_id": "2021-10085",
       "student_name": "Escobar, Marielle C.",
-      "remarks": "",
-      "recommendations": "",
+      "course": "",
+      "year": "",
       "midterm": "",
       "final": "",
       "grade": "",
-      "course": "",
-      "year": ""
+      "remarks": "",
+      "recommendations": ""
     },
     {
       "student_id": "2021-10092",
       "student_name": "Espiritu, Nathaniel N.",
-      "remarks": "",
-      "recommendations": "",
+      "course": "",
+      "year": "",
       "midterm": "",
       "final": "",
       "grade": "",
-      "course": "",
-      "year": ""
+      "remarks": "",
+      "recommendations": ""
     },
     {
       "student_id": "2021-10099",
       "student_name": "Fernandez, Odette Y.",
-      "remarks": "",
-      "recommendations": "",
+      "course": "",
+      "year": "",
       "midterm": "",
       "final": "",
       "grade": "",
-      "course": "",
-      "year": ""
+      "remarks": "",
+      "recommendations": ""
     },
     {
       "student_id": "2021-10106",
       "student_name": "Flores, Patricia J.",
-      "remarks": "",
-      "recommendations": "",
+      "course": "",
+      "year": "",
       "midterm": "",
       "final": "",
       "grade": "",
-      "course": "",
-      "year": ""
+      "remarks": "",
+      "recommendations": ""
     },
     {
       "student_id": "2021-10113",
       "student_name": "Gabriel, Quennie U.",
-      "remarks": "",
-      "recommendations": "",
+      "course": "",
+      "year": "",
       "midterm": "",
       "final": "",
       "grade": "",
-      "course": "",
-      "year": ""
+      "remarks": "",
+      "recommendations": ""
     },
     {
       "student_id": "2021-10120",
       "student_name": "Garcia, Rafael F.",
-      "remarks": "",
-      "recommendations": "",
+      "course": "",
+      "year": "",
       "midterm": "",
       "final": "",
       "grade": "",
-      "course": "",
-      "year": ""
+      "remarks": "",
+      "recommendations": ""
     },
     {
       "student_id": "2021-10127",
       "student_name": "Gonzales, Sofia Q.",
-      "remarks": "",
-      "recommendations": "",
+      "course": "",
+      "year": "",
       "midterm": "",
       "final": "",
       "grade": "",
-      "course": "",
-      "year": ""
+      "remarks": "",
+      "recommendations": ""
     },
     {
       "student_id": "2021-10134",
       "student_name": "Hernandez, Teodoro B.",
-      "remarks": "",
-      "recommendations": "",
+      "course": "",
+      "year": "",
       "midterm": "",
       "final": "",
       "grade": "",
-      "course": "",
-      "year": ""
+      "remarks": "",
+      "recommendations": ""
     },
     {
       "student_id": "2021-10141",
       "student_name": "Ilagan, Ursula M.",
-      "remarks": "",
-      "recommendations": "",
+      "course": "",
+      "year": "",
       "midterm": "",
       "final": "",
       "grade": "",
-      "course": "",
-      "year": ""
+      "remarks": "",
+      "recommendations": ""
     },
     {
       "student_id": "2021-10148",
       "student_name": "Jimenez, Vicente X.",
-      "remarks": "",
-      "recommendations": "",
+      "course": "",
+      "year": "",
       "midterm": "",
       "final": "",
       "grade": "",
-      "course": "",
-      "year": ""
+      "remarks": "",
+      "recommendations": ""
     },
     {
       "student_id": "2021-10155",
       "student_name": "Lacsamana, Wilma I.",
-      "remarks": "",
-      "recommendations": "",
+      "course": "",
+      "year": "",
       "midterm": "",
       "final": "",
       "grade": "",
-      "course": "",
-      "year": ""
+      "remarks": "",
+      "recommendations": ""
     },
     {
       "student_id": "2021-10162",
       "student_name": "Lazaro, Xavier T.",
-      "remarks": "",
-      "recommendations": "",
+      "course": "",
+      "year": "",
       "midterm": "",
       "final": "",
       "grade": "",
-      "course": "",
-      "year": ""
+      "remarks": "",
+      "recommendations": ""
     },
     {
       "student_id": "2021-10169",
       "student_name": "Legaspi, Yvonne E.",
-      "remarks": "",
-      "recommendations": "",
+      "course": "",
+      "year": "",
       "midterm": "",
       "final": "",
       "grade": "",
-      "course": "",
-      "year": ""
+      "remarks": "",
+      "recommendations": ""
     },
     {
       "student_id": "2021-10176",
       "student_name": "Macaraeg, Zenaida P.",
-      "remarks": "",
-      "recommendations": "",
+      "course": "",
+      "year": "",
       "midterm": "",
       "final": "",
       "grade": "",
-      "course": "",
-      "year": ""
+      "remarks": "",
+      "recommendations": ""
     },
     {
       "student_id": "2021-10183",
       "student_name": "Magsino, Arnel A.",
-      "remarks": "",
-      "recommendations": "",
+      "course": "",
+      "year": "",
       "midterm": "",
       "final": "",
       "grade": "",
-      "course": "",
-      "year": ""
+      "remarks": "",
+      "recommendations": ""
     },
     {
       "student_id": "2021-10190",
       "student_name": "Manalo, Bianca L.",
-      "remarks": "",
-      "recommendations": "",
+      "course": "",
+      "year": "",
       "midterm": "",
       "final": "",
       "grade": "",
-      "course": "",
-      "year": ""
+      "remarks": "",
+      "recommendations": ""
     },
     {
       "student_id": "2021-10197",
       "student_name": "Mendoza, Carlo W.",
-      "remarks": "",
-      "recommendations": "",
+      "course": "",
+      "year": "",
       "midterm": "",
       "final": "",
       "grade": "",
-      "course": "",
-      "year": ""
+      "remarks": "",
+      "recommendations": ""
     },
     {
       "student_id": "2021-10204",
       "student_name": "Nacpil, Divina H.",
-      "remarks": "",
-      "recommendations": "",
+      "course": "",
+      "year": "",
       "midterm": "",
       "final": "",
       "grade": "",
-      "course": "",
-      "year": ""
+      "remarks": "",
+      "recommendations": ""
     },
     {
       "student_id": "2021-10211",
       "student_name": "Navarro, Emilio S.",
-      "remarks": "",
-      "recommendations": "",
+      "course": "",
+      "year": "",
       "midterm": "",
       "final": "",
       "grade": "",
-      "course": "",
-      "year": ""
+      "remarks": "",
+      "recommendations": ""
     },
     {
       "student_id": "2021-10218",
       "student_name": "Ocampo, Fatima D.",
-      "remarks": "",
-      "recommendations": "",
+      "course": "",
+      "year": "",
       "midterm": "",
       "final": "",
       "grade": "",
-      "course": "",
-      "year": ""
+      "remarks": "",
+      "recommendations": ""
     },
     {
       "student_id": "2021-10225",
       "student_name": "Olivares, Gerald O.",
-      "remarks": "",
-      "recommendations": "",
+      "course": "",
+      "year": "",
       "midterm": "",
       "final": "",
       "grade": "",
-      "course": "",
-      "year": ""
+      "remarks": "",
+      "recommendations": ""
     },
     {
       "student_id": "2021-10232",
       "student_name": "Padilla, Hazel Z.",
-      "remarks": "",
-      "recommendations": "",
+      "course": "",
+      "year": "",
       "midterm": "",
       "final": "",
       "grade": "",
-      "course": "",
-      "year": ""
+      "remarks": "",
+      "recommendations": ""
     },
     {
       "student_id": "2021-10239",
       "student_name": "Pascual, Ignacio K.",
-      "remarks": "",
-      "recommendations": "",
+      "course": "",
+      "year": "",
       "midterm": "",
       "final": "",
       "grade": "",
-      "course": "",
-      "year": ""
+      "remarks": "",
+      "recommendations": ""
     },
     {
       "student_id": "2021-10246",
       "student_name": "Quinto, Jasmine V.",
-      "remarks": "",
-      "recommendations": "",
+      "course": "",
+      "year": "",
       "midterm": "",
       "final": "",
       "grade": "",
-      "course": "",
-      "year": ""
+      "remarks": "",
+      "recommendations": ""
     },
     {
       "student_id": "2021-10253",
       "student_name": "Ramos, Kevin G.",
-      "remarks": "",
-      "recommendations": "",
+      "course": "",
+      "year": "",
       "midterm": "",
       "final": "",
       "grade": "",
-      "course": "",
-      "year": ""
+      "remarks": "",
+      "recommendations": ""
     },
     {
       "student_id": "2021-10260",
       "student_name": "Reyes, Liza R.",
-      "remarks": "",
-      "recommendations": "",
+      "course": "",
+      "year": "",
       "midterm": "",
       "final": "",
       "grade": "",
-      "course": "",
-      "year": ""
+      "remarks": "",
+      "recommendations": ""
     },
     {
       "student_id": "2021-10267",
       "student_name": "Rivera, Miguel C.",
-      "remarks": "",
-      "recommendations": "",
+      "course": "",
+      "year": "",
       "midterm": "",
       "final": "",
       "grade": "",
-      "course": "",
-      "year": ""
+      "remarks": "",
+      "recommendations": ""
     },
     {
       "student_id": "2021-10274",
       "student_name": "Salazar, Nadine N.",
-      "remarks": "",
-      "recommendations": "",
+      "course": "",
+      "year": "",
       "midterm": "",
       "final": "",
       "grade": "",
-      "course": "",
-      "year": ""
+      "remarks": "",
+      "recommendations": ""
     },
     {
       "student_id": "2021-10281",
       "student_name": "Santiago, Oscar Y.",
-      "remarks": "",
-      "recommendations": "",
+      "course": "",
+      "year": "",
       "midterm": "",
       "final": "",
       "grade": "",
-      "course": "",
-      "year": ""
+      "remarks": "",
+      "recommendations": ""
     },
     {
       "student_id": "2021-10288",
       "student_name": "Santos, Pamela J.",
-      "remarks": "",
-      "recommendations": "",
+      "course": "",
+      "year": "",
       "midterm": "",
       "final": "",
       "grade": "",
-      "course": "",
-      "year": ""
+      "remarks": "",
+      "recommendations": ""
     },
     {
       "student_id": "2021-10295",
       "student_name": "Soriano, Ramon U.",
-      "remarks": "",
-      "recommendations": "",
+      "course": "",
+      "year": "",
       "midterm": "",
       "final": "",
       "grade": "",
-      "course": "",
-      "year": ""
+      "remarks": "",
+      "recommendations": ""
     },
     {
       "student_id": "2021-10302",
       "student_name": "Tolentino, Sheila F.",
-      "remarks": "",
-      "recommendations": "",
+      "course": "",
+      "year": "",
       "midterm": "",
       "final": "",
       "grade": "",
-      "course": "",
-      "year": ""
+      "remarks": "",
+      "recommendations": ""
     },
     {
       "student_id": "2021-10309",
       "student_name": "Torres, Tomas Q.",
-      "remarks": "",
-      "recommendations": "",
+      "course": "",
+      "year": "",
       "midterm": "",
       "final": "",
       "grade": "",
-      "course": "",
-      "year": ""
+      "remarks": "",
+      "recommendations": ""
     },
     {
       "student_id": "2021-10316",
       "student_name": "Valdez, Ulysses B.",
-      "remarks": "",
-      "recommendations": "",
+      "course": "",
+      "year": "",
       "midterm": "",
       "final": "",
       "grade": "",
-      "course": "",
-      "year": ""
+      "remarks": "",
+      "recommendations": ""
     },
     {
       "student_id": "2021-10323",
       "student_name": "Velasco, Veronica M.",
-      "remarks": "",
-      "recommendations": "",
+      "course": "",
+      "year": "",
       "midterm": "",
       "final": "",
       "grade": "",
-      "course": "",
-      "year": ""
+      "remarks": "",
+      "recommendations": ""
     },
     {
       "student_id": "2021-10330",
       "student_name": "Villanueva, Warren X.",
-      "remarks": "",
-      "recommendations": "",
+      "course": "",
+      "year": "",
       "midterm": "",
       "final": "",
       "grade": "",
-      "course": "",
-      "year": ""
+      "remarks": "",
+      "recommendations": ""
     },
     {
       "student_id": "2021-10337",
       "student_name": "Ybanez, Ysabel I.",
-      "remarks": "",
-      "recommendations": "",
+      "course": "",
+      "year": "",
       "midterm": "",
       "final": "",
       "grade": "",
-      "course": "",
-      "year": ""
+      "remarks": "",
+      "recommendations": ""
     },
     {
       "student_id": "2021-10344",
       "student_name": "Zamora, Zoe T.",
-      "remarks": "",
-      "recommendations": "",
+      "course": "",
+      "year": "",
       "midterm": "",
       "final": "",
       "grade": "",
-      "course": "",
-      "year": ""
+      "remarks": "",
+      "recommendations": ""
     }
   ]
 }

@@ -1,0 +1,306 @@
+{
+  "variant": "v5_near_duplicates",
+  "stopped_with_error": "Locator.fill: Error: Cannot type text into input[type=number]",
+  "rows": [
+    {
+      "student_id": "2021-10001",
+      "status": "failed",
+      "reason": "Locator.fill: Error: Cannot type text into input[type=number]",
+      "verified": {}
+    },
+    {
+      "student_id": "2021-10008",
+      "status": "failed",
+      "reason": "Locator.fill: Error: Cannot type text into input[type=number]",
+      "verified": {}
+    },
+    {
+      "student_id": "2021-10015",
+      "status": "failed",
+      "reason": "Locator.fill: Error: Cannot type text into input[type=number]",
+      "verified": {}
+    },
+    {
+      "student_id": "2021-10022",
+      "status": "failed",
+      "reason": "Locator.fill: Error: Cannot type text into input[type=number]",
+      "verified": {}
+    },
+    {
+      "student_id": "2021-10029",
+      "status": "failed",
+      "reason": "Locator.fill: Error: Cannot type text into input[type=number]",
+      "verified": {}
+    },
+    {
+      "student_id": "2021-10036",
+      "status": "failed",
+      "reason": "Locator.fill: Error: Cannot type text into input[type=number]",
+      "verified": {}
+    },
+    {
+      "student_id": "2021-10043",
+      "status": "failed",
+      "reason": "Locator.fill: Error: Cannot type text into input[type=number]",
+      "verified": {}
+    },
+    {
+      "student_id": "2021-10050",
+      "status": "failed",
+      "reason": "Locator.fill: Error: Cannot type text into input[type=number]",
+      "verified": {}
+    },
+    {
+      "student_id": "2021-10057",
+      "status": "failed",
+      "reason": "Locator.fill: Error: Cannot type text into input[type=number]",
+      "verified": {}
+    },
+    {
+      "student_id": "2021-10064",
+      "status": "failed",
+      "reason": "Locator.fill: Error: Cannot type text into input[type=number]",
+      "verified": {}
+    },
+    {
+      "student_id": "2021-10071",
+      "status": "failed",
+      "reason": "Locator.fill: Error: Cannot type text into input[type=number]",
+      "verified": {}
+    },
+    {
+      "student_id": "2021-10078",
+      "status": "failed",
+      "reason": "Locator.fill: Error: Cannot type text into input[type=number]",
+      "verified": {}
+    },
+    {
+      "student_id": "2021-10085",
+      "status": "failed",
+      "reason": "Locator.fill: Error: Cannot type text into input[type=number]",
+      "verified": {}
+    },
+    {
+      "student_id": "2021-10092",
+      "status": "failed",
+      "reason": "Locator.fill: Error: Cannot type text into input[type=number]",
+      "verified": {}
+    },
+    {
+      "student_id": "2021-10099",
+      "status": "failed",
+      "reason": "Locator.fill: Error: Cannot type text into input[type=number]",
+      "verified": {}
+    },
+    {
+      "student_id": "2021-10106",
+      "status": "failed",
+      "reason": "Locator.fill: Error: Cannot type text into input[type=number]",
+      "verified": {}
+    },
+    {
+      "student_id": "2021-10113",
+      "status": "failed",
+      "reason": "Locator.fill: Error: Cannot type text into input[type=number]",
+      "verified": {}
+    },
+    {
+      "student_id": "2021-10120",
+      "status": "failed",
+      "reason": "Locator.fill: Error: Cannot type text into input[type=number]",
+      "verified": {}
+    },
+    {
+      "student_id": "2021-10127",
+      "status": "failed",
+      "reason": "Locator.fill: Error: Cannot type text into input[type=number]",
+      "verified": {}
+    },
+    {
+      "student_id": "2021-10134",
+      "status": "failed",
+      "reason": "Locator.fill: Error: Cannot type text into input[type=number]",
+      "verified": {}
+    },
+    {
+      "student_id": "2021-10141",
+      "status": "failed",
+      "reason": "Locator.fill: Error: Cannot type text into input[type=number]",
+      "verified": {}
+    },
+    {
+      "student_id": "2021-10148",
+      "status": "failed",
+      "reason": "Locator.fill: Error: Cannot type text into input[type=number]",
+      "verified": {}
+    },
+    {
+      "student_id": "2021-10155",
+      "status": "failed",
+      "reason": "Locator.fill: Error: Cannot type text into input[type=number]",
+      "verified": {}
+    },
+    {
+      "student_id": "2021-10162",
+      "status": "failed",
+      "reason": "Locator.fill: Error: Cannot type text into input[type=number]",
+      "verified": {}
+    },
+    {
+      "student_id": "2021-10169",
+      "status": "failed",
+      "reason": "Locator.fill: Error: Cannot type text into input[type=number]",
+      "verified": {}
+    },
+    {
+      "student_id": "2021-10176",
+      "status": "failed",
+      "reason": "Locator.fill: Error: Cannot type text into input[type=number]",
+      "verified": {}
+    },
+    {
+      "student_id": "2021-10183",
+      "status": "failed",
+      "reason": "Locator.fill: Error: Cannot type text into input[type=number]",
+      "verified": {}
+    },
+    {
+      "student_id": "2021-10190",
+      "status": "failed",
+      "reason": "Locator.fill: Error: Cannot type text into input[type=number]",
+      "verified": {}
+    },
+    {
+      "student_id": "2021-10197",
+      "status": "failed",
+      "reason": "Locator.fill: Error: Cannot type text into input[type=number]",
+      "verified": {}
+    },
+    {
+      "student_id": "2021-10204",
+      "status": "failed",
+      "reason": "Locator.fill: Error: Cannot type text into input[type=number]",
+      "verified": {}
+    },
+    {
+      "student_id": "2021-10211",
+      "status": "failed",
+      "reason": "Locator.fill: Error: Cannot type text into input[type=number]",
+      "verified": {}
+    },
+    {
+      "student_id": "2021-10218",
+      "status": "failed",
+      "reason": "Locator.fill: Error: Cannot type text into input[type=number]",
+      "verified": {}
+    },
+    {
+      "student_id": "2021-10225",
+      "status": "failed",
+      "reason": "Locator.fill: Error: Cannot type text into input[type=number]",
+      "verified": {}
+    },
+    {
+      "student_id": "2021-10232",
+      "status": "failed",
+      "reason": "Locator.fill: Error: Cannot type text into input[type=number]",
+      "verified": {}
+    },
+    {
+      "student_id": "2021-10239",
+      "status": "failed",
+      "reason": "Locator.fill: Error: Cannot type text into input[type=number]",
+      "verified": {}
+    },
+    {
+      "student_id": "2021-10246",
+      "status": "failed",
+      "reason": "Locator.fill: Error: Cannot type text into input[type=number]",
+      "verified": {}
+    },
+    {
+      "student_id": "2021-10253",
+      "status": "failed",
+      "reason": "Locator.fill: Error: Cannot type text into input[type=number]",
+      "verified": {}
+    },
+    {
+      "student_id": "2021-10260",
+      "status": "failed",
+      "reason": "Locator.fill: Error: Cannot type text into input[type=number]",
+      "verified": {}
+    },
+    {
+      "student_id": "2021-10267",
+      "status": "failed",
+      "reason": "Locator.fill: Error: Cannot type text into input[type=number]",
+      "verified": {}
+    },
+    {
+      "student_id": "2021-10274",
+      "status": "failed",
+      "reason": "Locator.fill: Error: Cannot type text into input[type=number]",
+      "verified": {}
+    },
+    {
+      "student_id": "2021-10281",
+      "status": "failed",
+      "reason": "Locator.fill: Error: Cannot type text into input[type=number]",
+      "verified": {}
+    },
+    {
+      "student_id": "2021-10288",
+      "status": "failed",
+      "reason": "Locator.fill: Error: Cannot type text into input[type=number]",
+      "verified": {}
+    },
+    {
+      "student_id": "2021-10295",
+      "status": "failed",
+      "reason": "Locator.fill: Error: Cannot type text into input[type=number]",
+      "verified": {}
+    },
+    {
+      "student_id": "2021-10302",
+      "status": "failed",
+      "reason": "Locator.fill: Error: Cannot type text into input[type=number]",
+      "verified": {}
+    },
+    {
+      "student_id": "2021-10309",
+      "status": "failed",
+      "reason": "Locator.fill: Error: Cannot type text into input[type=number]",
+      "verified": {}
+    },
+    {
+      "student_id": "2021-10316",
+      "status": "failed",
+      "reason": "Locator.fill: Error: Cannot type text into input[type=number]",
+      "verified": {}
+    },
+    {
+      "student_id": "2021-10323",
+      "status": "failed",
+      "reason": "Locator.fill: Error: Cannot type text into input[type=number]",
+      "verified": {}
+    },
+    {
+      "student_id": "2021-10330",
+      "status": "failed",
+      "reason": "Locator.fill: Error: Cannot type text into input[type=number]",
+      "verified": {}
+    },
+    {
+      "student_id": "2021-10337",
+      "status": "failed",
+      "reason": "Locator.fill: Error: Cannot type text into input[type=number]",
+      "verified": {}
+    },
+    {
+      "student_id": "2021-10344",
+      "status": "failed",
+      "reason": "Locator.fill: Error: Cannot type text into input[type=number]",
+      "verified": {}
+    }
+  ]
+}

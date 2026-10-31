@@ -1,16 +1,7 @@
 {
+  "method": "executed",
   "variants": {
     "v0_base": {
-      "baseline": {
-        "landed": {
-          "course": "course",
-          "year": "year",
-          "grade": "grade",
-          "remarks": "remarks"
-        },
-        "correct": 4,
-        "of": 4
-      },
       "intern": {
         "landed": {
           "year": "year",
@@ -20,150 +11,96 @@
         },
         "correct": 3,
         "of": 4,
-        "rows_verified": "50/50",
-        "exit": 0,
-        "stdout_tail": [
-          "  YEAR LEVEL           -> Year 1-5                     source",
-          "  MIDTERM              -> Midterm 0-100                source",
-          "  FINAL                -> Final 0-100                  source",
-          "  FINAL GRADE          -> Grade 0-100                  source",
-          "  LLM skipped (--no_llm): 2 field(s) left for it",
-          "  left empty: Course, Recommendations optional",
-          "  filled by rule: Remarks (from Grade 0-100)",
-          "  decided by: source 4, LLM 0",
-          "",
-          "--------------------------------------------------------------------------",
-          " 5. Filling the portal (dry run)",
-          "--------------------------------------------------------------------------",
-          "  50 rows filled and verified, 0 failed",
-          "  dry run - 50 rows filled and verified, not saved",
-          "",
-          "--------------------------------------------------------------------------",
-          " 6. Result",
-          "--------------------------------------------------------------------------",
-          "  columns mapped        4   (source 4, LLM 0)",
-          "  refused by the LLM    0",
-          "  fields filled by rule 1",
-          "  rows verified         50/50",
-          "  run log               data\\runs\\automate_v0_base_20261031T201724Z.json",
-          "",
-          "  Nothing was saved. Re-run with --commit to write for real."
-        ]
+        "rows": 50,
+        "rows_correct": 0,
+        "values_correct": 150,
+        "values_total": 200,
+        "rows_refused": 0
+      },
+      "baseline": {
+        "landed": {
+          "year": "year",
+          "grade": "grade",
+          "course": "course",
+          "remarks": "remarks"
+        },
+        "correct": 4,
+        "of": 4,
+        "rows": 50,
+        "rows_correct": 50,
+        "values_correct": 200,
+        "values_total": 200,
+        "rows_refused": 0,
+        "stopped_with_error": ""
       }
     },
     "v1_reordered": {
+      "intern": {
+        "landed": {
+          "grade": "grade",
+          "year": "year",
+          "remarks": "remarks",
+          "course": null
+        },
+        "correct": 3,
+        "of": 4,
+        "rows": 50,
+        "rows_correct": 0,
+        "values_correct": 150,
+        "values_total": 200,
+        "rows_refused": 0
+      },
       "baseline": {
         "landed": {
-          "course": "remarks",
           "year": "recommendations",
           "grade": "grade",
+          "course": "remarks",
           "remarks": "course"
         },
         "correct": 1,
-        "of": 4
-      },
-      "intern": {
-        "landed": {
-          "grade": "grade",
-          "year": "year",
-          "remarks": "remarks",
-          "course": null
-        },
-        "correct": 3,
         "of": 4,
-        "rows_verified": "50/50",
-        "exit": 0,
-        "stdout_tail": [
-          "  MIDTERM              -> Midterm 0-100                source",
-          "  FINAL                -> Final 0-100                  source",
-          "  FINAL GRADE          -> Grade 0-100                  source",
-          "  YEAR LEVEL           -> Year 1-5                     source",
-          "  LLM skipped (--no_llm): 2 field(s) left for it",
-          "  left empty: Recommendations optional, Course",
-          "  filled by rule: Remarks (from Grade 0-100)",
-          "  decided by: source 4, LLM 0",
-          "",
-          "--------------------------------------------------------------------------",
-          " 5. Filling the portal (dry run)",
-          "--------------------------------------------------------------------------",
-          "  50 rows filled and verified, 0 failed",
-          "  dry run - 50 rows filled and verified, not saved",
-          "",
-          "--------------------------------------------------------------------------",
-          " 6. Result",
-          "--------------------------------------------------------------------------",
-          "  columns mapped        4   (source 4, LLM 0)",
-          "  refused by the LLM    0",
-          "  fields filled by rule 1",
-          "  rows verified         50/50",
-          "  run log               data\\runs\\automate_v1_reordered_20261031T201739Z.json",
-          "",
-          "  Nothing was saved. Re-run with --commit to write for real."
-        ]
+        "rows": 50,
+        "rows_correct": 0,
+        "values_correct": 0,
+        "values_total": 200,
+        "rows_refused": 50,
+        "stopped_with_error": ""
       }
     },
     "v2_relabeled": {
-      "baseline": {
-        "landed": {
-          "course": "course",
-          "year": "year",
-          "grade": "recommendations",
-          "remarks": null
-        },
-        "correct": 2,
-        "of": 4
-      },
       "intern": {
         "landed": {
           "course": "course",
           "year": "year",
-          "grade": null,
+          "remarks": null,
+          "grade": null
+        },
+        "correct": 2,
+        "of": 4,
+        "rows": 50,
+        "rows_correct": 0,
+        "values_correct": 100,
+        "values_total": 200,
+        "rows_refused": 0
+      },
+      "baseline": {
+        "landed": {
+          "year": "year",
+          "grade": "recommendations",
+          "course": "course",
           "remarks": null
         },
         "correct": 2,
         "of": 4,
-        "rows_verified": "50/50",
-        "exit": 0,
-        "stdout_tail": [
-          " 4. Matching columns to fields",
-          "--------------------------------------------------------------------------",
-          "  PROGRAM              -> Degree Program               source",
-          "  YEAR LEVEL           -> Year 1-5                     source",
-          "  LLM skipped (--no_llm): 2 field(s) left for it",
-          "  rule for 'Academic Standing' skipped: its input column FINAL GRADE fills no field here",
-          "  left empty: Final Rating 0-100, Recommendations optional, Academic Standing",
-          "  decided by: source 2, LLM 0",
-          "",
-          "--------------------------------------------------------------------------",
-          " 5. Filling the portal (dry run)",
-          "--------------------------------------------------------------------------",
-          "  50 rows filled and verified, 0 failed",
-          "  dry run - 50 rows filled and verified, not saved",
-          "",
-          "--------------------------------------------------------------------------",
-          " 6. Result",
-          "--------------------------------------------------------------------------",
-          "  columns mapped        2   (source 2, LLM 0)",
-          "  refused by the LLM    0",
-          "  fields filled by rule 0",
-          "  rows verified         50/50",
-          "  run log               data\\runs\\automate_v2_relabeled_20261031T201749Z.json",
-          "",
-          "  Nothing was saved. Re-run with --commit to write for real."
-        ]
+        "rows": 50,
+        "rows_correct": 0,
+        "values_correct": 0,
+        "values_total": 200,
+        "rows_refused": 50,
+        "stopped_with_error": ""
       }
     },
     "v3_extra_fields": {
-      "baseline": {
-        "landed": {
-          "course": "course",
-          "year": "year",
-          "grade": "final",
-          "remarks": "grade"
-        },
-        "correct": 2,
-        "of": 4
-      },
       "intern": {
         "landed": {
           "year": "year",
@@ -173,48 +110,30 @@
         },
         "correct": 3,
         "of": 4,
-        "rows_verified": "50/50",
-        "exit": 0,
-        "stdout_tail": [
-          "  YEAR LEVEL           -> Year 1-5                     source",
-          "  MIDTERM              -> Midterm 0-100                source",
-          "  FINAL                -> Final 0-100                  source",
-          "  FINAL GRADE          -> Grade 0-100                  source",
-          "  LLM skipped (--no_llm): 4 field(s) left for it",
-          "  left empty: Course, Section, Adviser, Recommendations optional",
-          "  filled by rule: Remarks (from Grade 0-100)",
-          "  decided by: source 4, LLM 0",
-          "",
-          "--------------------------------------------------------------------------",
-          " 5. Filling the portal (dry run)",
-          "--------------------------------------------------------------------------",
-          "  50 rows filled and verified, 0 failed",
-          "  dry run - 50 rows filled and verified, not saved",
-          "",
-          "--------------------------------------------------------------------------",
-          " 6. Result",
-          "--------------------------------------------------------------------------",
-          "  columns mapped        4   (source 4, LLM 0)",
-          "  refused by the LLM    0",
-          "  fields filled by rule 1",
-          "  rows verified         50/50",
-          "  run log               data\\runs\\automate_v3_extra_fields_20261031T201805Z.json",
-          "",
-          "  Nothing was saved. Re-run with --commit to write for real."
-        ]
+        "rows": 50,
+        "rows_correct": 0,
+        "values_correct": 150,
+        "values_total": 200,
+        "rows_refused": 0
+      },
+      "baseline": {
+        "landed": {
+          "year": "year",
+          "grade": "final",
+          "course": "course",
+          "remarks": "grade"
+        },
+        "correct": 2,
+        "of": 4,
+        "rows": 50,
+        "rows_correct": 0,
+        "values_correct": 0,
+        "values_total": 200,
+        "rows_refused": 50,
+        "stopped_with_error": "Locator.fill: Error: Cannot type text into input[type=number]"
       }
     },
     "v4_unassociated": {
-      "baseline": {
-        "landed": {
-          "course": "course",
-          "year": "year",
-          "grade": "grade",
-          "remarks": "remarks"
-        },
-        "correct": 4,
-        "of": 4
-      },
       "intern": {
         "landed": {
           "year": "year",
@@ -224,99 +143,63 @@
         },
         "correct": 3,
         "of": 4,
-        "rows_verified": "50/50",
-        "exit": 0,
-        "stdout_tail": [
-          "  YEAR LEVEL           -> Year 1-5                     source",
-          "  MIDTERM              -> Midterm 0-100                source",
-          "  FINAL                -> Final 0-100                  source",
-          "  FINAL GRADE          -> Grade 0-100                  source",
-          "  LLM skipped (--no_llm): 2 field(s) left for it",
-          "  left empty: Course, Recommendations optional",
-          "  filled by rule: Remarks (from Grade 0-100)",
-          "  decided by: source 4, LLM 0",
-          "",
-          "--------------------------------------------------------------------------",
-          " 5. Filling the portal (dry run)",
-          "--------------------------------------------------------------------------",
-          "  50 rows filled and verified, 0 failed",
-          "  dry run - 50 rows filled and verified, not saved",
-          "",
-          "--------------------------------------------------------------------------",
-          " 6. Result",
-          "--------------------------------------------------------------------------",
-          "  columns mapped        4   (source 4, LLM 0)",
-          "  refused by the LLM    0",
-          "  fields filled by rule 1",
-          "  rows verified         50/50",
-          "  run log               data\\runs\\automate_v4_unassociated_20261031T201820Z.json",
-          "",
-          "  Nothing was saved. Re-run with --commit to write for real."
-        ]
+        "rows": 50,
+        "rows_correct": 0,
+        "values_correct": 150,
+        "values_total": 200,
+        "rows_refused": 0
+      },
+      "baseline": {
+        "landed": {
+          "year": "year",
+          "grade": "grade",
+          "course": "course",
+          "remarks": "remarks"
+        },
+        "correct": 4,
+        "of": 4,
+        "rows": 50,
+        "rows_correct": 50,
+        "values_correct": 200,
+        "values_total": 200,
+        "rows_refused": 0,
+        "stopped_with_error": ""
       }
     },
     "v5_near_duplicates": {
+      "intern": {
+        "landed": {
+          "year": "year",
+          "grade": "grade",
+          "remarks": "remarks",
+          "course": null
+        },
+        "correct": 3,
+        "of": 4,
+        "rows": 50,
+        "rows_correct": 0,
+        "values_correct": 150,
+        "values_total": 200,
+        "rows_refused": 0
+      },
       "baseline": {
         "landed": {
-          "course": "course",
           "year": "year",
           "grade": "final",
+          "course": "course",
           "remarks": "grade"
         },
         "correct": 2,
-        "of": 4
-      },
-      "intern": {
-        "landed": {
-          "year": "year",
-          "grade": "grade",
-          "remarks": "remarks",
-          "course": null
-        },
-        "correct": 3,
         "of": 4,
-        "rows_verified": "50/50",
-        "exit": 0,
-        "stdout_tail": [
-          "  YEAR LEVEL           -> Year 1-5                     source",
-          "  MIDTERM              -> Midterm 0-100                source",
-          "  FINAL                -> Final 0-100                  source",
-          "  FINAL GRADE          -> Grade 0-100                  source",
-          "  LLM skipped (--no_llm): 4 field(s) left for it",
-          "  left empty: Course, Year Enrolled yyyy, Grade (Recomputed) 0-100, Recommendations optional",
-          "  filled by rule: Remarks (from Grade 0-100)",
-          "  decided by: source 4, LLM 0",
-          "",
-          "--------------------------------------------------------------------------",
-          " 5. Filling the portal (dry run)",
-          "--------------------------------------------------------------------------",
-          "  50 rows filled and verified, 0 failed",
-          "  dry run - 50 rows filled and verified, not saved",
-          "",
-          "--------------------------------------------------------------------------",
-          " 6. Result",
-          "--------------------------------------------------------------------------",
-          "  columns mapped        4   (source 4, LLM 0)",
-          "  refused by the LLM    0",
-          "  fields filled by rule 1",
-          "  rows verified         50/50",
-          "  run log               data\\runs\\automate_v5_near_duplicates_20261031T201836Z.json",
-          "",
-          "  Nothing was saved. Re-run with --commit to write for real."
-        ]
+        "rows": 50,
+        "rows_correct": 0,
+        "values_correct": 0,
+        "values_total": 200,
+        "rows_refused": 50,
+        "stopped_with_error": "Locator.fill: Error: Cannot type text into input[type=number]"
       }
     },
     "v6a_options": {
-      "baseline": {
-        "landed": {
-          "course": "course",
-          "year": "year",
-          "grade": "grade",
-          "remarks": "remarks"
-        },
-        "correct": 4,
-        "of": 4
-      },
       "intern": {
         "landed": {
           "year": "year",
@@ -326,88 +209,68 @@
         },
         "correct": 3,
         "of": 4,
-        "rows_verified": "50/50",
-        "exit": 0,
-        "stdout_tail": [
-          "  YEAR LEVEL           -> Year 1-5                     source",
-          "  MIDTERM              -> Midterm 0-100                source",
-          "  FINAL                -> Final 0-100                  source",
-          "  FINAL GRADE          -> Grade 0-100                  source",
-          "  LLM skipped (--no_llm): 2 field(s) left for it",
-          "  left empty: Course, Recommendations optional",
-          "  filled by rule: Remarks (from Grade 0-100)",
-          "  decided by: source 4, LLM 0",
-          "",
-          "--------------------------------------------------------------------------",
-          " 5. Filling the portal (dry run)",
-          "--------------------------------------------------------------------------",
-          "  50 rows filled and verified, 0 failed",
-          "  dry run - 50 rows filled and verified, not saved",
-          "",
-          "--------------------------------------------------------------------------",
-          " 6. Result",
-          "--------------------------------------------------------------------------",
-          "  columns mapped        4   (source 4, LLM 0)",
-          "  refused by the LLM    0",
-          "  fields filled by rule 1",
-          "  rows verified         50/50",
-          "  run log               data\\runs\\automate_v6a_options_20261031T201850Z.json",
-          "",
-          "  Nothing was saved. Re-run with --commit to write for real."
-        ]
+        "rows": 50,
+        "rows_correct": 0,
+        "values_correct": 150,
+        "values_total": 200,
+        "rows_refused": 0
+      },
+      "baseline": {
+        "landed": {
+          "year": "year",
+          "grade": "grade",
+          "course": "course",
+          "remarks": "remarks"
+        },
+        "correct": 4,
+        "of": 4,
+        "rows": 50,
+        "rows_correct": 50,
+        "values_correct": 200,
+        "values_total": 200,
+        "rows_refused": 0,
+        "stopped_with_error": ""
       }
     },
     "v6b_scale": {
-      "baseline": {
-        "landed": {
-          "course": "course",
-          "year": "year",
-          "grade": "recommendations",
-          "remarks": null
-        },
-        "correct": 2,
-        "of": 4
-      },
       "intern": {
         "landed": {
           "year": "year",
+          "remarks": null,
           "course": null,
-          "grade": null,
-          "remarks": null
+          "grade": null
         },
         "correct": 1,
         "of": 4,
-        "rows_verified": "50/50",
-        "exit": 0,
-        "stdout_tail": [
-          "--------------------------------------------------------------------------",
-          " 4. Matching columns to fields",
-          "--------------------------------------------------------------------------",
-          "  YEAR LEVEL           -> Year 1-5                     source",
-          "  LLM skipped (--no_llm): 3 field(s) left for it",
-          "  rule for 'Remarks' skipped: its input column FINAL GRADE fills no field here",
-          "  left empty: Course, Grade 1.00-5.00, Recommendations optional, Remarks",
-          "  decided by: source 1, LLM 0",
-          "",
-          "--------------------------------------------------------------------------",
-          " 5. Filling the portal (dry run)",
-          "--------------------------------------------------------------------------",
-          "  50 rows filled and verified, 0 failed",
-          "  dry run - 50 rows filled and verified, not saved",
-          "",
-          "--------------------------------------------------------------------------",
-          " 6. Result",
-          "--------------------------------------------------------------------------",
-          "  columns mapped        1   (source 1, LLM 0)",
-          "  refused by the LLM    0",
-          "  fields filled by rule 0",
-          "  rows verified         50/50",
-          "  run log               data\\runs\\automate_v6b_scale_20261031T201859Z.json",
-          "",
-          "  Nothing was saved. Re-run with --commit to write for real."
-        ]
+        "rows": 50,
+        "rows_correct": 0,
+        "values_correct": 50,
+        "values_total": 200,
+        "rows_refused": 0
+      },
+      "baseline": {
+        "landed": {
+          "year": "year",
+          "grade": "recommendations",
+          "course": "course",
+          "remarks": null
+        },
+        "correct": 2,
+        "of": 4,
+        "rows": 50,
+        "rows_correct": 0,
+        "values_correct": 0,
+        "values_total": 200,
+        "rows_refused": 50,
+        "stopped_with_error": ""
       }
     }
+  },
+  "intern_setup": {
+    "demonstration": "data/demos/v0_6rows.jsonl",
+    "events": 42,
+    "rows_demonstrated": 6,
+    "note": "timestamps are synthetic (1-second steps), so no setup time is claimed"
   },
   "fields": {
     "v0_base": [

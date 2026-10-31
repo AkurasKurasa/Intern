@@ -1,0 +1,51 @@
+{
+  "variant": "v2_relabeled",
+  "sheet": {
+    "path": "C:\\Users\\DANIEL\\Intern-Final\\Intern\\components\\scope2\\data\\sheets\\grade_sheet.xlsx",
+    "sheet_name": "SUMMARY",
+    "header_row": 11,
+    "key_column": "STUDENT NUMBER"
+  },
+  "assignments": [
+    {
+      "source_header": "PROGRAM",
+      "target_label": "Degree Program",
+      "score": null,
+      "margin": null,
+      "status": "auto",
+      "via": "source"
+    },
+    {
+      "source_header": "YEAR LEVEL",
+      "target_label": "Year 1-5",
+      "score": null,
+      "margin": null,
+      "status": "auto",
+      "via": "source"
+    }
+  ],
+  "abstained": [],
+  "derived_rules": [],
+  "unmapped_fields": [
+    "Final Rating 0-100",
+    "Recommendations optional",
+    "Academic Standing"
+  ],
+  "unmapped_columns": [
+    "No.",
+    "STUDENT NUMBER",
+    "NAME OF STUDENT",
+    "MIDTERM",
+    "FINAL",
+    "FINAL GRADE"
+  ],
+  "control_fields": [
+    "Select"
+  ],
+  "row_alignment": {
+    "key_column": "STUDENT NUMBER",
+    "key_field": "Student ID",
+    "verify_column": "NAME OF STUDENT",
+    "verify_field": "Student Name"
+  }
+}

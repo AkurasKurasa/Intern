@@ -1,7 +1,7 @@
 {
   "variant": "v0_base",
-  "mapping": "C:\\Users\\DANIEL\\AppData\\Local\\Temp\\tmpf4k60dh0\\induced_mapping.json",
-  "started": "2026-10-31T20:17:12+00:00",
+  "mapping": "C:\\Users\\DANIEL\\AppData\\Local\\Temp\\tmptzijrsrs\\baseline_mapping.json",
+  "started": "2026-10-31T20:48:19+00:00",
   "dry_run": true,
   "rows": [
     {
@@ -14,6 +14,7 @@
         "Midterm 0-100": "85",
         "Final 0-100": "85",
         "Grade 0-100": "85",
+        "Course": "BS Information Systems",
         "Remarks": "Passed"
       },
       "verified": {
@@ -21,6 +22,7 @@
         "Midterm 0-100": "85",
         "Final 0-100": "85",
         "Grade 0-100": "85",
+        "Course": "BS Information Systems",
         "Remarks": "Passed"
       },
       "escalations": []
@@ -35,6 +37,7 @@
         "Midterm 0-100": "95",
         "Final 0-100": "96",
         "Grade 0-100": "96",
+        "Course": "BS Information Systems",
         "Remarks": "Passed"
       },
       "verified": {
@@ -42,6 +45,7 @@
         "Midterm 0-100": "95",
         "Final 0-100": "96",
         "Grade 0-100": "96",
+        "Course": "BS Information Systems",
         "Remarks": "Passed"
       },
       "escalations": []
@@ -56,6 +60,7 @@
         "Midterm 0-100": "92",
         "Final 0-100": "98",
         "Grade 0-100": "95",
+        "Course": "BS Information Systems",
         "Remarks": "Passed"
       },
       "verified": {
@@ -63,6 +68,7 @@
         "Midterm 0-100": "92",
         "Final 0-100": "98",
         "Grade 0-100": "95",
+        "Course": "BS Information Systems",
         "Remarks": "Passed"
       },
       "escalations": []
@@ -77,6 +83,7 @@
         "Midterm 0-100": "89",
         "Final 0-100": "85",
         "Grade 0-100": "87",
+        "Course": "BS Information Technology",
         "Remarks": "Passed"
       },
       "verified": {
@@ -84,6 +91,7 @@
         "Midterm 0-100": "89",
         "Final 0-100": "85",
         "Grade 0-100": "87",
+        "Course": "BS Information Technology",
         "Remarks": "Passed"
       },
       "escalations": []
@@ -98,6 +106,7 @@
         "Midterm 0-100": "72",
         "Final 0-100": "73",
         "Grade 0-100": "72",
+        "Course": "BS Information Systems",
         "Remarks": "Failed"
       },
       "verified": {
@@ -105,6 +114,7 @@
         "Midterm 0-100": "72",
         "Final 0-100": "73",
         "Grade 0-100": "72",
+        "Course": "BS Information Systems",
         "Remarks": "Failed"
       },
       "escalations": []
@@ -119,6 +129,7 @@
         "Midterm 0-100": "85",
         "Final 0-100": "85",
         "Grade 0-100": "85",
+        "Course": "BS Information Systems",
         "Remarks": "Passed"
       },
       "verified": {
@@ -126,6 +137,7 @@
         "Midterm 0-100": "85",
         "Final 0-100": "85",
         "Grade 0-100": "85",
+        "Course": "BS Information Systems",
         "Remarks": "Passed"
       },
       "escalations": []
@@ -140,6 +152,7 @@
         "Midterm 0-100": "78",
         "Final 0-100": "86",
         "Grade 0-100": "82",
+        "Course": "BS Information Technology",
         "Remarks": "Passed"
       },
       "verified": {
@@ -147,6 +160,7 @@
         "Midterm 0-100": "78",
         "Final 0-100": "86",
         "Grade 0-100": "82",
+        "Course": "BS Information Technology",
         "Remarks": "Passed"
       },
       "escalations": []
@@ -161,6 +175,7 @@
         "Midterm 0-100": "74",
         "Final 0-100": "75",
         "Grade 0-100": "74",
+        "Course": "BS Information Systems",
         "Remarks": "Failed"
       },
       "verified": {
@@ -168,6 +183,7 @@
         "Midterm 0-100": "74",
         "Final 0-100": "75",
         "Grade 0-100": "74",
+        "Course": "BS Information Systems",
         "Remarks": "Failed"
       },
       "escalations": []
@@ -182,6 +198,7 @@
         "Midterm 0-100": "90",
         "Final 0-100": "89",
         "Grade 0-100": "90",
+        "Course": "BS Computer Science",
         "Remarks": "Passed"
       },
       "verified": {
@@ -189,6 +206,7 @@
         "Midterm 0-100": "90",
         "Final 0-100": "89",
         "Grade 0-100": "90",
+        "Course": "BS Computer Science",
         "Remarks": "Passed"
       },
       "escalations": []
@@ -203,6 +221,7 @@
         "Midterm 0-100": "92",
         "Final 0-100": "80",
         "Grade 0-100": "86",
+        "Course": "BS Information Systems",
         "Remarks": "Passed"
       },
       "verified": {
@@ -210,6 +229,7 @@
         "Midterm 0-100": "92",
         "Final 0-100": "80",
         "Grade 0-100": "86",
+        "Course": "BS Information Systems",
         "Remarks": "Passed"
       },
       "escalations": []
@@ -224,6 +244,7 @@
         "Midterm 0-100": "79",
         "Final 0-100": "81",
         "Grade 0-100": "80",
+        "Course": "BS Information Systems",
         "Remarks": "Passed"
       },
       "verified": {
@@ -231,6 +252,7 @@
         "Midterm 0-100": "79",
         "Final 0-100": "81",
         "Grade 0-100": "80",
+        "Course": "BS Information Systems",
         "Remarks": "Passed"
       },
       "escalations": []
@@ -245,6 +267,7 @@
         "Midterm 0-100": "97",
         "Final 0-100": "97",
         "Grade 0-100": "97",
+        "Course": "BS Computer Science",
         "Remarks": "Passed"
       },
       "verified": {
@@ -252,6 +275,7 @@
         "Midterm 0-100": "97",
         "Final 0-100": "97",
         "Grade 0-100": "97",
+        "Course": "BS Computer Science",
         "Remarks": "Passed"
       },
       "escalations": []
@@ -266,6 +290,7 @@
         "Midterm 0-100": "73",
         "Final 0-100": "72",
         "Grade 0-100": "72",
+        "Course": "BS Computer Science",
         "Remarks": "Failed"
       },
       "verified": {
@@ -273,6 +298,7 @@
         "Midterm 0-100": "73",
         "Final 0-100": "72",
         "Grade 0-100": "72",
+        "Course": "BS Computer Science",
         "Remarks": "Failed"
       },
       "escalations": []
@@ -287,6 +313,7 @@
         "Midterm 0-100": "91",
         "Final 0-100": "93",
         "Grade 0-100": "92",
+        "Course": "BS Information Systems",
         "Remarks": "Passed"
       },
       "verified": {
@@ -294,6 +321,7 @@
         "Midterm 0-100": "91",
         "Final 0-100": "93",
         "Grade 0-100": "92",
+        "Course": "BS Information Systems",
         "Remarks": "Passed"
       },
       "escalations": []
@@ -308,6 +336,7 @@
         "Midterm 0-100": "73",
         "Final 0-100": "73",
         "Grade 0-100": "73",
+        "Course": "BS Information Systems",
         "Remarks": "Failed"
       },
       "verified": {
@@ -315,6 +344,7 @@
         "Midterm 0-100": "73",
         "Final 0-100": "73",
         "Grade 0-100": "73",
+        "Course": "BS Information Systems",
         "Remarks": "Failed"
       },
       "escalations": []
@@ -329,6 +359,7 @@
         "Midterm 0-100": "72",
         "Final 0-100": "71",
         "Grade 0-100": "72",
+        "Course": "BS Information Technology",
         "Remarks": "Failed"
       },
       "verified": {
@@ -336,6 +367,7 @@
         "Midterm 0-100": "72",
         "Final 0-100": "71",
         "Grade 0-100": "72",
+        "Course": "BS Information Technology",
         "Remarks": "Failed"
       },
       "escalations": []
@@ -350,6 +382,7 @@
         "Midterm 0-100": "93",
         "Final 0-100": "94",
         "Grade 0-100": "94",
+        "Course": "BS Computer Science",
         "Remarks": "Passed"
       },
       "verified": {
@@ -357,6 +390,7 @@
         "Midterm 0-100": "93",
         "Final 0-100": "94",
         "Grade 0-100": "94",
+        "Course": "BS Computer Science",
         "Remarks": "Passed"
       },
       "escalations": []
@@ -371,6 +405,7 @@
         "Midterm 0-100": "74",
         "Final 0-100": "74",
         "Grade 0-100": "74",
+        "Course": "BS Computer Science",
         "Remarks": "Failed"
       },
       "verified": {
@@ -378,6 +413,7 @@
         "Midterm 0-100": "74",
         "Final 0-100": "74",
         "Grade 0-100": "74",
+        "Course": "BS Computer Science",
         "Remarks": "Failed"
       },
       "escalations": []
@@ -392,6 +428,7 @@
         "Midterm 0-100": "87",
         "Final 0-100": "83",
         "Grade 0-100": "85",
+        "Course": "BS Information Technology",
         "Remarks": "Passed"
       },
       "verified": {
@@ -399,6 +436,7 @@
         "Midterm 0-100": "87",
         "Final 0-100": "83",
         "Grade 0-100": "85",
+        "Course": "BS Information Technology",
         "Remarks": "Passed"
       },
       "escalations": []
@@ -413,6 +451,7 @@
         "Midterm 0-100": "91",
         "Final 0-100": "95",
         "Grade 0-100": "93",
+        "Course": "BS Information Systems",
         "Remarks": "Passed"
       },
       "verified": {
@@ -420,6 +459,7 @@
         "Midterm 0-100": "91",
         "Final 0-100": "95",
         "Grade 0-100": "93",
+        "Course": "BS Information Systems",
         "Remarks": "Passed"
       },
       "escalations": []
@@ -434,6 +474,7 @@
         "Midterm 0-100": "94",
         "Final 0-100": "91",
         "Grade 0-100": "92",
+        "Course": "BS Information Technology",
         "Remarks": "Passed"
       },
       "verified": {
@@ -441,6 +482,7 @@
         "Midterm 0-100": "94",
         "Final 0-100": "91",
         "Grade 0-100": "92",
+        "Course": "BS Information Technology",
         "Remarks": "Passed"
       },
       "escalations": []
@@ -455,6 +497,7 @@
         "Midterm 0-100": "96",
         "Final 0-100": "87",
         "Grade 0-100": "92",
+        "Course": "BS Information Systems",
         "Remarks": "Passed"
       },
       "verified": {
@@ -462,6 +505,7 @@
         "Midterm 0-100": "96",
         "Final 0-100": "87",
         "Grade 0-100": "92",
+        "Course": "BS Information Systems",
         "Remarks": "Passed"
       },
       "escalations": []
@@ -476,6 +520,7 @@
         "Midterm 0-100": "88",
         "Final 0-100": "89",
         "Grade 0-100": "88",
+        "Course": "BS Computer Science",
         "Remarks": "Passed"
       },
       "verified": {
@@ -483,6 +528,7 @@
         "Midterm 0-100": "88",
         "Final 0-100": "89",
         "Grade 0-100": "88",
+        "Course": "BS Computer Science",
         "Remarks": "Passed"
       },
       "escalations": []
@@ -497,6 +543,7 @@
         "Midterm 0-100": "88",
         "Final 0-100": "81",
         "Grade 0-100": "84",
+        "Course": "BS Computer Science",
         "Remarks": "Passed"
       },
       "verified": {
@@ -504,6 +551,7 @@
         "Midterm 0-100": "88",
         "Final 0-100": "81",
         "Grade 0-100": "84",
+        "Course": "BS Computer Science",
         "Remarks": "Passed"
       },
       "escalations": []
@@ -518,6 +566,7 @@
         "Midterm 0-100": "74",
         "Final 0-100": "76",
         "Grade 0-100": "75",
+        "Course": "BS Information Systems",
         "Remarks": "Passed"
       },
       "verified": {
@@ -525,6 +574,7 @@
         "Midterm 0-100": "74",
         "Final 0-100": "76",
         "Grade 0-100": "75",
+        "Course": "BS Information Systems",
         "Remarks": "Passed"
       },
       "escalations": []
@@ -539,6 +589,7 @@
         "Midterm 0-100": "73",
         "Final 0-100": "79",
         "Grade 0-100": "76",
+        "Course": "BS Computer Science",
         "Remarks": "Passed"
       },
       "verified": {
@@ -546,6 +597,7 @@
         "Midterm 0-100": "73",
         "Final 0-100": "79",
         "Grade 0-100": "76",
+        "Course": "BS Computer Science",
         "Remarks": "Passed"
       },
       "escalations": []
@@ -560,6 +612,7 @@
         "Midterm 0-100": "74",
         "Final 0-100": "74",
         "Grade 0-100": "74",
+        "Course": "BS Information Systems",
         "Remarks": "Failed"
       },
       "verified": {
@@ -567,6 +620,7 @@
         "Midterm 0-100": "74",
         "Final 0-100": "74",
         "Grade 0-100": "74",
+        "Course": "BS Information Systems",
         "Remarks": "Failed"
       },
       "escalations": []
@@ -581,6 +635,7 @@
         "Midterm 0-100": "99",
         "Final 0-100": "99",
         "Grade 0-100": "99",
+        "Course": "BS Computer Science",
         "Remarks": "Passed"
       },
       "verified": {
@@ -588,6 +643,7 @@
         "Midterm 0-100": "99",
         "Final 0-100": "99",
         "Grade 0-100": "99",
+        "Course": "BS Computer Science",
         "Remarks": "Passed"
       },
       "escalations": []
@@ -602,6 +658,7 @@
         "Midterm 0-100": "81",
         "Final 0-100": "86",
         "Grade 0-100": "84",
+        "Course": "BS Information Systems",
         "Remarks": "Passed"
       },
       "verified": {
@@ -609,6 +666,7 @@
         "Midterm 0-100": "81",
         "Final 0-100": "86",
         "Grade 0-100": "84",
+        "Course": "BS Information Systems",
         "Remarks": "Passed"
       },
       "escalations": []
@@ -623,6 +681,7 @@
         "Midterm 0-100": "91",
         "Final 0-100": "88",
         "Grade 0-100": "90",
+        "Course": "BS Information Technology",
         "Remarks": "Passed"
       },
       "verified": {
@@ -630,6 +689,7 @@
         "Midterm 0-100": "91",
         "Final 0-100": "88",
         "Grade 0-100": "90",
+        "Course": "BS Information Technology",
         "Remarks": "Passed"
       },
       "escalations": []
@@ -644,6 +704,7 @@
         "Midterm 0-100": "87",
         "Final 0-100": "90",
         "Grade 0-100": "88",
+        "Course": "BS Computer Science",
         "Remarks": "Passed"
       },
       "verified": {
@@ -651,6 +712,7 @@
         "Midterm 0-100": "87",
         "Final 0-100": "90",
         "Grade 0-100": "88",
+        "Course": "BS Computer Science",
         "Remarks": "Passed"
       },
       "escalations": []
@@ -665,6 +727,7 @@
         "Midterm 0-100": "73",
         "Final 0-100": "76",
         "Grade 0-100": "74",
+        "Course": "BS Computer Science",
         "Remarks": "Failed"
       },
       "verified": {
@@ -672,6 +735,7 @@
         "Midterm 0-100": "73",
         "Final 0-100": "76",
         "Grade 0-100": "74",
+        "Course": "BS Computer Science",
         "Remarks": "Failed"
       },
       "escalations": []
@@ -686,6 +750,7 @@
         "Midterm 0-100": "74",
         "Final 0-100": "72",
         "Grade 0-100": "73",
+        "Course": "BS Computer Science",
         "Remarks": "Failed"
       },
       "verified": {
@@ -693,6 +758,7 @@
         "Midterm 0-100": "74",
         "Final 0-100": "72",
         "Grade 0-100": "73",
+        "Course": "BS Computer Science",
         "Remarks": "Failed"
       },
       "escalations": []
@@ -707,6 +773,7 @@
         "Midterm 0-100": "77",
         "Final 0-100": "74",
         "Grade 0-100": "76",
+        "Course": "BS Computer Science",
         "Remarks": "Passed"
       },
       "verified": {
@@ -714,6 +781,7 @@
         "Midterm 0-100": "77",
         "Final 0-100": "74",
         "Grade 0-100": "76",
+        "Course": "BS Computer Science",
         "Remarks": "Passed"
       },
       "escalations": []
@@ -728,6 +796,7 @@
         "Midterm 0-100": "88",
         "Final 0-100": "81",
         "Grade 0-100": "84",
+        "Course": "BS Computer Science",
         "Remarks": "Passed"
       },
       "verified": {
@@ -735,6 +804,7 @@
         "Midterm 0-100": "88",
         "Final 0-100": "81",
         "Grade 0-100": "84",
+        "Course": "BS Computer Science",
         "Remarks": "Passed"
       },
       "escalations": []
@@ -749,6 +819,7 @@
         "Midterm 0-100": "84",
         "Final 0-100": "83",
         "Grade 0-100": "84",
+        "Course": "BS Information Systems",
         "Remarks": "Passed"
       },
       "verified": {
@@ -756,6 +827,7 @@
         "Midterm 0-100": "84",
         "Final 0-100": "83",
         "Grade 0-100": "84",
+        "Course": "BS Information Systems",
         "Remarks": "Passed"
       },
       "escalations": []
@@ -770,6 +842,7 @@
         "Midterm 0-100": "86",
         "Final 0-100": "92",
         "Grade 0-100": "89",
+        "Course": "BS Computer Science",
         "Remarks": "Passed"
       },
       "verified": {
@@ -777,6 +850,7 @@
         "Midterm 0-100": "86",
         "Final 0-100": "92",
         "Grade 0-100": "89",
+        "Course": "BS Computer Science",
         "Remarks": "Passed"
       },
       "escalations": []
@@ -791,6 +865,7 @@
         "Midterm 0-100": "78",
         "Final 0-100": "79",
         "Grade 0-100": "78",
+        "Course": "BS Information Technology",
         "Remarks": "Passed"
       },
       "verified": {
@@ -798,6 +873,7 @@
         "Midterm 0-100": "78",
         "Final 0-100": "79",
         "Grade 0-100": "78",
+        "Course": "BS Information Technology",
         "Remarks": "Passed"
       },
       "escalations": []
@@ -812,6 +888,7 @@
         "Midterm 0-100": "93",
         "Final 0-100": "87",
         "Grade 0-100": "90",
+        "Course": "BS Computer Science",
         "Remarks": "Passed"
       },
       "verified": {
@@ -819,6 +896,7 @@
         "Midterm 0-100": "93",
         "Final 0-100": "87",
         "Grade 0-100": "90",
+        "Course": "BS Computer Science",
         "Remarks": "Passed"
       },
       "escalations": []
@@ -833,6 +911,7 @@
         "Midterm 0-100": "96",
         "Final 0-100": "96",
         "Grade 0-100": "96",
+        "Course": "BS Information Technology",
         "Remarks": "Passed"
       },
       "verified": {
@@ -840,6 +919,7 @@
         "Midterm 0-100": "96",
         "Final 0-100": "96",
         "Grade 0-100": "96",
+        "Course": "BS Information Technology",
         "Remarks": "Passed"
       },
       "escalations": []
@@ -854,6 +934,7 @@
         "Midterm 0-100": "85",
         "Final 0-100": "87",
         "Grade 0-100": "86",
+        "Course": "BS Information Technology",
         "Remarks": "Passed"
       },
       "verified": {
@@ -861,6 +942,7 @@
         "Midterm 0-100": "85",
         "Final 0-100": "87",
         "Grade 0-100": "86",
+        "Course": "BS Information Technology",
         "Remarks": "Passed"
       },
       "escalations": []
@@ -875,6 +957,7 @@
         "Midterm 0-100": "80",
         "Final 0-100": "78",
         "Grade 0-100": "79",
+        "Course": "BS Computer Science",
         "Remarks": "Passed"
       },
       "verified": {
@@ -882,6 +965,7 @@
         "Midterm 0-100": "80",
         "Final 0-100": "78",
         "Grade 0-100": "79",
+        "Course": "BS Computer Science",
         "Remarks": "Passed"
       },
       "escalations": []
@@ -896,6 +980,7 @@
         "Midterm 0-100": "83",
         "Final 0-100": "76",
         "Grade 0-100": "80",
+        "Course": "BS Information Technology",
         "Remarks": "Passed"
       },
       "verified": {
@@ -903,6 +988,7 @@
         "Midterm 0-100": "83",
         "Final 0-100": "76",
         "Grade 0-100": "80",
+        "Course": "BS Information Technology",
         "Remarks": "Passed"
       },
       "escalations": []
@@ -917,6 +1003,7 @@
         "Midterm 0-100": "97",
         "Final 0-100": "97",
         "Grade 0-100": "97",
+        "Course": "BS Information Technology",
         "Remarks": "Passed"
       },
       "verified": {
@@ -924,6 +1011,7 @@
         "Midterm 0-100": "97",
         "Final 0-100": "97",
         "Grade 0-100": "97",
+        "Course": "BS Information Technology",
         "Remarks": "Passed"
       },
       "escalations": []
@@ -938,6 +1026,7 @@
         "Midterm 0-100": "98",
         "Final 0-100": "95",
         "Grade 0-100": "96",
+        "Course": "BS Information Systems",
         "Remarks": "Passed"
       },
       "verified": {
@@ -945,6 +1034,7 @@
         "Midterm 0-100": "98",
         "Final 0-100": "95",
         "Grade 0-100": "96",
+        "Course": "BS Information Systems",
         "Remarks": "Passed"
       },
       "escalations": []
@@ -959,6 +1049,7 @@
         "Midterm 0-100": "85",
         "Final 0-100": "76",
         "Grade 0-100": "80",
+        "Course": "BS Computer Science",
         "Remarks": "Passed"
       },
       "verified": {
@@ -966,6 +1057,7 @@
         "Midterm 0-100": "85",
         "Final 0-100": "76",
         "Grade 0-100": "80",
+        "Course": "BS Computer Science",
         "Remarks": "Passed"
       },
       "escalations": []
@@ -980,6 +1072,7 @@
         "Midterm 0-100": "94",
         "Final 0-100": "91",
         "Grade 0-100": "92",
+        "Course": "BS Information Technology",
         "Remarks": "Passed"
       },
       "verified": {
@@ -987,6 +1080,7 @@
         "Midterm 0-100": "94",
         "Final 0-100": "91",
         "Grade 0-100": "92",
+        "Course": "BS Information Technology",
         "Remarks": "Passed"
       },
       "escalations": []
@@ -1001,6 +1095,7 @@
         "Midterm 0-100": "74",
         "Final 0-100": "73",
         "Grade 0-100": "74",
+        "Course": "BS Computer Science",
         "Remarks": "Failed"
       },
       "verified": {
@@ -1008,6 +1103,7 @@
         "Midterm 0-100": "74",
         "Final 0-100": "73",
         "Grade 0-100": "74",
+        "Course": "BS Computer Science",
         "Remarks": "Failed"
       },
       "escalations": []
@@ -1022,6 +1118,7 @@
         "Midterm 0-100": "96",
         "Final 0-100": "93",
         "Grade 0-100": "94",
+        "Course": "BS Computer Science",
         "Remarks": "Passed"
       },
       "verified": {
@@ -1029,6 +1126,7 @@
         "Midterm 0-100": "96",
         "Final 0-100": "93",
         "Grade 0-100": "94",
+        "Course": "BS Computer Science",
         "Remarks": "Passed"
       },
       "escalations": []
@@ -1043,6 +1141,7 @@
         "Midterm 0-100": "85",
         "Final 0-100": "80",
         "Grade 0-100": "82",
+        "Course": "BS Information Systems",
         "Remarks": "Passed"
       },
       "verified": {
@@ -1050,6 +1149,7 @@
         "Midterm 0-100": "85",
         "Final 0-100": "80",
         "Grade 0-100": "82",
+        "Course": "BS Information Systems",
         "Remarks": "Passed"
       },
       "escalations": []
