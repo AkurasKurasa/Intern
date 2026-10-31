@@ -1,13 +1,23 @@
-system,form_version,run,finished_without_help,fields_total,fields_wrong,minutes,notes
-UI.Vision,normal,setup,,,,,"setup time: stopwatch from recording start to first successful replay (cap 45 min)"
-UI.Vision,normal,1,,,,,
-UI.Vision,normal,2,,,,,
-UI.Vision,normal,3,,,,,
-UI.Vision,normal,4,,,,,
-UI.Vision,normal,5,,,,,
-UI.Vision,modified,1,,,,,
-UI.Vision,modified,2,,,,,
-UI.Vision,modified,3,,,,,
-UI.Vision,modified,4,,,,,
-UI.Vision,modified,5,,,,,
-Intern,normal,setup,,,,,"setup time: demo recording + training + first successful run"
+system,form_version,run,record,submission,finished_without_help,minutes,notes
+UI.Vision,normal,setup,,,,,"stopwatch: tool open, nothing built -> first replay that fills record 1 correctly (cap 45 min). If capped, write 'cap reached' in notes."
+UI.Vision,normal,1,1,,,,
+UI.Vision,normal,2,1,,,,
+UI.Vision,normal,3,1,,,,
+UI.Vision,normal,4,1,,,,
+UI.Vision,normal,5,1,,,,
+UI.Vision,modified,1,1,,,,
+UI.Vision,modified,2,1,,,,
+UI.Vision,modified,3,1,,,,
+UI.Vision,modified,4,1,,,,
+UI.Vision,modified,5,1,,,,
+Intern,normal,setup,,,,,demonstration + training + first successful run; see README section 'Intern setup time'
+Intern,normal,1,1,,,,
+Intern,normal,2,1,,,,
+Intern,normal,3,1,,,,
+Intern,normal,4,1,,,,
+Intern,normal,5,1,,,,
+Intern,modified,1,1,,,,
+Intern,modified,2,1,,,,
+Intern,modified,3,1,,,,
+Intern,modified,4,1,,,,
+Intern,modified,5,1,,,,
