@@ -1,0 +1,387 @@
+{
+  "tool": "UI.Vision RPA 10.0.303 (Chrome extension, in Playwright Chromium)",
+  "variants": {
+    "v0_base": {
+      "uivision": {
+        "rows": 50,
+        "rows_correct": 50,
+        "rows_saved": 50,
+        "values_correct": 200,
+        "values_total": 200,
+        "noncourse_correct": 150,
+        "noncourse_total": 150,
+        "fields_placed_row1": 4,
+        "save_status": "Saved 50 rows.",
+        "macro_status": "completed",
+        "runtime_s": 19.26,
+        "wall_s": 22.0
+      },
+      "intern": {
+        "landed": {
+          "year": "year",
+          "grade": "grade",
+          "remarks": "remarks",
+          "course": null
+        },
+        "correct": 3,
+        "of": 4,
+        "rows": 50,
+        "rows_correct": 0,
+        "values_correct": 150,
+        "values_total": 200,
+        "rows_refused": 0
+      },
+      "scripted_baseline": {
+        "landed": {
+          "year": "year",
+          "grade": "grade",
+          "course": "course",
+          "remarks": "remarks"
+        },
+        "correct": 4,
+        "of": 4,
+        "rows": 50,
+        "rows_correct": 50,
+        "values_correct": 200,
+        "values_total": 200,
+        "rows_refused": 0,
+        "stopped_with_error": ""
+      }
+    },
+    "v1_reordered": {
+      "uivision": {
+        "rows": 50,
+        "rows_correct": 50,
+        "rows_saved": 50,
+        "values_correct": 200,
+        "values_total": 200,
+        "noncourse_correct": 150,
+        "noncourse_total": 150,
+        "fields_placed_row1": 4,
+        "save_status": "Saved 50 rows.",
+        "macro_status": "completed",
+        "runtime_s": 17.6,
+        "wall_s": 21.9
+      },
+      "intern": {
+        "landed": {
+          "grade": "grade",
+          "year": "year",
+          "remarks": "remarks",
+          "course": null
+        },
+        "correct": 3,
+        "of": 4,
+        "rows": 50,
+        "rows_correct": 0,
+        "values_correct": 150,
+        "values_total": 200,
+        "rows_refused": 0
+      },
+      "scripted_baseline": {
+        "landed": {
+          "year": "recommendations",
+          "grade": "grade",
+          "course": "remarks",
+          "remarks": "course"
+        },
+        "correct": 1,
+        "of": 4,
+        "rows": 50,
+        "rows_correct": 0,
+        "values_correct": 0,
+        "values_total": 200,
+        "rows_refused": 50,
+        "stopped_with_error": ""
+      }
+    },
+    "v2_relabeled": {
+      "uivision": {
+        "rows": 50,
+        "rows_correct": 0,
+        "rows_saved": 0,
+        "values_correct": 2,
+        "values_total": 200,
+        "noncourse_correct": 1,
+        "noncourse_total": 150,
+        "fields_placed_row1": 2,
+        "save_status": "",
+        "macro_status": "error: Line 3: timeout reached when looking for element 'id=grade_2021-10001'",
+        "runtime_s": 20.19,
+        "wall_s": 24.6
+      },
+      "intern": {
+        "landed": {
+          "course": "course",
+          "year": "year",
+          "remarks": null,
+          "grade": null
+        },
+        "correct": 2,
+        "of": 4,
+        "rows": 50,
+        "rows_correct": 0,
+        "values_correct": 100,
+        "values_total": 200,
+        "rows_refused": 0
+      },
+      "scripted_baseline": {
+        "landed": {
+          "year": "year",
+          "grade": "recommendations",
+          "course": "course",
+          "remarks": null
+        },
+        "correct": 2,
+        "of": 4,
+        "rows": 50,
+        "rows_correct": 0,
+        "values_correct": 0,
+        "values_total": 200,
+        "rows_refused": 50,
+        "stopped_with_error": ""
+      }
+    },
+    "v3_extra_fields": {
+      "uivision": {
+        "rows": 50,
+        "rows_correct": 50,
+        "rows_saved": 50,
+        "values_correct": 200,
+        "values_total": 200,
+        "noncourse_correct": 150,
+        "noncourse_total": 150,
+        "fields_placed_row1": 4,
+        "save_status": "Saved 50 rows.",
+        "macro_status": "completed",
+        "runtime_s": 20.07,
+        "wall_s": 24.0
+      },
+      "intern": {
+        "landed": {
+          "year": "year",
+          "grade": "grade",
+          "remarks": "remarks",
+          "course": null
+        },
+        "correct": 3,
+        "of": 4,
+        "rows": 50,
+        "rows_correct": 0,
+        "values_correct": 150,
+        "values_total": 200,
+        "rows_refused": 0
+      },
+      "scripted_baseline": {
+        "landed": {
+          "year": "year",
+          "grade": "final",
+          "course": "course",
+          "remarks": "grade"
+        },
+        "correct": 2,
+        "of": 4,
+        "rows": 50,
+        "rows_correct": 0,
+        "values_correct": 0,
+        "values_total": 200,
+        "rows_refused": 50,
+        "stopped_with_error": "Locator.fill: Error: Cannot type text into input[type=number]"
+      }
+    },
+    "v4_unassociated": {
+      "uivision": {
+        "rows": 50,
+        "rows_correct": 50,
+        "rows_saved": 50,
+        "values_correct": 200,
+        "values_total": 200,
+        "noncourse_correct": 150,
+        "noncourse_total": 150,
+        "fields_placed_row1": 4,
+        "save_status": "Saved 50 rows.",
+        "macro_status": "completed",
+        "runtime_s": 20.68,
+        "wall_s": 25.1
+      },
+      "intern": {
+        "landed": {
+          "year": "year",
+          "grade": "grade",
+          "remarks": "remarks",
+          "course": null
+        },
+        "correct": 3,
+        "of": 4,
+        "rows": 50,
+        "rows_correct": 0,
+        "values_correct": 150,
+        "values_total": 200,
+        "rows_refused": 0
+      },
+      "scripted_baseline": {
+        "landed": {
+          "year": "year",
+          "grade": "grade",
+          "course": "course",
+          "remarks": "remarks"
+        },
+        "correct": 4,
+        "of": 4,
+        "rows": 50,
+        "rows_correct": 50,
+        "values_correct": 200,
+        "values_total": 200,
+        "rows_refused": 0,
+        "stopped_with_error": ""
+      }
+    },
+    "v5_near_duplicates": {
+      "uivision": {
+        "rows": 50,
+        "rows_correct": 50,
+        "rows_saved": 50,
+        "values_correct": 200,
+        "values_total": 200,
+        "noncourse_correct": 150,
+        "noncourse_total": 150,
+        "fields_placed_row1": 4,
+        "save_status": "Saved 50 rows.",
+        "macro_status": "completed",
+        "runtime_s": 19.57,
+        "wall_s": 24.0
+      },
+      "intern": {
+        "landed": {
+          "year": "year",
+          "grade": "grade",
+          "remarks": "remarks",
+          "course": null
+        },
+        "correct": 3,
+        "of": 4,
+        "rows": 50,
+        "rows_correct": 0,
+        "values_correct": 150,
+        "values_total": 200,
+        "rows_refused": 0
+      },
+      "scripted_baseline": {
+        "landed": {
+          "year": "year",
+          "grade": "final",
+          "course": "course",
+          "remarks": "grade"
+        },
+        "correct": 2,
+        "of": 4,
+        "rows": 50,
+        "rows_correct": 0,
+        "values_correct": 0,
+        "values_total": 200,
+        "rows_refused": 50,
+        "stopped_with_error": "Locator.fill: Error: Cannot type text into input[type=number]"
+      }
+    },
+    "v6a_options": {
+      "uivision": {
+        "rows": 50,
+        "rows_correct": 0,
+        "rows_saved": 0,
+        "values_correct": 3,
+        "values_total": 200,
+        "noncourse_correct": 2,
+        "noncourse_total": 150,
+        "fields_placed_row1": 3,
+        "save_status": "",
+        "macro_status": "error: Line 4: cannot find option with 'label=Passed'",
+        "runtime_s": 0.2,
+        "wall_s": 4.5
+      },
+      "intern": {
+        "landed": {
+          "year": "year",
+          "grade": "grade",
+          "remarks": "remarks",
+          "course": null
+        },
+        "correct": 3,
+        "of": 4,
+        "rows": 50,
+        "rows_correct": 0,
+        "values_correct": 150,
+        "values_total": 200,
+        "rows_refused": 0
+      },
+      "scripted_baseline": {
+        "landed": {
+          "year": "year",
+          "grade": "grade",
+          "course": "course",
+          "remarks": "remarks"
+        },
+        "correct": 4,
+        "of": 4,
+        "rows": 50,
+        "rows_correct": 50,
+        "values_correct": 200,
+        "values_total": 200,
+        "rows_refused": 0,
+        "stopped_with_error": ""
+      }
+    },
+    "v6b_scale": {
+      "uivision": {
+        "rows": 50,
+        "rows_correct": 0,
+        "rows_saved": 0,
+        "values_correct": 200,
+        "values_total": 200,
+        "noncourse_correct": 150,
+        "noncourse_total": 150,
+        "fields_placed_row1": 4,
+        "save_status": "50 rows could not be saved - see the highlighted cells.",
+        "macro_status": "completed",
+        "runtime_s": 19.33,
+        "wall_s": 24.1
+      },
+      "intern": {
+        "landed": {
+          "year": "year",
+          "remarks": null,
+          "course": null,
+          "grade": null
+        },
+        "correct": 1,
+        "of": 4,
+        "rows": 50,
+        "rows_correct": 0,
+        "values_correct": 50,
+        "values_total": 200,
+        "rows_refused": 0
+      },
+      "scripted_baseline": {
+        "landed": {
+          "year": "year",
+          "grade": "recommendations",
+          "course": "course",
+          "remarks": null
+        },
+        "correct": 2,
+        "of": 4,
+        "rows": 50,
+        "rows_correct": 0,
+        "values_correct": 0,
+        "values_total": 200,
+        "rows_refused": 50,
+        "stopped_with_error": ""
+      }
+    }
+  },
+  "macro": {
+    "file": "docs/rpa_comparison/uivision_web/Objective7_Scope2_GradeSheet.json",
+    "commands": 201,
+    "backup_locators_saved": true,
+    "built_on": "v0_base"
+  }
+}

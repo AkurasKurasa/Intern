@@ -77,4 +77,4 @@ because it reused the keystroke sequence corrected during the PyAutoGUI run (3 r
 - The setup time is not human effort, because the macro was generated.
 - UiPath and Power Automate Desktop, which select controls by name and might survive the
   reorder, were not tested.
-- Scopes 2 and 3 still use scripted baselines.
+- Scopes 2 and 3 were re-run with UI.Vision's browser extension: see `../uivision_web/README.md`.

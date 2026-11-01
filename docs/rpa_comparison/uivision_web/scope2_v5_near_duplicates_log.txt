@@ -1,0 +1,130 @@
+e | 
+[info]
+Executing:  | type | id=year_2021-10253 | 2 | 
+[info]
+Executing:  | type | id=grade_2021-10253 | 89 | 
+[info]
+Executing:  | select | id=remarks_2021-10253 | label=Passed | 
+[info]
+Executing:  | type | id=course_2021-10260 | BS Information Technology | 
+[info]
+Executing:  | type | id=year_2021-10260 | 3 | 
+[info]
+Executing:  | type | id=grade_2021-10260 | 78 | 
+[info]
+Executing:  | select | id=remarks_2021-10260 | label=Passed | 
+[info]
+Executing:  | type | id=course_2021-10267 | BS Computer Science | 
+[info]
+Executing:  | type | id=year_2021-10267 | 4 | 
+[info]
+Executing:  | type | id=grade_2021-10267 | 90 | 
+[info]
+Executing:  | select | id=remarks_2021-10267 | label=Passed | 
+[info]
+Executing:  | type | id=course_2021-10274 | BS Information Technology | 
+[info]
+Executing:  | type | id=year_2021-10274 | 3 | 
+[info]
+Executing:  | type | id=grade_2021-10274 | 96 | 
+[info]
+Executing:  | select | id=remarks_2021-10274 | label=Passed | 
+[info]
+Executing:  | type | id=course_2021-10281 | BS Information Technology | 
+[info]
+Executing:  | type | id=year_2021-10281 | 3 | 
+[info]
+Executing:  | type | id=grade_2021-10281 | 86 | 
+[info]
+Executing:  | select | id=remarks_2021-10281 | label=Passed | 
+[info]
+Executing:  | type | id=course_2021-10288 | BS Computer Science | 
+[info]
+Executing:  | type | id=year_2021-10288 | 1 | 
+[info]
+Executing:  | type | id=grade_2021-10288 | 79 | 
+[info]
+Executing:  | select | id=remarks_2021-10288 | label=Passed | 
+[info]
+Executing:  | type | id=course_2021-10295 | BS Information Technology | 
+[info]
+Executing:  | type | id=year_2021-10295 | 3 | 
+[info]
+Executing:  | type | id=grade_2021-10295 | 80 | 
+[info]
+Executing:  | select | id=remarks_2021-10295 | label=Passed | 
+[info]
+Executing:  | type | id=course_2021-10302 | BS Information Technology | 
+[info]
+Executing:  | type | id=year_2021-10302 | 4 | 
+[info]
+Executing:  | type | id=grade_2021-10302 | 97 | 
+[info]
+Executing:  | select | id=remarks_2021-10302 | label=Passed | 
+[info]
+Executing:  | type | id=course_2021-10309 | BS Information Systems | 
+[info]
+Executing:  | type | id=year_2021-10309 | 1 | 
+[info]
+Executing:  | type | id=grade_2021-10309 | 96 | 
+[info]
+Executing:  | select | id=remarks_2021-10309 | label=Passed | 
+[info]
+Executing:  | type | id=course_2021-10316 | BS Computer Science | 
+[info]
+Executing:  | type | id=year_2021-10316 | 2 | 
+[info]
+Executing:  | type | id=grade_2021-10316 | 80 | 
+[info]
+Executing:  | select | id=remarks_2021-10316 | label=Passed | 
+[info]
+Executing:  | type | id=course_2021-10323 | BS Information Technology | 
+[info]
+Executing:  | type | id=year_2021-10323 | 4 | 
+[info]
+Executing:  | type | id=grade_2021-10323 | 92 | 
+[info]
+Executing:  | select | id=remarks_2021-10323 | label=Passed | 
+[info]
+Executing:  | type | id=course_2021-10330 | BS Computer Science | 
+[info]
+Executing:  | type | id=year_2021-10330 | 3 | 
+[info]
+Executing:  | type | id=grade_2021-10330 | 74 | 
+[info]
+Executing:  | select | id=remarks_2021-10330 | label=Failed | 
+[info]
+Executing:  | type | id=course_2021-10337 | BS Computer Science | 
+[info]
+Executing:  | type | id=year_2021-10337 | 2 | 
+[info]
+Executing:  | type | id=grade_2021-10337 | 94 | 
+[info]
+Executing:  | select | id=remarks_2021-10337 | label=Passed | 
+[info]
+Executing:  | type | id=course_2021-10344 | BS Information Systems | 
+[info]
+Executing:  | type | id=year_2021-10344 | 2 | 
+[info]
+Executing:  | type | id=grade_2021-10344 | 82 | 
+[info]
+Executing:  | select | id=remarks_2021-10344 | label=Passed | 
+[info]
+Executing:  | click | id=submit-btn |  | 
+[info]
+Macro completed (Runtime 19.57s, 100% local execution, no cloud used)
+All
+Clear
+Continue in Side Panel
+Ui.Vision | AI | OCR | Forum | Github
+AI Chat ✨
+✕
+
+Tell the AI what to automate. It builds the macro in the editor, runs it and fixes it until it works. Try an example:
+
+Run again (Objective7_Scope2_GradeSheet)
+Explain the current macro
+Download the 3 XModules (Win, Mac, Linux)
+AI
+Faster
+Macro completed running

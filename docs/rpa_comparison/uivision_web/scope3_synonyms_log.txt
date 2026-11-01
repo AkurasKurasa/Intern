@@ -1,0 +1,97 @@
+ -> handoff
+[info]
+Executing: uiv.page.click {"locator":"id=backBtn","force":false}
+[info]
+Executing: uiv.$ {"timeout":15,"locator":"css=#rowList li.row-item"}
+[info]
+Executing: uiv.$ {"locator":"css=#rowList li.row-item"}
+[info]
+Executing: uiv.page.click {"x":748,"y":1014,"frameId":0,"frameLocal":false,"scope":"browser","tag":"li","elementId":"vczlz1o1cek:21","elementSignature":"[\"\",null,null,\"Payro…
+[info]
+Executing: uiv.$ {"hasText":true,"locator":"id=detailSender"}
+[info]
+Executing: uiv.$ {"locator":"id=detailSubject"}
+[echo]
+21. payroll@companyhr.example.com | Timesheet submission due date - Sept 2, 5pm -> handoff
+[info]
+Executing: uiv.page.click {"locator":"id=backBtn","force":false}
+[info]
+Executing: uiv.$ {"timeout":15,"locator":"css=#rowList li.row-item"}
+[info]
+Executing: uiv.$ {"locator":"css=#rowList li.row-item"}
+[info]
+Executing: uiv.page.click {"x":748,"y":1058,"frameId":0,"frameLocal":false,"scope":"browser","tag":"li","elementId":"vczlz1o1cek:22","elementSignature":"[\"\",null,null,\"Priya…
+[info]
+Executing: uiv.$ {"hasText":true,"locator":"id=detailSender"}
+[info]
+Executing: uiv.$ {"locator":"id=detailSubject"}
+[echo]
+22. priya@ramaswami-consulting.example.com | Loved the proposal - let's talk pricing Sept 11th? -> handoff
+[info]
+Executing: uiv.page.click {"locator":"id=backBtn","force":false}
+[info]
+Executing: uiv.$ {"timeout":15,"locator":"css=#rowList li.row-item"}
+[info]
+Executing: uiv.$ {"locator":"css=#rowList li.row-item"}
+[info]
+Executing: uiv.page.click {"x":748,"y":1102,"frameId":0,"frameLocal":false,"scope":"browser","tag":"li","elementId":"vczlz1o1cek:23","elementSignature":"[\"\",null,null,\"Hanna…
+[info]
+Executing: uiv.$ {"hasText":true,"locator":"id=detailSender"}
+[info]
+Executing: uiv.$ {"locator":"id=detailSubject"}
+[echo]
+23. hannah.cole@brightpath.example.com | Re: Partnership intro - automating data entry for your team -> handoff
+[info]
+Executing: uiv.page.click {"locator":"id=backBtn","force":false}
+[info]
+Executing: uiv.$ {"timeout":15,"locator":"css=#rowList li.row-item"}
+[info]
+Executing: uiv.$ {"locator":"css=#rowList li.row-item"}
+[info]
+Executing: uiv.page.click {"x":748,"y":1146,"frameId":0,"frameLocal":false,"scope":"browser","tag":"li","elementId":"vczlz1o1cek:24","elementSignature":"[\"\",null,null,\"Grace…
+[info]
+Executing: uiv.$ {"hasText":true,"locator":"id=detailSender"}
+[info]
+Executing: uiv.$ {"locator":"id=detailSubject"}
+[echo]
+24. g.okafor@meridianmutual.example.com | Re: Following up from the InsurTech Summit -> handoff
+[info]
+Executing: uiv.page.click {"locator":"id=backBtn","force":false}
+[info]
+Executing: uiv.$ {"timeout":15,"locator":"css=#rowList li.row-item"}
+[info]
+Executing: uiv.$ {"locator":"css=#rowList li.row-item"}
+[info]
+Executing: uiv.page.click {"x":748,"y":1190,"frameId":0,"frameLocal":false,"scope":"browser","tag":"li","elementId":"vczlz1o1cek:25","elementSignature":"[\"\",null,null,\"Priya…
+[info]
+Executing: uiv.$ {"hasText":true,"locator":"id=detailSender"}
+[info]
+Executing: uiv.$ {"locator":"id=detailSubject"}
+[echo]
+25. priya.raman@vendorco.com | October bill attached -> reply
+[info]
+Executing: uiv.page.click {"locator":"id=replyPillBtn","force":false}
+[info]
+Executing: uiv.page.fill {"locator":"id=replyBody","text":"Thanks for your message. I will get back to you shortly."}
+[info]
+Executing: uiv.page.click {"locator":"id=sendBtn","force":false}
+[info]
+Executing: uiv.$ {"timeout":15,"locator":"css=#rowList li.row-item"}
+[info]
+perf: 31 commands, avg 16ms each (tab 1, dispatch 2, wait-start 0, run 13) — first 21ms, slowest uiv.page.click 33ms
+[info]
+Objective7_Scope3_MailRules completed (Runtime 11.85s, 100% local execution, no cloud used)
+All
+Clear
+Continue in Side Panel
+Ui.Vision | AI | OCR | Forum | Github
+AI Chat ✨
+✕
+
+Tell the AI what to automate. It builds the macro in the editor, runs it and fixes it until it works. Try an example:
+
+Run again (Objective7_Scope3_MailRules)
+Explain the current macro
+Search Wikipedia for "Solar cell"
+AI
+Faster

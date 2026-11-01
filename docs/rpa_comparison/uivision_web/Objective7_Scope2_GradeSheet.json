@@ -1,0 +1,2618 @@
+{
+  "Name": "Objective7_Scope2_GradeSheet",
+  "CreationDate": "2026-11-02",
+  "Commands": [
+    {
+      "Command": "type",
+      "Target": "id=course_2021-10001",
+      "Value": "BS Information Systems",
+      "Targets": [
+        "id=course_2021-10001",
+        "name=course",
+        "xpath=//*[@id=\"course_2021-10001\"]",
+        "xpath=//input[@id='course_2021-10001']",
+        "xpath=//td[5]/input",
+        "css=#course_2021-10001"
+      ]
+    },
+    {
+      "Command": "type",
+      "Target": "id=year_2021-10001",
+      "Value": "2",
+      "Targets": [
+        "id=year_2021-10001",
+        "name=year",
+        "xpath=//*[@id=\"year_2021-10001\"]",
+        "xpath=//input[@id='year_2021-10001']",
+        "xpath=//td[6]/input",
+        "css=#year_2021-10001"
+      ]
+    },
+    {
+      "Command": "type",
+      "Target": "id=grade_2021-10001",
+      "Value": "85",
+      "Targets": [
+        "id=grade_2021-10001",
+        "name=grade",
+        "xpath=//*[@id=\"grade_2021-10001\"]",
+        "xpath=//input[@id='grade_2021-10001']",
+        "xpath=//td[9]/input",
+        "css=#grade_2021-10001"
+      ]
+    },
+    {
+      "Command": "select",
+      "Target": "id=remarks_2021-10001",
+      "Value": "label=Passed",
+      "Targets": [
+        "id=remarks_2021-10001",
+        "name=remarks",
+        "xpath=//*[@id=\"remarks_2021-10001\"]",
+        "xpath=//select[@id='remarks_2021-10001']",
+        "xpath=//select",
+        "css=#remarks_2021-10001"
+      ]
+    },
+    {
+      "Command": "type",
+      "Target": "id=course_2021-10008",
+      "Value": "BS Information Systems",
+      "Targets": [
+        "id=course_2021-10008",
+        "name=course",
+        "xpath=//*[@id=\"course_2021-10008\"]",
+        "xpath=//input[@id='course_2021-10008']",
+        "xpath=//tr[2]/td[5]/input",
+        "css=#course_2021-10008"
+      ]
+    },
+    {
+      "Command": "type",
+      "Target": "id=year_2021-10008",
+      "Value": "2",
+      "Targets": [
+        "id=year_2021-10008",
+        "name=year",
+        "xpath=//*[@id=\"year_2021-10008\"]",
+        "xpath=//input[@id='year_2021-10008']",
+        "xpath=//tr[2]/td[6]/input",
+        "css=#year_2021-10008"
+      ]
+    },
+    {
+      "Command": "type",
+      "Target": "id=grade_2021-10008",
+      "Value": "96",
+      "Targets": [
+        "id=grade_2021-10008",
+        "name=grade",
+        "xpath=//*[@id=\"grade_2021-10008\"]",
+        "xpath=//input[@id='grade_2021-10008']",
+        "xpath=//tr[2]/td[9]/input",
+        "css=#grade_2021-10008"
+      ]
+    },
+    {
+      "Command": "select",
+      "Target": "id=remarks_2021-10008",
+      "Value": "label=Passed",
+      "Targets": [
+        "id=remarks_2021-10008",
+        "name=remarks",
+        "xpath=//*[@id=\"remarks_2021-10008\"]",
+        "xpath=//select[@id='remarks_2021-10008']",
+        "xpath=//tr[2]/td[10]/select",
+        "css=#remarks_2021-10008"
+      ]
+    },
+    {
+      "Command": "type",
+      "Target": "id=course_2021-10015",
+      "Value": "BS Information Systems",
+      "Targets": [
+        "id=course_2021-10015",
+        "name=course",
+        "xpath=//*[@id=\"course_2021-10015\"]",
+        "xpath=//input[@id='course_2021-10015']",
+        "xpath=//tr[3]/td[5]/input",
+        "css=#course_2021-10015"
+      ]
+    },
+    {
+      "Command": "type",
+      "Target": "id=year_2021-10015",
+      "Value": "3",
+      "Targets": [
+        "id=year_2021-10015",
+        "name=year",
+        "xpath=//*[@id=\"year_2021-10015\"]",
+        "xpath=//input[@id='year_2021-10015']",
+        "xpath=//tr[3]/td[6]/input",
+        "css=#year_2021-10015"
+      ]
+    },
+    {
+      "Command": "type",
+      "Target": "id=grade_2021-10015",
+      "Value": "95",
+      "Targets": [
+        "id=grade_2021-10015",
+        "name=grade",
+        "xpath=//*[@id=\"grade_2021-10015\"]",
+        "xpath=//input[@id='grade_2021-10015']",
+        "xpath=//tr[3]/td[9]/input",
+        "css=#grade_2021-10015"
+      ]
+    },
+    {
+      "Command": "select",
+      "Target": "id=remarks_2021-10015",
+      "Value": "label=Passed",
+      "Targets": [
+        "id=remarks_2021-10015",
+        "name=remarks",
+        "xpath=//*[@id=\"remarks_2021-10015\"]",
+        "xpath=//select[@id='remarks_2021-10015']",
+        "xpath=//tr[3]/td[10]/select",
+        "css=#remarks_2021-10015"
+      ]
+    },
+    {
+      "Command": "type",
+      "Target": "id=course_2021-10022",
+      "Value": "BS Information Technology",
+      "Targets": [
+        "id=course_2021-10022",
+        "name=course",
+        "xpath=//*[@id=\"course_2021-10022\"]",
+        "xpath=//input[@id='course_2021-10022']",
+        "xpath=//tr[4]/td[5]/input",
+        "css=#course_2021-10022"
+      ]
+    },
+    {
+      "Command": "type",
+      "Target": "id=year_2021-10022",
+      "Value": "2",
+      "Targets": [
+        "id=year_2021-10022",
+        "name=year",
+        "xpath=//*[@id=\"year_2021-10022\"]",
+        "xpath=//input[@id='year_2021-10022']",
+        "xpath=//tr[4]/td[6]/input",
+        "css=#year_2021-10022"
+      ]
+    },
+    {
+      "Command": "type",
+      "Target": "id=grade_2021-10022",
+      "Value": "87",
+      "Targets": [
+        "id=grade_2021-10022",
+        "name=grade",
+        "xpath=//*[@id=\"grade_2021-10022\"]",
+        "xpath=//input[@id='grade_2021-10022']",
+        "xpath=//tr[4]/td[9]/input",
+        "css=#grade_2021-10022"
+      ]
+    },
+    {
+      "Command": "select",
+      "Target": "id=remarks_2021-10022",
+      "Value": "label=Passed",
+      "Targets": [
+        "id=remarks_2021-10022",
+        "name=remarks",
+        "xpath=//*[@id=\"remarks_2021-10022\"]",
+        "xpath=//select[@id='remarks_2021-10022']",
+        "xpath=//tr[4]/td[10]/select",
+        "css=#remarks_2021-10022"
+      ]
+    },
+    {
+      "Command": "type",
+      "Target": "id=course_2021-10029",
+      "Value": "BS Information Systems",
+      "Targets": [
+        "id=course_2021-10029",
+        "name=course",
+        "xpath=//*[@id=\"course_2021-10029\"]",
+        "xpath=//input[@id='course_2021-10029']",
+        "xpath=//tr[5]/td[5]/input",
+        "css=#course_2021-10029"
+      ]
+    },
+    {
+      "Command": "type",
+      "Target": "id=year_2021-10029",
+      "Value": "1",
+      "Targets": [
+        "id=year_2021-10029",
+        "name=year",
+        "xpath=//*[@id=\"year_2021-10029\"]",
+        "xpath=//input[@id='year_2021-10029']",
+        "xpath=//tr[5]/td[6]/input",
+        "css=#year_2021-10029"
+      ]
+    },
+    {
+      "Command": "type",
+      "Target": "id=grade_2021-10029",
+      "Value": "72",
+      "Targets": [
+        "id=grade_2021-10029",
+        "name=grade",
+        "xpath=//*[@id=\"grade_2021-10029\"]",
+        "xpath=//input[@id='grade_2021-10029']",
+        "xpath=//tr[5]/td[9]/input",
+        "css=#grade_2021-10029"
+      ]
+    },
+    {
+      "Command": "select",
+      "Target": "id=remarks_2021-10029",
+      "Value": "label=Failed",
+      "Targets": [
+        "id=remarks_2021-10029",
+        "name=remarks",
+        "xpath=//*[@id=\"remarks_2021-10029\"]",
+        "xpath=//select[@id='remarks_2021-10029']",
+        "xpath=//tr[5]/td[10]/select",
+        "css=#remarks_2021-10029"
+      ]
+    },
+    {
+      "Command": "type",
+      "Target": "id=course_2021-10036",
+      "Value": "BS Information Systems",
+      "Targets": [
+        "id=course_2021-10036",
+        "name=course",
+        "xpath=//*[@id=\"course_2021-10036\"]",
+        "xpath=//input[@id='course_2021-10036']",
+        "xpath=//tr[6]/td[5]/input",
+        "css=#course_2021-10036"
+      ]
+    },
+    {
+      "Command": "type",
+      "Target": "id=year_2021-10036",
+      "Value": "3",
+      "Targets": [
+        "id=year_2021-10036",
+        "name=year",
+        "xpath=//*[@id=\"year_2021-10036\"]",
+        "xpath=//input[@id='year_2021-10036']",
+        "xpath=//tr[6]/td[6]/input",
+        "css=#year_2021-10036"
+      ]
+    },
+    {
+      "Command": "type",
+      "Target": "id=grade_2021-10036",
+      "Value": "85",
+      "Targets": [
+        "id=grade_2021-10036",
+        "name=grade",
+        "xpath=//*[@id=\"grade_2021-10036\"]",
+        "xpath=//input[@id='grade_2021-10036']",
+        "xpath=//tr[6]/td[9]/input",
+        "css=#grade_2021-10036"
+      ]
+    },
+    {
+      "Command": "select",
+      "Target": "id=remarks_2021-10036",
+      "Value": "label=Passed",
+      "Targets": [
+        "id=remarks_2021-10036",
+        "name=remarks",
+        "xpath=//*[@id=\"remarks_2021-10036\"]",
+        "xpath=//select[@id='remarks_2021-10036']",
+        "xpath=//tr[6]/td[10]/select",
+        "css=#remarks_2021-10036"
+      ]
+    },
+    {
+      "Command": "type",
+      "Target": "id=course_2021-10043",
+      "Value": "BS Information Technology",
+      "Targets": [
+        "id=course_2021-10043",
+        "name=course",
+        "xpath=//*[@id=\"course_2021-10043\"]",
+        "xpath=//input[@id='course_2021-10043']",
+        "xpath=//tr[7]/td[5]/input",
+        "css=#course_2021-10043"
+      ]
+    },
+    {
+      "Command": "type",
+      "Target": "id=year_2021-10043",
+      "Value": "4",
+      "Targets": [
+        "id=year_2021-10043",
+        "name=year",
+        "xpath=//*[@id=\"year_2021-10043\"]",
+        "xpath=//input[@id='year_2021-10043']",
+        "xpath=//tr[7]/td[6]/input",
+        "css=#year_2021-10043"
+      ]
+    },
+    {
+      "Command": "type",
+      "Target": "id=grade_2021-10043",
+      "Value": "82",
+      "Targets": [
+        "id=grade_2021-10043",
+        "name=grade",
+        "xpath=//*[@id=\"grade_2021-10043\"]",
+        "xpath=//input[@id='grade_2021-10043']",
+        "xpath=//tr[7]/td[9]/input",
+        "css=#grade_2021-10043"
+      ]
+    },
+    {
+      "Command": "select",
+      "Target": "id=remarks_2021-10043",
+      "Value": "label=Passed",
+      "Targets": [
+        "id=remarks_2021-10043",
+        "name=remarks",
+        "xpath=//*[@id=\"remarks_2021-10043\"]",
+        "xpath=//select[@id='remarks_2021-10043']",
+        "xpath=//tr[7]/td[10]/select",
+        "css=#remarks_2021-10043"
+      ]
+    },
+    {
+      "Command": "type",
+      "Target": "id=course_2021-10050",
+      "Value": "BS Information Systems",
+      "Targets": [
+        "id=course_2021-10050",
+        "name=course",
+        "xpath=//*[@id=\"course_2021-10050\"]",
+        "xpath=//input[@id='course_2021-10050']",
+        "xpath=//tr[8]/td[5]/input",
+        "css=#course_2021-10050"
+      ]
+    },
+    {
+      "Command": "type",
+      "Target": "id=year_2021-10050",
+      "Value": "3",
+      "Targets": [
+        "id=year_2021-10050",
+        "name=year",
+        "xpath=//*[@id=\"year_2021-10050\"]",
+        "xpath=//input[@id='year_2021-10050']",
+        "xpath=//tr[8]/td[6]/input",
+        "css=#year_2021-10050"
+      ]
+    },
+    {
+      "Command": "type",
+      "Target": "id=grade_2021-10050",
+      "Value": "74",
+      "Targets": [
+        "id=grade_2021-10050",
+        "name=grade",
+        "xpath=//*[@id=\"grade_2021-10050\"]",
+        "xpath=//input[@id='grade_2021-10050']",
+        "xpath=//tr[8]/td[9]/input",
+        "css=#grade_2021-10050"
+      ]
+    },
+    {
+      "Command": "select",
+      "Target": "id=remarks_2021-10050",
+      "Value": "label=Failed",
+      "Targets": [
+        "id=remarks_2021-10050",
+        "name=remarks",
+        "xpath=//*[@id=\"remarks_2021-10050\"]",
+        "xpath=//select[@id='remarks_2021-10050']",
+        "xpath=//tr[8]/td[10]/select",
+        "css=#remarks_2021-10050"
+      ]
+    },
+    {
+      "Command": "type",
+      "Target": "id=course_2021-10057",
+      "Value": "BS Computer Science",
+      "Targets": [
+        "id=course_2021-10057",
+        "name=course",
+        "xpath=//*[@id=\"course_2021-10057\"]",
+        "xpath=//input[@id='course_2021-10057']",
+        "xpath=//tr[9]/td[5]/input",
+        "css=#course_2021-10057"
+      ]
+    },
+    {
+      "Command": "type",
+      "Target": "id=year_2021-10057",
+      "Value": "1",
+      "Targets": [
+        "id=year_2021-10057",
+        "name=year",
+        "xpath=//*[@id=\"year_2021-10057\"]",
+        "xpath=//input[@id='year_2021-10057']",
+        "xpath=//tr[9]/td[6]/input",
+        "css=#year_2021-10057"
+      ]
+    },
+    {
+      "Command": "type",
+      "Target": "id=grade_2021-10057",
+      "Value": "90",
+      "Targets": [
+        "id=grade_2021-10057",
+        "name=grade",
+        "xpath=//*[@id=\"grade_2021-10057\"]",
+        "xpath=//input[@id='grade_2021-10057']",
+        "xpath=//tr[9]/td[9]/input",
+        "css=#grade_2021-10057"
+      ]
+    },
+    {
+      "Command": "select",
+      "Target": "id=remarks_2021-10057",
+      "Value": "label=Passed",
+      "Targets": [
+        "id=remarks_2021-10057",
+        "name=remarks",
+        "xpath=//*[@id=\"remarks_2021-10057\"]",
+        "xpath=//select[@id='remarks_2021-10057']",
+        "xpath=//tr[9]/td[10]/select",
+        "css=#remarks_2021-10057"
+      ]
+    },
+    {
+      "Command": "type",
+      "Target": "id=course_2021-10064",
+      "Value": "BS Information Systems",
+      "Targets": [
+        "id=course_2021-10064",
+        "name=course",
+        "xpath=//*[@id=\"course_2021-10064\"]",
+        "xpath=//input[@id='course_2021-10064']",
+        "xpath=//tr[10]/td[5]/input",
+        "css=#course_2021-10064"
+      ]
+    },
+    {
+      "Command": "type",
+      "Target": "id=year_2021-10064",
+      "Value": "3",
+      "Targets": [
+        "id=year_2021-10064",
+        "name=year",
+        "xpath=//*[@id=\"year_2021-10064\"]",
+        "xpath=//input[@id='year_2021-10064']",
+        "xpath=//tr[10]/td[6]/input",
+        "css=#year_2021-10064"
+      ]
+    },
+    {
+      "Command": "type",
+      "Target": "id=grade_2021-10064",
+      "Value": "86",
+      "Targets": [
+        "id=grade_2021-10064",
+        "name=grade",
+        "xpath=//*[@id=\"grade_2021-10064\"]",
+        "xpath=//input[@id='grade_2021-10064']",
+        "xpath=//tr[10]/td[9]/input",
+        "css=#grade_2021-10064"
+      ]
+    },
+    {
+      "Command": "select",
+      "Target": "id=remarks_2021-10064",
+      "Value": "label=Passed",
+      "Targets": [
+        "id=remarks_2021-10064",
+        "name=remarks",
+        "xpath=//*[@id=\"remarks_2021-10064\"]",
+        "xpath=//select[@id='remarks_2021-10064']",
+        "xpath=//tr[10]/td[10]/select",
+        "css=#remarks_2021-10064"
+      ]
+    },
+    {
+      "Command": "type",
+      "Target": "id=course_2021-10071",
+      "Value": "BS Information Systems",
+      "Targets": [
+        "id=course_2021-10071",
+        "name=course",
+        "xpath=//*[@id=\"course_2021-10071\"]",
+        "xpath=//input[@id='course_2021-10071']",
+        "xpath=//tr[11]/td[5]/input",
+        "css=#course_2021-10071"
+      ]
+    },
+    {
+      "Command": "type",
+      "Target": "id=year_2021-10071",
+      "Value": "3",
+      "Targets": [
+        "id=year_2021-10071",
+        "name=year",
+        "xpath=//*[@id=\"year_2021-10071\"]",
+        "xpath=//input[@id='year_2021-10071']",
+        "xpath=//tr[11]/td[6]/input",
+        "css=#year_2021-10071"
+      ]
+    },
+    {
+      "Command": "type",
+      "Target": "id=grade_2021-10071",
+      "Value": "80",
+      "Targets": [
+        "id=grade_2021-10071",
+        "name=grade",
+        "xpath=//*[@id=\"grade_2021-10071\"]",
+        "xpath=//input[@id='grade_2021-10071']",
+        "xpath=//tr[11]/td[9]/input",
+        "css=#grade_2021-10071"
+      ]
+    },
+    {
+      "Command": "select",
+      "Target": "id=remarks_2021-10071",
+      "Value": "label=Passed",
+      "Targets": [
+        "id=remarks_2021-10071",
+        "name=remarks",
+        "xpath=//*[@id=\"remarks_2021-10071\"]",
+        "xpath=//select[@id='remarks_2021-10071']",
+        "xpath=//tr[11]/td[10]/select",
+        "css=#remarks_2021-10071"
+      ]
+    },
+    {
+      "Command": "type",
+      "Target": "id=course_2021-10078",
+      "Value": "BS Computer Science",
+      "Targets": [
+        "id=course_2021-10078",
+        "name=course",
+        "xpath=//*[@id=\"course_2021-10078\"]",
+        "xpath=//input[@id='course_2021-10078']",
+        "xpath=//tr[12]/td[5]/input",
+        "css=#course_2021-10078"
+      ]
+    },
+    {
+      "Command": "type",
+      "Target": "id=year_2021-10078",
+      "Value": "3",
+      "Targets": [
+        "id=year_2021-10078",
+        "name=year",
+        "xpath=//*[@id=\"year_2021-10078\"]",
+        "xpath=//input[@id='year_2021-10078']",
+        "xpath=//tr[12]/td[6]/input",
+        "css=#year_2021-10078"
+      ]
+    },
+    {
+      "Command": "type",
+      "Target": "id=grade_2021-10078",
+      "Value": "97",
+      "Targets": [
+        "id=grade_2021-10078",
+        "name=grade",
+        "xpath=//*[@id=\"grade_2021-10078\"]",
+        "xpath=//input[@id='grade_2021-10078']",
+        "xpath=//tr[12]/td[9]/input",
+        "css=#grade_2021-10078"
+      ]
+    },
+    {
+      "Command": "select",
+      "Target": "id=remarks_2021-10078",
+      "Value": "label=Passed",
+      "Targets": [
+        "id=remarks_2021-10078",
+        "name=remarks",
+        "xpath=//*[@id=\"remarks_2021-10078\"]",
+        "xpath=//select[@id='remarks_2021-10078']",
+        "xpath=//tr[12]/td[10]/select",
+        "css=#remarks_2021-10078"
+      ]
+    },
+    {
+      "Command": "type",
+      "Target": "id=course_2021-10085",
+      "Value": "BS Computer Science",
+      "Targets": [
+        "id=course_2021-10085",
+        "name=course",
+        "xpath=//*[@id=\"course_2021-10085\"]",
+        "xpath=//input[@id='course_2021-10085']",
+        "xpath=//tr[13]/td[5]/input",
+        "css=#course_2021-10085"
+      ]
+    },
+    {
+      "Command": "type",
+      "Target": "id=year_2021-10085",
+      "Value": "1",
+      "Targets": [
+        "id=year_2021-10085",
+        "name=year",
+        "xpath=//*[@id=\"year_2021-10085\"]",
+        "xpath=//input[@id='year_2021-10085']",
+        "xpath=//tr[13]/td[6]/input",
+        "css=#year_2021-10085"
+      ]
+    },
+    {
+      "Command": "type",
+      "Target": "id=grade_2021-10085",
+      "Value": "72",
+      "Targets": [
+        "id=grade_2021-10085",
+        "name=grade",
+        "xpath=//*[@id=\"grade_2021-10085\"]",
+        "xpath=//input[@id='grade_2021-10085']",
+        "xpath=//tr[13]/td[9]/input",
+        "css=#grade_2021-10085"
+      ]
+    },
+    {
+      "Command": "select",
+      "Target": "id=remarks_2021-10085",
+      "Value": "label=Failed",
+      "Targets": [
+        "id=remarks_2021-10085",
+        "name=remarks",
+        "xpath=//*[@id=\"remarks_2021-10085\"]",
+        "xpath=//select[@id='remarks_2021-10085']",
+        "xpath=//tr[13]/td[10]/select",
+        "css=#remarks_2021-10085"
+      ]
+    },
+    {
+      "Command": "type",
+      "Target": "id=course_2021-10092",
+      "Value": "BS Information Systems",
+      "Targets": [
+        "id=course_2021-10092",
+        "name=course",
+        "xpath=//*[@id=\"course_2021-10092\"]",
+        "xpath=//input[@id='course_2021-10092']",
+        "xpath=//tr[14]/td[5]/input",
+        "css=#course_2021-10092"
+      ]
+    },
+    {
+      "Command": "type",
+      "Target": "id=year_2021-10092",
+      "Value": "3",
+      "Targets": [
+        "id=year_2021-10092",
+        "name=year",
+        "xpath=//*[@id=\"year_2021-10092\"]",
+        "xpath=//input[@id='year_2021-10092']",
+        "xpath=//tr[14]/td[6]/input",
+        "css=#year_2021-10092"
+      ]
+    },
+    {
+      "Command": "type",
+      "Target": "id=grade_2021-10092",
+      "Value": "92",
+      "Targets": [
+        "id=grade_2021-10092",
+        "name=grade",
+        "xpath=//*[@id=\"grade_2021-10092\"]",
+        "xpath=//input[@id='grade_2021-10092']",
+        "xpath=//tr[14]/td[9]/input",
+        "css=#grade_2021-10092"
+      ]
+    },
+    {
+      "Command": "select",
+      "Target": "id=remarks_2021-10092",
+      "Value": "label=Passed",
+      "Targets": [
+        "id=remarks_2021-10092",
+        "name=remarks",
+        "xpath=//*[@id=\"remarks_2021-10092\"]",
+        "xpath=//select[@id='remarks_2021-10092']",
+        "xpath=//tr[14]/td[10]/select",
+        "css=#remarks_2021-10092"
+      ]
+    },
+    {
+      "Command": "type",
+      "Target": "id=course_2021-10099",
+      "Value": "BS Information Systems",
+      "Targets": [
+        "id=course_2021-10099",
+        "name=course",
+        "xpath=//*[@id=\"course_2021-10099\"]",
+        "xpath=//input[@id='course_2021-10099']",
+        "xpath=//tr[15]/td[5]/input",
+        "css=#course_2021-10099"
+      ]
+    },
+    {
+      "Command": "type",
+      "Target": "id=year_2021-10099",
+      "Value": "4",
+      "Targets": [
+        "id=year_2021-10099",
+        "name=year",
+        "xpath=//*[@id=\"year_2021-10099\"]",
+        "xpath=//input[@id='year_2021-10099']",
+        "xpath=//tr[15]/td[6]/input",
+        "css=#year_2021-10099"
+      ]
+    },
+    {
+      "Command": "type",
+      "Target": "id=grade_2021-10099",
+      "Value": "73",
+      "Targets": [
+        "id=grade_2021-10099",
+        "name=grade",
+        "xpath=//*[@id=\"grade_2021-10099\"]",
+        "xpath=//input[@id='grade_2021-10099']",
+        "xpath=//tr[15]/td[9]/input",
+        "css=#grade_2021-10099"
+      ]
+    },
+    {
+      "Command": "select",
+      "Target": "id=remarks_2021-10099",
+      "Value": "label=Failed",
+      "Targets": [
+        "id=remarks_2021-10099",
+        "name=remarks",
+        "xpath=//*[@id=\"remarks_2021-10099\"]",
+        "xpath=//select[@id='remarks_2021-10099']",
+        "xpath=//tr[15]/td[10]/select",
+        "css=#remarks_2021-10099"
+      ]
+    },
+    {
+      "Command": "type",
+      "Target": "id=course_2021-10106",
+      "Value": "BS Information Technology",
+      "Targets": [
+        "id=course_2021-10106",
+        "name=course",
+        "xpath=//*[@id=\"course_2021-10106\"]",
+        "xpath=//input[@id='course_2021-10106']",
+        "xpath=//tr[16]/td[5]/input",
+        "css=#course_2021-10106"
+      ]
+    },
+    {
+      "Command": "type",
+      "Target": "id=year_2021-10106",
+      "Value": "4",
+      "Targets": [
+        "id=year_2021-10106",
+        "name=year",
+        "xpath=//*[@id=\"year_2021-10106\"]",
+        "xpath=//input[@id='year_2021-10106']",
+        "xpath=//tr[16]/td[6]/input",
+        "css=#year_2021-10106"
+      ]
+    },
+    {
+      "Command": "type",
+      "Target": "id=grade_2021-10106",
+      "Value": "72",
+      "Targets": [
+        "id=grade_2021-10106",
+        "name=grade",
+        "xpath=//*[@id=\"grade_2021-10106\"]",
+        "xpath=//input[@id='grade_2021-10106']",
+        "xpath=//tr[16]/td[9]/input",
+        "css=#grade_2021-10106"
+      ]
+    },
+    {
+      "Command": "select",
+      "Target": "id=remarks_2021-10106",
+      "Value": "label=Failed",
+      "Targets": [
+        "id=remarks_2021-10106",
+        "name=remarks",
+        "xpath=//*[@id=\"remarks_2021-10106\"]",
+        "xpath=//select[@id='remarks_2021-10106']",
+        "xpath=//tr[16]/td[10]/select",
+        "css=#remarks_2021-10106"
+      ]
+    },
+    {
+      "Command": "type",
+      "Target": "id=course_2021-10113",
+      "Value": "BS Computer Science",
+      "Targets": [
+        "id=course_2021-10113",
+        "name=course",
+        "xpath=//*[@id=\"course_2021-10113\"]",
+        "xpath=//input[@id='course_2021-10113']",
+        "xpath=//tr[17]/td[5]/input",
+        "css=#course_2021-10113"
+      ]
+    },
+    {
+      "Command": "type",
+      "Target": "id=year_2021-10113",
+      "Value": "3",
+      "Targets": [
+        "id=year_2021-10113",
+        "name=year",
+        "xpath=//*[@id=\"year_2021-10113\"]",
+        "xpath=//input[@id='year_2021-10113']",
+        "xpath=//tr[17]/td[6]/input",
+        "css=#year_2021-10113"
+      ]
+    },
+    {
+      "Command": "type",
+      "Target": "id=grade_2021-10113",
+      "Value": "94",
+      "Targets": [
+        "id=grade_2021-10113",
+        "name=grade",
+        "xpath=//*[@id=\"grade_2021-10113\"]",
+        "xpath=//input[@id='grade_2021-10113']",
+        "xpath=//tr[17]/td[9]/input",
+        "css=#grade_2021-10113"
+      ]
+    },
+    {
+      "Command": "select",
+      "Target": "id=remarks_2021-10113",
+      "Value": "label=Passed",
+      "Targets": [
+        "id=remarks_2021-10113",
+        "name=remarks",
+        "xpath=//*[@id=\"remarks_2021-10113\"]",
+        "xpath=//select[@id='remarks_2021-10113']",
+        "xpath=//tr[17]/td[10]/select",
+        "css=#remarks_2021-10113"
+      ]
+    },
+    {
+      "Command": "type",
+      "Target": "id=course_2021-10120",
+      "Value": "BS Computer Science",
+      "Targets": [
+        "id=course_2021-10120",
+        "name=course",
+        "xpath=//*[@id=\"course_2021-10120\"]",
+        "xpath=//input[@id='course_2021-10120']",
+        "xpath=//tr[18]/td[5]/input",
+        "css=#course_2021-10120"
+      ]
+    },
+    {
+      "Command": "type",
+      "Target": "id=year_2021-10120",
+      "Value": "4",
+      "Targets": [
+        "id=year_2021-10120",
+        "name=year",
+        "xpath=//*[@id=\"year_2021-10120\"]",
+        "xpath=//input[@id='year_2021-10120']",
+        "xpath=//tr[18]/td[6]/input",
+        "css=#year_2021-10120"
+      ]
+    },
+    {
+      "Command": "type",
+      "Target": "id=grade_2021-10120",
+      "Value": "74",
+      "Targets": [
+        "id=grade_2021-10120",
+        "name=grade",
+        "xpath=//*[@id=\"grade_2021-10120\"]",
+        "xpath=//input[@id='grade_2021-10120']",
+        "xpath=//tr[18]/td[9]/input",
+        "css=#grade_2021-10120"
+      ]
+    },
+    {
+      "Command": "select",
+      "Target": "id=remarks_2021-10120",
+      "Value": "label=Failed",
+      "Targets": [
+        "id=remarks_2021-10120",
+        "name=remarks",
+        "xpath=//*[@id=\"remarks_2021-10120\"]",
+        "xpath=//select[@id='remarks_2021-10120']",
+        "xpath=//tr[18]/td[10]/select",
+        "css=#remarks_2021-10120"
+      ]
+    },
+    {
+      "Command": "type",
+      "Target": "id=course_2021-10127",
+      "Value": "BS Information Technology",
+      "Targets": [
+        "id=course_2021-10127",
+        "name=course",
+        "xpath=//*[@id=\"course_2021-10127\"]",
+        "xpath=//input[@id='course_2021-10127']",
+        "xpath=//tr[19]/td[5]/input",
+        "css=#course_2021-10127"
+      ]
+    },
+    {
+      "Command": "type",
+      "Target": "id=year_2021-10127",
+      "Value": "4",
+      "Targets": [
+        "id=year_2021-10127",
+        "name=year",
+        "xpath=//*[@id=\"year_2021-10127\"]",
+        "xpath=//input[@id='year_2021-10127']",
+        "xpath=//tr[19]/td[6]/input",
+        "css=#year_2021-10127"
+      ]
+    },
+    {
+      "Command": "type",
+      "Target": "id=grade_2021-10127",
+      "Value": "85",
+      "Targets": [
+        "id=grade_2021-10127",
+        "name=grade",
+        "xpath=//*[@id=\"grade_2021-10127\"]",
+        "xpath=//input[@id='grade_2021-10127']",
+        "xpath=//tr[19]/td[9]/input",
+        "css=#grade_2021-10127"
+      ]
+    },
+    {
+      "Command": "select",
+      "Target": "id=remarks_2021-10127",
+      "Value": "label=Passed",
+      "Targets": [
+        "id=remarks_2021-10127",
+        "name=remarks",
+        "xpath=//*[@id=\"remarks_2021-10127\"]",
+        "xpath=//select[@id='remarks_2021-10127']",
+        "xpath=//tr[19]/td[10]/select",
+        "css=#remarks_2021-10127"
+      ]
+    },
+    {
+      "Command": "type",
+      "Target": "id=course_2021-10134",
+      "Value": "BS Information Systems",
+      "Targets": [
+        "id=course_2021-10134",
+        "name=course",
+        "xpath=//*[@id=\"course_2021-10134\"]",
+        "xpath=//input[@id='course_2021-10134']",
+        "xpath=//tr[20]/td[5]/input",
+        "css=#course_2021-10134"
+      ]
+    },
+    {
+      "Command": "type",
+      "Target": "id=year_2021-10134",
+      "Value": "4",
+      "Targets": [
+        "id=year_2021-10134",
+        "name=year",
+        "xpath=//*[@id=\"year_2021-10134\"]",
+        "xpath=//input[@id='year_2021-10134']",
+        "xpath=//tr[20]/td[6]/input",
+        "css=#year_2021-10134"
+      ]
+    },
+    {
+      "Command": "type",
+      "Target": "id=grade_2021-10134",
+      "Value": "93",
+      "Targets": [
+        "id=grade_2021-10134",
+        "name=grade",
+        "xpath=//*[@id=\"grade_2021-10134\"]",
+        "xpath=//input[@id='grade_2021-10134']",
+        "xpath=//tr[20]/td[9]/input",
+        "css=#grade_2021-10134"
+      ]
+    },
+    {
+      "Command": "select",
+      "Target": "id=remarks_2021-10134",
+      "Value": "label=Passed",
+      "Targets": [
+        "id=remarks_2021-10134",
+        "name=remarks",
+        "xpath=//*[@id=\"remarks_2021-10134\"]",
+        "xpath=//select[@id='remarks_2021-10134']",
+        "xpath=//tr[20]/td[10]/select",
+        "css=#remarks_2021-10134"
+      ]
+    },
+    {
+      "Command": "type",
+      "Target": "id=course_2021-10141",
+      "Value": "BS Information Technology",
+      "Targets": [
+        "id=course_2021-10141",
+        "name=course",
+        "xpath=//*[@id=\"course_2021-10141\"]",
+        "xpath=//input[@id='course_2021-10141']",
+        "xpath=//tr[21]/td[5]/input",
+        "css=#course_2021-10141"
+      ]
+    },
+    {
+      "Command": "type",
+      "Target": "id=year_2021-10141",
+      "Value": "1",
+      "Targets": [
+        "id=year_2021-10141",
+        "name=year",
+        "xpath=//*[@id=\"year_2021-10141\"]",
+        "xpath=//input[@id='year_2021-10141']",
+        "xpath=//tr[21]/td[6]/input",
+        "css=#year_2021-10141"
+      ]
+    },
+    {
+      "Command": "type",
+      "Target": "id=grade_2021-10141",
+      "Value": "92",
+      "Targets": [
+        "id=grade_2021-10141",
+        "name=grade",
+        "xpath=//*[@id=\"grade_2021-10141\"]",
+        "xpath=//input[@id='grade_2021-10141']",
+        "xpath=//tr[21]/td[9]/input",
+        "css=#grade_2021-10141"
+      ]
+    },
+    {
+      "Command": "select",
+      "Target": "id=remarks_2021-10141",
+      "Value": "label=Passed",
+      "Targets": [
+        "id=remarks_2021-10141",
+        "name=remarks",
+        "xpath=//*[@id=\"remarks_2021-10141\"]",
+        "xpath=//select[@id='remarks_2021-10141']",
+        "xpath=//tr[21]/td[10]/select",
+        "css=#remarks_2021-10141"
+      ]
+    },
+    {
+      "Command": "type",
+      "Target": "id=course_2021-10148",
+      "Value": "BS Information Systems",
+      "Targets": [
+        "id=course_2021-10148",
+        "name=course",
+        "xpath=//*[@id=\"course_2021-10148\"]",
+        "xpath=//input[@id='course_2021-10148']",
+        "xpath=//tr[22]/td[5]/input",
+        "css=#course_2021-10148"
+      ]
+    },
+    {
+      "Command": "type",
+      "Target": "id=year_2021-10148",
+      "Value": "2",
+      "Targets": [
+        "id=year_2021-10148",
+        "name=year",
+        "xpath=//*[@id=\"year_2021-10148\"]",
+        "xpath=//input[@id='year_2021-10148']",
+        "xpath=//tr[22]/td[6]/input",
+        "css=#year_2021-10148"
+      ]
+    },
+    {
+      "Command": "type",
+      "Target": "id=grade_2021-10148",
+      "Value": "92",
+      "Targets": [
+        "id=grade_2021-10148",
+        "name=grade",
+        "xpath=//*[@id=\"grade_2021-10148\"]",
+        "xpath=//input[@id='grade_2021-10148']",
+        "xpath=//tr[22]/td[9]/input",
+        "css=#grade_2021-10148"
+      ]
+    },
+    {
+      "Command": "select",
+      "Target": "id=remarks_2021-10148",
+      "Value": "label=Passed",
+      "Targets": [
+        "id=remarks_2021-10148",
+        "name=remarks",
+        "xpath=//*[@id=\"remarks_2021-10148\"]",
+        "xpath=//select[@id='remarks_2021-10148']",
+        "xpath=//tr[22]/td[10]/select",
+        "css=#remarks_2021-10148"
+      ]
+    },
+    {
+      "Command": "type",
+      "Target": "id=course_2021-10155",
+      "Value": "BS Computer Science",
+      "Targets": [
+        "id=course_2021-10155",
+        "name=course",
+        "xpath=//*[@id=\"course_2021-10155\"]",
+        "xpath=//input[@id='course_2021-10155']",
+        "xpath=//tr[23]/td[5]/input",
+        "css=#course_2021-10155"
+      ]
+    },
+    {
+      "Command": "type",
+      "Target": "id=year_2021-10155",
+      "Value": "1",
+      "Targets": [
+        "id=year_2021-10155",
+        "name=year",
+        "xpath=//*[@id=\"year_2021-10155\"]",
+        "xpath=//input[@id='year_2021-10155']",
+        "xpath=//tr[23]/td[6]/input",
+        "css=#year_2021-10155"
+      ]
+    },
+    {
+      "Command": "type",
+      "Target": "id=grade_2021-10155",
+      "Value": "88",
+      "Targets": [
+        "id=grade_2021-10155",
+        "name=grade",
+        "xpath=//*[@id=\"grade_2021-10155\"]",
+        "xpath=//input[@id='grade_2021-10155']",
+        "xpath=//tr[23]/td[9]/input",
+        "css=#grade_2021-10155"
+      ]
+    },
+    {
+      "Command": "select",
+      "Target": "id=remarks_2021-10155",
+      "Value": "label=Passed",
+      "Targets": [
+        "id=remarks_2021-10155",
+        "name=remarks",
+        "xpath=//*[@id=\"remarks_2021-10155\"]",
+        "xpath=//select[@id='remarks_2021-10155']",
+        "xpath=//tr[23]/td[10]/select",
+        "css=#remarks_2021-10155"
+      ]
+    },
+    {
+      "Command": "type",
+      "Target": "id=course_2021-10162",
+      "Value": "BS Computer Science",
+      "Targets": [
+        "id=course_2021-10162",
+        "name=course",
+        "xpath=//*[@id=\"course_2021-10162\"]",
+        "xpath=//input[@id='course_2021-10162']",
+        "xpath=//tr[24]/td[5]/input",
+        "css=#course_2021-10162"
+      ]
+    },
+    {
+      "Command": "type",
+      "Target": "id=year_2021-10162",
+      "Value": "3",
+      "Targets": [
+        "id=year_2021-10162",
+        "name=year",
+        "xpath=//*[@id=\"year_2021-10162\"]",
+        "xpath=//input[@id='year_2021-10162']",
+        "xpath=//tr[24]/td[6]/input",
+        "css=#year_2021-10162"
+      ]
+    },
+    {
+      "Command": "type",
+      "Target": "id=grade_2021-10162",
+      "Value": "84",
+      "Targets": [
+        "id=grade_2021-10162",
+        "name=grade",
+        "xpath=//*[@id=\"grade_2021-10162\"]",
+        "xpath=//input[@id='grade_2021-10162']",
+        "xpath=//tr[24]/td[9]/input",
+        "css=#grade_2021-10162"
+      ]
+    },
+    {
+      "Command": "select",
+      "Target": "id=remarks_2021-10162",
+      "Value": "label=Passed",
+      "Targets": [
+        "id=remarks_2021-10162",
+        "name=remarks",
+        "xpath=//*[@id=\"remarks_2021-10162\"]",
+        "xpath=//select[@id='remarks_2021-10162']",
+        "xpath=//tr[24]/td[10]/select",
+        "css=#remarks_2021-10162"
+      ]
+    },
+    {
+      "Command": "type",
+      "Target": "id=course_2021-10169",
+      "Value": "BS Information Systems",
+      "Targets": [
+        "id=course_2021-10169",
+        "name=course",
+        "xpath=//*[@id=\"course_2021-10169\"]",
+        "xpath=//input[@id='course_2021-10169']",
+        "xpath=//tr[25]/td[5]/input",
+        "css=#course_2021-10169"
+      ]
+    },
+    {
+      "Command": "type",
+      "Target": "id=year_2021-10169",
+      "Value": "2",
+      "Targets": [
+        "id=year_2021-10169",
+        "name=year",
+        "xpath=//*[@id=\"year_2021-10169\"]",
+        "xpath=//input[@id='year_2021-10169']",
+        "xpath=//tr[25]/td[6]/input",
+        "css=#year_2021-10169"
+      ]
+    },
+    {
+      "Command": "type",
+      "Target": "id=grade_2021-10169",
+      "Value": "75",
+      "Targets": [
+        "id=grade_2021-10169",
+        "name=grade",
+        "xpath=//*[@id=\"grade_2021-10169\"]",
+        "xpath=//input[@id='grade_2021-10169']",
+        "xpath=//tr[25]/td[9]/input",
+        "css=#grade_2021-10169"
+      ]
+    },
+    {
+      "Command": "select",
+      "Target": "id=remarks_2021-10169",
+      "Value": "label=Passed",
+      "Targets": [
+        "id=remarks_2021-10169",
+        "name=remarks",
+        "xpath=//*[@id=\"remarks_2021-10169\"]",
+        "xpath=//select[@id='remarks_2021-10169']",
+        "xpath=//tr[25]/td[10]/select",
+        "css=#remarks_2021-10169"
+      ]
+    },
+    {
+      "Command": "type",
+      "Target": "id=course_2021-10176",
+      "Value": "BS Computer Science",
+      "Targets": [
+        "id=course_2021-10176",
+        "name=course",
+        "xpath=//*[@id=\"course_2021-10176\"]",
+        "xpath=//input[@id='course_2021-10176']",
+        "xpath=//tr[26]/td[5]/input",
+        "css=#course_2021-10176"
+      ]
+    },
+    {
+      "Command": "type",
+      "Target": "id=year_2021-10176",
+      "Value": "4",
+      "Targets": [
+        "id=year_2021-10176",
+        "name=year",
+        "xpath=//*[@id=\"year_2021-10176\"]",
+        "xpath=//input[@id='year_2021-10176']",
+        "xpath=//tr[26]/td[6]/input",
+        "css=#year_2021-10176"
+      ]
+    },
+    {
+      "Command": "type",
+      "Target": "id=grade_2021-10176",
+      "Value": "76",
+      "Targets": [
+        "id=grade_2021-10176",
+        "name=grade",
+        "xpath=//*[@id=\"grade_2021-10176\"]",
+        "xpath=//input[@id='grade_2021-10176']",
+        "xpath=//tr[26]/td[9]/input",
+        "css=#grade_2021-10176"
+      ]
+    },
+    {
+      "Command": "select",
+      "Target": "id=remarks_2021-10176",
+      "Value": "label=Passed",
+      "Targets": [
+        "id=remarks_2021-10176",
+        "name=remarks",
+        "xpath=//*[@id=\"remarks_2021-10176\"]",
+        "xpath=//select[@id='remarks_2021-10176']",
+        "xpath=//tr[26]/td[10]/select",
+        "css=#remarks_2021-10176"
+      ]
+    },
+    {
+      "Command": "type",
+      "Target": "id=course_2021-10183",
+      "Value": "BS Information Systems",
+      "Targets": [
+        "id=course_2021-10183",
+        "name=course",
+        "xpath=//*[@id=\"course_2021-10183\"]",
+        "xpath=//input[@id='course_2021-10183']",
+        "xpath=//tr[27]/td[5]/input",
+        "css=#course_2021-10183"
+      ]
+    },
+    {
+      "Command": "type",
+      "Target": "id=year_2021-10183",
+      "Value": "1",
+      "Targets": [
+        "id=year_2021-10183",
+        "name=year",
+        "xpath=//*[@id=\"year_2021-10183\"]",
+        "xpath=//input[@id='year_2021-10183']",
+        "xpath=//tr[27]/td[6]/input",
+        "css=#year_2021-10183"
+      ]
+    },
+    {
+      "Command": "type",
+      "Target": "id=grade_2021-10183",
+      "Value": "74",
+      "Targets": [
+        "id=grade_2021-10183",
+        "name=grade",
+        "xpath=//*[@id=\"grade_2021-10183\"]",
+        "xpath=//input[@id='grade_2021-10183']",
+        "xpath=//tr[27]/td[9]/input",
+        "css=#grade_2021-10183"
+      ]
+    },
+    {
+      "Command": "select",
+      "Target": "id=remarks_2021-10183",
+      "Value": "label=Failed",
+      "Targets": [
+        "id=remarks_2021-10183",
+        "name=remarks",
+        "xpath=//*[@id=\"remarks_2021-10183\"]",
+        "xpath=//select[@id='remarks_2021-10183']",
+        "xpath=//tr[27]/td[10]/select",
+        "css=#remarks_2021-10183"
+      ]
+    },
+    {
+      "Command": "type",
+      "Target": "id=course_2021-10190",
+      "Value": "BS Computer Science",
+      "Targets": [
+        "id=course_2021-10190",
+        "name=course",
+        "xpath=//*[@id=\"course_2021-10190\"]",
+        "xpath=//input[@id='course_2021-10190']",
+        "xpath=//tr[28]/td[5]/input",
+        "css=#course_2021-10190"
+      ]
+    },
+    {
+      "Command": "type",
+      "Target": "id=year_2021-10190",
+      "Value": "2",
+      "Targets": [
+        "id=year_2021-10190",
+        "name=year",
+        "xpath=//*[@id=\"year_2021-10190\"]",
+        "xpath=//input[@id='year_2021-10190']",
+        "xpath=//tr[28]/td[6]/input",
+        "css=#year_2021-10190"
+      ]
+    },
+    {
+      "Command": "type",
+      "Target": "id=grade_2021-10190",
+      "Value": "99",
+      "Targets": [
+        "id=grade_2021-10190",
+        "name=grade",
+        "xpath=//*[@id=\"grade_2021-10190\"]",
+        "xpath=//input[@id='grade_2021-10190']",
+        "xpath=//tr[28]/td[9]/input",
+        "css=#grade_2021-10190"
+      ]
+    },
+    {
+      "Command": "select",
+      "Target": "id=remarks_2021-10190",
+      "Value": "label=Passed",
+      "Targets": [
+        "id=remarks_2021-10190",
+        "name=remarks",
+        "xpath=//*[@id=\"remarks_2021-10190\"]",
+        "xpath=//select[@id='remarks_2021-10190']",
+        "xpath=//tr[28]/td[10]/select",
+        "css=#remarks_2021-10190"
+      ]
+    },
+    {
+      "Command": "type",
+      "Target": "id=course_2021-10197",
+      "Value": "BS Information Systems",
+      "Targets": [
+        "id=course_2021-10197",
+        "name=course",
+        "xpath=//*[@id=\"course_2021-10197\"]",
+        "xpath=//input[@id='course_2021-10197']",
+        "xpath=//tr[29]/td[5]/input",
+        "css=#course_2021-10197"
+      ]
+    },
+    {
+      "Command": "type",
+      "Target": "id=year_2021-10197",
+      "Value": "3",
+      "Targets": [
+        "id=year_2021-10197",
+        "name=year",
+        "xpath=//*[@id=\"year_2021-10197\"]",
+        "xpath=//input[@id='year_2021-10197']",
+        "xpath=//tr[29]/td[6]/input",
+        "css=#year_2021-10197"
+      ]
+    },
+    {
+      "Command": "type",
+      "Target": "id=grade_2021-10197",
+      "Value": "84",
+      "Targets": [
+        "id=grade_2021-10197",
+        "name=grade",
+        "xpath=//*[@id=\"grade_2021-10197\"]",
+        "xpath=//input[@id='grade_2021-10197']",
+        "xpath=//tr[29]/td[9]/input",
+        "css=#grade_2021-10197"
+      ]
+    },
+    {
+      "Command": "select",
+      "Target": "id=remarks_2021-10197",
+      "Value": "label=Passed",
+      "Targets": [
+        "id=remarks_2021-10197",
+        "name=remarks",
+        "xpath=//*[@id=\"remarks_2021-10197\"]",
+        "xpath=//select[@id='remarks_2021-10197']",
+        "xpath=//tr[29]/td[10]/select",
+        "css=#remarks_2021-10197"
+      ]
+    },
+    {
+      "Command": "type",
+      "Target": "id=course_2021-10204",
+      "Value": "BS Information Technology",
+      "Targets": [
+        "id=course_2021-10204",
+        "name=course",
+        "xpath=//*[@id=\"course_2021-10204\"]",
+        "xpath=//input[@id='course_2021-10204']",
+        "xpath=//tr[30]/td[5]/input",
+        "css=#course_2021-10204"
+      ]
+    },
+    {
+      "Command": "type",
+      "Target": "id=year_2021-10204",
+      "Value": "3",
+      "Targets": [
+        "id=year_2021-10204",
+        "name=year",
+        "xpath=//*[@id=\"year_2021-10204\"]",
+        "xpath=//input[@id='year_2021-10204']",
+        "xpath=//tr[30]/td[6]/input",
+        "css=#year_2021-10204"
+      ]
+    },
+    {
+      "Command": "type",
+      "Target": "id=grade_2021-10204",
+      "Value": "90",
+      "Targets": [
+        "id=grade_2021-10204",
+        "name=grade",
+        "xpath=//*[@id=\"grade_2021-10204\"]",
+        "xpath=//input[@id='grade_2021-10204']",
+        "xpath=//tr[30]/td[9]/input",
+        "css=#grade_2021-10204"
+      ]
+    },
+    {
+      "Command": "select",
+      "Target": "id=remarks_2021-10204",
+      "Value": "label=Passed",
+      "Targets": [
+        "id=remarks_2021-10204",
+        "name=remarks",
+        "xpath=//*[@id=\"remarks_2021-10204\"]",
+        "xpath=//select[@id='remarks_2021-10204']",
+        "xpath=//tr[30]/td[10]/select",
+        "css=#remarks_2021-10204"
+      ]
+    },
+    {
+      "Command": "type",
+      "Target": "id=course_2021-10211",
+      "Value": "BS Computer Science",
+      "Targets": [
+        "id=course_2021-10211",
+        "name=course",
+        "xpath=//*[@id=\"course_2021-10211\"]",
+        "xpath=//input[@id='course_2021-10211']",
+        "xpath=//tr[31]/td[5]/input",
+        "css=#course_2021-10211"
+      ]
+    },
+    {
+      "Command": "type",
+      "Target": "id=year_2021-10211",
+      "Value": "4",
+      "Targets": [
+        "id=year_2021-10211",
+        "name=year",
+        "xpath=//*[@id=\"year_2021-10211\"]",
+        "xpath=//input[@id='year_2021-10211']",
+        "xpath=//tr[31]/td[6]/input",
+        "css=#year_2021-10211"
+      ]
+    },
+    {
+      "Command": "type",
+      "Target": "id=grade_2021-10211",
+      "Value": "88",
+      "Targets": [
+        "id=grade_2021-10211",
+        "name=grade",
+        "xpath=//*[@id=\"grade_2021-10211\"]",
+        "xpath=//input[@id='grade_2021-10211']",
+        "xpath=//tr[31]/td[9]/input",
+        "css=#grade_2021-10211"
+      ]
+    },
+    {
+      "Command": "select",
+      "Target": "id=remarks_2021-10211",
+      "Value": "label=Passed",
+      "Targets": [
+        "id=remarks_2021-10211",
+        "name=remarks",
+        "xpath=//*[@id=\"remarks_2021-10211\"]",
+        "xpath=//select[@id='remarks_2021-10211']",
+        "xpath=//tr[31]/td[10]/select",
+        "css=#remarks_2021-10211"
+      ]
+    },
+    {
+      "Command": "type",
+      "Target": "id=course_2021-10218",
+      "Value": "BS Computer Science",
+      "Targets": [
+        "id=course_2021-10218",
+        "name=course",
+        "xpath=//*[@id=\"course_2021-10218\"]",
+        "xpath=//input[@id='course_2021-10218']",
+        "xpath=//tr[32]/td[5]/input",
+        "css=#course_2021-10218"
+      ]
+    },
+    {
+      "Command": "type",
+      "Target": "id=year_2021-10218",
+      "Value": "3",
+      "Targets": [
+        "id=year_2021-10218",
+        "name=year",
+        "xpath=//*[@id=\"year_2021-10218\"]",
+        "xpath=//input[@id='year_2021-10218']",
+        "xpath=//tr[32]/td[6]/input",
+        "css=#year_2021-10218"
+      ]
+    },
+    {
+      "Command": "type",
+      "Target": "id=grade_2021-10218",
+      "Value": "74",
+      "Targets": [
+        "id=grade_2021-10218",
+        "name=grade",
+        "xpath=//*[@id=\"grade_2021-10218\"]",
+        "xpath=//input[@id='grade_2021-10218']",
+        "xpath=//tr[32]/td[9]/input",
+        "css=#grade_2021-10218"
+      ]
+    },
+    {
+      "Command": "select",
+      "Target": "id=remarks_2021-10218",
+      "Value": "label=Failed",
+      "Targets": [
+        "id=remarks_2021-10218",
+        "name=remarks",
+        "xpath=//*[@id=\"remarks_2021-10218\"]",
+        "xpath=//select[@id='remarks_2021-10218']",
+        "xpath=//tr[32]/td[10]/select",
+        "css=#remarks_2021-10218"
+      ]
+    },
+    {
+      "Command": "type",
+      "Target": "id=course_2021-10225",
+      "Value": "BS Computer Science",
+      "Targets": [
+        "id=course_2021-10225",
+        "name=course",
+        "xpath=//*[@id=\"course_2021-10225\"]",
+        "xpath=//input[@id='course_2021-10225']",
+        "xpath=//tr[33]/td[5]/input",
+        "css=#course_2021-10225"
+      ]
+    },
+    {
+      "Command": "type",
+      "Target": "id=year_2021-10225",
+      "Value": "1",
+      "Targets": [
+        "id=year_2021-10225",
+        "name=year",
+        "xpath=//*[@id=\"year_2021-10225\"]",
+        "xpath=//input[@id='year_2021-10225']",
+        "xpath=//tr[33]/td[6]/input",
+        "css=#year_2021-10225"
+      ]
+    },
+    {
+      "Command": "type",
+      "Target": "id=grade_2021-10225",
+      "Value": "73",
+      "Targets": [
+        "id=grade_2021-10225",
+        "name=grade",
+        "xpath=//*[@id=\"grade_2021-10225\"]",
+        "xpath=//input[@id='grade_2021-10225']",
+        "xpath=//tr[33]/td[9]/input",
+        "css=#grade_2021-10225"
+      ]
+    },
+    {
+      "Command": "select",
+      "Target": "id=remarks_2021-10225",
+      "Value": "label=Failed",
+      "Targets": [
+        "id=remarks_2021-10225",
+        "name=remarks",
+        "xpath=//*[@id=\"remarks_2021-10225\"]",
+        "xpath=//select[@id='remarks_2021-10225']",
+        "xpath=//tr[33]/td[10]/select",
+        "css=#remarks_2021-10225"
+      ]
+    },
+    {
+      "Command": "type",
+      "Target": "id=course_2021-10232",
+      "Value": "BS Computer Science",
+      "Targets": [
+        "id=course_2021-10232",
+        "name=course",
+        "xpath=//*[@id=\"course_2021-10232\"]",
+        "xpath=//input[@id='course_2021-10232']",
+        "xpath=//tr[34]/td[5]/input",
+        "css=#course_2021-10232"
+      ]
+    },
+    {
+      "Command": "type",
+      "Target": "id=year_2021-10232",
+      "Value": "4",
+      "Targets": [
+        "id=year_2021-10232",
+        "name=year",
+        "xpath=//*[@id=\"year_2021-10232\"]",
+        "xpath=//input[@id='year_2021-10232']",
+        "xpath=//tr[34]/td[6]/input",
+        "css=#year_2021-10232"
+      ]
+    },
+    {
+      "Command": "type",
+      "Target": "id=grade_2021-10232",
+      "Value": "76",
+      "Targets": [
+        "id=grade_2021-10232",
+        "name=grade",
+        "xpath=//*[@id=\"grade_2021-10232\"]",
+        "xpath=//input[@id='grade_2021-10232']",
+        "xpath=//tr[34]/td[9]/input",
+        "css=#grade_2021-10232"
+      ]
+    },
+    {
+      "Command": "select",
+      "Target": "id=remarks_2021-10232",
+      "Value": "label=Passed",
+      "Targets": [
+        "id=remarks_2021-10232",
+        "name=remarks",
+        "xpath=//*[@id=\"remarks_2021-10232\"]",
+        "xpath=//select[@id='remarks_2021-10232']",
+        "xpath=//tr[34]/td[10]/select",
+        "css=#remarks_2021-10232"
+      ]
+    },
+    {
+      "Command": "type",
+      "Target": "id=course_2021-10239",
+      "Value": "BS Computer Science",
+      "Targets": [
+        "id=course_2021-10239",
+        "name=course",
+        "xpath=//*[@id=\"course_2021-10239\"]",
+        "xpath=//input[@id='course_2021-10239']",
+        "xpath=//tr[35]/td[5]/input",
+        "css=#course_2021-10239"
+      ]
+    },
+    {
+      "Command": "type",
+      "Target": "id=year_2021-10239",
+      "Value": "2",
+      "Targets": [
+        "id=year_2021-10239",
+        "name=year",
+        "xpath=//*[@id=\"year_2021-10239\"]",
+        "xpath=//input[@id='year_2021-10239']",
+        "xpath=//tr[35]/td[6]/input",
+        "css=#year_2021-10239"
+      ]
+    },
+    {
+      "Command": "type",
+      "Target": "id=grade_2021-10239",
+      "Value": "84",
+      "Targets": [
+        "id=grade_2021-10239",
+        "name=grade",
+        "xpath=//*[@id=\"grade_2021-10239\"]",
+        "xpath=//input[@id='grade_2021-10239']",
+        "xpath=//tr[35]/td[9]/input",
+        "css=#grade_2021-10239"
+      ]
+    },
+    {
+      "Command": "select",
+      "Target": "id=remarks_2021-10239",
+      "Value": "label=Passed",
+      "Targets": [
+        "id=remarks_2021-10239",
+        "name=remarks",
+        "xpath=//*[@id=\"remarks_2021-10239\"]",
+        "xpath=//select[@id='remarks_2021-10239']",
+        "xpath=//tr[35]/td[10]/select",
+        "css=#remarks_2021-10239"
+      ]
+    },
+    {
+      "Command": "type",
+      "Target": "id=course_2021-10246",
+      "Value": "BS Information Systems",
+      "Targets": [
+        "id=course_2021-10246",
+        "name=course",
+        "xpath=//*[@id=\"course_2021-10246\"]",
+        "xpath=//input[@id='course_2021-10246']",
+        "xpath=//tr[36]/td[5]/input",
+        "css=#course_2021-10246"
+      ]
+    },
+    {
+      "Command": "type",
+      "Target": "id=year_2021-10246",
+      "Value": "3",
+      "Targets": [
+        "id=year_2021-10246",
+        "name=year",
+        "xpath=//*[@id=\"year_2021-10246\"]",
+        "xpath=//input[@id='year_2021-10246']",
+        "xpath=//tr[36]/td[6]/input",
+        "css=#year_2021-10246"
+      ]
+    },
+    {
+      "Command": "type",
+      "Target": "id=grade_2021-10246",
+      "Value": "84",
+      "Targets": [
+        "id=grade_2021-10246",
+        "name=grade",
+        "xpath=//*[@id=\"grade_2021-10246\"]",
+        "xpath=//input[@id='grade_2021-10246']",
+        "xpath=//tr[36]/td[9]/input",
+        "css=#grade_2021-10246"
+      ]
+    },
+    {
+      "Command": "select",
+      "Target": "id=remarks_2021-10246",
+      "Value": "label=Passed",
+      "Targets": [
+        "id=remarks_2021-10246",
+        "name=remarks",
+        "xpath=//*[@id=\"remarks_2021-10246\"]",
+        "xpath=//select[@id='remarks_2021-10246']",
+        "xpath=//tr[36]/td[10]/select",
+        "css=#remarks_2021-10246"
+      ]
+    },
+    {
+      "Command": "type",
+      "Target": "id=course_2021-10253",
+      "Value": "BS Computer Science",
+      "Targets": [
+        "id=course_2021-10253",
+        "name=course",
+        "xpath=//*[@id=\"course_2021-10253\"]",
+        "xpath=//input[@id='course_2021-10253']",
+        "xpath=//tr[37]/td[5]/input",
+        "css=#course_2021-10253"
+      ]
+    },
+    {
+      "Command": "type",
+      "Target": "id=year_2021-10253",
+      "Value": "2",
+      "Targets": [
+        "id=year_2021-10253",
+        "name=year",
+        "xpath=//*[@id=\"year_2021-10253\"]",
+        "xpath=//input[@id='year_2021-10253']",
+        "xpath=//tr[37]/td[6]/input",
+        "css=#year_2021-10253"
+      ]
+    },
+    {
+      "Command": "type",
+      "Target": "id=grade_2021-10253",
+      "Value": "89",
+      "Targets": [
+        "id=grade_2021-10253",
+        "name=grade",
+        "xpath=//*[@id=\"grade_2021-10253\"]",
+        "xpath=//input[@id='grade_2021-10253']",
+        "xpath=//tr[37]/td[9]/input",
+        "css=#grade_2021-10253"
+      ]
+    },
+    {
+      "Command": "select",
+      "Target": "id=remarks_2021-10253",
+      "Value": "label=Passed",
+      "Targets": [
+        "id=remarks_2021-10253",
+        "name=remarks",
+        "xpath=//*[@id=\"remarks_2021-10253\"]",
+        "xpath=//select[@id='remarks_2021-10253']",
+        "xpath=//tr[37]/td[10]/select",
+        "css=#remarks_2021-10253"
+      ]
+    },
+    {
+      "Command": "type",
+      "Target": "id=course_2021-10260",
+      "Value": "BS Information Technology",
+      "Targets": [
+        "id=course_2021-10260",
+        "name=course",
+        "xpath=//*[@id=\"course_2021-10260\"]",
+        "xpath=//input[@id='course_2021-10260']",
+        "xpath=//tr[38]/td[5]/input",
+        "css=#course_2021-10260"
+      ]
+    },
+    {
+      "Command": "type",
+      "Target": "id=year_2021-10260",
+      "Value": "3",
+      "Targets": [
+        "id=year_2021-10260",
+        "name=year",
+        "xpath=//*[@id=\"year_2021-10260\"]",
+        "xpath=//input[@id='year_2021-10260']",
+        "xpath=//tr[38]/td[6]/input",
+        "css=#year_2021-10260"
+      ]
+    },
+    {
+      "Command": "type",
+      "Target": "id=grade_2021-10260",
+      "Value": "78",
+      "Targets": [
+        "id=grade_2021-10260",
+        "name=grade",
+        "xpath=//*[@id=\"grade_2021-10260\"]",
+        "xpath=//input[@id='grade_2021-10260']",
+        "xpath=//tr[38]/td[9]/input",
+        "css=#grade_2021-10260"
+      ]
+    },
+    {
+      "Command": "select",
+      "Target": "id=remarks_2021-10260",
+      "Value": "label=Passed",
+      "Targets": [
+        "id=remarks_2021-10260",
+        "name=remarks",
+        "xpath=//*[@id=\"remarks_2021-10260\"]",
+        "xpath=//select[@id='remarks_2021-10260']",
+        "xpath=//tr[38]/td[10]/select",
+        "css=#remarks_2021-10260"
+      ]
+    },
+    {
+      "Command": "type",
+      "Target": "id=course_2021-10267",
+      "Value": "BS Computer Science",
+      "Targets": [
+        "id=course_2021-10267",
+        "name=course",
+        "xpath=//*[@id=\"course_2021-10267\"]",
+        "xpath=//input[@id='course_2021-10267']",
+        "xpath=//tr[39]/td[5]/input",
+        "css=#course_2021-10267"
+      ]
+    },
+    {
+      "Command": "type",
+      "Target": "id=year_2021-10267",
+      "Value": "4",
+      "Targets": [
+        "id=year_2021-10267",
+        "name=year",
+        "xpath=//*[@id=\"year_2021-10267\"]",
+        "xpath=//input[@id='year_2021-10267']",
+        "xpath=//tr[39]/td[6]/input",
+        "css=#year_2021-10267"
+      ]
+    },
+    {
+      "Command": "type",
+      "Target": "id=grade_2021-10267",
+      "Value": "90",
+      "Targets": [
+        "id=grade_2021-10267",
+        "name=grade",
+        "xpath=//*[@id=\"grade_2021-10267\"]",
+        "xpath=//input[@id='grade_2021-10267']",
+        "xpath=//tr[39]/td[9]/input",
+        "css=#grade_2021-10267"
+      ]
+    },
+    {
+      "Command": "select",
+      "Target": "id=remarks_2021-10267",
+      "Value": "label=Passed",
+      "Targets": [
+        "id=remarks_2021-10267",
+        "name=remarks",
+        "xpath=//*[@id=\"remarks_2021-10267\"]",
+        "xpath=//select[@id='remarks_2021-10267']",
+        "xpath=//tr[39]/td[10]/select",
+        "css=#remarks_2021-10267"
+      ]
+    },
+    {
+      "Command": "type",
+      "Target": "id=course_2021-10274",
+      "Value": "BS Information Technology",
+      "Targets": [
+        "id=course_2021-10274",
+        "name=course",
+        "xpath=//*[@id=\"course_2021-10274\"]",
+        "xpath=//input[@id='course_2021-10274']",
+        "xpath=//tr[40]/td[5]/input",
+        "css=#course_2021-10274"
+      ]
+    },
+    {
+      "Command": "type",
+      "Target": "id=year_2021-10274",
+      "Value": "3",
+      "Targets": [
+        "id=year_2021-10274",
+        "name=year",
+        "xpath=//*[@id=\"year_2021-10274\"]",
+        "xpath=//input[@id='year_2021-10274']",
+        "xpath=//tr[40]/td[6]/input",
+        "css=#year_2021-10274"
+      ]
+    },
+    {
+      "Command": "type",
+      "Target": "id=grade_2021-10274",
+      "Value": "96",
+      "Targets": [
+        "id=grade_2021-10274",
+        "name=grade",
+        "xpath=//*[@id=\"grade_2021-10274\"]",
+        "xpath=//input[@id='grade_2021-10274']",
+        "xpath=//tr[40]/td[9]/input",
+        "css=#grade_2021-10274"
+      ]
+    },
+    {
+      "Command": "select",
+      "Target": "id=remarks_2021-10274",
+      "Value": "label=Passed",
+      "Targets": [
+        "id=remarks_2021-10274",
+        "name=remarks",
+        "xpath=//*[@id=\"remarks_2021-10274\"]",
+        "xpath=//select[@id='remarks_2021-10274']",
+        "xpath=//tr[40]/td[10]/select",
+        "css=#remarks_2021-10274"
+      ]
+    },
+    {
+      "Command": "type",
+      "Target": "id=course_2021-10281",
+      "Value": "BS Information Technology",
+      "Targets": [
+        "id=course_2021-10281",
+        "name=course",
+        "xpath=//*[@id=\"course_2021-10281\"]",
+        "xpath=//input[@id='course_2021-10281']",
+        "xpath=//tr[41]/td[5]/input",
+        "css=#course_2021-10281"
+      ]
+    },
+    {
+      "Command": "type",
+      "Target": "id=year_2021-10281",
+      "Value": "3",
+      "Targets": [
+        "id=year_2021-10281",
+        "name=year",
+        "xpath=//*[@id=\"year_2021-10281\"]",
+        "xpath=//input[@id='year_2021-10281']",
+        "xpath=//tr[41]/td[6]/input",
+        "css=#year_2021-10281"
+      ]
+    },
+    {
+      "Command": "type",
+      "Target": "id=grade_2021-10281",
+      "Value": "86",
+      "Targets": [
+        "id=grade_2021-10281",
+        "name=grade",
+        "xpath=//*[@id=\"grade_2021-10281\"]",
+        "xpath=//input[@id='grade_2021-10281']",
+        "xpath=//tr[41]/td[9]/input",
+        "css=#grade_2021-10281"
+      ]
+    },
+    {
+      "Command": "select",
+      "Target": "id=remarks_2021-10281",
+      "Value": "label=Passed",
+      "Targets": [
+        "id=remarks_2021-10281",
+        "name=remarks",
+        "xpath=//*[@id=\"remarks_2021-10281\"]",
+        "xpath=//select[@id='remarks_2021-10281']",
+        "xpath=//tr[41]/td[10]/select",
+        "css=#remarks_2021-10281"
+      ]
+    },
+    {
+      "Command": "type",
+      "Target": "id=course_2021-10288",
+      "Value": "BS Computer Science",
+      "Targets": [
+        "id=course_2021-10288",
+        "name=course",
+        "xpath=//*[@id=\"course_2021-10288\"]",
+        "xpath=//input[@id='course_2021-10288']",
+        "xpath=//tr[42]/td[5]/input",
+        "css=#course_2021-10288"
+      ]
+    },
+    {
+      "Command": "type",
+      "Target": "id=year_2021-10288",
+      "Value": "1",
+      "Targets": [
+        "id=year_2021-10288",
+        "name=year",
+        "xpath=//*[@id=\"year_2021-10288\"]",
+        "xpath=//input[@id='year_2021-10288']",
+        "xpath=//tr[42]/td[6]/input",
+        "css=#year_2021-10288"
+      ]
+    },
+    {
+      "Command": "type",
+      "Target": "id=grade_2021-10288",
+      "Value": "79",
+      "Targets": [
+        "id=grade_2021-10288",
+        "name=grade",
+        "xpath=//*[@id=\"grade_2021-10288\"]",
+        "xpath=//input[@id='grade_2021-10288']",
+        "xpath=//tr[42]/td[9]/input",
+        "css=#grade_2021-10288"
+      ]
+    },
+    {
+      "Command": "select",
+      "Target": "id=remarks_2021-10288",
+      "Value": "label=Passed",
+      "Targets": [
+        "id=remarks_2021-10288",
+        "name=remarks",
+        "xpath=//*[@id=\"remarks_2021-10288\"]",
+        "xpath=//select[@id='remarks_2021-10288']",
+        "xpath=//tr[42]/td[10]/select",
+        "css=#remarks_2021-10288"
+      ]
+    },
+    {
+      "Command": "type",
+      "Target": "id=course_2021-10295",
+      "Value": "BS Information Technology",
+      "Targets": [
+        "id=course_2021-10295",
+        "name=course",
+        "xpath=//*[@id=\"course_2021-10295\"]",
+        "xpath=//input[@id='course_2021-10295']",
+        "xpath=//tr[43]/td[5]/input",
+        "css=#course_2021-10295"
+      ]
+    },
+    {
+      "Command": "type",
+      "Target": "id=year_2021-10295",
+      "Value": "3",
+      "Targets": [
+        "id=year_2021-10295",
+        "name=year",
+        "xpath=//*[@id=\"year_2021-10295\"]",
+        "xpath=//input[@id='year_2021-10295']",
+        "xpath=//tr[43]/td[6]/input",
+        "css=#year_2021-10295"
+      ]
+    },
+    {
+      "Command": "type",
+      "Target": "id=grade_2021-10295",
+      "Value": "80",
+      "Targets": [
+        "id=grade_2021-10295",
+        "name=grade",
+        "xpath=//*[@id=\"grade_2021-10295\"]",
+        "xpath=//input[@id='grade_2021-10295']",
+        "xpath=//tr[43]/td[9]/input",
+        "css=#grade_2021-10295"
+      ]
+    },
+    {
+      "Command": "select",
+      "Target": "id=remarks_2021-10295",
+      "Value": "label=Passed",
+      "Targets": [
+        "id=remarks_2021-10295",
+        "name=remarks",
+        "xpath=//*[@id=\"remarks_2021-10295\"]",
+        "xpath=//select[@id='remarks_2021-10295']",
+        "xpath=//tr[43]/td[10]/select",
+        "css=#remarks_2021-10295"
+      ]
+    },
+    {
+      "Command": "type",
+      "Target": "id=course_2021-10302",
+      "Value": "BS Information Technology",
+      "Targets": [
+        "id=course_2021-10302",
+        "name=course",
+        "xpath=//*[@id=\"course_2021-10302\"]",
+        "xpath=//input[@id='course_2021-10302']",
+        "xpath=//tr[44]/td[5]/input",
+        "css=#course_2021-10302"
+      ]
+    },
+    {
+      "Command": "type",
+      "Target": "id=year_2021-10302",
+      "Value": "4",
+      "Targets": [
+        "id=year_2021-10302",
+        "name=year",
+        "xpath=//*[@id=\"year_2021-10302\"]",
+        "xpath=//input[@id='year_2021-10302']",
+        "xpath=//tr[44]/td[6]/input",
+        "css=#year_2021-10302"
+      ]
+    },
+    {
+      "Command": "type",
+      "Target": "id=grade_2021-10302",
+      "Value": "97",
+      "Targets": [
+        "id=grade_2021-10302",
+        "name=grade",
+        "xpath=//*[@id=\"grade_2021-10302\"]",
+        "xpath=//input[@id='grade_2021-10302']",
+        "xpath=//tr[44]/td[9]/input",
+        "css=#grade_2021-10302"
+      ]
+    },
+    {
+      "Command": "select",
+      "Target": "id=remarks_2021-10302",
+      "Value": "label=Passed",
+      "Targets": [
+        "id=remarks_2021-10302",
+        "name=remarks",
+        "xpath=//*[@id=\"remarks_2021-10302\"]",
+        "xpath=//select[@id='remarks_2021-10302']",
+        "xpath=//tr[44]/td[10]/select",
+        "css=#remarks_2021-10302"
+      ]
+    },
+    {
+      "Command": "type",
+      "Target": "id=course_2021-10309",
+      "Value": "BS Information Systems",
+      "Targets": [
+        "id=course_2021-10309",
+        "name=course",
+        "xpath=//*[@id=\"course_2021-10309\"]",
+        "xpath=//input[@id='course_2021-10309']",
+        "xpath=//tr[45]/td[5]/input",
+        "css=#course_2021-10309"
+      ]
+    },
+    {
+      "Command": "type",
+      "Target": "id=year_2021-10309",
+      "Value": "1",
+      "Targets": [
+        "id=year_2021-10309",
+        "name=year",
+        "xpath=//*[@id=\"year_2021-10309\"]",
+        "xpath=//input[@id='year_2021-10309']",
+        "xpath=//tr[45]/td[6]/input",
+        "css=#year_2021-10309"
+      ]
+    },
+    {
+      "Command": "type",
+      "Target": "id=grade_2021-10309",
+      "Value": "96",
+      "Targets": [
+        "id=grade_2021-10309",
+        "name=grade",
+        "xpath=//*[@id=\"grade_2021-10309\"]",
+        "xpath=//input[@id='grade_2021-10309']",
+        "xpath=//tr[45]/td[9]/input",
+        "css=#grade_2021-10309"
+      ]
+    },
+    {
+      "Command": "select",
+      "Target": "id=remarks_2021-10309",
+      "Value": "label=Passed",
+      "Targets": [
+        "id=remarks_2021-10309",
+        "name=remarks",
+        "xpath=//*[@id=\"remarks_2021-10309\"]",
+        "xpath=//select[@id='remarks_2021-10309']",
+        "xpath=//tr[45]/td[10]/select",
+        "css=#remarks_2021-10309"
+      ]
+    },
+    {
+      "Command": "type",
+      "Target": "id=course_2021-10316",
+      "Value": "BS Computer Science",
+      "Targets": [
+        "id=course_2021-10316",
+        "name=course",
+        "xpath=//*[@id=\"course_2021-10316\"]",
+        "xpath=//input[@id='course_2021-10316']",
+        "xpath=//tr[46]/td[5]/input",
+        "css=#course_2021-10316"
+      ]
+    },
+    {
+      "Command": "type",
+      "Target": "id=year_2021-10316",
+      "Value": "2",
+      "Targets": [
+        "id=year_2021-10316",
+        "name=year",
+        "xpath=//*[@id=\"year_2021-10316\"]",
+        "xpath=//input[@id='year_2021-10316']",
+        "xpath=//tr[46]/td[6]/input",
+        "css=#year_2021-10316"
+      ]
+    },
+    {
+      "Command": "type",
+      "Target": "id=grade_2021-10316",
+      "Value": "80",
+      "Targets": [
+        "id=grade_2021-10316",
+        "name=grade",
+        "xpath=//*[@id=\"grade_2021-10316\"]",
+        "xpath=//input[@id='grade_2021-10316']",
+        "xpath=//tr[46]/td[9]/input",
+        "css=#grade_2021-10316"
+      ]
+    },
+    {
+      "Command": "select",
+      "Target": "id=remarks_2021-10316",
+      "Value": "label=Passed",
+      "Targets": [
+        "id=remarks_2021-10316",
+        "name=remarks",
+        "xpath=//*[@id=\"remarks_2021-10316\"]",
+        "xpath=//select[@id='remarks_2021-10316']",
+        "xpath=//tr[46]/td[10]/select",
+        "css=#remarks_2021-10316"
+      ]
+    },
+    {
+      "Command": "type",
+      "Target": "id=course_2021-10323",
+      "Value": "BS Information Technology",
+      "Targets": [
+        "id=course_2021-10323",
+        "name=course",
+        "xpath=//*[@id=\"course_2021-10323\"]",
+        "xpath=//input[@id='course_2021-10323']",
+        "xpath=//tr[47]/td[5]/input",
+        "css=#course_2021-10323"
+      ]
+    },
+    {
+      "Command": "type",
+      "Target": "id=year_2021-10323",
+      "Value": "4",
+      "Targets": [
+        "id=year_2021-10323",
+        "name=year",
+        "xpath=//*[@id=\"year_2021-10323\"]",
+        "xpath=//input[@id='year_2021-10323']",
+        "xpath=//tr[47]/td[6]/input",
+        "css=#year_2021-10323"
+      ]
+    },
+    {
+      "Command": "type",
+      "Target": "id=grade_2021-10323",
+      "Value": "92",
+      "Targets": [
+        "id=grade_2021-10323",
+        "name=grade",
+        "xpath=//*[@id=\"grade_2021-10323\"]",
+        "xpath=//input[@id='grade_2021-10323']",
+        "xpath=//tr[47]/td[9]/input",
+        "css=#grade_2021-10323"
+      ]
+    },
+    {
+      "Command": "select",
+      "Target": "id=remarks_2021-10323",
+      "Value": "label=Passed",
+      "Targets": [
+        "id=remarks_2021-10323",
+        "name=remarks",
+        "xpath=//*[@id=\"remarks_2021-10323\"]",
+        "xpath=//select[@id='remarks_2021-10323']",
+        "xpath=//tr[47]/td[10]/select",
+        "css=#remarks_2021-10323"
+      ]
+    },
+    {
+      "Command": "type",
+      "Target": "id=course_2021-10330",
+      "Value": "BS Computer Science",
+      "Targets": [
+        "id=course_2021-10330",
+        "name=course",
+        "xpath=//*[@id=\"course_2021-10330\"]",
+        "xpath=//input[@id='course_2021-10330']",
+        "xpath=//tr[48]/td[5]/input",
+        "css=#course_2021-10330"
+      ]
+    },
+    {
+      "Command": "type",
+      "Target": "id=year_2021-10330",
+      "Value": "3",
+      "Targets": [
+        "id=year_2021-10330",
+        "name=year",
+        "xpath=//*[@id=\"year_2021-10330\"]",
+        "xpath=//input[@id='year_2021-10330']",
+        "xpath=//tr[48]/td[6]/input",
+        "css=#year_2021-10330"
+      ]
+    },
+    {
+      "Command": "type",
+      "Target": "id=grade_2021-10330",
+      "Value": "74",
+      "Targets": [
+        "id=grade_2021-10330",
+        "name=grade",
+        "xpath=//*[@id=\"grade_2021-10330\"]",
+        "xpath=//input[@id='grade_2021-10330']",
+        "xpath=//tr[48]/td[9]/input",
+        "css=#grade_2021-10330"
+      ]
+    },
+    {
+      "Command": "select",
+      "Target": "id=remarks_2021-10330",
+      "Value": "label=Failed",
+      "Targets": [
+        "id=remarks_2021-10330",
+        "name=remarks",
+        "xpath=//*[@id=\"remarks_2021-10330\"]",
+        "xpath=//select[@id='remarks_2021-10330']",
+        "xpath=//tr[48]/td[10]/select",
+        "css=#remarks_2021-10330"
+      ]
+    },
+    {
+      "Command": "type",
+      "Target": "id=course_2021-10337",
+      "Value": "BS Computer Science",
+      "Targets": [
+        "id=course_2021-10337",
+        "name=course",
+        "xpath=//*[@id=\"course_2021-10337\"]",
+        "xpath=//input[@id='course_2021-10337']",
+        "xpath=//tr[49]/td[5]/input",
+        "css=#course_2021-10337"
+      ]
+    },
+    {
+      "Command": "type",
+      "Target": "id=year_2021-10337",
+      "Value": "2",
+      "Targets": [
+        "id=year_2021-10337",
+        "name=year",
+        "xpath=//*[@id=\"year_2021-10337\"]",
+        "xpath=//input[@id='year_2021-10337']",
+        "xpath=//tr[49]/td[6]/input",
+        "css=#year_2021-10337"
+      ]
+    },
+    {
+      "Command": "type",
+      "Target": "id=grade_2021-10337",
+      "Value": "94",
+      "Targets": [
+        "id=grade_2021-10337",
+        "name=grade",
+        "xpath=//*[@id=\"grade_2021-10337\"]",
+        "xpath=//input[@id='grade_2021-10337']",
+        "xpath=//tr[49]/td[9]/input",
+        "css=#grade_2021-10337"
+      ]
+    },
+    {
+      "Command": "select",
+      "Target": "id=remarks_2021-10337",
+      "Value": "label=Passed",
+      "Targets": [
+        "id=remarks_2021-10337",
+        "name=remarks",
+        "xpath=//*[@id=\"remarks_2021-10337\"]",
+        "xpath=//select[@id='remarks_2021-10337']",
+        "xpath=//tr[49]/td[10]/select",
+        "css=#remarks_2021-10337"
+      ]
+    },
+    {
+      "Command": "type",
+      "Target": "id=course_2021-10344",
+      "Value": "BS Information Systems",
+      "Targets": [
+        "id=course_2021-10344",
+        "name=course",
+        "xpath=//*[@id=\"course_2021-10344\"]",
+        "xpath=//input[@id='course_2021-10344']",
+        "xpath=//tr[50]/td[5]/input",
+        "css=#course_2021-10344"
+      ]
+    },
+    {
+      "Command": "type",
+      "Target": "id=year_2021-10344",
+      "Value": "2",
+      "Targets": [
+        "id=year_2021-10344",
+        "name=year",
+        "xpath=//*[@id=\"year_2021-10344\"]",
+        "xpath=//input[@id='year_2021-10344']",
+        "xpath=//tr[50]/td[6]/input",
+        "css=#year_2021-10344"
+      ]
+    },
+    {
+      "Command": "type",
+      "Target": "id=grade_2021-10344",
+      "Value": "82",
+      "Targets": [
+        "id=grade_2021-10344",
+        "name=grade",
+        "xpath=//*[@id=\"grade_2021-10344\"]",
+        "xpath=//input[@id='grade_2021-10344']",
+        "xpath=//tr[50]/td[9]/input",
+        "css=#grade_2021-10344"
+      ]
+    },
+    {
+      "Command": "select",
+      "Target": "id=remarks_2021-10344",
+      "Value": "label=Passed",
+      "Targets": [
+        "id=remarks_2021-10344",
+        "name=remarks",
+        "xpath=//*[@id=\"remarks_2021-10344\"]",
+        "xpath=//select[@id='remarks_2021-10344']",
+        "xpath=//tr[50]/td[10]/select",
+        "css=#remarks_2021-10344"
+      ]
+    },
+    {
+      "Command": "click",
+      "Target": "id=submit-btn",
+      "Value": "",
+      "Targets": [
+        "id=submit-btn",
+        "xpath=//*[@id=\"submit-btn\"]",
+        "xpath=//button[@id='submit-btn']",
+        "xpath=//button",
+        "css=#submit-btn"
+      ]
+    }
+  ]
+}

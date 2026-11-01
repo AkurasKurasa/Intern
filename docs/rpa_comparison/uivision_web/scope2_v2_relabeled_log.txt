@@ -1,0 +1,28 @@
+Playing macro Objective7_Scope2_GradeSheet
+[info]
+Executing:  | type | id=course_2021-10001 | BS Information Systems | 
+[warning]
+Line 1: Element found with secondary locator "xpath=//td[5]/input". To use it by default, update the target field to use it as primary locator.
+[info]
+Executing:  | type | id=year_2021-10001 | 2 | 
+[info]
+Executing:  | type | id=grade_2021-10001 | 85 | 
+[error]
+Line 3: timeout reached when looking for element 'id=grade_2021-10001'
+[info]
+Macro failed (Runtime 20.19s)
+All
+Clear
+Continue in Side Panel
+Ui.Vision | AI | OCR | Forum | Github
+AI Chat ✨
+✕
+
+Tell the AI what to automate. It builds the macro in the editor, runs it and fixes it until it works. Try an example:
+
+Fix the last error (Objective7_Scope2_GradeSheet)
+Explain the current macro
+Download the 3 XModules (Win, Mac, Linux)
+AI
+Faster
+Macro encountered some error
