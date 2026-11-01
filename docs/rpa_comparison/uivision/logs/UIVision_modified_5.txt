@@ -1,0 +1,10 @@
+03:39:37.077 [status] [] Ui.Vision for Desktop app 2.1.43 started (host lib 2.1.43) — data: C:\Users\Ralph\AppData\Roaming\UiVision RPA
+03:39:37.078 [info] [] permissions: {"accessibility":true,"screenRecording":true}
+03:39:37.078 [info] [] settings: C:\Users\Ralph\Desktop\uivision\settings.json · keys: C:\Users\Ralph\Desktop\uivision\keys.json · macros: C:\Users\Ralph\Desktop\uivision\macros
+03:39:37.262 [info] [] self-check: region capture 800x400 px in 183 ms
+03:39:37.581 [status] [Objective7_Scope1_Record1.d.js] Objective7_Scope1_Record1.d.js started
+03:39:37.582 [status] [Objective7_Scope1_Record1.d.js] extension endpoint listening on ws://127.0.0.1:50889/
+03:39:37.591 [info] [Objective7_Scope1_Record1.d.js] uiv API loaded (9 ms, Boa 0.22)
+03:39:39.624 [mcp] [Objective7_Scope1_Record1.d.js] [MCP] disconnected (URL error: Unable to connect to ws://127.0.0.1:50888/)
+03:39:41.789 [status] [Objective7_Scope1_Record1.d.js] Objective7_Scope1_Record1.d.js completed (Runtime 4.21s)
+03:39:41.791 [info] [Objective7_Scope1_Record1.d.js] overlay: 6 queued draw request(s) dropped at hide

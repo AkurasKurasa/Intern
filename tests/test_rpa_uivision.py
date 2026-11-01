@@ -21,29 +21,34 @@ import rpa_uivision as U  # noqa: E402
 from bc_fidelity import _parse_intake_record  # noqa: E402
 
 INTAKE = (ROOT / "data_entry_tasks" / "data_entry_intake.txt").read_text(encoding="utf-8")
-COORDS = {"first_field": [1007, 278], "submit": [1052, 901], "window": [0, 0, 1, 1]}
+COORDS = {"first_field": [607, 212], "submit": [652, 835], "window": [40, 40, 1080, 860]}
 
 
 # ── key streams, for comparing the two macros event by event ──────────────────
 
 _KEY = re.compile(r"\$\{KEY_([A-Z0-9_+]+)\}")
-_NAMES = {"TAB": "tab", "SPACE": "space", "HOME": "home", "DOWN": "down", "DEL": "delete",
+_NAMES = {"TAB": "tab", "SPACE": "space", "HOME": "home", "DOWN": "down", "DELETE": "delete",
           "CTRL+KEY_TAB": "ctrl+tab", "CTRL+KEY_A": "ctrl+a"}
+_CALL = re.compile(r"^uiv\.desktop\.(mouse\.click|keyboard\.type)\((.*)\);")
 
 
-def uivision_stream(commands: list[dict]) -> list[tuple]:
+def uivision_stream(js: str) -> list[tuple]:
     out = []
-    for c in commands:
-        if c["Command"] == "XClick":
-            m = re.fullmatch(r"D(\d+),(\d+)", c["Target"])
-            out.append(("click", int(m.group(1)), int(m.group(2))))
-        elif c["Command"] == "XType":
-            pos = 0
-            for m in _KEY.finditer(c["Target"]):
-                out += [("char", ch) for ch in c["Target"][pos:m.start()]]
-                out.append(("key", _NAMES[m.group(1)]))
-                pos = m.end()
-            out += [("char", ch) for ch in c["Target"][pos:]]
+    for line in js.splitlines():
+        m = _CALL.match(line.split("   //")[0])
+        if not m:
+            continue
+        if m.group(1) == "mouse.click":
+            x, y = (int(v) for v in m.group(2).split(","))
+            out.append(("click", x, y))
+            continue
+        text = json.loads(m.group(2))
+        pos = 0
+        for k in _KEY.finditer(text):
+            out += [("char", ch) for ch in text[pos:k.start()]]
+            out.append(("key", _NAMES[k.group(1)]))
+            pos = k.end()
+        out += [("char", ch) for ch in text[pos:]]
     return out
 
 
@@ -86,29 +91,29 @@ def real_macro():
 # ── tests ─────────────────────────────────────────────────────────────────────
 
 def test_uivision_plays_the_same_keys_and_clicks_as_the_pyautogui_baseline(real_macro, monkeypatch):
-    ui = uivision_stream(U.to_uivision_commands(real_macro))
+    ui = uivision_stream(U.to_desktop_macro(real_macro))
     pg = pyautogui_stream(real_macro, monkeypatch)
     assert ui == pg
-    assert ui[0] == ("click", 1007, 278) and ui[-1] == ("click", 1052, 901)
+    assert ui[0] == ("click", 607, 212) and ui[-1] == ("click", 652, 835)
 
 
-def test_macro_runs_in_desktop_mode_and_never_brings_the_browser_forward(real_macro):
-    cmds = U.to_uivision_commands(real_macro)
-    assert cmds[0]["Command"] == "XDesktopAutomation" and cmds[0]["Target"] == "true"
-    assert all(c["Command"] in {"XDesktopAutomation", "XClick", "XType", "pause"} for c in cmds)
-    assert all(re.fullmatch(r"D\d+,\d+", c["Target"]) for c in cmds if c["Command"] == "XClick")
+def test_macro_is_a_desktop_app_macro_using_only_clicks_typing_and_pauses(real_macro):
+    js = U.to_desktop_macro(real_macro)
+    assert js.splitlines()[0] == '"use desktop-app";'
+    assert U.MACRO_NAME.endswith(".d.js")
+    calls = [l.split("(")[0] for l in js.splitlines() if l.startswith("uiv.")]
+    assert set(calls) == {"uiv.desktop.mouse.click", "uiv.desktop.keyboard.type", "uiv.sleep"}
 
 
 def test_page_switches_are_ctrl_tab_with_a_pause(real_macro):
-    cmds = U.to_uivision_commands(real_macro)
-    switches = [i for i, c in enumerate(cmds) if c["Target"] == "${KEY_CTRL+KEY_TAB}"]
+    lines = U.to_desktop_macro(real_macro).splitlines()
+    switches = [i for i, l in enumerate(lines) if '"${KEY_CTRL+KEY_TAB}"' in l]
     assert len(switches) == len(real_macro["pages"]) - 1 == 7
-    assert all(cmds[i + 1]["Command"] == "pause" for i in switches)
+    assert all(lines[i + 1] == "uiv.sleep(400);" for i in switches)
 
 
 def test_record_1_em_dash_is_typed_as_text(real_macro):
-    cmds = U.to_uivision_commands(real_macro)
-    assert any("Pinnacle Auto — Riverside Branch" in c["Target"] for c in cmds)
+    assert "Pinnacle Auto — Riverside Branch" in U.to_desktop_macro(real_macro)
 
 
 @pytest.mark.parametrize("keys,expected", [
@@ -116,14 +121,14 @@ def test_record_1_em_dash_is_typed_as_text(real_macro):
     ("{CHOICE:3}", "${KEY_HOME}${KEY_DOWN}${KEY_DOWN}${KEY_DOWN}"),
     ("{CHOICE:0}", "${KEY_HOME}"),
     ("{HOME}", "${KEY_HOME}"),
-    ("{CLEAR}", "${KEY_CTRL+KEY_A}${KEY_DEL}"),
+    ("{CLEAR}", "${KEY_CTRL+KEY_A}${KEY_DELETE}"),
     ("04/01/2026", "04/01/2026"),
 ])
 def test_keys_to_xtype(keys, expected):
     assert U._keys_to_xtype(keys) == expected
 
 
-def test_a_value_xtype_would_misread_is_refused():
+def test_a_value_uivision_would_misread_is_refused():
     with pytest.raises(ValueError):
         U._keys_to_xtype("cost ${PRICE}")
 
@@ -131,33 +136,32 @@ def test_a_value_xtype_would_misread_is_refused():
 def test_last_control_on_a_page_gets_no_tab_and_empty_steps_get_only_a_tab():
     macro = {"coordinates": COORDS, "pages": [
         [{"field": "a", "kind": "text", "keys": "x"}, {"field": "b", "kind": "stop", "keys": ""}],
-        [{"field": "c", "kind": "text", "keys": ""}, {"field": "d", "kind": "text", "keys": "y"}],
+        [{"field": "c", "kind": "text", "keys": ""}, {"field": "d", "kind": "text", "keys": 'say "hi"'}],
     ]}
-    types = [c["Target"] for c in U.to_uivision_commands(macro) if c["Command"] == "XType"]
-    assert types == ["x${KEY_TAB}", "${KEY_CTRL+KEY_TAB}", "${KEY_TAB}", "y"]
+    typed = [json.loads(_CALL.match(l.split("   //")[0]).group(2))
+             for l in U.to_desktop_macro(macro).splitlines() if l.startswith("uiv.desktop.keyboard.type")]
+    assert typed == ["x${KEY_TAB}", "${KEY_CTRL+KEY_TAB}", "${KEY_TAB}", 'say "hi"']
 
 
-def test_run_page_embeds_the_macro_and_uses_uivisions_embedded_macro_event():
-    macro = U.macro_json([U._cmd("XType", "Pinnacle Auto — x")], "2026-11-02")
-    html = U.run_page_html(macro)
-    assert "kantuSaveAndRunMacro" in html and "data-kantu" in html
-    embedded = re.search(r"var MACRO = (\{.*?\});\nvar s =", html, re.S).group(1)
-    assert json.loads(embedded) == macro
+def test_parse_app_log_reads_completion_and_runtime():
+    name = U.MACRO_NAME
+    lines = [
+        "03:34:48.894 [status] [] Ui.Vision for Desktop app 2.1.43 started",
+        f"03:34:49.452 [status] [{name}] {name} started",
+        f"03:34:49.465 [info] [{name}] uiv API loaded (11 ms, Boa 0.22)",
+    ]
+    assert U.parse_app_log(lines) == ("", None)
+    lines.append(f"03:36:20.100 [status] [{name}] {name} completed (Runtime 90.65s)")
+    assert U.parse_app_log(lines) == ("completed", 90.65)
 
 
-def test_run_url_carries_uivision_command_line_switches(tmp_path):
-    url = U.run_url(tmp_path / "log1.txt")
-    assert url.startswith("file:///") and "run_macro.html?" in url
-    for switch in ("direct=1", "closeRPA=1", "closeBrowser=1"):
-        assert switch in url
-    assert url.endswith("savelog=" + (tmp_path / "log1.txt").as_posix())
-
-
-def test_browser_uses_its_own_profile_not_the_users(monkeypatch):
-    monkeypatch.setattr(U, "_second_display", lambda: True)
-    args = U.browser_args("file:///x.html")
-    assert f"--user-data-dir={U.PROFILE}" in args
-    assert "--window-position=1960,40" in args and args[-1] == "file:///x.html"
+def test_parse_app_log_reports_an_error_line():
+    name = U.MACRO_NAME
+    lines = [f"03:34:49.452 [status] [{name}] {name} started",
+             f"03:34:50.000 [error] [{name}] TypeError: uiv.desktop.foo is not a function"]
+    status, runtime = U.parse_app_log(lines)
+    assert status.startswith("TypeError") and runtime is None
+    assert U.parse_app_log([f"x [status] [other.d.js] other.d.js completed (Runtime 1s)"]) == ("", None)
 
 
 def test_new_sheet_has_uivision_rows_and_keeps_interns_runs(tmp_path):
@@ -186,13 +190,6 @@ def test_put_fills_exactly_one_row(tmp_path, monkeypatch):
     assert saved[1]["submission"] == "a.json" and saved[0]["submission"] == ""
     with pytest.raises(KeyError):
         U.put(rows, "normal", "9", {})
-
-
-def test_read_status_returns_the_first_log_line(tmp_path):
-    p = tmp_path / "log.txt"
-    assert U.read_status(p) == ""
-    p.write_text("Status=OK\nMacro: Objective7_Scope1_Record1\n", encoding="utf-8")
-    assert U.read_status(p) == "Status=OK"
 
 
 def test_gate_report_scores_against_record_1(tmp_path, monkeypatch):

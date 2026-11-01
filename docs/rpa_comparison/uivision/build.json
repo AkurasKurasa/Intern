@@ -1,7 +1,7 @@
 {
   "built_on": "car_insurance_form_wx.py",
   "record": 1,
-  "built_at": "2026-11-02T03:21:14",
+  "built_at": "2026-11-02T03:36:56",
   "form_position": [
     40,
     40
@@ -1070,12 +1070,5 @@
       }
     ]
   ],
-  "seconds": 5.5,
-  "window_rect": [
-    40,
-    40,
-    1080,
-    860
-  ],
-  "n_commands": 218
+  "seconds": 5.5
 }

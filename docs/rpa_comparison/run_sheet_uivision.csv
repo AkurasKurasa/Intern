@@ -1,0 +1,23 @@
+system,form_version,run,record,submission,finished_without_help,minutes,notes
+UI.Vision,normal,setup,,,,,"UI.Vision RPA desktop app (Ui.Vision for Desktop 2.1.43, silent per-user install, not timed). Macro generated automatically from the normal form's Tab order in 5.5 s (scripts/rpa_uivision.py build); the generator was written by an AI coding assistant, so no human setup time exists. It worked on its first replay (gate 2026-11-02 03:37, 171/171) because it reuses the keystroke sequence corrected during the PyAutoGUI run (3 replays, 5.2 min)."
+UI.Vision,normal,1,1,UIVision_normal_1__PAI-2026-00441_20261102_033747_754431.json,yes,0.07,reached Submit; UI.Vision: completed (macro runtime 4.2 s; 0.08 min incl. app start)
+UI.Vision,normal,2,1,UIVision_normal_2__PAI-2026-00441_20261102_033800_447299.json,yes,0.07,reached Submit; UI.Vision: completed (macro runtime 4.3 s; 0.08 min incl. app start)
+UI.Vision,normal,3,1,UIVision_normal_3__PAI-2026-00441_20261102_033813_051722.json,yes,0.07,reached Submit; UI.Vision: completed (macro runtime 4.2 s; 0.08 min incl. app start)
+UI.Vision,normal,4,1,UIVision_normal_4__PAI-2026-00441_20261102_033825_710474.json,yes,0.07,reached Submit; UI.Vision: completed (macro runtime 4.2 s; 0.08 min incl. app start)
+UI.Vision,normal,5,1,UIVision_normal_5__PAI-2026-00441_20261102_033838_551716.json,yes,0.07,reached Submit; UI.Vision: completed (macro runtime 4.2 s; 0.08 min incl. app start)
+UI.Vision,modified,1,1,UIVision_modified_1___20261102_033851_157789.json,yes,0.07,reached Submit; UI.Vision: completed (macro runtime 4.2 s; 0.08 min incl. app start)
+UI.Vision,modified,2,1,UIVision_modified_2___20261102_033903_800522.json,yes,0.07,reached Submit; UI.Vision: completed (macro runtime 4.2 s; 0.08 min incl. app start)
+UI.Vision,modified,3,1,UIVision_modified_3___20261102_033916_387010.json,yes,0.07,reached Submit; UI.Vision: completed (macro runtime 4.2 s; 0.08 min incl. app start)
+UI.Vision,modified,4,1,UIVision_modified_4___20261102_033929_108666.json,yes,0.07,reached Submit; UI.Vision: completed (macro runtime 4.3 s; 0.09 min incl. app start)
+UI.Vision,modified,5,1,UIVision_modified_5___20261102_033941_933606.json,yes,0.07,reached Submit; UI.Vision: completed (macro runtime 4.2 s; 0.08 min incl. app start)
+Intern,normal,setup,,,,,"Historical, not re-measured: 19 demonstration sessions in tasks/form_filling/traces, 10,405 steps, 260.9 min of recording (first-to-last step timestamps per session); plus an 'unorganized' pool of 657 steps with no usable duration. Training time not available (transformer_training_log.jsonl absent; model.pt stores epoch 78, val click acc 0.830, no time). Setup >= 261 min."
+Intern,normal,1,1,Intern_normal_1__PAI-2026-00441_20261101_022329_727798.json,yes,1.07,reached Submit; exit code 0
+Intern,normal,2,1,Intern_normal_2__PAI-2026-00441_20261101_022435_414844.json,yes,1.02,reached Submit; exit code 0
+Intern,normal,3,1,Intern_normal_3__PAI-2026-00441_20261101_022540_748684.json,yes,1.02,reached Submit; exit code 0
+Intern,normal,4,1,Intern_normal_4__PAI-2026-00441_20261101_022646_223379.json,yes,1.02,reached Submit; exit code 0
+Intern,normal,5,1,Intern_normal_5__PAI-2026-00441_20261101_022751_676060.json,yes,1.02,reached Submit; exit code 0
+Intern,modified,1,1,Intern_modified_1__PAI-2026-00441_20261101_022857_254783.json,yes,1.02,reached Submit; exit code 0
+Intern,modified,2,1,Intern_modified_2__PAI-2026-00441_20261101_023002_891158.json,yes,1.02,reached Submit; exit code 0
+Intern,modified,3,1,Intern_modified_3__PAI-2026-00441_20261101_023108_554636.json,yes,1.02,reached Submit; exit code 0
+Intern,modified,4,1,Intern_modified_4__PAI-2026-00441_20261101_023213_838335.json,yes,1.02,reached Submit; exit code 0
+Intern,modified,5,1,Intern_modified_5__PAI-2026-00441_20261101_023319_145871.json,yes,1.02,reached Submit; exit code 0

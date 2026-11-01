@@ -1,0 +1,16 @@
+
+Scored sheet written to docs\rpa_comparison\run_sheet_uivision_scored.csv
+
+System    Form       Runs  Finished  Fully correct  Mean field corr.  Policy tab  Mean min
+UI.Vision normal        5      5/5            5/5             100.0%       11/11       0.1
+UI.Vision modified      5      5/5            0/5              98.8%        9/11       0.1
+UI.Vision setup            setup minutes = not recorded
+Intern    normal        5      5/5            0/5              85.4%        9/11       1.0
+Intern    modified      5      5/5            0/5              85.4%        9/11       1.0
+Intern    setup            setup minutes = not recorded
+
+Fully-correct runs, Fisher's exact test (two-sided):
+  normal     UI.Vision 5/5 vs Intern 0/5   p = 0.0079   (significant at .05)
+  modified   UI.Vision 0/5 vs Intern 0/5   p = 1.0000
+  Setup time is one measurement per system, so it is reported descriptively, not tested.
+

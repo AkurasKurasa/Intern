@@ -1,7 +1,8 @@
 """
 scripts/rpa_uivision.py
 =======================
-Objective 7, re-run with a real RPA product: UI.Vision RPA (a9t9 software GmbH).
+Objective 7, re-run with a real RPA product: UI.Vision RPA (a9t9 software GmbH),
+played by its desktop app, Ui.Vision for Desktop.
 
 The panel chair asked to "test Intern against one simple tool (such as
 UI.Vision) on the Scope 1 form". The first run used a PyAutoGUI script because
@@ -11,31 +12,29 @@ and Intern's runs stay the same, so only the baseline system changes.
 
 How UI.Vision drives a desktop form
 -----------------------------------
-UI.Vision's desktop mode (XModules) has no recorder and cannot read a native
-app's controls, so a desktop macro is written by hand as XClick (screen
-coordinates or an image) + XType (real keystrokes). Image matching would fail
-on the modified form for its new colours alone, so the macro is keyboard-
-driven, as fixed before testing in docs/rpa_comparison/README.md: one XClick on
-the first field, record 1's values in the NORMAL form's Tab order, Ctrl+Tab
-between pages, and an XClick on Submit.
+UI.Vision's desktop automation has no recorder and cannot read a native app's
+controls, so a desktop macro is written as clicks (screen coordinates or an
+image) + typed keys. Image matching would fail on the modified form for its
+new colours alone, so the macro is keyboard-driven, as fixed before testing in
+docs/rpa_comparison/README.md: one click on the first field, record 1's values
+in the NORMAL form's Tab order, Ctrl+Tab between pages, and a click on Submit.
+
+The macro is a UI.Vision desktop-app macro (`<name>.d.js`, "use desktop-app"),
+played by `uivision-app.exe --run <file>`; the app logs "<name> completed
+(Runtime N s)" when it ends. No browser is involved.
 
 Commands
 --------
   python scripts/rpa_uivision.py build
       Built ONCE, on the NORMAL form. Opens it briefly (no clicks or keys) to
       read the screen positions of the first field and Submit, then writes
-        docs/rpa_comparison/uivision/Objective7_Scope1_Record1.json  the macro
-        docs/rpa_comparison/uivision/run_macro.html                  local page that hands
-                                                                     the macro to UI.Vision
-  python scripts/rpa_uivision.py browser
-      Opens the dedicated Chrome profile used for the runs (one-time setup:
-      install UI.Vision there; see docs/rpa_comparison/uivision/SETUP.md).
+      docs/rpa_comparison/uivision/Objective7_Scope1_Record1.d.js and build.json.
   python scripts/rpa_uivision.py run [--only gate|runs] [--runs 5]
-      LIVE GUI -- only the user runs this (CLAUDE.md). Each run opens a fresh
-      form, lets UI.Vision play the unedited macro, waits for the form's
-      auto-saved submission, closes the form, and writes one row to
+      LIVE GUI. Each run opens a fresh form, lets UI.Vision play the unedited
+      macro, waits for the form's auto-saved submission and the app's
+      "completed" line, closes both, and writes one row to
       docs/rpa_comparison/run_sheet_uivision.csv. Do not touch the PC while
-      it runs.
+      it runs (moving the mouse to the top-left corner stops UI.Vision).
 Then:
   python scripts/rpa_score.py --sheet docs/rpa_comparison/run_sheet_uivision.csv \
       --submissions docs/rpa_comparison/submissions
@@ -45,6 +44,7 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import re
 import shutil
 import subprocess
 import sys
@@ -64,11 +64,10 @@ FORMS = {
 }
 TITLES = {"normal": "Car Insurance", "modified": "(Messy UI Test)"}
 UIV_DIR = ROOT / "docs" / "rpa_comparison" / "uivision"
-MACRO_NAME = "Objective7_Scope1_Record1"
-MACRO_FILE = UIV_DIR / f"{MACRO_NAME}.json"
+MACRO_NAME = "Objective7_Scope1_Record1.d.js"
+MACRO_FILE = UIV_DIR / MACRO_NAME
 BUILD_FILE = UIV_DIR / "build.json"
-RUN_PAGE = UIV_DIR / "run_macro.html"
-LOG_DIR = UIV_DIR / "logs"
+APP_LOG_DIR = UIV_DIR / "logs"
 FORM_SUBMISSIONS = ROOT / "practice_apps" / "data" / "output" / "submissions"
 KEEP_DIR = ROOT / "docs" / "rpa_comparison" / "submissions"
 PYAUTOGUI_SHEET = ROOT / "docs" / "rpa_comparison" / "run_sheet.csv"
@@ -78,29 +77,20 @@ SYSTEM = "UI.Vision"
 SHEET_FIELDS = ["system", "form_version", "run", "record", "submission",
                 "finished_without_help", "minutes", "notes"]
 
-CHROME = Path(r"C:\Program Files\Google\Chrome\Application\chrome.exe")
-# A Chrome profile used only for these runs, so the user's own browser,
-# tabs and settings are never touched and closeBrowser=1 closes only this one.
-PROFILE = Path.home() / "AppData" / "Local" / "InternRPA" / "chrome-uivision"
-STORE_URL = "https://chromewebstore.google.com/detail/gcbalfbdmfieckjlnblleoemohcganoc"
+APP_EXE = Path.home() / "AppData" / "Local" / "UI.Vision" / "DesktopAutomation" / "uivision-app.exe"
+APP_LOG = Path.home() / "AppData" / "Roaming" / "UiVision RPA" / "log.txt"
 
 # Where the form is placed for the build and for every run (primary display,
-# which is the only one UI.Vision's desktop clicks cover). The browser goes to
-# the second display when there is one, so it never covers the form.
+# which is the only one UI.Vision's desktop clicks cover). It is kept above
+# other windows during runs so UI.Vision's own window cannot cover it.
 FORM_POS = (40, 40)
-BROWSER_POS_SECOND = (1960, 40)
-BROWSER_POS_PRIMARY = (1100, 40)
-BROWSER_SIZE = (760, 760)
 
 
 # ── build: the UI.Vision macro ────────────────────────────────────────────────
 
-def _cmd(command: str, target: str = "", value: str = "", description: str = "") -> dict:
-    return {"Command": command, "Target": target, "Value": value, "Description": description}
-
-
 def _keys_to_xtype(keys: str) -> str:
-    """One step's keys (rpa_baseline.build_steps format) in UI.Vision XType syntax."""
+    """One step's keys (rpa_baseline.build_steps format) in UI.Vision's
+    ${KEY_...} typing grammar."""
     if keys == "{SPACE}":
         return "${KEY_SPACE}"
     if keys.startswith("{CHOICE:"):
@@ -108,95 +98,53 @@ def _keys_to_xtype(keys: str) -> str:
     if keys == "{HOME}":
         return "${KEY_HOME}"
     if keys == "{CLEAR}":
-        return "${KEY_CTRL+KEY_A}${KEY_DEL}"
+        return "${KEY_CTRL+KEY_A}${KEY_DELETE}"
     if "${" in keys:
-        # XType would read it as a variable or key name, not as text
-        raise ValueError(f"value cannot be typed literally by XType: {keys!r}")
+        # UI.Vision would read it as a key name, not as text
+        raise ValueError(f"value cannot be typed literally by UI.Vision: {keys!r}")
     return keys
 
 
-def to_uivision_commands(macro: dict) -> list[dict]:
-    """The baseline key sequence as UI.Vision commands. Pure function.
+def _js(s: str) -> str:
+    return json.dumps(s, ensure_ascii=False)
+
+
+def to_desktop_macro(macro: dict) -> str:
+    """The baseline key sequence as a UI.Vision desktop-app macro. Pure function.
 
     Same sequence as rpa_baseline.replay(): click the first field, then per
     control its keys followed by Tab (except after a page's last control),
     Ctrl+Tab and a short pause between pages, and a click on Submit."""
     x, y = macro["coordinates"]["first_field"]
     sx, sy = macro["coordinates"]["submit"]
-    out = [
-        _cmd("XDesktopAutomation", "true", description="desktop mode: X commands go to the screen, "
-                                                       "and the browser is not brought to the front"),
-        _cmd("XClick", f"D{x},{y}", description="first field (fixed screen position)"),
+    lines = [
+        '"use desktop-app";',
+        "// Objective 7, Scope 1: enter record 1 of the intake packet into the car-insurance form.",
+        f"// Built once on the NORMAL form ({macro.get('built_on', NORMAL_FORM.name)}) and NOT edited",
+        "// before the modified-form runs. Keyboard-driven: UI.Vision cannot read the form's",
+        "// controls, and image matching would fail on the modified form's colours.",
+        f"uiv.desktop.mouse.click({x}, {y});   // first field (fixed screen position)",
+        "uiv.sleep(300);",
     ]
     pages = macro["pages"]
     for p, steps in enumerate(pages):
+        lines.append(f"// tab {p + 1} of {len(pages)}")
         for i, s in enumerate(steps):
             text = _keys_to_xtype(s["keys"]) if s["keys"] else ""
             if i < len(steps) - 1:
                 text += "${KEY_TAB}"
             if text:
-                out.append(_cmd("XType", text, description=s["field"]))
+                lines.append(f"uiv.desktop.keyboard.type({_js(text)});   // {s['field']}")
         if p < len(pages) - 1:
-            out.append(_cmd("XType", "${KEY_CTRL+KEY_TAB}", description=f"next tab ({p + 2} of {len(pages)})"))
-            out.append(_cmd("pause", "400", description="let the tab switch settle"))
-    out.append(_cmd("XClick", f"D{sx},{sy}", description="Submit (fixed screen position)"))
-    return out
-
-
-def macro_json(commands: list[dict], created: str) -> dict:
-    return {"Name": MACRO_NAME, "CreationDate": created, "Commands": commands}
-
-
-RUN_PAGE_TEMPLATE = """<!doctype html>
-<html><head><meta charset="utf-8"><title>Objective 7 - UI.Vision run</title>
-<style>body{font:16px/1.5 system-ui,sans-serif;margin:24px;max-width:640px}
-#s{padding:12px;border-radius:6px;background:#eef}#s.err{background:#fdd}</style></head>
-<body><h1>Objective 7: UI.Vision run</h1><p id="s">Waiting for the UI.Vision extension&hellip;</p>
-<script>
-// Hands the macro to UI.Vision the same way its embedded-macro pages do
-// (event kantuSaveAndRunMacro). Needs, once: Chrome "Allow access to file
-// URLs" for UI.Vision, and UI.Vision Settings > API > "Run embedded macros
-// from local files". Command-line switches (direct=1, closeRPA, closeBrowser,
-// savelog) are read by UI.Vision from this page's URL.
-var MACRO = __MACRO__;
-var s = document.getElementById('s');
-function fail(msg) { s.className = 'err'; s.textContent = msg; }
-var start = Date.now();
-(function wait() {
-  var root = document.documentElement;
-  if (root.getAttribute('data-kantu')) {
-    // UI.Vision removes the mark again shortly after if local-file runs are off
-    return setTimeout(function () {
-      if (!root.getAttribute('data-kantu')) {
-        return fail('UI.Vision is installed, but local-file macro runs are off: ' +
-                    'UI.Vision > Settings > API > tick "Run embedded macros from local files".');
-      }
-      var ok = false;
-      window.addEventListener('kantuInvokeSuccess', function () {
-        ok = true; s.textContent = 'UI.Vision accepted the macro and is running it.';
-      });
-      window.dispatchEvent(new CustomEvent('kantuSaveAndRunMacro', {detail: {direct: 1, json: MACRO}}));
-      setTimeout(function () { if (!ok) fail('UI.Vision did not accept the macro.'); }, 15000);
-    }, 1500);
-  }
-  if (Date.now() - start > 20000) {
-    return fail('UI.Vision extension not found on this page. In chrome://extensions > UI.Vision > ' +
-                'Details, turn on "Allow access to file URLs".');
-  }
-  setTimeout(wait, 250);
-})();
-</script></body></html>
-"""
-
-
-def run_page_html(macro: dict) -> str:
-    return RUN_PAGE_TEMPLATE.replace("__MACRO__", json.dumps(macro, ensure_ascii=False, indent=1))
+            lines.append('uiv.desktop.keyboard.type("${KEY_CTRL+KEY_TAB}");   // next tab')
+            lines.append("uiv.sleep(400);")
+    lines.append(f"uiv.desktop.mouse.click({sx}, {sy});   // Submit (fixed screen position)")
+    return "\n".join(lines) + "\n"
 
 
 def _place_form(hwnd: int, topmost: bool) -> None:
     """Move the form to FORM_POS (size unchanged) and, during runs, keep it
-    above other windows so the browser and UI.Vision's panel cannot cover it.
-    Window placement only: no click or key is sent to the form."""
+    above other windows. Window placement only: no click or key is sent."""
     import win32con
     import win32gui
     after = win32con.HWND_TOPMOST if topmost else win32con.HWND_TOP
@@ -224,7 +172,6 @@ def _close(proc: subprocess.Popen) -> None:
 
 def build(record_num: int = 1) -> dict:
     """Build the macro on the NORMAL form only, as any record-and-replay user would."""
-    import win32gui
     _dpi_aware()
     t0 = time.time()
     gold = _parse_intake_record(DEFAULT_INTAKE.read_text(encoding="utf-8"), record_num)
@@ -233,19 +180,14 @@ def build(record_num: int = 1) -> dict:
     try:
         _place_form(hwnd, topmost=False)
         coords = capture_coordinates(hwnd)
-        size = win32gui.GetWindowRect(hwnd)
     finally:
         _close(proc)
     base = {"built_on": NORMAL_FORM.name, "record": record_num,
             "built_at": time.strftime("%Y-%m-%dT%H:%M:%S"),
             "form_position": list(FORM_POS), "coordinates": coords, "pages": steps}
-    macro = macro_json(to_uivision_commands(base), time.strftime("%Y-%m-%d"))
     UIV_DIR.mkdir(parents=True, exist_ok=True)
-    MACRO_FILE.write_text(json.dumps(macro, indent=2, ensure_ascii=False), encoding="utf-8")
-    RUN_PAGE.write_text(run_page_html(macro), encoding="utf-8")
+    MACRO_FILE.write_text(to_desktop_macro(base), encoding="utf-8")
     base["seconds"] = round(time.time() - t0, 1)
-    base["window_rect"] = list(size)
-    base["n_commands"] = len(macro["Commands"])
     BUILD_FILE.write_text(json.dumps(base, indent=2, ensure_ascii=False), encoding="utf-8")
     return base
 
@@ -263,64 +205,65 @@ def _submissions() -> set[str]:
     return {p.name for p in FORM_SUBMISSIONS.glob("*.json")} if FORM_SUBMISSIONS.exists() else set()
 
 
-def _second_display() -> bool:
-    import win32api
-    return len(win32api.EnumDisplayMonitors()) > 1
+def _app_log_lines() -> list[str]:
+    if not APP_LOG.exists():
+        return []
+    return APP_LOG.read_text(encoding="utf-8", errors="replace").splitlines()
 
 
-def run_url(log_file: Path) -> str:
-    """file:// URL of the run page with UI.Vision's command-line switches."""
-    log = log_file.as_posix()
-    return (RUN_PAGE.resolve().as_uri()
-            + f"?direct=1&closeRPA=1&closeBrowser=1&savelog={log}")
+_RUNTIME = re.compile(r"Runtime\s+([\d.]+)\s*s", re.I)
 
 
-def browser_args(url: str) -> list[str]:
-    pos = BROWSER_POS_SECOND if _second_display() else BROWSER_POS_PRIMARY
-    return [str(CHROME), f"--user-data-dir={PROFILE}", "--no-first-run", "--no-default-browser-check",
-            f"--window-position={pos[0]},{pos[1]}", f"--window-size={BROWSER_SIZE[0]},{BROWSER_SIZE[1]}",
-            "--new-window", url]
+def parse_app_log(lines: list[str], name: str = MACRO_NAME) -> tuple[str, float | None]:
+    """(status, runtime seconds) of the macro run in these app-log lines.
 
-
-def read_status(log_file: Path) -> str:
-    """First line of UI.Vision's savelog file, e.g. 'Status=OK' or the error."""
-    if not log_file.exists():
-        return ""
-    for enc in ("utf-8-sig", "utf-16", "cp1252"):
-        try:
-            return log_file.read_text(encoding=enc).splitlines()[0].strip()
-        except (UnicodeDecodeError, IndexError):
+    The app logs '<name> started', then '<name> completed (Runtime N s)'.
+    status is 'completed', the text of an error / failed / stopped line, or ''
+    while the macro is still running."""
+    tag = f"[{name}]"
+    for line in lines:
+        if tag not in line:
             continue
-    return ""
+        rest = line.split(tag, 1)[1].strip()
+        if rest.startswith(f"{name} completed"):
+            m = _RUNTIME.search(rest)
+            return "completed", float(m.group(1)) if m else None
+        if "[error]" in line or re.match(re.escape(name) + r" (failed|stopped|aborted)", rest):
+            return rest, None
+    return "", None
 
 
 def _edit_texts(hwnd: int) -> list[str]:
     """Text of every text box in the form (read only), to see whether any
     keystroke has reached it yet."""
+    import ctypes
     import win32con
     import win32gui
     texts: list[str] = []
 
     def cb(h, _):
         if win32gui.GetClassName(h) == "Edit":
-            buf = win32gui.PyMakeBuffer(512)
-            n = win32gui.SendMessage(h, win32con.WM_GETTEXT, 256, buf)
-            texts.append(bytes(buf[:n * 2]).decode("utf-16-le", "replace"))
+            buf = ctypes.create_unicode_buffer(256)
+            ctypes.windll.user32.SendMessageW(h, win32con.WM_GETTEXT, 256, buf)
+            texts.append(buf.value)
     win32gui.EnumChildWindows(hwnd, cb, None)
     return texts
 
 
-def run_once(version: str, tag: str, timeout: float, start_timeout: float = 75) -> dict:
+def _stop_app() -> None:
+    subprocess.run(["taskkill", "/F", "/IM", APP_EXE.name], capture_output=True)
+    time.sleep(1.0)
+
+
+def run_once(version: str, tag: str, timeout: float, start_timeout: float = 60) -> dict:
+    _stop_app()
     proc, hwnd = _open_form(version)
     _place_form(hwnd, topmost=True)
-    LOG_DIR.mkdir(parents=True, exist_ok=True)
-    log_file = LOG_DIR / f"{tag}.txt"
-    if log_file.exists():
-        log_file.unlink()
     before, fresh = _submissions(), _edit_texts(hwnd)
+    log_start = len(_app_log_lines())
     t0 = time.time()
-    browser = subprocess.Popen(browser_args(run_url(log_file)))
-    sub, t_submit, started, why = "", None, False, ""
+    subprocess.Popen([str(APP_EXE), "--run", str(MACRO_FILE)])
+    sub, t_submit, started, why, status, runtime = "", None, False, "", "", None
     end = time.time() + timeout
     while time.time() < end:
         if not sub:
@@ -329,10 +272,11 @@ def run_once(version: str, tag: str, timeout: float, start_timeout: float = 75) 
                 sub, t_submit = new[-1], time.time()
         if not started and _edit_texts(hwnd) != fresh:
             started = True
-        if log_file.exists() and (sub or time.time() - t0 > 20):
-            break                                   # UI.Vision finished (OK or error)
+        status, runtime = parse_app_log(_app_log_lines()[log_start:])
+        if status and (sub or status != "completed"):
+            break                                   # UI.Vision finished (OK or not)
         if sub and time.time() - t_submit > 20:
-            break                                   # submitted; no log written
+            break                                   # submitted; no end line seen
         if not started and not sub and time.time() - t0 > start_timeout:
             why = f"no keystroke reached the form within {start_timeout:.0f} s"
             break
@@ -344,11 +288,12 @@ def run_once(version: str, tag: str, timeout: float, start_timeout: float = 75) 
     if not sub:
         new = sorted(_submissions() - before)
         sub = new[-1] if new else ""
-    status = read_status(log_file)
-    minutes = ((t_submit or time.time()) - t0) / 60
+    app_lines = _app_log_lines()[log_start:]
+    APP_LOG_DIR.mkdir(parents=True, exist_ok=True)
+    (APP_LOG_DIR / f"{tag}.txt").write_text("\n".join(app_lines) + "\n", encoding="utf-8")
+    wall = ((t_submit or time.time()) - t0) / 60
     _close(proc)
-    if browser.poll() is None:
-        time.sleep(3)                               # closeBrowser=1 should have closed it
+    _stop_app()
     kept = ""
     if sub:
         KEEP_DIR.mkdir(parents=True, exist_ok=True)
@@ -360,7 +305,10 @@ def run_once(version: str, tag: str, timeout: float, start_timeout: float = 75) 
         note = f"no submission saved: {why}"
     else:
         note = f"no submission within {timeout / 60:.0f} min"
-    note += f"; UI.Vision log: {status or 'none written'}"
+    note += f"; UI.Vision: {status or 'no end line'}"
+    if runtime is not None:
+        note += f" (macro runtime {runtime:.1f} s; {wall:.2f} min incl. app start)"
+    minutes = runtime / 60 if runtime is not None else wall
     return {"submission": kept, "finished_without_help": "yes" if sub else "no",
             "minutes": f"{minutes:.2f}", "notes": note}
 
@@ -409,17 +357,10 @@ def put(rows: list[dict], version: str, run: str, result: dict) -> None:
     raise KeyError((SYSTEM, version, run))
 
 
-def open_browser() -> None:
-    PROFILE.mkdir(parents=True, exist_ok=True)
-    subprocess.Popen([str(CHROME), f"--user-data-dir={PROFILE}", "--no-first-run",
-                      "--no-default-browser-check", STORE_URL, "chrome://extensions"])
-
-
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     sub = ap.add_subparsers(dest="cmd", required=True)
     sub.add_parser("build")
-    sub.add_parser("browser")
     r = sub.add_parser("run")
     r.add_argument("--only", choices=["gate", "runs"], default="runs")
     r.add_argument("--runs", type=int, default=5)
@@ -428,19 +369,15 @@ def main() -> None:
 
     if args.cmd == "build":
         b = build()
-        print(f"Macro: {MACRO_FILE.relative_to(ROOT)} ({b['n_commands']} commands)\n"
-              f"Run page: {RUN_PAGE.relative_to(ROOT)}\n"
+        print(f"Macro: {MACRO_FILE.relative_to(ROOT)}\n"
               f"Coordinates: {b['coordinates']}  (form at {b['form_position']}, built in {b['seconds']} s)")
-        return
-    if args.cmd == "browser":
-        open_browser()
         return
 
     _dpi_aware()
     if not MACRO_FILE.exists():
         sys.exit("Build the macro first: python scripts/rpa_uivision.py build")
-    if not CHROME.exists():
-        sys.exit(f"Chrome not found at {CHROME}")
+    if not APP_EXE.exists():
+        sys.exit(f"Ui.Vision for Desktop not found at {APP_EXE}")
     if args.only == "gate":
         res = run_once("normal", f"gate_uivision_normal_{time.strftime('%H%M%S')}", args.timeout)
         _log({"event": "gate", "form": "normal", **res})
