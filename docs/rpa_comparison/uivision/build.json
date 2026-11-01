@@ -1,0 +1,1081 @@
+{
+  "built_on": "car_insurance_form_wx.py",
+  "record": 1,
+  "built_at": "2026-11-02T03:21:14",
+  "form_position": [
+    40,
+    40
+  ],
+  "coordinates": {
+    "first_field": [
+      607,
+      212
+    ],
+    "submit": [
+      652,
+      835
+    ],
+    "window": [
+      40,
+      40,
+      1080,
+      860
+    ]
+  },
+  "pages": [
+    [
+      {
+        "field": "policy_number",
+        "kind": "text",
+        "keys": "PAI-2026-00441"
+      },
+      {
+        "field": "policy_status",
+        "kind": "choice",
+        "keys": ""
+      },
+      {
+        "field": "policy_type",
+        "kind": "choice",
+        "keys": ""
+      },
+      {
+        "field": "policy_term",
+        "kind": "choice",
+        "keys": ""
+      },
+      {
+        "field": "effective_date",
+        "kind": "text",
+        "keys": "04/01/2026"
+      },
+      {
+        "field": "expiration_date",
+        "kind": "text",
+        "keys": "10/01/2026"
+      },
+      {
+        "field": "section_agent_/_agency",
+        "kind": "stop",
+        "keys": ""
+      },
+      {
+        "field": "agent_id",
+        "kind": "text",
+        "keys": "AGT-0092"
+      },
+      {
+        "field": "agent_name",
+        "kind": "text",
+        "keys": "Sandra Whitfield"
+      },
+      {
+        "field": "agency_name",
+        "kind": "text",
+        "keys": "Pinnacle Auto — Riverside Branch"
+      },
+      {
+        "field": "underwriter",
+        "kind": "text",
+        "keys": "Marcus D. Chen"
+      },
+      {
+        "field": "section_flags",
+        "kind": "stop",
+        "keys": ""
+      },
+      {
+        "field": "renewal_flag",
+        "kind": "check",
+        "keys": "{SPACE}"
+      },
+      {
+        "field": "paperless",
+        "kind": "check",
+        "keys": ""
+      },
+      {
+        "field": "esign",
+        "kind": "check",
+        "keys": "{SPACE}"
+      }
+    ],
+    [
+      {
+        "field": "ph_first",
+        "kind": "text",
+        "keys": "James"
+      },
+      {
+        "field": "ph_middle",
+        "kind": "text",
+        "keys": "Arthur"
+      },
+      {
+        "field": "ph_last",
+        "kind": "text",
+        "keys": "Delgado"
+      },
+      {
+        "field": "ph_suffix",
+        "kind": "choice",
+        "keys": ""
+      },
+      {
+        "field": "ph_dob",
+        "kind": "text",
+        "keys": "07/14/1978"
+      },
+      {
+        "field": "ph_gender",
+        "kind": "choice",
+        "keys": ""
+      },
+      {
+        "field": "ph_ssn",
+        "kind": "text",
+        "keys": "512-88-4401"
+      },
+      {
+        "field": "ph_marital",
+        "kind": "choice",
+        "keys": "{CHOICE:2}"
+      },
+      {
+        "field": "ph_occupation",
+        "kind": "choice",
+        "keys": ""
+      },
+      {
+        "field": "ph_education",
+        "kind": "choice",
+        "keys": ""
+      },
+      {
+        "field": "ph_credit_score",
+        "kind": "text",
+        "keys": "724"
+      },
+      {
+        "field": "ph_years_insured",
+        "kind": "text",
+        "keys": "9"
+      },
+      {
+        "field": "section_contact_information",
+        "kind": "stop",
+        "keys": ""
+      },
+      {
+        "field": "ph_email",
+        "kind": "text",
+        "keys": "jdelgado78@gmail.com"
+      },
+      {
+        "field": "ph_phone_home",
+        "kind": "text",
+        "keys": "(951) 440-2281"
+      },
+      {
+        "field": "ph_phone_cell",
+        "kind": "text",
+        "keys": "(951) 882-5573"
+      },
+      {
+        "field": "ph_phone_work",
+        "kind": "text",
+        "keys": "(951) 300-0044"
+      },
+      {
+        "field": "section_address",
+        "kind": "stop",
+        "keys": ""
+      },
+      {
+        "field": "ph_addr1",
+        "kind": "text",
+        "keys": "4418 Creekstone Drive"
+      },
+      {
+        "field": "ph_addr2",
+        "kind": "text",
+        "keys": ""
+      },
+      {
+        "field": "ph_city",
+        "kind": "text",
+        "keys": "Riverside"
+      },
+      {
+        "field": "ph_state",
+        "kind": "choice",
+        "keys": ""
+      },
+      {
+        "field": "ph_zip",
+        "kind": "text",
+        "keys": "92506"
+      },
+      {
+        "field": "ph_county",
+        "kind": "text",
+        "keys": "Riverside"
+      },
+      {
+        "field": "ph_country",
+        "kind": "text",
+        "keys": ""
+      },
+      {
+        "field": "ph_years_at_addr",
+        "kind": "text",
+        "keys": "6"
+      },
+      {
+        "field": "ph_homeowner",
+        "kind": "check",
+        "keys": "{SPACE}"
+      },
+      {
+        "field": "section_driver's_license",
+        "kind": "stop",
+        "keys": ""
+      },
+      {
+        "field": "ph_drivers_license",
+        "kind": "text",
+        "keys": "D7734821"
+      },
+      {
+        "field": "ph_dl_state",
+        "kind": "choice",
+        "keys": ""
+      },
+      {
+        "field": "ph_dl_exp",
+        "kind": "text",
+        "keys": "07/14/2028"
+      },
+      {
+        "field": "section_prior_insurance",
+        "kind": "stop",
+        "keys": ""
+      },
+      {
+        "field": "ph_prior_insurer",
+        "kind": "text",
+        "keys": "State Farm"
+      },
+      {
+        "field": "ph_prior_policy_no",
+        "kind": "text",
+        "keys": ""
+      },
+      {
+        "field": "ph_prior_expiry",
+        "kind": "text",
+        "keys": "03/31/2026"
+      },
+      {
+        "field": "ph_prior_liability",
+        "kind": "text",
+        "keys": "50/100"
+      }
+    ],
+    [
+      {
+        "field": "v_vin",
+        "kind": "text",
+        "keys": "1HGCV1F30LA081234"
+      },
+      {
+        "field": "v_year",
+        "kind": "text",
+        "keys": "2020"
+      },
+      {
+        "field": "v_make",
+        "kind": "choice",
+        "keys": "{CHOICE:17}"
+      },
+      {
+        "field": "v_model",
+        "kind": "text",
+        "keys": "Accord"
+      },
+      {
+        "field": "v_trim",
+        "kind": "text",
+        "keys": "Sport 2.0T"
+      },
+      {
+        "field": "v_body",
+        "kind": "choice",
+        "keys": ""
+      },
+      {
+        "field": "v_color",
+        "kind": "choice",
+        "keys": "{CHOICE:4}"
+      },
+      {
+        "field": "v_doors",
+        "kind": "choice",
+        "keys": ""
+      },
+      {
+        "field": "section_engine_&_drivetrain",
+        "kind": "stop",
+        "keys": ""
+      },
+      {
+        "field": "v_cylinders",
+        "kind": "choice",
+        "keys": "{CHOICE:2}"
+      },
+      {
+        "field": "v_displacement",
+        "kind": "text",
+        "keys": "2.0"
+      },
+      {
+        "field": "v_fuel",
+        "kind": "choice",
+        "keys": ""
+      },
+      {
+        "field": "v_transmission",
+        "kind": "choice",
+        "keys": ""
+      },
+      {
+        "field": "v_drive",
+        "kind": "choice",
+        "keys": ""
+      },
+      {
+        "field": "section_usage_&_mileage",
+        "kind": "stop",
+        "keys": ""
+      },
+      {
+        "field": "v_mileage",
+        "kind": "text",
+        "keys": "38450"
+      },
+      {
+        "field": "v_annual_miles",
+        "kind": "text",
+        "keys": ""
+      },
+      {
+        "field": "v_usage",
+        "kind": "choice",
+        "keys": "{CHOICE:2}"
+      },
+      {
+        "field": "v_garaging",
+        "kind": "choice",
+        "keys": ""
+      },
+      {
+        "field": "section_ownership_/_purchase",
+        "kind": "stop",
+        "keys": ""
+      },
+      {
+        "field": "v_purchase_date",
+        "kind": "text",
+        "keys": "02/15/2020"
+      },
+      {
+        "field": "v_purchase_price",
+        "kind": "text",
+        "keys": "29800"
+      },
+      {
+        "field": "v_market_value",
+        "kind": "text",
+        "keys": "22400"
+      },
+      {
+        "field": "v_condition",
+        "kind": "choice",
+        "keys": ""
+      },
+      {
+        "field": "v_title_state",
+        "kind": "choice",
+        "keys": ""
+      },
+      {
+        "field": "section_lien_/_financing",
+        "kind": "stop",
+        "keys": ""
+      },
+      {
+        "field": "v_lienholder",
+        "kind": "text",
+        "keys": "Honda Financial Services"
+      },
+      {
+        "field": "v_lienholder_addr",
+        "kind": "text",
+        "keys": "P.O. Box 7829, Orlando, FL 32854"
+      },
+      {
+        "field": "v_loan_number",
+        "kind": "text",
+        "keys": ""
+      },
+      {
+        "field": "section_safety_&_features",
+        "kind": "stop",
+        "keys": ""
+      },
+      {
+        "field": "v_salvage",
+        "kind": "check",
+        "keys": ""
+      },
+      {
+        "field": "v_anti_theft",
+        "kind": "check",
+        "keys": "{SPACE}"
+      },
+      {
+        "field": "v_airbags",
+        "kind": "check",
+        "keys": ""
+      },
+      {
+        "field": "v_abs",
+        "kind": "check",
+        "keys": ""
+      },
+      {
+        "field": "v_daytime_lights",
+        "kind": "check",
+        "keys": ""
+      },
+      {
+        "field": "v_backup_camera",
+        "kind": "check",
+        "keys": "{SPACE}"
+      },
+      {
+        "field": "v_gps",
+        "kind": "check",
+        "keys": ""
+      },
+      {
+        "field": "v_parking_sensors",
+        "kind": "check",
+        "keys": ""
+      },
+      {
+        "field": "v_lane_assist",
+        "kind": "check",
+        "keys": "{SPACE}"
+      },
+      {
+        "field": "v_adaptive_cruise",
+        "kind": "check",
+        "keys": ""
+      },
+      {
+        "field": "v_custom_equipment",
+        "kind": "check",
+        "keys": ""
+      },
+      {
+        "field": "v_custom_value",
+        "kind": "text",
+        "keys": ""
+      }
+    ],
+    [
+      {
+        "field": "cov_bodily_limit",
+        "kind": "choice",
+        "keys": ""
+      },
+      {
+        "field": "cov_property",
+        "kind": "choice",
+        "keys": ""
+      },
+      {
+        "field": "section_collision_&_comprehensive",
+        "kind": "stop",
+        "keys": ""
+      },
+      {
+        "field": "cov_collision_ded",
+        "kind": "choice",
+        "keys": ""
+      },
+      {
+        "field": "cov_comp_ded",
+        "kind": "choice",
+        "keys": ""
+      },
+      {
+        "field": "section_additional_coverages",
+        "kind": "stop",
+        "keys": ""
+      },
+      {
+        "field": "cov_um_uim",
+        "kind": "check",
+        "keys": ""
+      },
+      {
+        "field": "cov_pip",
+        "kind": "check",
+        "keys": ""
+      },
+      {
+        "field": "cov_medpay",
+        "kind": "check",
+        "keys": "{SPACE}"
+      },
+      {
+        "field": "cov_rental",
+        "kind": "check",
+        "keys": ""
+      },
+      {
+        "field": "cov_roadside",
+        "kind": "check",
+        "keys": "{SPACE}"
+      },
+      {
+        "field": "cov_gap",
+        "kind": "check",
+        "keys": ""
+      },
+      {
+        "field": "cov_rideshare",
+        "kind": "check",
+        "keys": ""
+      },
+      {
+        "field": "cov_new_car",
+        "kind": "check",
+        "keys": ""
+      },
+      {
+        "field": "cov_acc_forgive",
+        "kind": "check",
+        "keys": "{SPACE}"
+      },
+      {
+        "field": "cov_disappear_ded",
+        "kind": "check",
+        "keys": ""
+      },
+      {
+        "field": "section_optional_limits",
+        "kind": "stop",
+        "keys": ""
+      },
+      {
+        "field": "cov_um_limit",
+        "kind": "text",
+        "keys": ""
+      },
+      {
+        "field": "cov_pip_limit",
+        "kind": "text",
+        "keys": ""
+      },
+      {
+        "field": "cov_medpay_limit",
+        "kind": "text",
+        "keys": "5000"
+      },
+      {
+        "field": "cov_rental_limit",
+        "kind": "text",
+        "keys": ""
+      },
+      {
+        "field": "section_discounts_applied",
+        "kind": "stop",
+        "keys": ""
+      },
+      {
+        "field": "disc_multi_car",
+        "kind": "check",
+        "keys": ""
+      },
+      {
+        "field": "disc_multi_policy",
+        "kind": "check",
+        "keys": "{SPACE}"
+      },
+      {
+        "field": "disc_good_driver",
+        "kind": "check",
+        "keys": "{SPACE}"
+      },
+      {
+        "field": "disc_good_student",
+        "kind": "check",
+        "keys": ""
+      },
+      {
+        "field": "disc_defensive_drv",
+        "kind": "check",
+        "keys": ""
+      },
+      {
+        "field": "disc_loyalty",
+        "kind": "check",
+        "keys": "{SPACE}"
+      },
+      {
+        "field": "disc_military",
+        "kind": "check",
+        "keys": ""
+      },
+      {
+        "field": "disc_affinity",
+        "kind": "check",
+        "keys": ""
+      },
+      {
+        "field": "section_premium_summary",
+        "kind": "stop",
+        "keys": ""
+      },
+      {
+        "field": "cov_premium_total",
+        "kind": "text",
+        "keys": "187.42"
+      },
+      {
+        "field": "cov_premium_period",
+        "kind": "choice",
+        "keys": ""
+      }
+    ],
+    [
+      {
+        "field": "d2_first",
+        "kind": "text",
+        "keys": "Maria"
+      },
+      {
+        "field": "d2_last",
+        "kind": "text",
+        "keys": "Delgado"
+      },
+      {
+        "field": "d2_dob",
+        "kind": "text",
+        "keys": "03/22/1980"
+      },
+      {
+        "field": "d2_gender",
+        "kind": "choice",
+        "keys": ""
+      },
+      {
+        "field": "d2_relation",
+        "kind": "choice",
+        "keys": ""
+      },
+      {
+        "field": "d2_dl",
+        "kind": "text",
+        "keys": "F8821047"
+      },
+      {
+        "field": "d2_dl_state",
+        "kind": "choice",
+        "keys": ""
+      },
+      {
+        "field": "d2_dl_exp",
+        "kind": "text",
+        "keys": "03/22/2027"
+      },
+      {
+        "field": "d2_accidents",
+        "kind": "choice",
+        "keys": ""
+      },
+      {
+        "field": "d2_violations",
+        "kind": "choice",
+        "keys": ""
+      },
+      {
+        "field": "d2_sr22",
+        "kind": "check",
+        "keys": ""
+      },
+      {
+        "field": "d2_excluded",
+        "kind": "check",
+        "keys": ""
+      },
+      {
+        "field": "section_driver_3",
+        "kind": "stop",
+        "keys": ""
+      },
+      {
+        "field": "d3_first",
+        "kind": "text",
+        "keys": "Tyler"
+      },
+      {
+        "field": "d3_last",
+        "kind": "text",
+        "keys": "Delgado"
+      },
+      {
+        "field": "d3_dob",
+        "kind": "text",
+        "keys": "09/05/2006"
+      },
+      {
+        "field": "d3_gender",
+        "kind": "choice",
+        "keys": ""
+      },
+      {
+        "field": "d3_relation",
+        "kind": "choice",
+        "keys": ""
+      },
+      {
+        "field": "d3_dl",
+        "kind": "text",
+        "keys": "D0012938"
+      },
+      {
+        "field": "d3_dl_state",
+        "kind": "choice",
+        "keys": ""
+      },
+      {
+        "field": "d3_dl_exp",
+        "kind": "text",
+        "keys": "09/05/2027"
+      },
+      {
+        "field": "d3_accidents",
+        "kind": "choice",
+        "keys": ""
+      },
+      {
+        "field": "d3_violations",
+        "kind": "choice",
+        "keys": "{CHOICE:2}"
+      },
+      {
+        "field": "d3_sr22",
+        "kind": "check",
+        "keys": ""
+      },
+      {
+        "field": "d3_excluded",
+        "kind": "check",
+        "keys": ""
+      }
+    ],
+    [
+      {
+        "field": "hist_at_fault",
+        "kind": "choice",
+        "keys": ""
+      },
+      {
+        "field": "hist_not_at_fault",
+        "kind": "choice",
+        "keys": ""
+      },
+      {
+        "field": "hist_accidents_3yr",
+        "kind": "choice",
+        "keys": ""
+      },
+      {
+        "field": "hist_violations_3yr",
+        "kind": "choice",
+        "keys": ""
+      },
+      {
+        "field": "hist_comp_claims",
+        "kind": "choice",
+        "keys": "{CHOICE:2}"
+      },
+      {
+        "field": "hist_claims_3yr",
+        "kind": "choice",
+        "keys": "{CHOICE:2}"
+      },
+      {
+        "field": "section_special_flags",
+        "kind": "stop",
+        "keys": ""
+      },
+      {
+        "field": "hist_dui",
+        "kind": "check",
+        "keys": ""
+      },
+      {
+        "field": "hist_sr22",
+        "kind": "check",
+        "keys": ""
+      },
+      {
+        "field": "hist_license_susp",
+        "kind": "check",
+        "keys": ""
+      }
+    ],
+    [
+      {
+        "field": "claim_number",
+        "kind": "text",
+        "keys": "CLM-2024-88341"
+      },
+      {
+        "field": "claim_date",
+        "kind": "text",
+        "keys": "08/03/2024"
+      },
+      {
+        "field": "claim_type",
+        "kind": "choice",
+        "keys": "{CHOICE:2}"
+      },
+      {
+        "field": "claim_status",
+        "kind": "choice",
+        "keys": "{CHOICE:2}"
+      },
+      {
+        "field": "claim_amount",
+        "kind": "text",
+        "keys": "1240.00"
+      },
+      {
+        "field": "claim_deductible",
+        "kind": "text",
+        "keys": "250.00"
+      },
+      {
+        "field": "claim_adjuster",
+        "kind": "text",
+        "keys": "Renee Harmon"
+      },
+      {
+        "field": "claim_settlement",
+        "kind": "text",
+        "keys": "990.00"
+      },
+      {
+        "field": "claim_resolve_date",
+        "kind": "text",
+        "keys": "08/19/2024"
+      },
+      {
+        "field": "section_claim_description",
+        "kind": "stop",
+        "keys": ""
+      },
+      {
+        "field": "claim_desc",
+        "kind": "text",
+        "keys": "Windshield cracked by falling tree branch during"
+      },
+      {
+        "field": "section_circumstances",
+        "kind": "stop",
+        "keys": ""
+      },
+      {
+        "field": "claim_police_rpt",
+        "kind": "check",
+        "keys": ""
+      },
+      {
+        "field": "claim_at_fault",
+        "kind": "check",
+        "keys": ""
+      },
+      {
+        "field": "claim_injury",
+        "kind": "check",
+        "keys": ""
+      },
+      {
+        "field": "claim_third_party",
+        "kind": "check",
+        "keys": ""
+      },
+      {
+        "field": "section_third_party_information",
+        "kind": "stop",
+        "keys": ""
+      },
+      {
+        "field": "claim_report_no",
+        "kind": "text",
+        "keys": ""
+      },
+      {
+        "field": "claim_tp_name",
+        "kind": "text",
+        "keys": ""
+      },
+      {
+        "field": "claim_tp_policy",
+        "kind": "text",
+        "keys": ""
+      }
+    ],
+    [
+      {
+        "field": "pay_amount",
+        "kind": "text",
+        "keys": "187.42"
+      },
+      {
+        "field": "pay_down_payment",
+        "kind": "text",
+        "keys": "374.84  (first 2 months collected upfront)"
+      },
+      {
+        "field": "pay_balance_due",
+        "kind": "text",
+        "keys": ""
+      },
+      {
+        "field": "pay_due_date",
+        "kind": "text",
+        "keys": "04/01/2026"
+      },
+      {
+        "field": "pay_frequency",
+        "kind": "choice",
+        "keys": ""
+      },
+      {
+        "field": "pay_last_paid_date",
+        "kind": "text",
+        "keys": ""
+      },
+      {
+        "field": "pay_last_paid_amt",
+        "kind": "text",
+        "keys": ""
+      },
+      {
+        "field": "pay_auto_pay",
+        "kind": "check",
+        "keys": ""
+      },
+      {
+        "field": "section_payment_method",
+        "kind": "stop",
+        "keys": ""
+      },
+      {
+        "field": "pay_method",
+        "kind": "choice",
+        "keys": ""
+      },
+      {
+        "field": "section_credit_/_debit_card",
+        "kind": "stop",
+        "keys": ""
+      },
+      {
+        "field": "pay_cc_name",
+        "kind": "text",
+        "keys": "James A. Delgado"
+      },
+      {
+        "field": "pay_cc_number",
+        "kind": "text",
+        "keys": "4532 8812 0044 7761"
+      },
+      {
+        "field": "pay_cc_exp",
+        "kind": "text",
+        "keys": "09/28"
+      },
+      {
+        "field": "pay_cc_cvv",
+        "kind": "text",
+        "keys": "341"
+      },
+      {
+        "field": "section_bank_account_(ach)",
+        "kind": "stop",
+        "keys": ""
+      },
+      {
+        "field": "pay_bank_name",
+        "kind": "text",
+        "keys": ""
+      },
+      {
+        "field": "pay_routing",
+        "kind": "text",
+        "keys": ""
+      },
+      {
+        "field": "pay_account",
+        "kind": "text",
+        "keys": ""
+      },
+      {
+        "field": "pay_account_type",
+        "kind": "choice",
+        "keys": "{HOME}"
+      },
+      {
+        "field": "section_billing_address",
+        "kind": "stop",
+        "keys": ""
+      },
+      {
+        "field": "pay_billing_addr1",
+        "kind": "text",
+        "keys": "4418 Creekstone Drive"
+      },
+      {
+        "field": "pay_billing_city",
+        "kind": "text",
+        "keys": "Riverside"
+      },
+      {
+        "field": "pay_billing_state",
+        "kind": "choice",
+        "keys": ""
+      },
+      {
+        "field": "pay_billing_zip",
+        "kind": "text",
+        "keys": "92506"
+      }
+    ]
+  ],
+  "seconds": 5.5,
+  "window_rect": [
+    40,
+    40,
+    1080,
+    860
+  ],
+  "n_commands": 218
+}
